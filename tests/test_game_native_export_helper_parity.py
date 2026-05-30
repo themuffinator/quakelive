@@ -76,6 +76,29 @@ def test_qagame_native_export_table_matches_recovered_slot_order() -> None:
 	assert "VM_NormalizeQbooleanResult" in vm_block
 
 
+def test_native_loader_api_version_wiring_matches_retail_dllentry_contracts() -> None:
+	sv_game = _read("src/code/server/sv_game.c")
+	cl_cgame = _read("src/code/client/cl_cgame.c")
+	game_public = _read("src/code/game/g_public.h")
+	cgame_public = _read("src/code/cgame/cg_public.h")
+	qagame_mapping = _read("docs/reverse-engineering/qagame-mapping.md")
+	cgame_mapping = _read("docs/reverse-engineering/cgame-mapping.md")
+	qvm_fallback_note = _read("docs/reverse-engineering/qcommon-vm-fallback-ownership-2026-04-10.md")
+
+	assert "#define\tGAME_API_VERSION\t8" in game_public
+	assert "#define\tGAME_NATIVE_API_VERSION\t10" in game_public
+	assert "#define\tCGAME_IMPORT_API_VERSION\t4" in cgame_public
+	assert "#define\tCGAME_NATIVE_API_VERSION\t8" in cgame_public
+	assert 'VM_Create( "qagame", SV_GameSystemCalls, VMI_NATIVE, ql_game_imports, GAME_NATIVE_API_VERSION );' in sv_game
+	assert 'return VM_Create( "qagame", SV_GameSystemCalls, interpret, ql_game_imports, GAME_API_VERSION );' in sv_game
+	assert 'VM_Create( "cgame", CL_CgameSystemCalls, VMI_NATIVE, ql_cgame_imports, CGAME_NATIVE_API_VERSION );' in cl_cgame
+	assert 'return VM_Create( "cgame", CL_CgameSystemCalls, interpret, ql_cgame_imports, CGAME_IMPORT_API_VERSION );' in cl_cgame
+	assert "writes API version `10`" in qagame_mapping
+	assert "writing native API version `8`" in cgame_mapping
+	assert "Windows defaults to native modules" in qvm_fallback_note
+	assert "fallback then opens `vm/<name>.qvm`" in qvm_fallback_note
+
+
 def test_voice_suppression_helper_matches_retail_export_policy() -> None:
 	local_h = _read("src/code/game/g_local.h")
 	team_c = _read("src/code/game/g_team.c")

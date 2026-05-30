@@ -110,6 +110,36 @@ Parity impact:
   remains unchanged because the catalog key strings and fallback behavior are
   identical.
 
+### 2026-05-29 addendum: arena file loader and gametype-token parity
+
+Retail/profile evidence:
+
+- The host and UI arena-file loaders both allocate `0x4000` bytes for a single
+  arena text file, load `scripts/arenas.txt`, enumerate `scripts/*.arena`, and
+  then print the parsed arena count.
+- The UI map cache is capped at `0x100` rows and formats arena preview shaders
+  as `levelshots/preview/%s`.
+- Retail gametype support is derived with substring checks over the short arena
+  tokens: `ffa`, `duel`/`tourney`, `race`, `tdm`, `ca`, `ctf`, `oneflag`,
+  `overload`, `hh`/`har`, `ft`, `dom`, `ad`, and `rr`.
+
+Source closure:
+
+- Raised the shared arena file buffer to `0x4000` and the UI/browser map-list
+  cap to 256 entries.
+- Routed UI and client web-host map-list gametype masks through the retail
+  short-token table and removed the non-retail long-alias fallback path for
+  unknown nonempty `type` strings.
+- Updated host factory and map-pool validation to use the same retail tokens,
+  including `overload` for Obelisk and `hh`/`har` for Harvester.
+
+Parity impact:
+
+- Arena-file loading, preview-path seeding, and host/UI/web gametype-token
+  wiring moved from **92% to 99%** for this slice. The remaining 1% is reserved
+  for a future runtime launch/screenshot pass if rendered UI behavior needs to
+  be revalidated; no launch was required for this static reconstruction.
+
 ### 2026-05-24 addendum: cgame serverinfo key contract
 
 Retail/profile evidence:

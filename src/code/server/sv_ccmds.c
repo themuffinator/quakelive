@@ -28,7 +28,6 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #define SV_FACTORY_FILE_LIST_BUFFER       4096
 #define SV_FACTORY_MAX_TAGS               8
 
-#define SV_MAX_MAP_GAMETYPE_ALIASES       3
 #define SV_MAP_POOL_FILE_BYTES            0x8000
 #define SV_MAX_MAP_POOL_ENTRIES           1024
 
@@ -652,11 +651,11 @@ static qboolean SV_FactoryParseTags( svFactoryParseState_t *state, char *tags[],
 															{ "ca", GT_CLAN_ARENA },
 															{ "ctf", GT_CTF },
 															{ "oneflag", GT_1FCTF },
+															{ "overload", GT_OBELISK },
 															{ "dom", GT_DOMINATION },
 		{ "ad", GT_ATTACK_DEFEND },
 		{ "ft", GT_FREEZE },
 		{ "har", GT_HARVESTER },
-		{ "obelisk", GT_OBELISK },
 		{ "rr", GT_RED_ROVER }
 	};
 														int i;
@@ -1497,7 +1496,7 @@ static void SV_LoadArenasFromFile( const char *filename ) {
 	char buffer[MAX_ARENAS_TEXT];
 
 	length = FS_FOpenFileRead( filename, &file, qfalse );
-	if ( length <= 0 ) {
+	if ( !file ) {
 		Com_Printf( "^1file not found: %s\n", filename );
 		return;
 	}
@@ -1522,7 +1521,7 @@ Initialises the cached arena metadata used for retail map validation.
 =============
 */
 static void SV_LoadArenas( void ) {
-	char fileList[MAX_ARENAS_TEXT];
+	char fileList[1024];
 	char *cursor;
 	int count;
 	int index;
@@ -1591,74 +1590,73 @@ SV_GetArenaInfoByMap
 
 													/*
 													=============
-													SV_MapTypesContainToken
+SV_ArenaTypeContains
 
-													Returns qtrue when the arena type list includes the supplied token.
+													Returns qtrue when the arena type list contains the supplied retail token.
 													=============
 													*/
-													static qboolean SV_MapTypesContainToken( const char *typeList, const char *token ) {
-														const char *scan;
-														size_t tokenLength;
-
+													static qboolean SV_ArenaTypeContains( const char *typeList, const char *token ) {
 														if ( !typeList || !*typeList || !token || !*token ) {
 															return qfalse;
 														}
 
-														tokenLength = strlen( token );
-														scan = typeList;
-														while ( *scan ) {
-															const char *start;
-															size_t length;
-
-															while ( *scan && *scan <= ' ' ) {
-																scan++;
-															}
-															if ( !*scan ) {
-																break;
-															}
-
-															start = scan;
-															while ( *scan && *scan > ' ' ) {
-																scan++;
-															}
-															length = scan - start;
-
-															if ( length == tokenLength && !Q_strnicmp( start, token, tokenLength ) ) {
-																return qtrue;
-															}
-														}
-
-														return qfalse;
+														return strstr( typeList, token ) != NULL;
 													}
 
 													/*
 													=============
-													SV_MapSupportsGametype
+													SV_ArenaTypeSupportsGametype
 
 													Determines whether the supplied map exposes entities for the requested gametype.
 													=============
 													*/
+static qboolean SV_ArenaTypeSupportsGametype( const char *types, gametype_t gametype ) {
+	if ( !types || !*types ) {
+		return qtrue;
+	}
+
+	switch ( gametype ) {
+	case GT_FFA:
+		return SV_ArenaTypeContains( types, "ffa" );
+	case GT_TOURNAMENT:
+		return SV_ArenaTypeContains( types, "duel" ) || SV_ArenaTypeContains( types, "tourney" );
+	case GT_SINGLE_PLAYER:
+		return SV_ArenaTypeContains( types, "race" );
+	case GT_TEAM:
+		return SV_ArenaTypeContains( types, "tdm" );
+	case GT_CLAN_ARENA:
+		return SV_ArenaTypeContains( types, "ca" );
+	case GT_CTF:
+		return SV_ArenaTypeContains( types, "ctf" );
+	case GT_1FCTF:
+		return SV_ArenaTypeContains( types, "oneflag" );
+	case GT_OBELISK:
+		return SV_ArenaTypeContains( types, "overload" );
+	case GT_HARVESTER:
+		return SV_ArenaTypeContains( types, "hh" ) || SV_ArenaTypeContains( types, "har" );
+	case GT_FREEZE:
+		return SV_ArenaTypeContains( types, "ft" );
+	case GT_DOMINATION:
+		return SV_ArenaTypeContains( types, "dom" );
+	case GT_ATTACK_DEFEND:
+		return SV_ArenaTypeContains( types, "ad" );
+	case GT_RED_ROVER:
+		return SV_ArenaTypeContains( types, "rr" );
+	default:
+		return qtrue;
+	}
+}
+
+/*
+=============
+SV_MapSupportsGametype
+
+Determines whether the supplied map exposes entities for the requested gametype.
+=============
+*/
 static qboolean SV_MapSupportsGametype( const char *mapName, gametype_t gametype ) {
-	static const char *const s_gametypeTokens[GT_MAX_GAME_TYPE][SV_MAX_MAP_GAMETYPE_ALIASES] = {
-															[GT_FFA] = { "ffa", NULL, NULL },
-															[GT_TOURNAMENT] = { "duel", "tourney", NULL },
-															[GT_SINGLE_PLAYER] = { "single", NULL, NULL },
-															[GT_TEAM] = { "tdm", "team", NULL },
-															[GT_CLAN_ARENA] = { "ca", "clanarena", NULL },
-															[GT_CTF] = { "ctf", NULL, NULL },
-															[GT_1FCTF] = { "oneflag", "1fctf", NULL },
-															[GT_OBELISK] = { "overload", "obelisk", NULL },
-															[GT_HARVESTER] = { "har", "harvester", NULL },
-															[GT_FREEZE] = { "ft", "freeze", NULL },
-															[GT_DOMINATION] = { "dom", "domination", NULL },
-															[GT_ATTACK_DEFEND] = { "ad", "attackdefend", NULL },
-															[GT_RED_ROVER] = { "rr", "redrover", NULL },
-															[GT_RACE] = { "race", NULL, NULL }
-														};
 														const char *info;
 														const char *types;
-														const char *const*aliases;
-														int aliasIndex;
 
 														if ( !mapName || !*mapName || mapName[0] == '_' ) {
 															return qtrue;
@@ -1674,20 +1672,7 @@ static qboolean SV_MapSupportsGametype( const char *mapName, gametype_t gametype
 														}
 
 	types = Info_ValueForKey( info, ARENA_INFO_KEY_TYPE );
-														if ( !types || !*types ) {
-															return qtrue;
-														}
-
-														aliases = s_gametypeTokens[gametype];
-														for ( aliasIndex = 0; aliasIndex < SV_MAX_MAP_GAMETYPE_ALIASES; aliasIndex++ ) {
-															const char *token = aliases[aliasIndex];
-
-															if ( token && SV_MapTypesContainToken( types, token ) ) {
-																return qtrue;
-															}
-														}
-
-	return qfalse;
+	return SV_ArenaTypeSupportsGametype( types, gametype );
 }
 
 /*
@@ -1879,7 +1864,7 @@ static qboolean SV_MapPoolLoadFromFile( const char *path ) {
 	}
 
 	length = FS_FOpenFileRead( path, &file, qfalse );
-	if ( length <= 0 ) {
+	if ( !file ) {
 		Com_Printf( "^1rotation file not found: %s\n^7", path );
 		return qfalse;
 	}

@@ -1967,6 +1967,25 @@ static void G_RecordSpectatorItemPickup( gentity_t *itemEnt, gentity_t *player, 
 
 /*
 ===============
+G_SyncWeaponRespawnCvarForItem
+
+Keeps the retail weapon-stay CVar mirror current before shared grab and pickup
+code read it.
+===============
+*/
+static void G_SyncWeaponRespawnCvarForItem( const gitem_t *item ) {
+	if ( !item || item->giType != IT_WEAPON ) {
+		return;
+	}
+
+	// Cvar_Update may otherwise skip a stale mirror with a matching mod count.
+	g_weaponRespawn.modificationCount = -1;
+	trap_Cvar_Update( &g_weaponRespawn );
+}
+
+
+/*
+===============
 Touch_Item
 ===============
 */
@@ -1987,6 +2006,8 @@ void Touch_Item (gentity_t *ent, gentity_t *other, trace_t *trace) {
 		other->client->ps.persistant[PERS_PLAYEREVENTS] ^= PLAYEREVENT_DENIEDREWARD;
 		return;
 	}
+
+	G_SyncWeaponRespawnCvarForItem( ent->item );
 
 	// the same pickup rules are used for client side and server side
 	if ( !BG_CanItemBeGrabbed( g_gametype.integer, level.time, &ent->s, &other->client->ps ) ) {

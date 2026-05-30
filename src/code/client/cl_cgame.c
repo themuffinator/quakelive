@@ -150,8 +150,18 @@ static int QLWebHost_CountRecoveredWebCvarMappings( void ) {
 #define CL_WEB_SURFACE_SHADER "browserShader"
 #define CL_WEB_BOOTSTRAP_MAX_ATTEMPTS 10
 #define CL_WEB_BOOTSTRAP_SLEEP_MSEC 100
+#define CL_WEB_NATIVE_REQUESTS_PER_FRAME 1
+#define CL_WEB_NATIVE_REQUEST_STARTUP_DELAY_FRAMES 120
+#define CL_WEB_NATIVE_REQUEST_IDLE_POLL_FRAMES 15
+#define CL_WEB_NATIVE_REQUEST_LOADING_POLL_FRAMES 30
+#define CL_WEB_NATIVE_REQUEST_BUSY_POLL_FRAMES 1
+#define CL_WEB_NATIVE_CONFIG_SYNC_FRAMES 300
+#define CL_WEB_NATIVE_CONFIG_BUFFER_SIZE 131072
 
 static qboolean CL_OverlayServiceAvailable( void );
+static void CL_WebHost_BuildConfigJson( char *buffer, size_t bufferSize );
+static void CL_WebHost_PumpNativeJavascriptRequests( void );
+static void CL_WebHost_SyncConfigSnapshot( void );
 
 typedef enum {
 	CL_WEB_METHOD_IS_PAK_FILE_PRESENT = 0,
@@ -245,10 +255,15 @@ typedef struct {
 	int			cursorX;
 	int			cursorY;
 	int			frameSequence;
+	int			nextConfigSyncFrame;
+	int			nextNativeRequestPollFrame;
 	int			zoomPercent;
 	int			bootstrapAttemptCount;
 	int			cvarMappingCount;
 	int			listenerCallbackMappingCount;
+	int			loadedDocumentScriptCount;
+	int			executedDocumentScriptCount;
+	int			failedDocumentScriptCount;
 	int			surfaceUploadWidth;
 	int			surfaceUploadHeight;
 	uint32_t	appId;
@@ -271,6 +286,7 @@ typedef struct {
 	int			activeCursorType;
 	qboolean	cursorOverrideActive;
 #endif
+	qboolean	configSynced;
 } clWebHostState_t;
 
 typedef struct {
@@ -280,7 +296,7 @@ typedef struct {
 } clWebJsonBuilder_t;
 
 #define CL_WEB_ARENA_FILE_LIST_BUFFER 4096
-#define CL_WEB_MAX_MAPS 128
+#define CL_WEB_MAX_MAPS 256
 #define CL_WEB_MAX_FACTORY_DEFINITIONS 256
 #define CL_WEB_FACTORY_JSON_STRING 8192
 
@@ -968,8 +984,14 @@ static void CL_WebHost_ResetRuntime( qboolean clearVisibility ) {
 	cl_webHost.cursorX = 0;
 	cl_webHost.cursorY = 0;
 	cl_webHost.frameSequence = 0;
+	cl_webHost.nextConfigSyncFrame = 0;
+	cl_webHost.nextNativeRequestPollFrame = 0;
 	cl_webHost.bootstrapAttemptCount = 0;
+	cl_webHost.configSynced = qfalse;
 	cl_webHost.cvarMappingCount = QLWebHost_CountRecoveredWebCvarMappings();
+	cl_webHost.loadedDocumentScriptCount = 0;
+	cl_webHost.executedDocumentScriptCount = 0;
+	cl_webHost.failedDocumentScriptCount = 0;
 	cl_webHost.surfaceUploadWidth = 0;
 	cl_webHost.surfaceUploadHeight = 0;
 	cl_webHost.surfaceShader = 0;
@@ -1304,6 +1326,34 @@ static void QLLoadHandler_OnFinishLoadingFrame( void ) {
 
 /*
 =============
+QLLoadHandler_ExecuteDocumentScript
+
+Executes one recovered launcher script in the live Awesomium view. Retail calls
+WebView::ExecuteJavascript for each `js/*.js` entry before `web.object.ready`.
+=============
+*/
+static void QLLoadHandler_ExecuteDocumentScript( const char *scriptPath, char *scriptBuffer, int scriptLength ) {
+#if defined( _WIN32 ) && QL_PLATFORM_HAS_ONLINE_SERVICES
+	if ( !cl_webHost.liveAwesomium || !scriptBuffer || scriptLength <= 0 ) {
+		return;
+	}
+
+	scriptBuffer[scriptLength] = '\0';
+	if ( CL_Awesomium_ExecuteJavascript( scriptBuffer, "" ) ) {
+		cl_webHost.executedDocumentScriptCount++;
+	} else {
+		cl_webHost.failedDocumentScriptCount++;
+		Com_DPrintf( "Awesomium failed to execute document script %s: %s\n", scriptPath ? scriptPath : "", CL_Awesomium_LastError() );
+	}
+#else
+	(void)scriptPath;
+	(void)scriptBuffer;
+	(void)scriptLength;
+#endif
+}
+
+/*
+=============
 CL_WebHost_PrimeLauncherDocument
 =============
 */
@@ -1353,14 +1403,16 @@ static void QLLoadHandler_LoadDocumentScripts( void ) {
 	cursor = fileList;
 
 	for ( i = 0; i < count && *cursor; i++ ) {
-		void	*scriptBuffer;
+		char	*scriptBuffer;
 		int	scriptLength;
 
 		scriptBuffer = NULL;
 		scriptLength = 0;
 
 		Com_sprintf( scriptPath, sizeof( scriptPath ), "js/%s", cursor );
-		if ( CL_LauncherRequestData( scriptPath, &scriptBuffer, &scriptLength ) && scriptBuffer ) {
+		if ( CL_LauncherRequestData( scriptPath, (void **)&scriptBuffer, &scriptLength ) && scriptBuffer ) {
+			cl_webHost.loadedDocumentScriptCount++;
+			QLLoadHandler_ExecuteDocumentScript( scriptPath, scriptBuffer, scriptLength );
 			Z_Free( scriptBuffer );
 		}
 
@@ -1380,6 +1432,28 @@ static void QLLoadHandler_OnDocumentReady( void ) {
 	cl_webHost.surfaceDirty = qtrue;
 	QLViewHandler_OnChangeCursor( 0 );
 	CL_WebView_PublishEvent( "web.object.ready", NULL );
+}
+
+/*
+=============
+QLLoadHandler_PollLiveDocumentReady
+
+Projects the retail load-handler completion callback onto the source adapter's
+frame pump while the native listener object remains mapped rather than rebuilt.
+=============
+*/
+static void QLLoadHandler_PollLiveDocumentReady( void ) {
+#if defined( _WIN32 ) && QL_PLATFORM_HAS_ONLINE_SERVICES
+	if ( !cl_webHost.liveAwesomium || !cl_webHost.loadingDocument || cl_webHost.documentReady ) {
+		return;
+	}
+	if ( CL_Awesomium_IsLoading() ) {
+		return;
+	}
+
+	QLLoadHandler_OnFinishLoadingFrame();
+	QLLoadHandler_OnDocumentReady();
+#endif
 }
 
 /*
@@ -2194,12 +2268,21 @@ static qboolean QLWebHost_EnsureRuntime( void ) {
 		if ( awesomiumAllowed ) {
 			char homePath[MAX_OSPATH];
 			char basePath[MAX_OSPATH];
+			char *initialConfigJson;
 
 			Cvar_VariableStringBuffer( "fs_homepath", homePath, sizeof( homePath ) );
 			Cvar_VariableStringBuffer( "fs_basepath", basePath, sizeof( basePath ) );
 			CL_WebHost_RefreshBootstrapProperties();
+			initialConfigJson = (char *)Z_Malloc( CL_WEB_NATIVE_CONFIG_BUFFER_SIZE );
+			if ( initialConfigJson ) {
+				initialConfigJson[0] = '\0';
+				CL_WebHost_BuildConfigJson( initialConfigJson, CL_WEB_NATIVE_CONFIG_BUFFER_SIZE );
+			}
 			cl_webHost.bootstrapAttemptCount++;
-			if ( CL_Awesomium_Startup( homePath, basePath, cl_webHost.playerName, cl_webHost.appId, cl_webHost.steamIdLow, cl_webHost.steamIdHigh, cls.glconfig.vidWidth, cls.glconfig.vidHeight ) ) {
+			if ( CL_Awesomium_Startup( homePath, basePath, cl_webHost.playerName, cl_webHost.appId, cl_webHost.steamIdLow, cl_webHost.steamIdHigh, cls.glconfig.vidWidth, cls.glconfig.vidHeight, initialConfigJson ) ) {
+				if ( initialConfigJson ) {
+					Z_Free( initialConfigJson );
+				}
 				cl_webHost.liveAwesomium = qtrue;
 				cl_webHost.coreInitialised = qtrue;
 				cl_webHost.sessionInitialised = qtrue;
@@ -2214,11 +2297,17 @@ static qboolean QLWebHost_EnsureRuntime( void ) {
 				cl_webHost.loadHandlerInstalled = qfalse;
 				cl_webHost.windowObjectBound = qtrue;
 				cl_webHost.qzInstanceBound = qtrue;
+				cl_webHost.configSynced = qtrue;
+				cl_webHost.nextConfigSyncFrame = cl_webHost.frameSequence + CL_WEB_NATIVE_CONFIG_SYNC_FRAMES;
+				cl_webHost.nextNativeRequestPollFrame = cl_webHost.frameSequence + CL_WEB_NATIVE_REQUEST_STARTUP_DELAY_FRAMES;
 				QLWebView_Resize( cls.glconfig.vidWidth, cls.glconfig.vidHeight );
 				QLWebView_RebuildSurfaceImage();
 				Com_Printf( "Awesomium WebCore live view initialised from %s\n", homePath );
 				CL_RefreshOnlineServicesBridgeState();
 				return qtrue;
+			}
+			if ( initialConfigJson ) {
+				Z_Free( initialConfigJson );
 			}
 			Com_Printf( "Awesomium WebCore initialisation failed: %s\n", CL_Awesomium_LastError() );
 			cl_webHost.loadFailed = qtrue;
@@ -2262,6 +2351,8 @@ static qboolean QLWebHost_OpenURL( const char *url ) {
 	cl_webHost.browserActive = qfalse;
 	cl_webHost.refreshStopped = qfalse;
 	cl_webHost.focused = qtrue;
+	cl_webHost.configSynced = qfalse;
+	cl_webHost.nextConfigSyncFrame = 0;
 	Cvar_Set( "web_browserActive", "1" );
 
 #if defined( _WIN32 ) && QL_PLATFORM_HAS_ONLINE_SERVICES
@@ -2276,8 +2367,6 @@ static qboolean QLWebHost_OpenURL( const char *url ) {
 		CL_Awesomium_SetZoom( cl_webHost.zoomPercent );
 		CL_WebZoomClearModified();
 		QLLoadHandler_OnBeginLoadingFrame();
-		QLLoadHandler_OnFinishLoadingFrame();
-		QLLoadHandler_OnDocumentReady();
 		QLWebView_RebuildSurfaceImage();
 		cl_webHost.browserActive = qtrue;
 		return qtrue;
@@ -2362,10 +2451,13 @@ static void QLWebHost_ReloadView( qboolean ignoreCache ) {
 
 #if defined( _WIN32 ) && QL_PLATFORM_HAS_ONLINE_SERVICES
 	if ( cl_webHost.liveAwesomium ) {
+		QLLoadHandler_OnBeginLoadingFrame();
 		CL_Awesomium_Reload( ignoreCache );
 		cl_webHost.zoomPercent = CL_WebZoomIntegerValue();
 		CL_Awesomium_SetZoom( cl_webHost.zoomPercent );
 		CL_WebZoomClearModified();
+		cl_webHost.configSynced = qfalse;
+		cl_webHost.nextConfigSyncFrame = 0;
 		cl_webHost.surfaceDirty = qtrue;
 		return;
 	}
@@ -2503,6 +2595,9 @@ static void QLWebCore_Update( void ) {
 		CL_WebZoomClearModified();
 
 		CL_Awesomium_Update();
+		QLLoadHandler_PollLiveDocumentReady();
+		CL_WebHost_PumpNativeJavascriptRequests();
+		CL_WebHost_SyncConfigSnapshot();
 		if ( CL_Awesomium_SurfaceDirty() ) {
 			cl_webHost.surfaceDirty = qtrue;
 		}
@@ -2626,34 +2721,15 @@ static qboolean CL_WebHost_StringListContains( char seen[][MAX_QPATH], int count
 
 /*
 =============
-CL_WebHost_TypeStringHasToken
+CL_WebHost_TypeStringContains
 =============
 */
-static qboolean CL_WebHost_TypeStringHasToken( const char *typeList, const char *token ) {
-	char working[1024];
-	char *cursor;
-	char *parsedToken;
-
+static qboolean CL_WebHost_TypeStringContains( const char *typeList, const char *token ) {
 	if ( !typeList || !typeList[0] || !token || !token[0] ) {
 		return qfalse;
 	}
 
-	Q_strncpyz( working, typeList, sizeof( working ) );
-	Q_strlwr( working );
-
-	cursor = working;
-	while ( 1 ) {
-		parsedToken = COM_ParseExt( &cursor, qfalse );
-		if ( !parsedToken[0] ) {
-			break;
-		}
-
-		if ( !Q_stricmp( parsedToken, token ) ) {
-			return qtrue;
-		}
-	}
-
-	return qfalse;
+	return strstr( typeList, token ) != NULL;
 }
 
 /*
@@ -2668,47 +2744,47 @@ static unsigned int CL_WebHost_ResolveMapTypeBits( const char *typeList ) {
 		return 1u << GT_FFA;
 	}
 
-	if ( CL_WebHost_TypeStringHasToken( typeList, "ffa" ) ) {
+	if ( CL_WebHost_TypeStringContains( typeList, "ffa" ) ) {
 		typeBits |= 1u << GT_FFA;
 	}
-	if ( CL_WebHost_TypeStringHasToken( typeList, "duel" ) || CL_WebHost_TypeStringHasToken( typeList, "tourney" ) ) {
+	if ( CL_WebHost_TypeStringContains( typeList, "duel" ) || CL_WebHost_TypeStringContains( typeList, "tourney" ) ) {
 		typeBits |= 1u << GT_TOURNAMENT;
 	}
-	if ( CL_WebHost_TypeStringHasToken( typeList, "single" ) || CL_WebHost_TypeStringHasToken( typeList, "race" ) ) {
+	if ( CL_WebHost_TypeStringContains( typeList, "race" ) ) {
 		typeBits |= 1u << GT_SINGLE_PLAYER;
 	}
-	if ( CL_WebHost_TypeStringHasToken( typeList, "team" ) || CL_WebHost_TypeStringHasToken( typeList, "tdm" ) ) {
+	if ( CL_WebHost_TypeStringContains( typeList, "tdm" ) ) {
 		typeBits |= 1u << GT_TEAM;
 	}
-	if ( CL_WebHost_TypeStringHasToken( typeList, "clanarena" ) || CL_WebHost_TypeStringHasToken( typeList, "ca" ) ) {
+	if ( CL_WebHost_TypeStringContains( typeList, "ca" ) ) {
 		typeBits |= 1u << GT_CLAN_ARENA;
 	}
-	if ( CL_WebHost_TypeStringHasToken( typeList, "ctf" ) ) {
+	if ( CL_WebHost_TypeStringContains( typeList, "ctf" ) ) {
 		typeBits |= 1u << GT_CTF;
 	}
-	if ( CL_WebHost_TypeStringHasToken( typeList, "oneflag" ) || CL_WebHost_TypeStringHasToken( typeList, "1fctf" ) ) {
+	if ( CL_WebHost_TypeStringContains( typeList, "oneflag" ) ) {
 		typeBits |= 1u << GT_1FCTF;
 	}
-	if ( CL_WebHost_TypeStringHasToken( typeList, "overload" ) || CL_WebHost_TypeStringHasToken( typeList, "obelisk" ) || CL_WebHost_TypeStringHasToken( typeList, "ovl" ) ) {
+	if ( CL_WebHost_TypeStringContains( typeList, "overload" ) ) {
 		typeBits |= 1u << GT_OBELISK;
 	}
-	if ( CL_WebHost_TypeStringHasToken( typeList, "harvester" ) || CL_WebHost_TypeStringHasToken( typeList, "har" ) ) {
+	if ( CL_WebHost_TypeStringContains( typeList, "hh" ) || CL_WebHost_TypeStringContains( typeList, "har" ) ) {
 		typeBits |= 1u << GT_HARVESTER;
 	}
-	if ( CL_WebHost_TypeStringHasToken( typeList, "freeze" ) || CL_WebHost_TypeStringHasToken( typeList, "freezetag" ) || CL_WebHost_TypeStringHasToken( typeList, "ft" ) ) {
+	if ( CL_WebHost_TypeStringContains( typeList, "ft" ) ) {
 		typeBits |= 1u << GT_FREEZE;
 	}
-	if ( CL_WebHost_TypeStringHasToken( typeList, "domination" ) || CL_WebHost_TypeStringHasToken( typeList, "dom" ) ) {
+	if ( CL_WebHost_TypeStringContains( typeList, "dom" ) ) {
 		typeBits |= 1u << GT_DOMINATION;
 	}
-	if ( CL_WebHost_TypeStringHasToken( typeList, "attackdefend" ) || CL_WebHost_TypeStringHasToken( typeList, "ad" ) ) {
+	if ( CL_WebHost_TypeStringContains( typeList, "ad" ) ) {
 		typeBits |= 1u << GT_ATTACK_DEFEND;
 	}
-	if ( CL_WebHost_TypeStringHasToken( typeList, "redrover" ) || CL_WebHost_TypeStringHasToken( typeList, "rr" ) ) {
+	if ( CL_WebHost_TypeStringContains( typeList, "rr" ) ) {
 		typeBits |= 1u << GT_RED_ROVER;
 	}
 
-	return typeBits ? typeBits : ( 1u << GT_FFA );
+	return typeBits;
 }
 
 /*
@@ -2828,6 +2904,10 @@ static void CL_WebHost_AppendArenasFromFile( const char *filename, char *buffer,
 	fileBuffer = NULL;
 	length = FS_ReadFile( filename, &fileBuffer );
 	if ( length <= 0 || !fileBuffer ) {
+		return;
+	}
+	if ( length >= MAX_ARENAS_TEXT ) {
+		FS_FreeFile( fileBuffer );
 		return;
 	}
 
@@ -3786,13 +3866,11 @@ static void CL_WebHost_ConfigCvarCallback( const cvar_t *var, void *userData ) {
 		Q_strncpyz( value, var->string, sizeof( value ) );
 	}
 
-	Q_strcat( context->buffer, context->bufferSize, "{\"name\":\"" );
+	Q_strcat( context->buffer, context->bufferSize, "\"" );
 	CL_WebHost_AppendJsonEscaped( context->buffer, context->bufferSize, var->name );
-	Q_strcat( context->buffer, context->bufferSize, "\",\"value\":\"" );
+	Q_strcat( context->buffer, context->bufferSize, "\":\"" );
 	CL_WebHost_AppendJsonEscaped( context->buffer, context->bufferSize, value );
-	Q_strcat( context->buffer, context->bufferSize, "\",\"flags\":" );
-	Q_strcat( context->buffer, context->bufferSize, va( "%d", var->flags ) );
-	Q_strcat( context->buffer, context->bufferSize, "}" );
+	Q_strcat( context->buffer, context->bufferSize, "\"" );
 }
 
 /*
@@ -3815,7 +3893,7 @@ static void CL_WebHost_ConfigBindCallback( int keynum, const char *keyName, cons
 
 	Q_strcat( context->buffer, context->bufferSize, "{\"id\":" );
 	Q_strcat( context->buffer, context->bufferSize, va( "%d", keynum ) );
-	Q_strcat( context->buffer, context->bufferSize, ",\"name\":\"" );
+	Q_strcat( context->buffer, context->bufferSize, ",\"key\":\"" );
 	CL_WebHost_AppendJsonEscaped( context->buffer, context->bufferSize, keyName ? keyName : "" );
 	Q_strcat( context->buffer, context->bufferSize, "\",\"value\":\"" );
 	CL_WebHost_AppendJsonEscaped( context->buffer, context->bufferSize, binding );
@@ -3894,11 +3972,240 @@ static void CL_WebHost_BuildConfigJson( char *buffer, size_t bufferSize ) {
 	Q_strcat( buffer, bufferSize, cl_webHost.browserActive ? "1" : "0" );
 	Q_strcat( buffer, bufferSize, ",\"url\":\"" );
 	CL_WebHost_AppendJsonEscaped( buffer, bufferSize, cl_webHost.currentUrl );
-	Q_strcat( buffer, bufferSize, "\",\"cvars\":[" );
+	Q_strcat( buffer, bufferSize, "\",\"cvars\":{" );
 	Q_strcat( buffer, bufferSize, cvarJson );
-	Q_strcat( buffer, bufferSize, "],\"binds\":[" );
+	Q_strcat( buffer, bufferSize, "},\"binds\":[" );
 	Q_strcat( buffer, bufferSize, bindJson );
 	Q_strcat( buffer, bufferSize, "]}" );
+}
+
+/*
+=============
+CL_WebHost_UpdateBrowserCvarCache
+
+Pushes one native cvar value back into the injected qz_instance cache so WebUI
+GetCvar calls observe the engine value after queued set, reset, or get requests.
+=============
+*/
+static void CL_WebHost_UpdateBrowserCvarCache( const char *name, const char *value ) {
+#if defined( _WIN32 ) && QL_PLATFORM_HAS_ONLINE_SERVICES
+	char escapedName[MAX_CVAR_VALUE_STRING * 2];
+	char escapedValue[MAX_CVAR_VALUE_STRING * 2];
+	char script[MAX_CVAR_VALUE_STRING * 4 + 128];
+
+	if ( !cl_webHost.liveAwesomium || !name || !name[0] ) {
+		return;
+	}
+
+	CL_WebHost_JsonEscape( name, escapedName, sizeof( escapedName ) );
+	CL_WebHost_JsonEscape( value ? value : "", escapedValue, sizeof( escapedValue ) );
+	Com_sprintf(
+		script,
+		sizeof( script ),
+		"(function(){if(window.__qlr_set_native_cvar){window.__qlr_set_native_cvar(\"%s\",\"%s\");}})();",
+		escapedName,
+		escapedValue
+	);
+	CL_Awesomium_ExecuteJavascript( script, "" );
+#else
+	(void)name;
+	(void)value;
+#endif
+}
+
+/*
+=============
+CL_WebHost_ProcessNativeJavascriptRequest
+
+Executes one request emitted by the injected qz_instance bridge using the same
+command-buffer and cvar APIs as the recovered retail QLJSHandler methods.
+=============
+*/
+static void CL_WebHost_ProcessNativeJavascriptRequest( const char *request ) {
+	const char *payload;
+	int kindLength;
+	char kind[16];
+	int i;
+
+	if ( !request || !request[0] ) {
+		return;
+	}
+
+	payload = strchr( request, '\n' );
+	if ( !payload ) {
+		return;
+	}
+
+	kindLength = (int)( payload - request );
+	if ( kindLength <= 0 ) {
+		return;
+	}
+	if ( kindLength >= (int)sizeof( kind ) ) {
+		kindLength = (int)sizeof( kind ) - 1;
+	}
+	for ( i = 0; i < kindLength; i++ ) {
+		kind[i] = request[i];
+	}
+	kind[kindLength] = '\0';
+	payload++;
+
+	if ( !Q_stricmp( kind, "cmd" ) ) {
+		if ( payload[0] ) {
+			Cbuf_ExecuteText( EXEC_APPEND, va( "%s\n", payload ) );
+		}
+		return;
+	}
+
+	if ( !Q_stricmp( kind, "get" ) ) {
+		char name[MAX_CVAR_VALUE_STRING];
+		char value[MAX_CVAR_VALUE_STRING];
+
+		if ( !payload[0] ) {
+			return;
+		}
+		Q_strncpyz( name, payload, sizeof( name ) );
+		Cvar_VariableStringBuffer( name, value, sizeof( value ) );
+		CL_WebHost_UpdateBrowserCvarCache( name, value );
+		return;
+	}
+
+	if ( !Q_stricmp( kind, "set" ) ) {
+		const char *valueStart;
+		int nameLength;
+		char name[MAX_CVAR_VALUE_STRING];
+		char value[MAX_CVAR_VALUE_STRING];
+
+		valueStart = strchr( payload, '\n' );
+		if ( !valueStart ) {
+			return;
+		}
+
+		nameLength = (int)( valueStart - payload );
+		if ( nameLength <= 0 ) {
+			return;
+		}
+		if ( nameLength >= (int)sizeof( name ) ) {
+			nameLength = (int)sizeof( name ) - 1;
+		}
+		for ( i = 0; i < nameLength; i++ ) {
+			name[i] = payload[i];
+		}
+		name[nameLength] = '\0';
+
+		valueStart++;
+		Q_strncpyz( value, valueStart, sizeof( value ) );
+		Cvar_Set( name, value );
+		CL_WebHost_UpdateBrowserCvarCache( name, value );
+		return;
+	}
+
+	if ( !Q_stricmp( kind, "reset" ) ) {
+		char name[MAX_CVAR_VALUE_STRING];
+		char value[MAX_CVAR_VALUE_STRING];
+
+		if ( !payload[0] ) {
+			return;
+		}
+		Q_strncpyz( name, payload, sizeof( name ) );
+		Cvar_Reset( name );
+		Cvar_VariableStringBuffer( name, value, sizeof( value ) );
+		CL_WebHost_UpdateBrowserCvarCache( name, value );
+	}
+}
+
+/*
+=============
+CL_WebHost_PumpNativeJavascriptRequests
+
+Drains a bounded number of qz_instance requests from the live Awesomium page each
+frame, matching the retail native handler ownership without blocking rendering.
+=============
+*/
+static void CL_WebHost_PumpNativeJavascriptRequests( void ) {
+#if defined( _WIN32 ) && QL_PLATFORM_HAS_ONLINE_SERVICES
+	int i;
+	qboolean handledRequest;
+
+	if ( !cl_webHost.liveAwesomium ) {
+		return;
+	}
+	if ( cl_webHost.frameSequence < cl_webHost.nextNativeRequestPollFrame ) {
+		return;
+	}
+	if ( CL_Awesomium_IsLoading() ) {
+		cl_webHost.nextNativeRequestPollFrame = cl_webHost.frameSequence + CL_WEB_NATIVE_REQUEST_LOADING_POLL_FRAMES;
+		return;
+	}
+
+	handledRequest = qfalse;
+	for ( i = 0; i < CL_WEB_NATIVE_REQUESTS_PER_FRAME; i++ ) {
+		char request[MAX_STRING_CHARS];
+
+		if ( !CL_Awesomium_PopJavascriptRequest( request, sizeof( request ) ) ) {
+			break;
+		}
+		if ( request[0] ) {
+			CL_WebHost_ProcessNativeJavascriptRequest( request );
+			handledRequest = qtrue;
+		}
+	}
+	cl_webHost.nextNativeRequestPollFrame = cl_webHost.frameSequence + ( handledRequest ? CL_WEB_NATIVE_REQUEST_BUSY_POLL_FRAMES : CL_WEB_NATIVE_REQUEST_IDLE_POLL_FRAMES );
+#endif
+}
+
+/*
+=============
+CL_WebHost_SyncConfigSnapshot
+
+Synchronizes the browser-side qz config cache from the native client cvar/bind
+state, giving WebUI GetConfig/GetCvar callers a retail-like native data source.
+=============
+*/
+static void CL_WebHost_SyncConfigSnapshot( void ) {
+#if defined( _WIN32 ) && QL_PLATFORM_HAS_ONLINE_SERVICES
+	char *configJson;
+	char *script;
+	size_t scriptSize;
+
+	if ( !cl_webHost.liveAwesomium ) {
+		return;
+	}
+	if ( cl_webHost.configSynced && cl_webHost.frameSequence < cl_webHost.nextConfigSyncFrame ) {
+		return;
+	}
+	if ( CL_Awesomium_IsLoading() ) {
+		cl_webHost.nextConfigSyncFrame = cl_webHost.frameSequence + CL_WEB_NATIVE_REQUEST_LOADING_POLL_FRAMES;
+		return;
+	}
+
+	configJson = (char *)Z_Malloc( CL_WEB_NATIVE_CONFIG_BUFFER_SIZE );
+	if ( !configJson ) {
+		return;
+	}
+	configJson[0] = '\0';
+	CL_WebHost_BuildConfigJson( configJson, CL_WEB_NATIVE_CONFIG_BUFFER_SIZE );
+
+	scriptSize = strlen( configJson ) + 160;
+	script = (char *)Z_Malloc( (int)scriptSize );
+	if ( !script ) {
+		Z_Free( configJson );
+		return;
+	}
+
+	Com_sprintf(
+		script,
+		scriptSize,
+		"(function(){if(window.__qlr_apply_native_config){window.__qlr_apply_native_config(%s);}})();",
+		configJson
+	);
+	if ( CL_Awesomium_ExecuteJavascript( script, "" ) ) {
+		cl_webHost.configSynced = qtrue;
+		cl_webHost.nextConfigSyncFrame = cl_webHost.frameSequence + CL_WEB_NATIVE_CONFIG_SYNC_FRAMES;
+	}
+
+	Z_Free( script );
+	Z_Free( configJson );
+#endif
 }
 
 /*
@@ -7373,7 +7680,7 @@ static vm_t *CL_LoadCGameVM( vmInterpret_t interpret ) {
 	CL_InitCGameImports();
 
 	if ( interpret != VMI_COMPILED ) {
-		vm = VM_Create( "cgame", CL_CgameSystemCalls, VMI_NATIVE, ql_cgame_imports, CGAME_IMPORT_API_VERSION );
+		vm = VM_Create( "cgame", CL_CgameSystemCalls, VMI_NATIVE, ql_cgame_imports, CGAME_NATIVE_API_VERSION );
 		if ( vm ) {
 			if ( vm->dllHandle || interpret != VMI_BYTECODE || !vm->compiled ) {
 				return vm;

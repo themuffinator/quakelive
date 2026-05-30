@@ -25,6 +25,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 //
 
 #include "ui_local.h"
+#include "../../game/match_state_keys.h"
 
 
 //
@@ -37,6 +38,63 @@ static char		*ui_botInfos[MAX_BOTS];
 
 static int		ui_numArenas;
 static char		*ui_arenaInfos[MAX_ARENAS];
+
+
+/*
+===============
+UI_ArenaTypeBits
+===============
+*/
+static int UI_ArenaTypeBits( const char *type ) {
+	int typeBits;
+
+	if ( !type || !*type ) {
+		return ( 1 << GT_FFA );
+	}
+
+	typeBits = 0;
+	if ( strstr( type, "ffa" ) ) {
+		typeBits |= ( 1 << GT_FFA );
+	}
+	if ( strstr( type, "duel" ) || strstr( type, "tourney" ) ) {
+		typeBits |= ( 1 << GT_TOURNAMENT );
+	}
+	if ( strstr( type, "race" ) ) {
+		typeBits |= ( 1 << GT_SINGLE_PLAYER );
+	}
+	if ( strstr( type, "tdm" ) ) {
+		typeBits |= ( 1 << GT_TEAM );
+	}
+	if ( strstr( type, "ca" ) ) {
+		typeBits |= ( 1 << GT_CLAN_ARENA );
+	}
+	if ( strstr( type, "ctf" ) ) {
+		typeBits |= ( 1 << GT_CTF );
+	}
+	if ( strstr( type, "oneflag" ) ) {
+		typeBits |= ( 1 << GT_1FCTF );
+	}
+	if ( strstr( type, "overload" ) ) {
+		typeBits |= ( 1 << GT_OBELISK );
+	}
+	if ( strstr( type, "hh" ) || strstr( type, "har" ) ) {
+		typeBits |= ( 1 << GT_HARVESTER );
+	}
+	if ( strstr( type, "ft" ) ) {
+		typeBits |= ( 1 << GT_FREEZE );
+	}
+	if ( strstr( type, "dom" ) ) {
+		typeBits |= ( 1 << GT_DOMINATION );
+	}
+	if ( strstr( type, "ad" ) ) {
+		typeBits |= ( 1 << GT_ATTACK_DEFEND );
+	}
+	if ( strstr( type, "rr" ) ) {
+		typeBits |= ( 1 << GT_RED_ROVER );
+	}
+
+	return typeBits;
+}
 
 
 /*
@@ -136,7 +194,6 @@ void UI_LoadArenas( void ) {
 	char*		dirptr;
 	int			i, n;
 	int			dirlen;
-	char		*type;
 
 	ui_numArenas = 0;
 	uiInfo.mapCount = 0;
@@ -160,64 +217,18 @@ void UI_LoadArenas( void ) {
 	}
 	trap_Print( va( "%i arenas parsed\n", ui_numArenas ) );
 	if (UI_OutOfMemory()) {
-		trap_Print(S_COLOR_YELLOW"WARNING: not anough memory in pool to load all arenas\n");
+		trap_Print(S_COLOR_YELLOW"WARNING: not enough memory in pool to load all arenas\n");
 	}
 
 	for( n = 0; n < ui_numArenas; n++ ) {
 		// determine type
 
 		uiInfo.mapList[uiInfo.mapCount].cinematic = -1;
-		uiInfo.mapList[uiInfo.mapCount].mapLoadName = String_Alloc(Info_ValueForKey(ui_arenaInfos[n], "map"));
-		uiInfo.mapList[uiInfo.mapCount].mapName = String_Alloc(Info_ValueForKey(ui_arenaInfos[n], "longname"));
+		uiInfo.mapList[uiInfo.mapCount].mapLoadName = String_Alloc(Info_ValueForKey(ui_arenaInfos[n], ARENA_INFO_KEY_MAP));
+		uiInfo.mapList[uiInfo.mapCount].mapName = String_Alloc(Info_ValueForKey(ui_arenaInfos[n], ARENA_INFO_KEY_LONGNAME));
 		uiInfo.mapList[uiInfo.mapCount].levelShot = -1;
-		uiInfo.mapList[uiInfo.mapCount].imageName = String_Alloc(va("levelshots/%s", uiInfo.mapList[uiInfo.mapCount].mapLoadName));
-		uiInfo.mapList[uiInfo.mapCount].typeBits = 0;
-
-		type = Info_ValueForKey( ui_arenaInfos[n], "type" );
-		// if no type specified, it will be treated as "ffa"
-		if( *type ) {
-			if( strstr( type, "ffa" ) ) {
-				uiInfo.mapList[uiInfo.mapCount].typeBits |= (1 << GT_FFA);
-			}
-			if( strstr( type, "tourney" ) ) {
-				uiInfo.mapList[uiInfo.mapCount].typeBits |= (1 << GT_TOURNAMENT);
-			}
-			if( strstr( type, "single" ) || strstr( type, "race" ) ) {
-				uiInfo.mapList[uiInfo.mapCount].typeBits |= (1 << GT_SINGLE_PLAYER);
-			}
-			if( strstr( type, "team" ) || strstr( type, "tdm" ) ) {
-				uiInfo.mapList[uiInfo.mapCount].typeBits |= (1 << GT_TEAM);
-			}
-			if( strstr( type, "clanarena" ) || strstr( type, "ca" ) ) {
-				uiInfo.mapList[uiInfo.mapCount].typeBits |= (1 << GT_CLAN_ARENA);
-			}
-			if( strstr( type, "ctf" ) ) {
-				uiInfo.mapList[uiInfo.mapCount].typeBits |= (1 << GT_CTF);
-			}
-			if( strstr( type, "oneflag" ) ) {
-				uiInfo.mapList[uiInfo.mapCount].typeBits |= (1 << GT_1FCTF);
-			}
-			if( strstr( type, "overload" ) ) {
-				uiInfo.mapList[uiInfo.mapCount].typeBits |= (1 << GT_OBELISK);
-			}
-			if( strstr( type, "harvester" ) ) {
-				uiInfo.mapList[uiInfo.mapCount].typeBits |= (1 << GT_HARVESTER);
-			}
-			if( strstr( type, "freeze" ) || strstr( type, "freezetag" ) ) {
-				uiInfo.mapList[uiInfo.mapCount].typeBits |= (1 << GT_FREEZE);
-			}
-			if( strstr( type, "domination" ) || strstr( type, "dom" ) ) {
-				uiInfo.mapList[uiInfo.mapCount].typeBits |= (1 << GT_DOMINATION);
-			}
-			if( strstr( type, "attackdefend" ) || strstr( type, "ad" ) ) {
-				uiInfo.mapList[uiInfo.mapCount].typeBits |= (1 << GT_ATTACK_DEFEND);
-			}
-			if( strstr( type, "redrover" ) || strstr( type, "rr" ) ) {
-				uiInfo.mapList[uiInfo.mapCount].typeBits |= (1 << GT_RED_ROVER);
-			}
-		} else {
-			uiInfo.mapList[uiInfo.mapCount].typeBits |= (1 << GT_FFA);
-		}
+		uiInfo.mapList[uiInfo.mapCount].imageName = String_Alloc(va("levelshots/preview/%s", uiInfo.mapList[uiInfo.mapCount].mapLoadName));
+		uiInfo.mapList[uiInfo.mapCount].typeBits = UI_ArenaTypeBits( Info_ValueForKey( ui_arenaInfos[n], ARENA_INFO_KEY_TYPE ) );
 
 		uiInfo.mapCount++;
 		if (uiInfo.mapCount >= MAX_MAPS) {

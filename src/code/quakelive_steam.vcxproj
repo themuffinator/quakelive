@@ -224,6 +224,16 @@
       <TerminalServerAware>true</TerminalServerAware>
     </Link>
   </ItemDefinitionGroup>
+  <ItemGroup Condition="'$(QLBuildOnlineServices)'!='0' and '$(AwesomiumRuntimeDir)'!=''">
+    <AwesomiumRuntimeRootFile Include="$(AwesomiumRuntimeDir)\awesomium.dll" Condition="Exists('$(AwesomiumRuntimeDir)\awesomium.dll')" />
+    <AwesomiumRuntimeRootFile Include="$(AwesomiumRuntimeDir)\avcodec-53.dll" Condition="Exists('$(AwesomiumRuntimeDir)\avcodec-53.dll')" />
+    <AwesomiumRuntimeRootFile Include="$(AwesomiumRuntimeDir)\avformat-53.dll" Condition="Exists('$(AwesomiumRuntimeDir)\avformat-53.dll')" />
+    <AwesomiumRuntimeRootFile Include="$(AwesomiumRuntimeDir)\avutil-51.dll" Condition="Exists('$(AwesomiumRuntimeDir)\avutil-51.dll')" />
+    <AwesomiumRuntimeRootFile Include="$(AwesomiumRuntimeDir)\icudt.dll" Condition="Exists('$(AwesomiumRuntimeDir)\icudt.dll')" />
+    <AwesomiumRuntimeRootFile Include="$(AwesomiumRuntimeDir)\libEGL.dll" Condition="Exists('$(AwesomiumRuntimeDir)\libEGL.dll')" />
+    <AwesomiumRuntimeRootFile Include="$(AwesomiumRuntimeDir)\libGLESv2.dll" Condition="Exists('$(AwesomiumRuntimeDir)\libGLESv2.dll')" />
+    <AwesomiumRuntimeLocaleFile Include="$(AwesomiumRuntimeDir)\locales\**\*.*" Condition="Exists('$(AwesomiumRuntimeDir)\locales')" />
+  </ItemGroup>
 
   <Target Name="ValidateSteamworksSdk" BeforeTargets="ClCompile" Condition="'$(QLBuildOnlineServices)'!='0' and '$(QLBuildSteamworks)'!='0'">
     <Error Condition="'$(QLRequireSteamworksSdk)'!='0' and '$(SteamworksSdkDir)'==''" Text="Steamworks support is enabled and QLRequireSteamworksSdk=1, but no external SDK path was provided. Set SteamworksSdkDir or STEAMWORKS_SDK_DIR to a local Steamworks SDK checkout; do not commit the proprietary SDK into this repository." />
@@ -239,6 +249,12 @@
     <Error Condition="'$(AwesomiumSdkDir)'!='' and !Exists('$(AwesomiumSdkDir)')" Text="AwesomiumSdkDir '$(AwesomiumSdkDir)' was not found. Set it to a local Awesomium SDK checkout or build with QLBuildOnlineServices=0." />
     <Error Condition="'$(AwesomiumSdkDir)'!='' and !Exists('$(AwesomiumIncludeDir)\Awesomium\WebCore.h')" Text="Awesomium headers were not found at '$(AwesomiumIncludeDir)\Awesomium\WebCore.h'. Set AwesomiumSdkDir to the SDK root that contains include\Awesomium\WebCore.h." />
     <Error Condition="'$(AwesomiumSdkDir)'!='' and !Exists('$(AwesomiumRuntimeDll)')" Text="The Awesomium runtime was not found at '$(AwesomiumRuntimeDll)'. Set AwesomiumSdkDir to a SDK root that contains bin\awesomium.dll or build\bin\awesomium.dll." />
+    <Error Condition="'$(AwesomiumSdkDir)'!='' and !Exists('$(AwesomiumRuntimeDir)\avcodec-53.dll')" Text="The Awesomium runtime sidecar '$(AwesomiumRuntimeDir)\avcodec-53.dll' was not found. Set AwesomiumSdkDir to a complete external Awesomium runtime folder." />
+    <Error Condition="'$(AwesomiumSdkDir)'!='' and !Exists('$(AwesomiumRuntimeDir)\avformat-53.dll')" Text="The Awesomium runtime sidecar '$(AwesomiumRuntimeDir)\avformat-53.dll' was not found. Set AwesomiumSdkDir to a complete external Awesomium runtime folder." />
+    <Error Condition="'$(AwesomiumSdkDir)'!='' and !Exists('$(AwesomiumRuntimeDir)\avutil-51.dll')" Text="The Awesomium runtime sidecar '$(AwesomiumRuntimeDir)\avutil-51.dll' was not found. Set AwesomiumSdkDir to a complete external Awesomium runtime folder." />
+    <Error Condition="'$(AwesomiumSdkDir)'!='' and !Exists('$(AwesomiumRuntimeDir)\icudt.dll')" Text="The Awesomium runtime sidecar '$(AwesomiumRuntimeDir)\icudt.dll' was not found. Set AwesomiumSdkDir to a complete external Awesomium runtime folder." />
+    <Error Condition="'$(AwesomiumSdkDir)'!='' and !Exists('$(AwesomiumRuntimeDir)\libEGL.dll')" Text="The Awesomium runtime sidecar '$(AwesomiumRuntimeDir)\libEGL.dll' was not found. Set AwesomiumSdkDir to a complete external Awesomium runtime folder." />
+    <Error Condition="'$(AwesomiumSdkDir)'!='' and !Exists('$(AwesomiumRuntimeDir)\libGLESv2.dll')" Text="The Awesomium runtime sidecar '$(AwesomiumRuntimeDir)\libGLESv2.dll' was not found. Set AwesomiumSdkDir to a complete external Awesomium runtime folder." />
     <Message Condition="'$(AwesomiumSdkDir)'!=''" Text="Awesomium support enabled with external SDK (headers: $(AwesomiumIncludeDir), runtime: $(AwesomiumRuntimeDll)). The SDK remains external and is not vendored." Importance="High" />
   </Target>
   <Target Name="ValidateVorbis" BeforeTargets="ClCompile" Condition="'$(QLEnableOgg)'=='1'">
@@ -265,8 +281,9 @@
   <Target Name="CopySteamworksRedistributable" AfterTargets="Build" Condition="'$(QLBuildOnlineServices)'!='0' and '$(QLBuildSteamworks)'!='0' and '$(SteamworksRedistDll)'!='' and Exists('$(SteamworksRedistDll)')">
     <Copy SourceFiles="$(SteamworksRedistDll)" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" />
   </Target>
-  <Target Name="CopyAwesomiumRuntime" AfterTargets="Build" Condition="'$(QLBuildOnlineServices)'!='0' and '$(AwesomiumRuntimeDll)'!='' and Exists('$(AwesomiumRuntimeDll)')">
-    <Copy SourceFiles="$(AwesomiumRuntimeDll)" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" />
+  <Target Name="CopyAwesomiumRuntime" AfterTargets="Build" Condition="'$(QLBuildOnlineServices)'!='0' and '$(AwesomiumRuntimeDir)'!=''">
+    <Copy SourceFiles="@(AwesomiumRuntimeRootFile)" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" Condition="'@(AwesomiumRuntimeRootFile)'!=''" />
+    <Copy SourceFiles="@(AwesomiumRuntimeLocaleFile)" DestinationFiles="@(AwesomiumRuntimeLocaleFile->'$(OutDir)locales\%(RecursiveDir)%(Filename)%(Extension)')" SkipUnchangedFiles="true" Condition="'@(AwesomiumRuntimeLocaleFile)'!=''" />
   </Target>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release TA|Win32'">
     <ClCompile>
@@ -1445,6 +1462,11 @@ if exist "$(PngSdkDir)\bin\*.dll" xcopy /y /d /i "$(PngSdkDir)\bin\*.dll" "$(Out
     <ProjectReference Include="splines\Splines.vcxproj">
       <Project>{dbaf2c53-3858-455d-a1ae-3fc093515314}</Project>
       <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
+    </ProjectReference>
+    <ProjectReference Include="awesomium_process.vcxproj" Condition="'$(QLBuildOnlineServices)'!='0' and '$(AwesomiumSdkDir)'!=''">
+      <Project>{c7006958-ab86-451d-baad-73f4b5dfbbd5}</Project>
+      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
+      <AdditionalProperties>QLBuildOnlineServices=$(QLBuildOnlineServices);AwesomiumSdkDir=$(AwesomiumSdkDir)</AdditionalProperties>
     </ProjectReference>
   </ItemGroup>
   <Import Project="$(MSBuildThisFileDirectory)quakelive.internal-deps.targets" />

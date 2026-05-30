@@ -43,6 +43,9 @@ typedef unsigned char byte;
 
 #if QL_BUILD_ONLINE_SERVICES
 
+#define CL_AWE_STARTUP_SCRIPT_RETRY_FRAMES 240
+#define CL_AWE_STARTUP_SCRIPT_RETRY_INTERVAL 10
+
 typedef void *(__stdcall *awe_new_void_fn)( void );
 typedef void (__stdcall *awe_delete_object_fn)( void *object );
 typedef void *(__stdcall *awe_webcore_initialize_fn)( void *config );
@@ -66,6 +69,7 @@ typedef void (__stdcall *awe_webview_pause_rendering_fn)( void *view );
 typedef void (__stdcall *awe_webview_reload_fn)( void *view, bool ignoreCache );
 typedef void (__stdcall *awe_webview_stop_fn)( void *view );
 typedef void (__stdcall *awe_webview_execute_javascript_fn)( void *view, const unsigned short *script, const unsigned short *frame );
+typedef void *(__stdcall *awe_webview_execute_javascript_with_result_fn)( void *view, const unsigned short *script, const unsigned short *frame );
 typedef void (__stdcall *awe_webview_set_transparent_fn)( void *view, bool transparent );
 typedef void (__stdcall *awe_webview_set_zoom_fn)( void *view, int zoomPercent );
 typedef void (__stdcall *awe_webview_mouse_move_fn)( void *view, int x, int y );
@@ -81,6 +85,7 @@ typedef int (__stdcall *awe_bitmap_dimension_fn)( void *surface );
 typedef const byte *(__stdcall *awe_bitmap_buffer_fn)( void *surface );
 typedef bool (__stdcall *awe_bitmap_bool_fn)( void *surface );
 typedef void (__stdcall *awe_bitmap_set_bool_fn)( void *surface, bool value );
+typedef int (__stdcall *awe_jsvalue_to_integer_fn)( void *value );
 
 typedef struct {
 	void	*webConfig;
@@ -95,7 +100,8 @@ typedef struct {
 	qboolean started;
 	qboolean urlLoaded;
 	int		startupScriptInjectionFrames;
-	char	startupScript[8192];
+	char	startupScript[196608];
+	char	startupRetryScript[256];
 	char	lastError[256];
 } clAwesomiumState_t;
 
@@ -115,12 +121,8 @@ typedef struct {
 	awe_webcore_set_string_fn		webConfigPackagePathSet;
 	awe_webcore_set_string_fn		webConfigUserAgentSet;
 	awe_webcore_set_string_fn		webConfigUserScriptSet;
-	awe_webprefs_set_bool_fn			webPrefsEnableJavascriptSet;
-	awe_webprefs_set_bool_fn			webPrefsEnableLocalStorageSet;
-	awe_webprefs_set_bool_fn			webPrefsEnableDatabasesSet;
+	awe_webprefs_set_bool_fn			webPrefsEnablePluginsSet;
 	awe_webprefs_set_bool_fn			webPrefsEnableWebSecuritySet;
-	awe_webprefs_set_bool_fn			webPrefsAllowFileAccessSet;
-	awe_webprefs_set_bool_fn			webPrefsAllowUniversalAccessSet;
 	awe_new_datapak_source_fn		newDataPakSource;
 	awe_delete_object_fn			deleteDataPakSource;
 	awe_new_weburl_fn				newWebURL;
@@ -131,6 +133,7 @@ typedef struct {
 	awe_webview_destroy_fn			webViewDestroy;
 	awe_webview_load_url_fn			webViewLoadURL;
 	awe_webview_execute_javascript_fn	webViewExecuteJavascript;
+	awe_webview_execute_javascript_with_result_fn	webViewExecuteJavascriptWithResult;
 	awe_webview_set_transparent_fn	webViewSetTransparent;
 	awe_webview_set_zoom_fn			webViewSetZoom;
 	awe_webview_resize_fn			webViewResize;
@@ -159,6 +162,8 @@ typedef struct {
 	awe_bitmap_buffer_fn			bitmapBuffer;
 	awe_bitmap_bool_fn				bitmapIsDirty;
 	awe_bitmap_set_bool_fn			bitmapSetIsDirty;
+	awe_jsvalue_to_integer_fn		jsValueToInteger;
+	awe_delete_object_fn			deleteJSValue;
 } clAwesomiumImports_t;
 
 #define CL_AWE_RETAIL_ABI_SCOPE_C_EXPORT "external SDK C API dependency"
@@ -219,6 +224,8 @@ static const clAwesomiumBootstrapRetailMapping_t cl_aweBootstrapRetailMappings[]
 	{ 0x004F2D30u, 0x0052C6A4u, "WebConfig::WebConfig", "CL_Awesomium_PrepareConfig", "_Awe_new_WebConfig@0", CL_AWE_RETAIL_BOOTSTRAP_SCOPE_C_EXPORT },
 	{ 0x004F2D30u, 0x0052C6A0u, "WebCore::Initialize", "CL_Awesomium_Startup", "_Awe_WebCore_Initialize@4", CL_AWE_RETAIL_BOOTSTRAP_SCOPE_C_EXPORT },
 	{ 0x004F2D30u, 0x0052C698u, "WebPreferences::WebPreferences", "CL_Awesomium_PreparePreferences", "_Awe_new_WebPreferences@0", CL_AWE_RETAIL_BOOTSTRAP_SCOPE_C_EXPORT },
+	{ 0x004F2D30u, 0x00000002u, "WebPreferences::enable_plugins byte", "CL_Awesomium_PreparePreferences", "_Awe_WebPreferences_enable_plugins_set@8", CL_AWE_RETAIL_BOOTSTRAP_SCOPE_C_EXPORT },
+	{ 0x004F2D30u, 0x00000008u, "WebPreferences::enable_web_security byte", "CL_Awesomium_PreparePreferences", "_Awe_WebPreferences_enable_web_security_set@8", CL_AWE_RETAIL_BOOTSTRAP_SCOPE_C_EXPORT },
 	{ 0x004F2D30u, 0x00000000u, "WebCore::CreateWebSession slot 0x00", "CL_Awesomium_CreateSession", "_Awe_WebCore_CreateWebSession@12", CL_AWE_RETAIL_BOOTSTRAP_SCOPE_C_EXPORT },
 	{ 0x004F2D30u, 0x00000018u, "WebSession bootstrap slot 0x18", "CL_Awesomium_CreateSession", "_Awe_WebSession_Initialize@4", CL_AWE_RETAIL_BOOTSTRAP_SCOPE_C_EXPORT },
 	{ 0x004F2A10u, 0x0000001Cu, "WebSession::ClearCache slot 0x1C", "CL_Awesomium_ClearCache", "_Awe_WebSession_ClearCache@4", CL_AWE_RETAIL_BOOTSTRAP_SCOPE_C_EXPORT },
@@ -248,7 +255,8 @@ static clAwesomiumImports_t cl_awe;
 static void CL_Awesomium_AppendPath( char *buffer, size_t bufferSize, const char *root, const char *fileName );
 static qboolean CL_Awesomium_FileExists( const char *path );
 static qboolean CL_Awesomium_LoadImports( const char *runtimePath, const char *basePath );
-static qboolean CL_Awesomium_PrepareConfig( const char *runtimePath, const char *basePath, const char *playerName, unsigned int appId, unsigned int steamIdLow, unsigned int steamIdHigh );
+static qboolean CL_Awesomium_PrepareConfig( const char *runtimePath, const char *basePath, const char *playerName, unsigned int appId, unsigned int steamIdLow, unsigned int steamIdHigh, const char *initialConfigJson );
+static void CL_Awesomium_BuildRetryScript( char *buffer, size_t bufferSize );
 static qboolean CL_Awesomium_PreparePreferences( void );
 static qboolean CL_Awesomium_CreateSession( const char *runtimePath, const char *basePath );
 
@@ -411,12 +419,8 @@ static qboolean CL_Awesomium_LoadImports( const char *runtimePath, const char *b
 	CL_AWE_IMPORT( webConfigPackagePathSet, "_Awe_WebConfig_package_path_set@8" );
 	CL_AWE_IMPORT( webConfigUserAgentSet, "_Awe_WebConfig_user_agent_set@8" );
 	cl_awe.webConfigUserScriptSet = reinterpret_cast<awe_webcore_set_string_fn>( CL_Awesomium_ResolveOptionalImport( "_Awe_WebConfig_user_script_set@8" ) );
-	CL_AWE_IMPORT( webPrefsEnableJavascriptSet, "_Awe_WebPreferences_enable_javascript_set@8" );
-	CL_AWE_IMPORT( webPrefsEnableLocalStorageSet, "_Awe_WebPreferences_enable_local_storage_set@8" );
-	CL_AWE_IMPORT( webPrefsEnableDatabasesSet, "_Awe_WebPreferences_enable_databases_set@8" );
+	CL_AWE_IMPORT( webPrefsEnablePluginsSet, "_Awe_WebPreferences_enable_plugins_set@8" );
 	CL_AWE_IMPORT( webPrefsEnableWebSecuritySet, "_Awe_WebPreferences_enable_web_security_set@8" );
-	CL_AWE_IMPORT( webPrefsAllowFileAccessSet, "_Awe_WebPreferences_allow_file_access_from_file_url_set@8" );
-	CL_AWE_IMPORT( webPrefsAllowUniversalAccessSet, "_Awe_WebPreferences_allow_universal_access_from_file_url_set@8" );
 	CL_AWE_IMPORT( newDataPakSource, "_Awe_new_DataPakSource@4" );
 	CL_AWE_IMPORT( deleteDataPakSource, "_Awe_delete_DataPakSource@4" );
 	CL_AWE_IMPORT( newWebURL, "_Awe_new_WebURL_1@4" );
@@ -428,6 +432,7 @@ static qboolean CL_Awesomium_LoadImports( const char *runtimePath, const char *b
 	CL_AWE_IMPORT( webViewDestroy, "_Awe_WebView_Destroy@4" );
 	CL_AWE_IMPORT( webViewLoadURL, "_Awe_WebView_LoadURL@8" );
 	CL_AWE_IMPORT( webViewExecuteJavascript, "_Awe_WebView_ExecuteJavascript@12" );
+	cl_awe.webViewExecuteJavascriptWithResult = reinterpret_cast<awe_webview_execute_javascript_with_result_fn>( CL_Awesomium_ResolveOptionalImport( "_Awe_WebView_ExecuteJavascriptWithResult@12" ) );
 	CL_AWE_IMPORT( webViewSetTransparent, "_Awe_WebView_SetTransparent@8" );
 	cl_awe.webViewSetZoom = reinterpret_cast<awe_webview_set_zoom_fn>( CL_Awesomium_ResolveOptionalImport( "_Awe_WebView_SetZoom@8" ) );
 	CL_AWE_IMPORT( webViewResize, "_Awe_WebView_Resize@12" );
@@ -455,6 +460,8 @@ static qboolean CL_Awesomium_LoadImports( const char *runtimePath, const char *b
 	cl_awe.webViewIsLoading = reinterpret_cast<awe_webview_query_bool_fn>( GetProcAddress( cl_awesomium.module, "_Awe_WebView_IsLoading@4" ) );
 	cl_awe.webViewIsCrashed = reinterpret_cast<awe_webview_query_bool_fn>( GetProcAddress( cl_awesomium.module, "_Awe_WebView_IsCrashed@4" ) );
 	cl_awe.webViewLastError = reinterpret_cast<awe_webview_query_int_fn>( GetProcAddress( cl_awesomium.module, "_Awe_WebView_last_error@4" ) );
+	cl_awe.jsValueToInteger = reinterpret_cast<awe_jsvalue_to_integer_fn>( GetProcAddress( cl_awesomium.module, "_Awe_JSValue_ToInteger@4" ) );
+	cl_awe.deleteJSValue = reinterpret_cast<awe_delete_object_fn>( GetProcAddress( cl_awesomium.module, "_Awe_delete_JSValue@4" ) );
 
 #undef CL_AWE_IMPORT
 
@@ -603,9 +610,10 @@ static void CL_Awesomium_EscapeScriptString( const char *value, char *buffer, si
 CL_Awesomium_BuildUserScript
 =============
 */
-static void CL_Awesomium_BuildUserScript( char *buffer, size_t bufferSize, const char *playerName, unsigned int appId, unsigned int steamIdLow, unsigned int steamIdHigh ) {
+static void CL_Awesomium_BuildUserScript( char *buffer, size_t bufferSize, const char *playerName, unsigned int appId, unsigned int steamIdLow, unsigned int steamIdHigh, const char *initialConfigJson ) {
 	char escapedName[256];
 	char steamId[64];
+	const char *configJson;
 
 	CL_Awesomium_EscapeScriptString( playerName ? playerName : "", escapedName, sizeof( escapedName ) );
 	if ( steamIdHigh || steamIdLow ) {
@@ -614,19 +622,29 @@ static void CL_Awesomium_BuildUserScript( char *buffer, size_t bufferSize, const
 		strcpy( steamId, "0" );
 	}
 	steamId[sizeof( steamId ) - 1] = '\0';
+	configJson = ( initialConfigJson && initialConfigJson[0] ) ? initialConfigJson : "null";
 
 	int written;
 
 	written = _snprintf(
 		buffer,
 		bufferSize,
-		"(function(){if(window.__qlr_qz_instance_ready){return;}window.__qlr_qz_instance_ready=true;"
+		"(function(){if(window.__qlr_qz_instance_ready){if(window.main_hook_v2){window.main_hook_v2();}return;}window.__qlr_qz_instance_ready=true;"
 		"var noop=function(){return false;};var empty=function(){return [];};"
 		"var maps={campgrounds:{id:'campgrounds',name:'Campgrounds',sysname:'campgrounds',gametypes:{0:true}}};"
 		"var factories={ffa:{id:'ffa',title:'Free For All',basegt:0,settings:{}}};"
 		"var config={cvars:{sv_servertype:'0',net_port:'27960',sv_hostname:'Quake Live Reverse',sv_maxclients:'8'},binds:[]};"
+		"var nativeQueue=window.__qlr_native_requests=window.__qlr_native_requests||[];"
+		"var canon=function(n){return String(n||'').toLowerCase();};"
+		"var queue=function(kind,payload){try{nativeQueue.push(String(kind||'')+'\\n'+String(payload||''));return true;}catch(e){return false;}};"
+		"var setNativeCvar=function(n,v){var k=canon(n);if(k){config.cvars[k]=String(v||'');}return true;};"
+		"var applyNativeConfig=function(cfg){try{if(!cfg){return false;}config.version=cfg.version||config.version;"
+		"if(typeof cfg.appId!=='undefined'){qz.appId=cfg.appId;}if(cfg.steamId){qz.steamId=String(cfg.steamId);}"
+		"if(cfg.playerName){qz.playerName=String(cfg.playerName);}if(cfg.cvars){var out={};"
+		"if(typeof cfg.cvars.length==='number'){for(var ci=0;ci<cfg.cvars.length;ci++){var cv=cfg.cvars[ci];if(cv&&cv.name){out[canon(cv.name)]=String(cv.value||'');}}}"
+		"else{for(var ck in cfg.cvars){out[canon(ck)]=String(cfg.cvars[ck]||'');}}config.cvars=out;}if(cfg.binds){config.binds=cfg.binds;}return true;}catch(e){return false;}};"
 		"var qz={appId:%u,steamId:\"%s\",playerName:\"%s\","
-		"SendGameCommand:function(cmd){cmd=String(cmd||'');console.log('qz SendGameCommand: '+cmd);var m=/^\\s*web_changeHash(?:\\s+(.*))?\\s*$/.exec(cmd);if(m){window.location.hash=(m[1]||'').replace(/^#/,'');return true;}return false;},"
+		"SendGameCommand:function(cmd){cmd=String(cmd||'');console.log('qz SendGameCommand: '+cmd);var m=/^\\s*web_changeHash(?:\\s+(.*))?\\s*$/.exec(cmd);if(m){window.location.hash=(m[1]||'').replace(/^#/,'');}return queue('cmd',cmd);},"
 		"WriteTextFile:noop,OpenURL:function(url){document.location.href=url;},"
 		"OpenSteamOverlayURL:function(url){console.log('qz OpenSteamOverlayURL: '+url);},"
 		"GetClipboardText:function(){return '';},SetClipboardText:noop,"
@@ -636,8 +654,8 @@ static void CL_Awesomium_BuildUserScript( char *buffer, size_t bufferSize, const
 		"ActivateGameOverlayToUser:noop,Invite:noop,GetAllUGC:function(){return [];},"
 		"GetNextKeyDown:noop,SetFavoriteServer:noop,"
 		"IsPakFilePresent:function(){return true;},IsGameRunning:function(){return false;},"
-		"FileExists:function(){return false;},GetCvar:function(name){return config.cvars[(name||'').toLowerCase()]||'';},"
-		"SetCvar:function(name,value){config.cvars[(name||'').toLowerCase()]=String(value);return true;},ResetCvar:function(name){delete config.cvars[(name||'').toLowerCase()];return true;},"
+		"FileExists:function(){return false;},GetCvar:function(name){var k=canon(name);if(k&&typeof config.cvars[k]==='undefined'){queue('get',k);}return config.cvars[k]||'';},"
+		"SetCvar:function(name,value){var k=canon(name);if(!k){return false;}value=String(value||'');config.cvars[k]=value;return queue('set',k+'\\n'+value);},ResetCvar:function(name){var k=canon(name);if(!k){return false;}delete config.cvars[k];return queue('reset',k);},"
 		"GetMapList:function(){return maps;},GetFactoryList:function(){return factories;},GetDemoList:empty,"
 		"GetFriendList:empty,GetConfig:function(){return config;},GetCursorPosition:function(){return {x:0,y:0};}};"
 		"var loading=function(){try{var show=function(){if(document.getElementById('__qlr_menu_loading')){return;}"
@@ -654,11 +672,13 @@ static void CL_Awesomium_BuildUserScript( char *buffer, size_t bufferSize, const
 		"var fm='IsPakFilePresent IsGameRunning FileExists'.split(' ');for(var i=0;i<fm.length;i++){bind(fm[i],ret(false));}"
 		"var nm='WriteTextFile OpenURL OpenSteamOverlayURL SetClipboardText RequestServers RequestServerDetails RefreshList CreateLobby LeaveLobby JoinLobby SetLobbyServer ShowInviteOverlay SayLobby RequestUserStats ActivateGameOverlayToUser Invite GetAllUGC GetNextKeyDown SetFavoriteServer NoOp'.split(' ');for(i=0;i<nm.length;i++){bind(nm[i],noop);}"
 		"var em='GetDemoList GetFriendList'.split(' ');for(i=0;i<em.length;i++){bind(em[i],empty);}"
-		"bind('GetCvar',function(n){return config.cvars[(n||'').toLowerCase()]||'';});bind('SetCvar',function(n,v){config.cvars[(n||'').toLowerCase()]=String(v||'');return true;});bind('ResetCvar',function(n){delete config.cvars[(n||'').toLowerCase()];return true;});"
+		"bind('GetCvar',function(n){var k=canon(n);if(k&&typeof config.cvars[k]==='undefined'){queue('get',k);}return config.cvars[k]||'';});bind('SetCvar',function(n,v){var k=canon(n);if(!k){return false;}v=String(v||'');config.cvars[k]=v;return queue('set',k+'\\n'+v);});bind('ResetCvar',function(n){var k=canon(n);if(!k){return false;}delete config.cvars[k];return queue('reset',k);});"
 		"bind('GetMapList',function(){return maps;});bind('GetFactoryList',function(){return factories;});bind('GetClipboardText',ret(''));bind('GetConfig',function(){return config;});bind('GetCursorPosition',function(){return {x:0,y:0};});"
 		"if(!window.FakeClient){window.FakeClient={};}if(!window.FakeClient.qz_instance){window.FakeClient.qz_instance={};}"
+		"window.__qlr_apply_native_config=applyNativeConfig;window.__qlr_set_native_cvar=setNativeCvar;"
+		"window.__qlr_initial_config_applied=applyNativeConfig(%s);"
 		"window.qz_instance=qz;window.main_hook_v2=function(){var f=window.FakeClient&&window.FakeClient.qz_instance;"
-		"if(!f){return;}for(var k in qz){if(typeof f[k]==='undefined'){f[k]=qz[k];}}};window.main_hook_v2();"
+		"if(f){for(var k in qz){f[k]=qz[k];}}window.qz_instance=qz;if(typeof window.EnginePublish==='function'&&!window.EnginePublish.__qlr_wrapped){var oldPublish=window.EnginePublish;var wrapped=function(topic,data){try{if(String(topic).indexOf('cvar.')===0){var d=typeof data==='string'?JSON.parse(data):data;if(d){setNativeCvar(d.name||String(topic).substr(5),d.value||'');}}}catch(e){}return oldPublish.apply(this,arguments);};wrapped.__qlr_wrapped=true;window.EnginePublish=wrapped;}};window.main_hook_v2();"
 		"if(document.addEventListener){document.addEventListener('DOMContentLoaded',window.main_hook_v2,false);}"
 		"window.__qlr_browser_helpers_ready=true;try{var qlrReadyEvent=document.createEvent('Event');"
 		"qlrReadyEvent.initEvent('qz_instance.ready',false,false);document.dispatchEvent(qlrReadyEvent);}catch(qlrReadyError){}"
@@ -666,7 +686,8 @@ static void CL_Awesomium_BuildUserScript( char *buffer, size_t bufferSize, const
 		"if(++qlrBridgeTries>=40){clearInterval(qlrBridgeTimer);}},250);window.__qlr_qz_instance_script_complete=true;})();",
 		appId,
 		steamId,
-		escapedName
+		escapedName,
+		configJson
 	);
 	buffer[bufferSize - 1] = '\0';
 	if ( written < 0 || (size_t)written >= bufferSize ) {
@@ -676,10 +697,32 @@ static void CL_Awesomium_BuildUserScript( char *buffer, size_t bufferSize, const
 
 /*
 =============
+CL_Awesomium_BuildRetryScript
+
+Re-runs only the lightweight browser helper hook after page scripts mutate the
+FakeClient object. The full startup bridge carries the native config snapshot
+and is intentionally not reparsed every retry frame.
+=============
+*/
+static void CL_Awesomium_BuildRetryScript( char *buffer, size_t bufferSize ) {
+	if ( !buffer || bufferSize == 0 ) {
+		return;
+	}
+
+	_snprintf(
+		buffer,
+		bufferSize,
+		"(function(){if(window.main_hook_v2){window.main_hook_v2();}})();"
+	);
+	buffer[bufferSize - 1] = '\0';
+}
+
+/*
+=============
 CL_Awesomium_PrepareConfig
 =============
 */
-static qboolean CL_Awesomium_PrepareConfig( const char *runtimePath, const char *basePath, const char *playerName, unsigned int appId, unsigned int steamIdLow, unsigned int steamIdHigh ) {
+static qboolean CL_Awesomium_PrepareConfig( const char *runtimePath, const char *basePath, const char *playerName, unsigned int appId, unsigned int steamIdLow, unsigned int steamIdHigh, const char *initialConfigJson ) {
 	char childProcessPath[MAX_PATH];
 	char logPath[MAX_PATH];
 	char packagePath[MAX_PATH];
@@ -710,7 +753,8 @@ static qboolean CL_Awesomium_PrepareConfig( const char *runtimePath, const char 
 	if ( !CL_Awesomium_FileExists( childProcessPath ) && sessionPath && sessionPath[0] ) {
 		CL_Awesomium_AppendPath( childProcessPath, sizeof( childProcessPath ), sessionPath, "awesomium_process.exe" );
 	}
-	CL_Awesomium_BuildUserScript( cl_awesomium.startupScript, sizeof( cl_awesomium.startupScript ), playerName, appId, steamIdLow, steamIdHigh );
+	CL_Awesomium_BuildUserScript( cl_awesomium.startupScript, sizeof( cl_awesomium.startupScript ), playerName, appId, steamIdLow, steamIdHigh, initialConfigJson );
+	CL_Awesomium_BuildRetryScript( cl_awesomium.startupRetryScript, sizeof( cl_awesomium.startupRetryScript ) );
 	if ( !CL_Awesomium_FileExists( childProcessPath ) ) {
 		CL_Awesomium_SetError( "awesomium_process.exe was not found in runtimePath or basePath" );
 		return qfalse;
@@ -747,12 +791,8 @@ static qboolean CL_Awesomium_PreparePreferences( void ) {
 	}
 
 	Com_Printf( "Awesomium startup phase: applying WebPreferences\n" );
-	cl_awe.webPrefsEnableJavascriptSet( cl_awesomium.webPreferences, true );
-	cl_awe.webPrefsEnableLocalStorageSet( cl_awesomium.webPreferences, true );
-	cl_awe.webPrefsEnableDatabasesSet( cl_awesomium.webPreferences, true );
+	cl_awe.webPrefsEnablePluginsSet( cl_awesomium.webPreferences, true );
 	cl_awe.webPrefsEnableWebSecuritySet( cl_awesomium.webPreferences, false );
-	cl_awe.webPrefsAllowFileAccessSet( cl_awesomium.webPreferences, true );
-	cl_awe.webPrefsAllowUniversalAccessSet( cl_awesomium.webPreferences, true );
 	return qtrue;
 }
 
@@ -840,7 +880,7 @@ static void *CL_Awesomium_Surface( void ) {
 CL_Awesomium_Startup
 =============
 */
-extern "C" qboolean CL_Awesomium_Startup( const char *runtimePath, const char *basePath, const char *playerName, unsigned int appId, unsigned int steamIdLow, unsigned int steamIdHigh, int width, int height ) {
+extern "C" qboolean CL_Awesomium_Startup( const char *runtimePath, const char *basePath, const char *playerName, unsigned int appId, unsigned int steamIdLow, unsigned int steamIdHigh, int width, int height, const char *initialConfigJson ) {
 	if ( cl_awesomium.started ) {
 		if ( cl_awesomium.webView ) {
 			cl_awe.webViewResize( cl_awesomium.webView, width, height );
@@ -858,7 +898,7 @@ extern "C" qboolean CL_Awesomium_Startup( const char *runtimePath, const char *b
 	}
 	Com_Printf( "Awesomium startup phase: imports loaded\n" );
 
-	if ( !CL_Awesomium_PrepareConfig( runtimePath, basePath, playerName, appId, steamIdLow, steamIdHigh )
+	if ( !CL_Awesomium_PrepareConfig( runtimePath, basePath, playerName, appId, steamIdLow, steamIdHigh, initialConfigJson )
 		|| !CL_Awesomium_PreparePreferences() ) {
 		CL_Awesomium_Shutdown();
 		return qfalse;
@@ -931,7 +971,7 @@ extern "C" qboolean CL_Awesomium_OpenURL( const char *url ) {
 	cl_awe.webViewFocus( cl_awesomium.webView );
 	cl_awe.deleteWebURL( webURL );
 	cl_awesomium.urlLoaded = qtrue;
-	cl_awesomium.startupScriptInjectionFrames = 240;
+	cl_awesomium.startupScriptInjectionFrames = CL_AWE_STARTUP_SCRIPT_RETRY_FRAMES;
 	return qtrue;
 }
 
@@ -960,6 +1000,110 @@ extern "C" qboolean CL_Awesomium_ExecuteJavascript( const char *script, const ch
 	cl_awe.webViewExecuteJavascript( cl_awesomium.webView, wideScript, wideFrame );
 	delete[] (wchar_t *)wideFrame;
 	delete[] (wchar_t *)wideScript;
+	return qtrue;
+}
+
+/*
+=============
+CL_Awesomium_ExecuteJavascriptInteger
+
+Executes JavaScript through the Awesomium C API and converts the return value to
+an integer. This is used for the source-owned qz bridge poller instead of full
+JSValue string marshalling.
+=============
+*/
+static qboolean CL_Awesomium_ExecuteJavascriptInteger( const char *script, const char *frame, int *outValue ) {
+	unsigned short *wideScript;
+	unsigned short *wideFrame;
+	void *value;
+
+	if ( outValue ) {
+		*outValue = 0;
+	}
+	if ( !cl_awesomium.started || !cl_awesomium.webView || !cl_awe.webViewExecuteJavascriptWithResult
+		|| !cl_awe.jsValueToInteger || !cl_awe.deleteJSValue || !script || !script[0] ) {
+		return qfalse;
+	}
+
+	wideScript = CL_Awesomium_AllocWideString( script );
+	wideFrame = CL_Awesomium_AllocWideString( frame ? frame : "" );
+	if ( !wideScript || !wideFrame ) {
+		delete[] (wchar_t *)wideScript;
+		delete[] (wchar_t *)wideFrame;
+		return qfalse;
+	}
+
+	value = cl_awe.webViewExecuteJavascriptWithResult( cl_awesomium.webView, wideScript, wideFrame );
+	delete[] (wchar_t *)wideScript;
+	delete[] (wchar_t *)wideFrame;
+	if ( !value ) {
+		return qfalse;
+	}
+
+	if ( outValue ) {
+		*outValue = cl_awe.jsValueToInteger( value );
+	}
+	cl_awe.deleteJSValue( value );
+	return qtrue;
+}
+
+/*
+=============
+CL_Awesomium_PopJavascriptRequest
+
+Pops one queued qz_instance request from the injected WebUI bridge. Awesomium's
+string JSValue conversion is intentionally avoided here; requests are copied
+out one UTF-16 code unit at a time through integer return values.
+=============
+*/
+extern "C" qboolean CL_Awesomium_PopJavascriptRequest( char *buffer, int bufferSize ) {
+	int length;
+	int i;
+
+	if ( !buffer || bufferSize <= 0 ) {
+		return qfalse;
+	}
+	buffer[0] = '\0';
+
+	if ( !CL_Awesomium_ExecuteJavascriptInteger(
+		"(function(){var q=window.__qlr_native_requests||[];if(!q.length){return -1;}window.__qlr_native_read=String(q.shift());return window.__qlr_native_read.length;})()",
+		"",
+		&length ) ) {
+		return qfalse;
+	}
+	if ( length < 0 ) {
+		return qfalse;
+	}
+	if ( length >= bufferSize ) {
+		length = bufferSize - 1;
+	}
+
+	for ( i = 0; i < length; i++ ) {
+		char script[160];
+		int codepoint;
+
+		_snprintf(
+			script,
+			sizeof( script ),
+			"(function(){var s=window.__qlr_native_read||'';return s.charCodeAt(%d)||0;})()",
+			i
+		);
+		script[sizeof( script ) - 1] = '\0';
+		if ( !CL_Awesomium_ExecuteJavascriptInteger( script, "", &codepoint ) ) {
+			buffer[0] = '\0';
+			return qfalse;
+		}
+		if ( codepoint <= 0 || codepoint > 255 ) {
+			buffer[i] = '?';
+		} else {
+			buffer[i] = (char)codepoint;
+		}
+	}
+	buffer[length] = '\0';
+	CL_Awesomium_ExecuteJavascript(
+		"(function(){window.__qlr_native_read='';})()",
+		""
+	);
 	return qtrue;
 }
 
@@ -1012,8 +1156,15 @@ extern "C" void CL_Awesomium_Update( void ) {
 	if ( cl_awesomium.started && cl_awesomium.webCore ) {
 		cl_awe.webCoreUpdate( cl_awesomium.webCore );
 		if ( cl_awesomium.startupScriptInjectionFrames > 0 && cl_awesomium.webView && cl_awesomium.startupScript[0] ) {
-			if ( ( cl_awesomium.startupScriptInjectionFrames % 10 ) == 0 ) {
-				CL_Awesomium_ExecuteJavascript( cl_awesomium.startupScript, "" );
+			if ( ( cl_awesomium.startupScriptInjectionFrames % CL_AWE_STARTUP_SCRIPT_RETRY_INTERVAL ) == 0 ) {
+				const char *script;
+
+				if ( cl_awesomium.startupScriptInjectionFrames == CL_AWE_STARTUP_SCRIPT_RETRY_FRAMES || !cl_awesomium.startupRetryScript[0] ) {
+					script = cl_awesomium.startupScript;
+				} else {
+					script = cl_awesomium.startupRetryScript;
+				}
+				CL_Awesomium_ExecuteJavascript( script, "" );
 			}
 			cl_awesomium.startupScriptInjectionFrames--;
 		}
@@ -1315,7 +1466,7 @@ extern "C" const char *CL_Awesomium_LastError( void ) {
 CL_Awesomium_Startup
 =============
 */
-extern "C" qboolean CL_Awesomium_Startup( const char *runtimePath, const char *basePath, const char *playerName, unsigned int appId, unsigned int steamIdLow, unsigned int steamIdHigh, int width, int height ) {
+extern "C" qboolean CL_Awesomium_Startup( const char *runtimePath, const char *basePath, const char *playerName, unsigned int appId, unsigned int steamIdLow, unsigned int steamIdHigh, int width, int height, const char *initialConfigJson ) {
 	(void)runtimePath;
 	(void)basePath;
 	(void)playerName;
@@ -1324,6 +1475,7 @@ extern "C" qboolean CL_Awesomium_Startup( const char *runtimePath, const char *b
 	(void)steamIdHigh;
 	(void)width;
 	(void)height;
+	(void)initialConfigJson;
 	return qfalse;
 }
 
@@ -1345,6 +1497,18 @@ CL_Awesomium_ExecuteJavascript
 extern "C" qboolean CL_Awesomium_ExecuteJavascript( const char *script, const char *frame ) {
 	(void)script;
 	(void)frame;
+	return qfalse;
+}
+
+/*
+=============
+CL_Awesomium_PopJavascriptRequest
+=============
+*/
+extern "C" qboolean CL_Awesomium_PopJavascriptRequest( char *buffer, int bufferSize ) {
+	if ( buffer && bufferSize > 0 ) {
+		buffer[0] = '\0';
+	}
 	return qfalse;
 }
 

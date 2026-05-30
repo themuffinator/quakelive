@@ -1,6 +1,6 @@
 # CGame Ownerdrawtype Parity Index
 
-Last updated: 2026-05-28
+Last updated: 2026-05-29
 
 Scope: the cgame ownerdraw block in `src/ui/menudef.h`, from `CG_SERVER_SETTINGS` (`1`) through `CG_MATCH_STATE` (`339`). This index intentionally excludes `CG_SHOW_*` visibility flags, `UI_*` ownerdraws beginning at `UI_OWNERDRAW_BASE` (`512`), and the `src/code/ui/ui_shared.h` source-only legacy aliases after `339`.
 
@@ -25,9 +25,9 @@ Summary:
 | 1 | `CG_SERVER_SETTINGS` | Direct switch: CG_DrawServerSettings custom-settings text plus modified-weapon icon strip. | Checked | No action unless source changes. |
 | 2 | `CG_STARTING_WEAPONS` | Direct switch: CG_DrawStartingWeapons CS_LOADOUT_MASK icon strip plus queued-primary preview. | Checked | No action unless source changes. |
 | 3 | `CG_GAME_LIMIT` | Direct switch: CG_DrawGameLimit retail Cap/Frag/Round/Score limit label. | Checked | No action unless source changes. |
-| 4 | `CG_GAME_TYPE` | Direct switch: CG_DrawGameType. | Checked | No action unless source changes. |
-| 5 | `CG_GAME_TYPE_ICON` | Direct switch: CG_DrawGameTypeIcon. | Checked | No action unless source changes. |
-| 6 | `CG_GAME_TYPE_MAP` | Direct switch: CG_DrawGameTypeMap. | Checked | No action unless source changes. |
+| 4 | `CG_GAME_TYPE` | Direct switch: CG_DrawGameType; only gametype member of CG_OwnerDrawWidth. | Checked | No action unless source changes. |
+| 5 | `CG_GAME_TYPE_ICON` | Direct switch: CG_DrawGameTypeIcon using pre-registered retail HUD `.tga` shaders. | Checked | No action unless source changes. |
+| 6 | `CG_GAME_TYPE_MAP` | Direct switch: CG_DrawGameTypeMap using the shared intro-panel detail string and ownerdraw alignment. | Checked | No action unless source changes. |
 | 7 | `CG_GAME_STATUS` | Direct switch: CG_DrawGameStatus. | Checked | No action unless source changes. |
 | 8 | `CG_MATCH_DETAILS` | Direct switch: CG_DrawMatchDetails. | Checked | No action unless source changes. |
 | 9 | `CG_MATCH_END_CONDITION` | Direct switch: CG_DrawMatchEndCondition. | Checked | No action unless source changes. |
@@ -40,42 +40,42 @@ Summary:
 | 16 | `CG_LOCALTIME` | Direct switch: CG_DrawLocalTime. | Checked | No action unless source changes. |
 | 17 | `CG_PLAYER_COUNTS` | Direct switch: CG_DrawPlayerCounts. | Checked | No action unless source changes. |
 | 18 | `CG_MAP_NAME` | Direct switch: CG_DrawMapName. | Checked | No action unless source changes. |
-| 19 | `CG_VOTEGAMETYPE1` | Direct switch: CG_DrawVoteGametype slot 1. | Checked | No action unless source changes. |
-| 20 | `CG_VOTEGAMETYPE2` | Direct switch: CG_DrawVoteGametype slot 2. | Checked | No action unless source changes. |
-| 21 | `CG_VOTEGAMETYPE3` | Direct switch: CG_DrawVoteGametype slot 3. | Checked | No action unless source changes. |
-| 22 | `CG_VOTEMAP1` | Direct switch: CG_DrawVoteMapSlot slot 1. | Checked | No action unless source changes. |
-| 23 | `CG_VOTEMAP2` | Direct switch: CG_DrawVoteMapSlot slot 2. | Checked | No action unless source changes. |
-| 24 | `CG_VOTEMAP3` | Direct switch: CG_DrawVoteMapSlot slot 3. | Checked | No action unless source changes. |
-| 25 | `CG_VOTESHOT1` | Direct switch: CG_DrawVoteShot slot 1. | Checked | No action unless source changes. |
-| 26 | `CG_VOTESHOT2` | Direct switch: CG_DrawVoteShot slot 2. | Checked | No action unless source changes. |
-| 27 | `CG_VOTESHOT3` | Direct switch: CG_DrawVoteShot slot 3. | Checked | No action unless source changes. |
-| 28 | `CG_VOTENAME1` | Direct switch: CG_DrawVoteName slot 1. | Checked | No action unless source changes. |
-| 29 | `CG_VOTENAME2` | Direct switch: CG_DrawVoteName slot 2. | Checked | No action unless source changes. |
-| 30 | `CG_VOTENAME3` | Direct switch: CG_DrawVoteName slot 3. | Checked | No action unless source changes. |
-| 31 | `CG_VOTECOUNT1` | Direct switch: CG_DrawVoteCount slot 1. | Checked | No action unless source changes. |
-| 32 | `CG_VOTECOUNT2` | Direct switch: CG_DrawVoteCount slot 2. | Checked | No action unless source changes. |
-| 33 | `CG_VOTECOUNT3` | Direct switch: CG_DrawVoteCount slot 3. | Checked | No action unless source changes. |
-| 34 | `CG_VOTETIMER` | Direct switch: CG_DrawVoteTimer. | Checked | No action unless source changes. |
-| 35 | `CG_SPEC_MESSAGES` | Direct switch: CG_DrawSpectatorMessages. | Checked | No action unless source changes. |
-| 36 | `CG_PLAYER_HEAD` | Direct switch: CG_DrawPlayerHead. | Checked | No action unless source changes. |
-| 37 | `CG_PLAYERMODEL` | Direct switch: CG_DrawPlayerModel. | Checked | No action unless source changes. |
-| 38 | `CG_PLAYER_ARMOR_ICON` | Direct switch: CG_DrawPlayerArmorIcon with CG_SHOW_2DONLY handling. | Checked | No action unless source changes. |
-| 39 | `CG_PLAYER_ARMOR_ICON2D` | Direct switch: CG_DrawPlayerArmorIcon forced 2D. | Checked | No action unless source changes. |
-| 40 | `CG_PLAYER_ARMOR_VALUE` | Direct switch: CG_DrawPlayerArmorValue. | Checked | No action unless source changes. |
-| 41 | `CG_PLAYER_ARMOR_BAR_100` | Direct switch: CG_DrawPlayerArmorBar100. | Checked | No action unless source changes. |
-| 42 | `CG_PLAYER_ARMOR_BAR_200` | Direct switch: CG_DrawPlayerArmorBar200. | Checked | No action unless source changes. |
-| 43 | `CG_ARMORTIERED_COLORIZED` | Direct switch: CG_DrawArmorTieredColorized. | Checked | No action unless source changes. |
-| 44 | `CG_PLAYER_HEALTH` | Direct switch: CG_DrawPlayerHealth. | Checked | No action unless source changes. |
-| 45 | `CG_PLAYER_HEALTH_BAR_100` | Direct switch: CG_DrawPlayerHealthBar100. | Checked | No action unless source changes. |
-| 46 | `CG_PLAYER_HEALTH_BAR_200` | Direct switch: CG_DrawPlayerHealthBar200. | Checked | No action unless source changes. |
-| 47 | `CG_PLAYER_AMMO_ICON` | Direct switch: CG_DrawPlayerAmmoIcon with CG_SHOW_2DONLY handling. | Checked | No action unless source changes. |
-| 48 | `CG_PLAYER_AMMO_ICON2D` | Direct switch: CG_DrawPlayerAmmoIcon forced 2D. | Checked | No action unless source changes. |
-| 49 | `CG_PLAYER_AMMO_VALUE` | Direct switch: CG_DrawPlayerAmmoValue. | Checked | No action unless source changes. |
-| 50 | `CG_PLAYER_ITEM` | Direct switch: CG_DrawPlayerItem. | Checked | No action unless source changes. |
-| 51 | `CG_PLAYER_SCORE` | Direct switch: CG_DrawScoreValue. | Checked | No action unless source changes. |
-| 52 | `CG_RACE_STATUS` | Direct switch: CG_DrawRaceStatusAndTimes. | Checked | No action unless source changes. |
-| 53 | `CG_RACE_TIMES` | Direct switch: CG_DrawRaceStatusAndTimes. | Checked | No action unless source changes. |
-| 54 | `CG_ONEFLAG_STATUS` | Direct switch: CG_OneFlagStatus. | Checked | No action unless source changes. |
+| 19 | `CG_VOTEGAMETYPE1` | Direct switch: CG_DrawVoteGametype slot 1 with retail ownerdraw alignment and `ui_voteGametype1` payload. | Checked | No action unless source changes. |
+| 20 | `CG_VOTEGAMETYPE2` | Direct switch: CG_DrawVoteGametype slot 2 with retail ownerdraw alignment and `ui_voteGametype2` payload. | Checked | No action unless source changes. |
+| 21 | `CG_VOTEGAMETYPE3` | Direct switch: CG_DrawVoteGametype slot 3 with retail ownerdraw alignment and `ui_voteGametype3` payload. | Checked | No action unless source changes. |
+| 22 | `CG_VOTEMAP1` | Direct switch: CG_DrawVoteMapSlot slot 1 with retail ownerdraw alignment and `ui_voteMap1` payload. | Checked | No action unless source changes. |
+| 23 | `CG_VOTEMAP2` | Direct switch: CG_DrawVoteMapSlot slot 2 with retail ownerdraw alignment and `ui_voteMap2` payload. | Checked | No action unless source changes. |
+| 24 | `CG_VOTEMAP3` | Direct switch: CG_DrawVoteMapSlot slot 3 with retail ownerdraw alignment and `ui_voteMap3` payload. | Checked | No action unless source changes. |
+| 25 | `CG_VOTESHOT1` | Direct switch: CG_DrawVoteShot slot 1 with `ui_voteShot1`, default preview fallback, and `levelshots/preview/%s`. | Checked | No action unless source changes. |
+| 26 | `CG_VOTESHOT2` | Direct switch: CG_DrawVoteShot slot 2 with `ui_voteShot2`, default preview fallback, and `levelshots/preview/%s`. | Checked | No action unless source changes. |
+| 27 | `CG_VOTESHOT3` | Direct switch: CG_DrawVoteShot slot 3 with `ui_voteShot3`, default preview fallback, and `levelshots/preview/%s`. | Checked | No action unless source changes. |
+| 28 | `CG_VOTENAME1` | Direct switch: CG_DrawVoteName slot 1 with retail ownerdraw alignment and `ui_voteName1` / map fallback payload. | Checked | No action unless source changes. |
+| 29 | `CG_VOTENAME2` | Direct switch: CG_DrawVoteName slot 2 with retail ownerdraw alignment and `ui_voteName2` / map fallback payload. | Checked | No action unless source changes. |
+| 30 | `CG_VOTENAME3` | Direct switch: CG_DrawVoteName slot 3 with retail ownerdraw alignment and `ui_voteName3` / map fallback payload. | Checked | No action unless source changes. |
+| 31 | `CG_VOTECOUNT1` | Direct switch: CG_DrawVoteCount slot 1 with retail `Votes: %s` text and ownerdraw alignment. | Checked | No action unless source changes. |
+| 32 | `CG_VOTECOUNT2` | Direct switch: CG_DrawVoteCount slot 2 with retail `Votes: %s` text and ownerdraw alignment. | Checked | No action unless source changes. |
+| 33 | `CG_VOTECOUNT3` | Direct switch: CG_DrawVoteCount slot 3 with retail `Votes: %s` text and ownerdraw alignment. | Checked | No action unless source changes. |
+| 34 | `CG_VOTETIMER` | Direct switch: CG_DrawVoteTimer with retail `cgs.voteTime - cg.time + 20000` countdown text and ownerdraw alignment. | Checked | No action unless source changes. |
+| 35 | `CG_SPEC_MESSAGES` | Direct switch: CG_DrawSpectatorMessages with the retail Round In Progress/SPECTATOR MODE/join-hint copy family. | Checked | No action unless source changes. |
+| 36 | `CG_PLAYER_HEAD` | Direct switch: CG_DrawPlayerHead with the local head damage kick and idle yaw/pitch interpolation. | Checked | No action unless source changes. |
+| 37 | `CG_PLAYERMODEL` | Direct switch: CG_DrawPlayerModel tracked/local preview with 5/210/0 preview angles. | Checked | No action unless source changes. |
+| 38 | `CG_PLAYER_ARMOR_ICON` | Direct switch: CG_DrawPlayerArmorIcon; CG_SHOW_2DONLY selects flat icon instead of the spinning 3D armor model. | Checked | No action unless source changes. |
+| 39 | `CG_PLAYER_ARMOR_ICON2D` | Direct switch: CG_DrawPlayerArmorIcon forced to the flat 2D armor icon path. | Checked | No action unless source changes. |
+| 40 | `CG_PLAYER_ARMOR_VALUE` | Direct switch: CG_DrawPlayerArmorValue; value callback returns STAT_ARMOR and draw path matches retail shader-or-aligned-number behavior. | Checked | No action unless source changes. |
+| 41 | `CG_PLAYER_ARMOR_BAR_100` | Direct switch: CG_DrawPlayerArmorBar100, clamping armor to the primary 0-100 right-clipped team-color bar. | Checked | No action unless source changes. |
+| 42 | `CG_PLAYER_ARMOR_BAR_200` | Direct switch: CG_DrawPlayerArmorBar200, subtracting 100 armor and drawing only the bottom-clipped excess segment. | Checked | No action unless source changes. |
+| 43 | `CG_ARMORTIERED_COLORIZED` | Direct switch: CG_DrawArmorTieredColorized using replicated STAT_ARMOR_TIER and half-alpha fill. | Checked | No action unless source changes. |
+| 44 | `CG_PLAYER_HEALTH` | Direct switch: CG_DrawPlayerHealth; value callback returns STAT_HEALTH and draw path matches retail shader-or-aligned-number behavior. | Checked | No action unless source changes. |
+| 45 | `CG_PLAYER_HEALTH_BAR_100` | Direct switch: CG_DrawPlayerHealthBar100, clamping STAT_HEALTH against STAT_MAX_HEALTH for the primary team-color bar. | Checked | No action unless source changes. |
+| 46 | `CG_PLAYER_HEALTH_BAR_200` | Direct switch: CG_DrawPlayerHealthBar200, subtracting STAT_MAX_HEALTH and drawing only the bottom-clipped excess-health segment. | Checked | No action unless source changes. |
+| 47 | `CG_PLAYER_AMMO_ICON` | Direct switch: CG_DrawPlayerAmmoIcon; CG_SHOW_2DONLY selects the 2D ammo icon, otherwise retail can draw the current ammo model. | Checked | No action unless source changes. |
+| 48 | `CG_PLAYER_AMMO_ICON2D` | Direct switch: CG_DrawPlayerAmmoIcon forced to the 2D ammo icon path. | Checked | No action unless source changes. |
+| 49 | `CG_PLAYER_AMMO_VALUE` | Direct switch: CG_DrawPlayerAmmoValue; value callback returns current weapon ammo and draw path preserves finite text, shader, and infinite-ammo icon fallback. | Checked | No action unless source changes. |
+| 50 | `CG_PLAYER_ITEM` | Direct switch: CG_DrawPlayerItem; renders the active holdable item and the invulnerability timer percent from the replicated holdable timer stats. | Checked | No action unless source changes. |
+| 51 | `CG_PLAYER_SCORE` | Direct switch: CG_DrawScoreValue; value callback returns PERS_SCORE while draw uses the retail Race client score/time formatter when appropriate. | Checked | No action unless source changes. |
+| 52 | `CG_RACE_STATUS` | Direct switch: shared CG_DrawRaceStatusAndTimes status branch with the recovered respawn/status text source. | Checked | No action unless source changes. |
+| 53 | `CG_RACE_TIMES` | Direct switch: shared CG_DrawRaceStatusAndTimes timing branch with current/last/best/leader Race timing strings. | Checked | No action unless source changes. |
+| 54 | `CG_ONEFLAG_STATUS` | Direct switch: CG_OneFlagStatus using the retail flag-status shader bank, white draw color, and stolen-flag score-dependent y offset. | Checked | No action unless source changes. |
 | 55 | `CG_PLAYER_HASFLAG` | Direct switch: CG_DrawPlayerHasFlag in model/icon mode. | Checked | No action unless source changes. |
 | 56 | `CG_PLAYER_HASFLAG2D` | Direct switch: CG_DrawPlayerHasFlag forced 2D. | Checked | No action unless source changes. |
 | 57 | `CG_HARVESTER_SKULLS` | Direct switch: CG_HarvesterSkulls in 3D-capable mode. | Checked | No action unless source changes. |
@@ -96,19 +96,19 @@ Summary:
 | 72 | `CG_RAMPAGES` | Explicit retail no-op case; no medal/helper route. | Checked no-op | Keep inert; no width/value/key route. |
 | 73 | `CG_MIDAIRS` | Explicit retail no-op case; no medal/helper route. | Checked no-op | Keep inert; no width/value/key route. |
 | 74 | `CG_PERFECT` | Direct switch: CG_DrawMedal. | Checked | No action unless source changes. |
-| 75 | `CG_MOST_VALUABLE_OFFENSIVE_PLYR` | Pre-switch award player helper: CS_AWARD_MOST_VALUABLE_OFFENSIVE. | Checked | No action unless source changes. |
-| 76 | `CG_MOST_VALUABLE_DEFENSIVE_PLYR` | Pre-switch award player helper: CS_AWARD_MOST_VALUABLE_DEFENSIVE. | Checked | No action unless source changes. |
-| 77 | `CG_MOST_VALUABLE_PLYR` | Pre-switch award player helper: CS_AWARD_MOST_VALUABLE. | Checked | No action unless source changes. |
-| 78 | `CG_BEST_ITEMCONTROL_PLYR` | Pre-switch award player helper: CS_AWARD_BEST_ITEMCONTROL. | Checked | No action unless source changes. |
-| 79 | `CG_MOST_ACCURATE_PLYR` | Pre-switch award player helper: CS_AWARD_MOST_ACCURATE. | Checked | No action unless source changes. |
+| 75 | `CG_MOST_VALUABLE_OFFENSIVE_PLYR` | Pre-switch award player helper: CS_AWARD_MOST_VALUABLE_OFFENSIVE profile image. | Checked | No action unless source changes. |
+| 76 | `CG_MOST_VALUABLE_DEFENSIVE_PLYR` | Pre-switch award player helper: CS_AWARD_MOST_VALUABLE_DEFENSIVE profile image. | Checked | No action unless source changes. |
+| 77 | `CG_MOST_VALUABLE_PLYR` | Pre-switch award player helper: CS_AWARD_MOST_VALUABLE profile image. | Checked | No action unless source changes. |
+| 78 | `CG_BEST_ITEMCONTROL_PLYR` | Pre-switch award player helper: CS_AWARD_BEST_ITEMCONTROL profile image. | Checked | No action unless source changes. |
+| 79 | `CG_MOST_ACCURATE_PLYR` | Pre-switch award player helper: CS_AWARD_MOST_ACCURATE profile image. | Checked | No action unless source changes. |
 | 80 | `CG_MOST_DAMAGEDEALT_PLYR` | Pre-switch award player helper: CS_AWARD_MOST_DAMAGEDEALT. | Checked | No action unless source changes. |
 | 81 | `CG_SPECTATORS` | Direct switch gated by spectatorEntryCount, then CG_DrawTeamSpectators. | Checked | No action unless source changes. |
 | 82 | `CG_MATCH_WINNER` | Direct switch: CG_DrawMatchWinner. | Checked | No action unless source changes. |
-| 83 | `CG_1STPLACE` | Direct switch: CG_DrawScoreValue. | Checked | No action unless source changes. |
-| 84 | `CG_1ST_PLACE_SCORE` | Direct switch: CG_Draw1stPlaceScore. | Checked | No action unless source changes. |
+| 83 | `CG_1STPLACE` | Direct switch: CG_DrawScoreValue compact score helper, including Race `[-]Ns` formatting; touches competitive score cache. | Checked | No action unless source changes. |
+| 84 | `CG_1ST_PLACE_SCORE` | Direct switch: CG_Draw1stPlaceScore wide score line. | Checked | No action unless source changes. |
 | 85 | `CG_1STPLACE_PLYR_MODEL` | Direct switch: CG_DrawFirstPlaceModel inactive variant. | Checked | No action unless source changes. |
-| 86 | `CG_2NDPLACE` | Direct switch: CG_DrawScoreValue. | Checked | No action unless source changes. |
-| 87 | `CG_2ND_PLACE_SCORE` | Direct switch: CG_Draw2ndPlaceScore. | Checked | No action unless source changes. |
+| 86 | `CG_2NDPLACE` | Direct switch: CG_DrawScoreValue compact score helper, including Race `[-]Ns` formatting; touches competitive score cache. | Checked | No action unless source changes. |
+| 87 | `CG_2ND_PLACE_SCORE` | Direct switch: CG_Draw2ndPlaceScore wide score line with retail spectator/local-row selection. | Checked | No action unless source changes. |
 | 88 | `CG_PLAYER_OBIT` | Direct switch: CG_DrawPlayerObituary. | Checked | No action unless source changes. |
 | 89 | `CG_AREA_NEW_CHAT` | Direct switch: CG_DrawNewChatArea. | Checked | No action unless source changes. |
 | 90 | `CG_PLYR_END_GAME_SCORE` | Direct switch: CG_DrawEndGameScore. | Checked | No action unless source changes. |
@@ -121,33 +121,33 @@ Summary:
 | 97 | `CG_WP_VERTICAL` | Direct switch: CG_DrawWeaponVertical. | Checked | No action unless source changes. |
 | 98 | `CG_ACC_VERTICAL` | Direct switch: CG_DrawAccVertical. | Checked | No action unless source changes. |
 | 99 | `CG_TEAM_COLORIZED` | Direct switch: CG_DrawTeamColorized with competitive HUD shader fallback. | Checked | No action unless source changes. |
-| 100 | `CG_TEAM_PLYR_COUNT` | Direct switch gated by CG_ShowPlayersRemaining, then CG_DrawPlayerCount friendly side. | Checked | No action unless source changes. |
-| 101 | `CG_ENEMY_PLYR_COUNT` | Direct switch gated by CG_ShowPlayersRemaining, then CG_DrawPlayerCount enemy side. | Checked | No action unless source changes. |
+| 100 | `CG_TEAM_PLYR_COUNT` | Direct switch gated by CG_ShowPlayersRemaining, then CG_DrawPlayerCount friendly side at the raw ownerdraw origin. | Checked | No action unless source changes. |
+| 101 | `CG_ENEMY_PLYR_COUNT` | Direct switch gated by CG_ShowPlayersRemaining, then CG_DrawPlayerCount enemy side at the raw ownerdraw origin. | Checked | No action unless source changes. |
 | 102 | `CG_1STPLACE_PLYR_MODEL_ACTIVE` | Explicit retail no-op case for raw 0x66. | Checked no-op | Keep inert; no width/value/key route. |
 | 103 | `CG_1ST_PLYR` | Direct switch: CG_DrawSpectatorPlayerName slot 0. | Checked | No action unless source changes. |
 | 104 | `CG_1ST_PLYR_READY` | Pre-switch placement helper: primary ready/status. | Checked | No action unless source changes. |
 | 105 | `CG_1ST_PLYR_SCORE` | Direct switch: CG_DrawSpectatorPlayerScore slot 0. | Checked | No action unless source changes. |
 | 106 | `CG_1ST_PLYR_FRAGS` | Pre-switch placement helper: frags slot 0. | Checked | No action unless source changes. |
-| 107 | `CG_1ST_PLYR_DEATHS` | Pre-switch placement helper: deaths slot 0. | Checked | No action unless source changes. |
-| 108 | `CG_1ST_PLYR_DMG` | Pre-switch placement helper: damage slot 0. | Checked | No action unless source changes. |
+| 107 | `CG_1ST_PLYR_DEATHS` | Pre-switch placement helper: deaths slot 0, `%i` from retail score death offset, baseline paint. | Checked | No action unless source changes. |
+| 108 | `CG_1ST_PLYR_DMG` | Pre-switch placement helper: damage slot 0, `%i` from retail score damage offset, baseline paint. | Checked | No action unless source changes. |
 | 109 | `CG_1ST_PLYR_TIME` | Explicit retail no-op case for raw 0x6d. | Checked no-op | Keep inert; no width/value/key route. |
-| 110 | `CG_1ST_PLYR_PING` | Pre-switch placement helper: ping slot 0. | Checked | No action unless source changes. |
-| 111 | `CG_1ST_PLYR_WINS` | Pre-switch placement helper: wins slot 0. | Checked | No action unless source changes. |
-| 112 | `CG_1ST_PLYR_ACC` | Pre-switch placement helper: total accuracy slot 0. | Checked | No action unless source changes. |
-| 113 | `CG_1ST_PLYR_FLAG` | Pre-switch placement helper: flag icon slot 0. | Checked | No action unless source changes. |
-| 114 | `CG_1ST_PLYR_AVATAR` | Direct switch: CG_DrawPlacementAvatarOwnerDraw slot 0. | Checked | No action unless source changes. |
+| 110 | `CG_1ST_PLYR_PING` | Pre-switch placement helper: ping slot 0, `%i` with retail `>40`/`>80` RGB warning tint and `0.8` alpha. | Checked | No action unless source changes. |
+| 111 | `CG_1ST_PLYR_WINS` | Pre-switch placement helper: wins/losses slot 0, matching retail's preformatted `%d/%d` string path and baseline paint. | Checked | No action unless source changes. |
+| 112 | `CG_1ST_PLYR_ACC` | Pre-switch placement helper: total accuracy slot 0, retail `%d%%` text and baseline paint. | Checked | No action unless source changes. |
+| 113 | `CG_1ST_PLYR_FLAG` | Pre-switch placement helper: flag icon slot 0 from cached country-flag shader / `CG_RegisterCountryFlag` fallback. | Checked | No action unless source changes. |
+| 114 | `CG_1ST_PLYR_AVATAR` | Direct switch: CG_DrawPlacementAvatarOwnerDraw slot 0, using the native avatar handle when profile images and identity are available before falling back to the model icon. | Checked | No action unless source changes. |
 | 115 | `CG_1ST_PLYR_TIMEOUT_COUNT` | Explicit retail no-op case for raw 0x73. | Checked no-op | Keep inert; no width/value/key route. |
-| 116 | `CG_1ST_PLYR_HEALTH_ARMOR` | Direct switch: CG_DrawSpectatorComparison slot family. | Checked | No action unless source changes. |
-| 117 | `CG_1ST_PLYR_FRAGS_G` | Pre-switch placement helper: weapon frags G slot 0. | Checked | No action unless source changes. |
-| 118 | `CG_1ST_PLYR_FRAGS_MG` | Pre-switch placement helper: weapon frags MG slot 0. | Checked | No action unless source changes. |
-| 119 | `CG_1ST_PLYR_FRAGS_SG` | Pre-switch placement helper: weapon frags SG slot 0. | Checked | No action unless source changes. |
-| 120 | `CG_1ST_PLYR_FRAGS_GL` | Pre-switch placement helper: weapon frags GL slot 0. | Checked | No action unless source changes. |
-| 121 | `CG_1ST_PLYR_FRAGS_RL` | Pre-switch placement helper: weapon frags RL slot 0. | Checked | No action unless source changes. |
-| 122 | `CG_1ST_PLYR_FRAGS_LG` | Pre-switch placement helper: weapon frags LG slot 0. | Checked | No action unless source changes. |
-| 123 | `CG_1ST_PLYR_FRAGS_RG` | Pre-switch placement helper: weapon frags RG slot 0. | Checked | No action unless source changes. |
-| 124 | `CG_1ST_PLYR_FRAGS_PG` | Pre-switch placement helper: weapon frags PG slot 0. | Checked | No action unless source changes. |
-| 125 | `CG_1ST_PLYR_FRAGS_BFG` | Pre-switch placement helper: weapon frags BFG slot 0. | Checked | No action unless source changes. |
-| 126 | `CG_1ST_PLYR_FRAGS_CG` | Pre-switch placement helper: weapon frags CG slot 0. | Checked | No action unless source changes. |
+| 116 | `CG_1ST_PLYR_HEALTH_ARMOR` | Direct switch: CG_DrawSpectatorComparison slot family, `cg_specDuelHealthArmor` gated with local playerState stat wiring, tracked-client fallback, retail color constants, damage-loss segment, right-aligned primary health/armor bands, and no synthetic text/marker overlay. | Checked | No action unless source changes. |
+| 117 | `CG_1ST_PLYR_FRAGS_G` | Pre-switch placement helper: weapon frags G slot 0, retail `0x100368A0` / `%d` paint path fed by the compact `scorestats` weapon order. | Checked | Guard weapon mapping, server send, cgame parse, and formatter together. |
+| 118 | `CG_1ST_PLYR_FRAGS_MG` | Pre-switch placement helper: weapon frags MG slot 0, retail `0x100368A0` / `%d` paint path fed by the compact `scorestats` weapon order. | Checked | Guard weapon mapping, server send, cgame parse, and formatter together. |
+| 119 | `CG_1ST_PLYR_FRAGS_SG` | Pre-switch placement helper: weapon frags SG slot 0, retail `0x100368A0` / `%d` paint path fed by the compact `scorestats` weapon order. | Checked | Guard weapon mapping, server send, cgame parse, and formatter together. |
+| 120 | `CG_1ST_PLYR_FRAGS_GL` | Pre-switch placement helper: weapon frags GL slot 0, retail `0x100368A0` / `%d` paint path fed by the compact `scorestats` weapon order. | Checked | Guard weapon mapping, server send, cgame parse, and formatter together. |
+| 121 | `CG_1ST_PLYR_FRAGS_RL` | Pre-switch placement helper: weapon frags RL slot 0, retail `0x100368A0` / `%d` paint path fed by the compact `scorestats` weapon order. | Checked | Guard weapon mapping, server send, cgame parse, and formatter together. |
+| 122 | `CG_1ST_PLYR_FRAGS_LG` | Pre-switch placement helper: weapon frags LG slot 0, retail `0x100368A0` / `%d` paint path with resolver return `6` and compact `scorestats` wiring. | Checked | Guard weapon mapping, server send, cgame parse, and formatter together. |
+| 123 | `CG_1ST_PLYR_FRAGS_RG` | Pre-switch placement helper: weapon frags RG slot 0, retail `0x100368A0` / `%d` paint path with resolver return `7` and compact `scorestats` wiring. | Checked | Guard weapon mapping, server send, cgame parse, and formatter together. |
+| 124 | `CG_1ST_PLYR_FRAGS_PG` | Pre-switch placement helper: weapon frags PG slot 0, retail `0x100368A0` / `%d` paint path with resolver return `8` and compact `scorestats` wiring. | Checked | Guard weapon mapping, server send, cgame parse, and formatter together. |
+| 125 | `CG_1ST_PLYR_FRAGS_BFG` | Pre-switch placement helper: weapon frags BFG slot 0, retail `0x100368A0` / `%d` paint path with resolver return `9` and compact `scorestats` wiring. | Checked | Guard weapon mapping, server send, cgame parse, and formatter together. |
+| 126 | `CG_1ST_PLYR_FRAGS_CG` | Pre-switch placement helper: weapon frags CG slot 0, retail `0x100368A0` / `%d` paint path with resolver return `0xd` and compact `scorestats` wiring. | Checked | Guard weapon mapping, server send, cgame parse, and formatter together. |
 | 127 | `CG_1ST_PLYR_FRAGS_NG` | Pre-switch placement helper: weapon frags NG slot 0. | Checked | No action unless source changes. |
 | 128 | `CG_1ST_PLYR_FRAGS_PL` | Pre-switch placement helper: weapon frags PL slot 0. | Checked | No action unless source changes. |
 | 129 | `CG_1ST_PLYR_FRAGS_HMG` | Pre-switch placement helper: weapon frags HMG slot 0. | Checked | No action unless source changes. |
@@ -221,13 +221,13 @@ Summary:
 | 197 | `CG_2ND_PLYR_DEATHS` | Pre-switch placement helper: deaths slot 1. | Checked | No action unless source changes. |
 | 198 | `CG_2ND_PLYR_DMG` | Pre-switch placement helper: damage slot 1. | Checked | No action unless source changes. |
 | 199 | `CG_2ND_PLYR_TIME` | Implicit default no-op; absent from retail placement helper and switch route. | Checked no-op | Keep inert; no width/value/key route. |
-| 200 | `CG_2ND_PLYR_PING` | Pre-switch placement helper: ping slot 1. | Checked | No action unless source changes. |
-| 201 | `CG_2ND_PLYR_WINS` | Pre-switch placement helper: wins slot 1. | Checked | No action unless source changes. |
-| 202 | `CG_2ND_PLYR_ACC` | Pre-switch placement helper: total accuracy slot 1. | Checked | No action unless source changes. |
-| 203 | `CG_2ND_PLYR_FLAG` | Pre-switch placement helper: flag icon slot 1. | Checked | No action unless source changes. |
-| 204 | `CG_2ND_PLYR_AVATAR` | Direct switch: CG_DrawPlacementAvatarOwnerDraw slot 1. | Checked | No action unless source changes. |
+| 200 | `CG_2ND_PLYR_PING` | Pre-switch placement helper: ping slot 1, sharing the retail `>40`/`>80` RGB warning tint and `0.8` alpha. | Checked | No action unless source changes. |
+| 201 | `CG_2ND_PLYR_WINS` | Pre-switch placement helper: wins/losses slot 1, sharing the retail `%d/%d` string path. | Checked | No action unless source changes. |
+| 202 | `CG_2ND_PLYR_ACC` | Pre-switch placement helper: total accuracy slot 1, sharing the retail `%d%%` text path. | Checked | No action unless source changes. |
+| 203 | `CG_2ND_PLYR_FLAG` | Pre-switch placement helper: flag icon slot 1 from cached country-flag shader / `CG_RegisterCountryFlag` fallback. | Checked | No action unless source changes. |
+| 204 | `CG_2ND_PLYR_AVATAR` | Direct switch: CG_DrawPlacementAvatarOwnerDraw slot 1, sharing the avatar-handle then model-icon fallback path. | Checked | No action unless source changes. |
 | 205 | `CG_2ND_PLYR_TIMEOUT_COUNT` | Explicit retail no-op case for raw 0xcd. | Checked no-op | Keep inert; no width/value/key route. |
-| 206 | `CG_2ND_PLYR_HEALTH_ARMOR` | Direct switch: CG_DrawSpectatorComparison slot family. | Checked | No action unless source changes. |
+| 206 | `CG_2ND_PLYR_HEALTH_ARMOR` | Direct switch: CG_DrawSpectatorComparison slot family, sharing the cvar/stat/fallback band drawing, damage-loss segment, and left-aligned secondary bars. | Checked | No action unless source changes. |
 | 207 | `CG_2ND_PLYR_FRAGS_G` | Pre-switch placement helper: weapon frags G slot 1. | Checked | No action unless source changes. |
 | 208 | `CG_2ND_PLYR_FRAGS_MG` | Pre-switch placement helper: weapon frags MG slot 1. | Checked | No action unless source changes. |
 | 209 | `CG_2ND_PLYR_FRAGS_SG` | Pre-switch placement helper: weapon frags SG slot 1. | Checked | No action unless source changes. |

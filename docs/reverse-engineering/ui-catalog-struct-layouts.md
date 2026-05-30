@@ -121,10 +121,10 @@ preview, skirmish launch setup, and single-player best-score lookups.
 | --- | --- | --- | --- |
 | `0x00` | `mapName` | `const char *` | Human-readable map title. Used in map ownerdraws and best-score labels. |
 | `0x04` | `mapLoadName` | `const char *` | Canonical BSP/map token used for launching, vote commands, levelshot lookup, and demo/best-score keys. |
-| `0x08` | `imageName` | `const char *` | Levelshot shader path. `UI_LoadArenas` seeds `levelshots/<mapLoadName>`; the legacy `UI_ParseGameInfo` map path expects the same role even though it registers a small-shot handle directly. |
+| `0x08` | `imageName` | `const char *` | Levelshot shader path. Retail `UI_LoadArenas` seeds `levelshots/preview/<mapLoadName>` from `.arena` metadata; the legacy `UI_ParseGameInfo` map path keeps the same member role even though it registers a small-shot handle directly. |
 | `0x0C` | `opponentName` | `const char *` | Default opponent model/name token for single-player or skirmish setup. `UI_StartSkirmish` pushes this into `ui_opponentModel`. |
 | `0x10` | `teamMembers` | `int` | Team-size hint for scripted skirmish launch setup. Strongly owned by the legacy `UI_ParseGameInfo` map block; `UI_LoadArenas` does not actively refresh it. |
-| `0x14` | `typeBits` | `int` | Bitmask of supported gametypes. Used by `UI_MapCountByGameType` and seeded by both the arena loader and the legacy gameinfo parser. |
+| `0x14` | `typeBits` | `int` | Bitmask of supported gametypes. Used by `UI_MapCountByGameType` and seeded by both the arena loader and the legacy gameinfo parser. The retail arena loader uses short-token substring checks (`duel`, `race`, `overload`, `hh`/`har`, `ft`, `dom`, `ad`, `rr`) and treats an empty `type` as FFA. |
 | `0x18` | `cinematic` | `int` | Map preview cinematic handle with the usual `-1` not-started / `-2` failed sentinels. |
 | `0x1C` | `timeToBeat` | `int[MAX_GAMETYPES]` | Per-gametype par/best-time values indexed by `gtEnum`. Drawn by `UI_DrawMapTimeToBeat`; strongest ownership is the legacy `UI_ParseGameInfo` map block. |
 | `0x5C` | `levelShot` | `qhandle_t` | Cached levelshot shader handle. |

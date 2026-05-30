@@ -1764,7 +1764,7 @@ static vm_t *SV_LoadGameModule( vmInterpret_t interpret ) {
 	SV_InitGameImports();
 
 	if ( interpret != VMI_COMPILED ) {
-		vm = VM_Create( "qagame", SV_GameSystemCalls, VMI_NATIVE, ql_game_imports, GAME_API_VERSION );
+		vm = VM_Create( "qagame", SV_GameSystemCalls, VMI_NATIVE, ql_game_imports, GAME_NATIVE_API_VERSION );
 		if ( vm ) {
 			if ( vm->dllHandle || interpret != VMI_BYTECODE || !vm->compiled ) {
 				return vm;

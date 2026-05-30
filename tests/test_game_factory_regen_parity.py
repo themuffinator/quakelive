@@ -510,9 +510,11 @@ def test_factory_apply_resets_factory_managed_cvars_before_overrides() -> None:
 	assert 'trap_Cvar_Set( "g_ammoPack", STRINGIZE( DEFAULT_AMMO_PACK_TOGGLE ) );' in config_c
 	assert 'trap_Cvar_Set( "g_ammoPackHack", STRINGIZE( DEFAULT_AMMO_PACK_HACK ) );' in config_c
 	assert 'trap_Cvar_Set( "g_weaponRespawn", STRINGIZE( DEFAULT_WEAPON_RESPAWN_SECONDS ) );' in config_c
+	assert "g_weaponRespawn.modificationCount = -1;" in config_c
 	assert "trap_Cvar_Update( &g_weaponRespawn );" in config_c
 	assert 'trap_Cvar_Set( "g_ammoRespawn", STRINGIZE( DEFAULT_AMMO_RESPAWN_SECONDS ) );' in config_c
-	assert config_c.index('trap_Cvar_Set( "g_weaponRespawn", STRINGIZE( DEFAULT_WEAPON_RESPAWN_SECONDS ) );') < config_c.index("trap_Cvar_Update( &g_weaponRespawn );")
+	assert config_c.index('trap_Cvar_Set( "g_weaponRespawn", STRINGIZE( DEFAULT_WEAPON_RESPAWN_SECONDS ) );') < config_c.index("g_weaponRespawn.modificationCount = -1;")
+	assert config_c.index("g_weaponRespawn.modificationCount = -1;") < config_c.index("trap_Cvar_Update( &g_weaponRespawn );")
 	assert config_c.index("trap_Cvar_Update( &g_weaponRespawn );") < config_c.index('trap_Cvar_Set( "g_ammoRespawn", STRINGIZE( DEFAULT_AMMO_RESPAWN_SECONDS ) );')
 	assert 'trap_Cvar_Set( "g_regenHealth", STRINGIZE( DEFAULT_REGEN_HEALTH_DELAY_MILLISECONDS ) );' in config_c
 	assert 'trap_Cvar_Set( "g_spawnItemPowerup", STRINGIZE( DEFAULT_SPAWN_ITEM_POWERUP ) );' in config_c
@@ -601,6 +603,8 @@ def test_weapon_respawn_zero_drives_retail_weapon_stay_pickup_path() -> None:
 		"references/hlil/quakelive/cgamex86.dll/cgamex86.dll_hlil_split/cgamex86.dll_hlil_part02.txt"
 	)
 	pickup_weapon_body = _function_body(g_items, "int Pickup_Weapon (gentity_t *ent, gentity_t *other)")
+	touch_item_body = _function_body(g_items, "void Touch_Item (gentity_t *ent, gentity_t *other, trace_t *trace)")
+	sync_weapon_respawn_body = _function_body(g_items, "static void G_SyncWeaponRespawnCvarForItem( const gitem_t *item )")
 
 	assert "1004e95d  if (data_1059c4ac == 0)" in qagame_hlil
 	assert "1004e9fe  if (data_1059c4ac == 0 && *(arg3 + 0xac) == 0)" in qagame_hlil
@@ -616,6 +620,11 @@ def test_weapon_respawn_zero_drives_retail_weapon_stay_pickup_path() -> None:
 	assert "return ( g_weaponRespawn.integer == 0 ) ? qtrue : qfalse;" in bg_misc
 	assert "if ( !BG_IsWeaponsStayEnabled() ) {\n\t\treturn qtrue;\n\t}" in bg_misc
 	assert "return ( ps->ammo[weapon] == 0 ) ? qtrue : qfalse;" in bg_misc
+	assert "item->giType != IT_WEAPON" in sync_weapon_respawn_body
+	assert "g_weaponRespawn.modificationCount = -1;" in sync_weapon_respawn_body
+	assert "trap_Cvar_Update( &g_weaponRespawn );" in sync_weapon_respawn_body
+	assert touch_item_body.index("G_SyncWeaponRespawnCvarForItem( ent->item );") < touch_item_body.index("BG_CanItemBeGrabbed")
+	assert touch_item_body.index("BG_CanItemBeGrabbed") < touch_item_body.index("respawn = Pickup_Weapon(ent, other);")
 	assert "if ( g_weaponRespawn.integer == 0 && !( ent->flags & FL_DROPPED_ITEM )" in pickup_weapon_body
 	assert "&& other->client->ps.ammo[weapon] != 0 ) {" in pickup_weapon_body
 	assert "quantity = ent->count;" in pickup_weapon_body

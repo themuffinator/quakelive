@@ -21,15 +21,15 @@ This note records the current retail mapping for the Quake Live Awesomium browse
 | --- | --- | --- |
 | 1 | Gate browser startup on platform/service state, then request `asset://ql/index.html`. | `src/code/client/cl_main.c`, `src/code/client/cl_awesomium_win32.cpp` |
 | 2 | Construct `Awesomium::WebConfig` and call `Awesomium::WebCore::Initialize`. | `CL_Awesomium_Startup` |
-| 3 | Construct `Awesomium::WebPreferences`. Retail sets two observed local preference bytes before WebSession creation. | Partially reconstructed in `CL_Awesomium_Startup`; exact preference field names remain open. |
+| 3 | Construct `Awesomium::WebPreferences`. Retail sets two observed local preference bytes before WebSession creation. | Reconstructed in `CL_Awesomium_PreparePreferences` as `enable_plugins = true` and `enable_web_security = false`, using SDK C API setters. |
 | 4 | Create a WebSession using `fs_homepath`, then call WebSession slot `0x18`. | `CL_Awesomium_CreateSession` |
 | 5 | Construct `DataPakSource("web.pak")` and add it under source host `QL`. | `CL_Awesomium_CreateSession`, `src/code/client/cl_webpak.c` |
 | 6 | Construct `SteamDataSource` and add it under source host `steam`. | Offline-safe avatar/resource bridge in `src/code/client/cl_steam_resources.c`; not yet attached as a native live Awesomium data source. |
 | 7 | Construct `QLResourceInterceptor` and set it on WebCore. | Request behavior reconstructed in `src/code/client/cl_steam_resources.c`; live native interceptor object is still a compatibility seam. |
 | 8 | Create WebView with current video dimensions and the session. | `CL_Awesomium_Startup` |
-| 9 | Construct `QLJSHandler` and install it on WebView vtable slot `0x12c`. | Source bridge reconstructs the browser-visible `qz_instance` method-name surface through startup script injection, including deterministic `FakeClient.qz_instance` creation. Native JSValue marshalling is still open. |
+| 9 | Construct `QLJSHandler` and install it on WebView vtable slot `0x12c`. | Source bridge reconstructs the browser-visible `qz_instance` method-name surface through startup script injection, deterministic `FakeClient.qz_instance` replacement, and a queued command/cvar native bridge. Native JSValue marshalling is still open. |
 | 10 | Wait up to ten 100 ms helper iterations for browser helper initialization. | `CL_Awesomium_Startup` has equivalent polling around view initialization. |
-| 11 | Install dialog, view, and load handlers on WebView slots `0x34`, `0x24`, and `0x28`. | Handler vtables are mapped; source currently uses direct host state and surface polling rather than native objects. |
+| 11 | Install dialog, view, and load handlers on WebView slots `0x34`, `0x24`, and `0x28`. | Handler vtables are mapped; source currently uses direct host state and surface polling rather than native objects. `QLLoadHandler` document-ready script execution is projected through the live frame pump. |
 | 12 | Call WebView slot `0xa0` with `1`, then load the URL through slot `0x64`. | URL load and transparent-state setup are reconstructed. |
 | 13 | Resume rendering through slot `0xac`, focus through slot `0xb0`, update activation/cursor state, set `web_browserActive` to `1`, and enable key catcher. | `CL_Awesomium_OpenURL`, `CL_Awesomium_Startup`, and client-side browser host drawing/input paths. |
 
@@ -46,7 +46,7 @@ This note records the current retail mapping for the Quake Live Awesomium browse
 | `WebView::SetTransparent` slot `0xa0` | HLIL bootstrap calls slot `0xa0` with `1` before URL presentation | Reconstructed through the SDK C API export `_Awe_WebView_SetTransparent@8`. |
 | `WebView::PauseRendering` slot `0xa8` | HLIL hide-browser path calls slot `0xa8` before deactivating `web_browserActive` | Reconstructed through `_Awe_WebView_PauseRendering@4`. |
 | `WebView::ExecuteJavascript` slot `0x124` | Awesomium import list and retail WebView ABI layout | Reconstructed in this pass as `CL_Awesomium_ExecuteJavascript`. |
-| `WebView::set_js_method_handler` slot `0x12c` | HLIL bootstrap constructs `QLJSHandler` and calls slot `0x12c`; `data_55c008` stores the 34-entry `qz_instance` method table. | Native handler object remains mapped, while the source-visible browser contract is reconstructed through the injected `qz_instance`/`FakeClient.qz_instance` bridge. |
+| `WebView::set_js_method_handler` slot `0x12c` | HLIL bootstrap constructs `QLJSHandler` and calls slot `0x12c`; `data_55c008` stores the 34-entry `qz_instance` method table. | Native handler object remains mapped, while the source-visible browser contract is reconstructed through the injected `qz_instance`/`FakeClient.qz_instance` bridge and native command/cvar request pump. |
 | `WebView::ResumeRendering` slot `0xac` | HLIL bootstrap | Reconstructed through `_Awe_WebView_ResumeRendering@4`. |
 | `WebView::Focus` slot `0xb0` | HLIL bootstrap | Reconstructed through `_Awe_WebView_Focus@4`. |
 | `WebView::Unfocus` slot `0xb4` | HLIL hide-browser path calls slot `0xb4` after pause rendering | Reconstructed through `_Awe_WebView_Unfocus@4`. |
@@ -64,8 +64,8 @@ This note records the current retail mapping for the Quake Live Awesomium browse
 | `QLResourceInterceptor` | vtable at `0x00547f94` | Intercepts `asset://ql/...`; maps screenshot URLs under `<fs_homepath>/<fs_game>/screenshots/`; maps other `asset://ql/...` paths through `fs_webpath` when set; navigation filter never blocks. | `QLResourceInterceptor_RequestRetailHost`, `QLResourceInterceptor_MapRetailPath`, and `QLResourceInterceptor_OnFilterNavigation` in `src/code/client/cl_steam_resources.c`. |
 | `QLDialogHandler` | vtable at `0x00547fa8` | Dialog callback surface for WebView. | Mapped only; no live native object yet. |
 | `QLViewHandler` | vtable at `0x00547fc0` | View lifecycle/paint-facing notifications. | Replaced by host polling of view/surface state. |
-| `QLLoadHandler` | vtable at `0x00547fe8` | Load lifecycle callbacks. | Mapped only; startup script and direct state checks cover the currently required behavior. |
-| `QLJSHandler` | vtable at `0x00548010` | Handles JS method calls and query responses for the menu. | Reconstructed with a deterministic injected `qz_instance`/`FakeClient` bridge. Full native JSValue/JSObject marshalling remains open. |
+| `QLLoadHandler` | vtable at `0x00547fe8` | Load lifecycle callbacks. | Native object remains mapped; source now projects begin/finish/document-ready state, executes recovered `js/*.js` scripts through WebView slot `0x124`, and publishes `web.object.ready`. |
+| `QLJSHandler` | vtable at `0x00548010` | Handles JS method calls and query responses for the menu. | Reconstructed with a deterministic injected `qz_instance`/`FakeClient` bridge plus native command/cvar dispatch. Full native JSValue/JSObject marshalling remains open. |
 | `DataPakSource` | vtable at `0x00548070` | Serves browser assets from `web.pak` under `asset://ql/`. | Reconstructed in Awesomium session setup and `cl_webpak.c`. |
 | `SteamDataSource` | vtable at `0x00532b80` | Serves Steam-backed resources, especially avatar-like data. | Offline-safe source-side bridge in `cl_steam_resources.c`; live Awesomium source attachment remains intentionally bounded by `QL_BUILD_ONLINE_SERVICES`. |
 
@@ -80,8 +80,10 @@ Implemented or source-reconstructed:
 - WebView creation, resize, URL load, render resume, focus, surface copy, dirty tracking, visible-surface gating, and dynamic texture upload.
 - External SDK C API imports for the core WebView calls needed by the menu path.
 - SDK-owned `WebKeyboardEvent` construction and WebView slot-`0xe0` keyboard event injection for modeled browser activation events.
-- Startup JS bridge for the 34-entry `qz_instance` method-name surface, deterministic `FakeClient.qz_instance` compatibility, and bounded helper-readiness retries.
+- Retail WebPreferences byte writes mapped to SDK fields and reconstructed through `enable_plugins` and `enable_web_security` setters.
+- Startup JS bridge for the 34-entry `qz_instance` method-name surface, deterministic `FakeClient.qz_instance` replacement, queued command/cvar dispatch, and bounded helper-readiness retries.
 - `ExecuteJavascript` wrapper/fallback reconstructed at the retail WebView ABI seam.
+- `QLLoadHandler_OnDocumentReady` observable behavior: recovered launcher `js/*.js` enumeration, live `ExecuteJavascript` dispatch, `qz_instance` bind, cursor reset, and `web.object.ready` publication.
 - Retail-shaped resource request mapping for `asset://ql/screenshot/...` and `fs_webpath` overrides.
 - Offline-safe Steam resource/avatar compatibility functions.
 
@@ -90,9 +92,22 @@ Mapped but not yet fully reconstructed:
 - Native `QLJSHandler` with Awesomium `JSValue`, `JSArray`, and `JSObject` marshalling.
 - Native `QLResourceInterceptor` object installation on the live WebCore instance.
 - Native `SteamDataSource` installation into the live WebSession.
-- Native dialog, view, and load handler objects.
-- Exact names and semantics for the observed WebPreferences bytes.
+- Native dialog, view, and load handler objects; `QLLoadHandler` behavior is source-projected, but the SDK listener object is not reconstructed.
 - Native hidden-view lifecycle state around the retail guard that suppresses pause/unfocus during some shutdown paths.
+
+SDK/API export audit:
+
+- The retail `awesomium.dll` C API exposes generated director-connect exports for
+  `DataSource`, `JSMethodHandler`, `ResourceInterceptor`, `Load`, `View`, and
+  `Dialog`, plus WebCore/WebView setter exports for the resource interceptor
+  and view/listener slots.
+- That makes native-object reconstruction a matter of wiring SDK-owned C API
+  objects and callback signatures. It does not require local source to recreate
+  Awesomium object layout, vtables, or decorated C++ ABI thunks.
+- Source should keep using the SDK C API boundary for this lane. Any future
+  native listener/data-source pass should import and verify those exports first,
+  then connect small source-owned callbacks that call the already recovered
+  `QL*Handler_*` and resource bridge helpers.
 
 Confidence notes:
 
@@ -106,7 +121,7 @@ Confidence notes:
 
 1. Reconstruct the native `QLJSHandler` object and Awesomium `JSValue` / `JSArray` / `JSObject` marshalling after the source-visible method-name surface is stable.
 2. Add a source-side native resource interceptor object only if live Awesomium still needs it after the `web.pak` and startup script path are stable.
-3. Cross-check WebPreferences field writes against Awesomium SDK headers or a focused retail object-layout pass before naming the fields.
+3. Prioritize native `QLLoadHandler` SDK C API/director wiring before attempting the higher-risk `QLJSHandler` value-marshalling lane.
 4. Keep Steam-backed data source behavior offline-first unless a documented open replacement path is chosen.
 
 ## 2026-05-28 WebSession lifecycle and cache correction
@@ -174,6 +189,76 @@ Source reconstruction:
 - Overlay drawing, `KEYCATCH_BROWSER`, and `web_browserActive` publication are
   now tied to a contentful browser surface, so shell-only paints do not take over
   the native menu or game view.
+
+## 2026-05-29 qz_instance command/cvar bridge correction
+
+Retail/runtime evidence:
+
+- The WebUI power button calls `qz_instance.SendGameCommand("quit")`; the local
+  bundle's non-Awesomium `FakeClient` implementation only logs that call.
+- `data_55c008` maps `SendGameCommand`, `GetCvar`, `SetCvar`, and `ResetCvar`
+  onto `QLJSHandler`; the recovered source handlers execute commands through
+  `Cbuf_ExecuteText` and cvars through `Cvar_VariableStringBuffer`, `Cvar_Set`,
+  and `Cvar_Reset`.
+- The startup script previously filled only missing `FakeClient.qz_instance`
+  methods, so the bundle's existing fake `SendGameCommand` survived on live
+  Awesomium pages and swallowed commands such as `quit`.
+
+Source reconstruction:
+
+- The injected `main_hook_v2` now replaces `FakeClient.qz_instance` methods with
+  the source-owned qz bridge and keeps `window.qz_instance` pointed at the same
+  object.
+- `SendGameCommand`, `GetCvar`, `SetCvar`, and `ResetCvar` now enqueue native
+  requests that the live Awesomium frame pump drains and routes through the same
+  command-buffer and cvar APIs as the recovered `QLJSHandler` methods.
+- The bridge uses `_Awe_WebView_ExecuteJavascriptWithResult@12` plus integer
+  `JSValue` conversion to pop queued request text without claiming full native
+  `JSMethodHandler` marshalling parity.
+- The browser-side config/cvar cache is synchronized from native cvars and binds
+  so WebUI `GetConfig` and `GetCvar` reads observe engine state instead of a
+  detached JavaScript-only object.
+
+Settings-menu parity evidence:
+
+- The retail Settings screenshot shows native state in the first render:
+  populated binds such as `w`, `SPACE`, and `CTRL, MOUSE1`, plus live cvar
+  values such as `sensitivity 1.00`. The source screenshot showed fallback
+  state instead: `Default`, `0.00`, and `None` for every bind.
+- The shipped WebUI bundle reads `qz_instance.GetConfig()` during
+  `componentWillMount`, iterates `cfg.cvars` as a name-to-value object, and
+  reads each bind through `bind.key` plus `bind.value`. It subscribes to
+  `cvar.*` and `bind.changed` afterward for live updates.
+- The retail `GetConfig` HLIL bind loop builds bind objects with `id`, `key`,
+  and `value`; `sub_4B6570(index)` supplies the same printable key name exposed
+  by the source `Key_KeynumToString` helper.
+
+Source reconstruction:
+
+- The live Awesomium startup now receives an initial native config JSON blob
+  before the injected `qz_instance` bridge exposes `GetConfig`, so the Settings
+  mount path sees engine cvars and key bindings instead of the fallback object.
+- The config snapshot now emits `cvars` as a JSON object and `binds` entries as
+  `{ "id", "key", "value" }`, matching the WebUI bundle and the retail bind
+  object literals.
+- `cvar.*` and `bind.changed` events are dispatched into the live page through
+  `EnginePublish`, keeping React state synchronized after WebUI cvar edits and
+  bind/unbind commands.
+
+Startup performance correction:
+
+- A runtime pass showed the source bridge could hitch during the black
+  Awesomium startup frame because the compatibility layer was reparsing the full
+  native-config startup script during helper retries and polling
+  `ExecuteJavascriptWithResult` every frame while the page was still settling.
+- The full startup script is now used for the initial config-bearing bridge only;
+  helper retries execute a tiny `main_hook_v2` script.
+- The request pump is deferred after live-view creation, skipped while Awesomium
+  reports the page loading, and reduced to one request per poll with idle/busy
+  pacing. Initial config sync is treated as satisfied by the startup script, so
+  the first frame no longer sends a second large config blob.
+- Live `EnginePublish` dispatch is gated on a drawable browser surface, avoiding
+  a startup event storm before the WebUI has a document ready to receive it.
 
 ## 2026-05-25 update/pump parity audit
 
@@ -322,13 +407,13 @@ Retail evidence:
 Source reconstruction:
 
 - The native slot-`0x12c` object remains mapped rather than claimed as ABI-reconstructed; `Awesomium::JSValue` and `Awesomium::JSArray` marshalling are still a separate evidence pass.
-- The startup script now deterministically creates `window.FakeClient.qz_instance` when absent, exposes `window.qz_instance`, fills missing browser-visible methods from the retail 34-entry method-name surface, and invokes `main_hook_v2` immediately instead of waiting for page code to call it.
+- The startup script now deterministically creates `window.FakeClient.qz_instance` when absent, exposes `window.qz_instance`, replaces browser-visible methods from the retail 34-entry method-name surface, and invokes `main_hook_v2` immediately instead of waiting for page code to call it.
 - Default implementations are deliberately offline-safe: catalog getters return bounded placeholder data, return-value helpers return stable empty/false values, and Steam/lobby/UGC methods no-op rather than attempting live services outside the source-owned service gates.
 
 Expected effect:
 
 - Browser payloads that assume `FakeClient.qz_instance` exists at startup should no longer trip a JavaScript exception before first paint.
-- Missing qz method names should no longer leave the menu in a black or loader-only state solely because the native Awesomium `QLJSHandler` object is still mapped rather than fully reconstructed.
+- Missing qz method names should no longer leave the menu in a black or loader-only state solely because the native Awesomium `QLJSHandler` object is still mapped rather than fully reconstructed, and pre-existing fake qz methods no longer swallow command/cvar calls.
 
 ## 2026-05-25 browser-helper readiness reconstruction
 
@@ -457,3 +542,150 @@ Expected effect:
 
 - The repository no longer contains a local reconstruction of Awesomium SDK object layout or C++ ABI behavior.
 - Live WebUI startup should fail with a precise missing-SDK/missing-export diagnostic instead of falling into an inaccurate local ABI imitation.
+
+## 2026-05-29 external Awesomium SDK/runtime payload correction
+
+Audit finding:
+
+- A live startup pass could initialize the main window and load `awesomium.dll`,
+  but `awesomium.log` reported child-process launch failures. Static project
+  review showed why: `quakelive_steam.vcxproj` only copied `awesomium.dll`,
+  leaving the helper and Chromium/Awesomium sidecar DLL contract to whatever
+  happened to be staged beside the executable.
+- Retail metadata in `docs/reverse-engineering/build-recapture.md` shows the
+  Awesomium payload is a set, not one DLL: `awesomium.dll`,
+  `awesomium_process.exe`, `avcodec-53.dll`, `avformat-53.dll`,
+  `avutil-51.dll`, `icudt.dll`, `libEGL.dll`, and `libGLESv2.dll`.
+- The Quake Live `web.pak` remains game UI data, not SDK code. It is still
+  resolved through the engine/runtime asset roots and passed to
+  `DataPakSource("web.pak")`.
+
+Source reconstruction:
+
+- Online client builds now project-reference `awesomium_process.vcxproj` when an
+  external `AwesomiumSdkDir` is supplied, so the helper is built from the SDK
+  header/import library boundary instead of depending on a stale staged binary.
+- The client project validates the retail-observed Awesomium runtime sidecar DLLs
+  under the external runtime folder and copies that payload into `$(OutDir)`.
+  Optional `locales` files are copied if the SDK/runtime package provides them.
+- The source tree still does not vendor the proprietary SDK, generate an import
+  library from a local `.def`, redeclare `ChildProcessMain`, or reconstruct
+  Awesomium C++ object layout. The only source-owned helper call remains
+  `Awesomium::ChildProcessMain` through `<Awesomium/ChildProcess.h>`.
+
+Expected effect:
+
+- A correctly installed external SDK/runtime now produces a self-contained
+  online-enabled output directory with the SDK-backed helper and required
+  Awesomium sidecars.
+- If the runtime payload is incomplete, the build fails with the missing sidecar
+  name instead of producing a black Awesomium window that can only report child
+  launch failure at runtime.
+
+## 2026-05-29 QLLoadHandler document-ready execution reconstruction
+
+Retail evidence:
+
+- `references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part01.txt:44449`
+  maps `sub_4317f0` as the `QLLoadHandler_OnDocumentReady` callback.
+- Lines `44463-44525` enumerate the `js` directory for `.js` entries, build
+  `js/<filename>`, read each script, and call the WebView `ExecuteJavascript`
+  slot `0x124`.
+- Lines `44527-44538` refresh the retained `window` object, then publish
+  `web.object.ready` through the same `EnginePublish` bridge used by later
+  browser events.
+- `references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part06.txt:35617`
+  identifies the `QLLoadHandler` vtable at `0x00547fe8`, with `OnBegin`,
+  `OnFail`, `OnFinish`, and `OnDocumentReady` callbacks.
+
+Source reconstruction:
+
+- `QLLoadHandler_LoadDocumentScripts` now preserves the retail order:
+  enumerate `js/*.js`, resolve each script through `CL_LauncherRequestData`,
+  execute it in live Awesomium with `CL_Awesomium_ExecuteJavascript`, then free
+  the source buffer.
+- `QLLoadHandler_PollLiveDocumentReady` projects the native load callback onto
+  the source frame pump: after `CL_Awesomium_Update`, if the host is waiting on
+  a document and `CL_Awesomium_IsLoading()` is false, it runs
+  `QLLoadHandler_OnFinishLoadingFrame` followed by
+  `QLLoadHandler_OnDocumentReady`.
+- Live `QLWebHost_OpenURL` and reload now mark the document as loading and let
+  the frame pump publish readiness, instead of immediately declaring the
+  document ready after `LoadURL`/reload dispatch.
+
+Expected effect:
+
+- The live WebUI gets the same launcher helper script staging before
+  `web.object.ready` that retail performs through the native load handler.
+- Events and native request polling are less likely to race the document load,
+  because the source bridge waits for Awesomium's loading state to clear before
+  publishing readiness.
+
+## 2026-05-29 Awesomium C API native-handler route mapping
+
+Retail/API evidence:
+
+- Local retail Awesomium export inspection identifies SDK C exports for the
+  remaining native object seams:
+  `_Awe_WebCore_set_resource_interceptor@8`,
+  `_Awe_WebView_set_js_method_handler@8`,
+  `_Awe_WebView_set_dialog_listener@8`,
+  `_Awe_WebView_set_load_listener@8`, and
+  `_Awe_WebView_set_view_listener@8`.
+- The same export table exposes constructor/director helpers:
+  `_Awe_new_ResourceInterceptor@0`,
+  `_Awe_ResourceInterceptor_director_connect@16`,
+  `_Awe_new_JSMethodHandler@0`,
+  `_Awe_JSMethodHandler_director_connect@12`,
+  `_Awe_new_DataSource@0`, `_Awe_DataSource_director_connect@8`,
+  `_Awe_new_Load@0`, `_Awe_Load_director_connect@20`,
+  `_Awe_new_View@0`, `_Awe_View_director_connect@36`,
+  `_Awe_new_Dialog@0`, and `_Awe_Dialog_director_connect@20`.
+- The committed HLIL already maps the corresponding retail install points:
+  resource interceptor on WebCore slot `0x10`, JS method handler on WebView slot
+  `0x12c`, dialog handler on `0x34`, view handler on `0x24`, and load handler on
+  `0x28`.
+
+Mapping result:
+
+- The remaining native listener/interceptor/data-source parity work has a
+  verified SDK-owned route. We should not reconstruct SDK class storage or
+  retail vtable objects in repository source.
+- The next implementation pass can replace source polling/projection for the
+  native object seams incrementally by importing these C exports and connecting
+  callbacks to the already recovered source helpers.
+- The JS method handler remains the riskiest lane because it also requires
+  precise `JSValue`, `JSArray`, and `JSObject` marshalling. Load/view/dialog
+  listener projection is a better first native-object target.
+
+## 2026-05-29 WebPreferences byte-field reconstruction
+
+Retail evidence:
+
+- `references/reverse-engineering/ghidra/quakelive_steam/decompile_top_functions.c:45557-45560`
+  shows retail constructing a local `Awesomium::WebPreferences`, then writing
+  byte offsets `+0x02 = 1` and `+0x08 = 0` before `WebCore::CreateWebSession`.
+- `references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part05.txt:15948-15950`
+  captures the same constructor-plus-two-byte-write sequence.
+- A focused x86 probe against the staged retail `E:\Games\QuakeLive\awesomium.dll`
+  mapped SDK C setters onto the WebPreferences byte layout:
+  `_Awe_WebPreferences_enable_plugins_set@8` toggles byte `+0x02`, and
+  `_Awe_WebPreferences_enable_web_security_set@8` toggles byte `+0x08`.
+
+Source reconstruction:
+
+- `CL_Awesomium_PreparePreferences` now imports and calls only the two
+  retail-observed setters: `enable_plugins = true` and
+  `enable_web_security = false`.
+- The previous broader compatibility setup no longer forces JavaScript, local
+  storage, databases, file-access, or universal file-access preferences. Those
+  SDK defaults are left to the constructed `WebPreferences`, matching the
+  recovered retail write surface.
+
+Expected effect:
+
+- Online-enabled WebUI startup now follows the retail WebPreferences mutation
+  contract instead of over-configuring the session.
+- The exact field-name gap for the two observed preference bytes is closed
+  without copying SDK headers, object layout, or proprietary implementation
+  code into repository source.

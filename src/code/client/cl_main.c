@@ -2258,6 +2258,73 @@ static void CL_LogBrowserEventLifecycle( const char *eventName, const char *reas
 
 /*
 =============
+CL_WebView_DispatchLiveEvent
+
+Forwards queued browser events into the live Awesomium page's EnginePublish
+hook. JSON payloads are parsed in-page so cvar and bind subscriptions receive
+objects just like the retail WebUI expects.
+=============
+*/
+static void CL_WebView_DispatchLiveEvent( const char *name, const char *payload ) {
+#if defined( _WIN32 ) && QL_PLATFORM_HAS_ONLINE_SERVICES
+	char escapedName[CL_STEAM_BROWSER_EVENT_NAME_LENGTH * 2];
+	char *escapedPayload;
+	char *script;
+	int payloadLength;
+	int escapedPayloadSize;
+	int scriptSize;
+
+	if ( !name || !name[0] || !CL_WebHost_HasLiveView() || !CL_WebHost_HasBoundWindowObject() || !CL_WebHost_HasDrawableSurface() ) {
+		return;
+	}
+
+	CL_Steam_JsonEscape( name, escapedName, sizeof( escapedName ) );
+	if ( payload && payload[0] ) {
+		payloadLength = (int)strlen( payload );
+		escapedPayloadSize = payloadLength * 2 + 1;
+		escapedPayload = (char *)Z_Malloc( escapedPayloadSize );
+		if ( !escapedPayload ) {
+			return;
+		}
+		CL_Steam_JsonEscape( payload, escapedPayload, escapedPayloadSize );
+		scriptSize = (int)strlen( escapedName ) + escapedPayloadSize + 320;
+		script = (char *)Z_Malloc( scriptSize );
+		if ( !script ) {
+			Z_Free( escapedPayload );
+			return;
+		}
+		Com_sprintf(
+			script,
+			scriptSize,
+			"(function(){if(window.EnginePublish){var p=\"%s\";var d;try{d=JSON.parse(p);}catch(e){d=p;}window.EnginePublish(\"%s\",d);}})();",
+			escapedPayload,
+			escapedName
+		);
+		Z_Free( escapedPayload );
+	} else {
+		scriptSize = (int)strlen( escapedName ) + 160;
+		script = (char *)Z_Malloc( scriptSize );
+		if ( !script ) {
+			return;
+		}
+		Com_sprintf(
+			script,
+			scriptSize,
+			"(function(){if(window.EnginePublish){window.EnginePublish(\"%s\",null);}})();",
+			escapedName
+		);
+	}
+
+	CL_Awesomium_ExecuteJavascript( script, "" );
+	Z_Free( script );
+#else
+	(void)name;
+	(void)payload;
+#endif
+}
+
+/*
+=============
 CL_WebView_PublishEvent
 
 Queues one browser-facing event through the retained client owner lane.
@@ -2291,6 +2358,7 @@ void CL_WebView_PublishEvent( const char *name, const char *payload ) {
 	payloadLength = (int)strlen( event->payload );
 	Com_sprintf( detail, sizeof( detail ), "queued payload bytes=%d sequence=%d", payloadLength, event->sequence );
 	CL_LogBrowserEventLifecycle( event->name, detail );
+	CL_WebView_DispatchLiveEvent( event->name, event->payload );
 }
 
 /*

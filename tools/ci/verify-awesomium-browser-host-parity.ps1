@@ -310,13 +310,13 @@ $sourceAnchors = @(
 	},
 	@{
 		Path = 'src/code/client/cl_cgame.c'
-		Literal = 'if ( cl_webHost.browserActive && !( cls.keyCatchers & KEYCATCH_BROWSER ) ) {'
-		Description = 'retail browser-active keycatcher arm without surface gate'
+		Literal = 'ownsOverlay = CL_WebHost_SurfaceReadyForOverlay( qtrue );'
+		Description = 'browser keycatcher waits for drawable Awesomium surface'
 	},
 	@{
 		Path = 'src/code/client/cl_cgame.c'
-		Literal = 'CL_SetCvarIfChanged( "web_browserActive", cl_webHost.browserActive ? "1" : "0" );'
-		Description = 'browser-active cvar publish without surface gate or no-op Cvar_Set2 churn'
+		Literal = 'CL_SetCvarIfChanged( "web_browserActive", ownsOverlay ? "1" : "0" );'
+		Description = 'browser-active cvar mirrors drawable overlay ownership'
 	},
 	@{
 		Path = 'src/code/client/cl_cgame.c'
@@ -389,6 +389,16 @@ $adapterAnchors = @(
 		Path = 'src/code/client/cl_awesomium_win32.cpp'
 		Literal = '{ 0x004F2D30u, 0x0052C6A0u, "WebCore::Initialize", "CL_Awesomium_Startup", "_Awe_WebCore_Initialize@4", CL_AWE_RETAIL_BOOTSTRAP_SCOPE_C_EXPORT },'
 		Description = 'WebCore initialize bootstrap substitution'
+	},
+	@{
+		Path = 'src/code/client/cl_awesomium_win32.cpp'
+		Literal = '{ 0x004F2D30u, 0x00000002u, "WebPreferences::enable_plugins byte", "CL_Awesomium_PreparePreferences", "_Awe_WebPreferences_enable_plugins_set@8", CL_AWE_RETAIL_BOOTSTRAP_SCOPE_C_EXPORT },'
+		Description = 'retail WebPreferences enable_plugins byte mapping'
+	},
+	@{
+		Path = 'src/code/client/cl_awesomium_win32.cpp'
+		Literal = '{ 0x004F2D30u, 0x00000008u, "WebPreferences::enable_web_security byte", "CL_Awesomium_PreparePreferences", "_Awe_WebPreferences_enable_web_security_set@8", CL_AWE_RETAIL_BOOTSTRAP_SCOPE_C_EXPORT },'
+		Description = 'retail WebPreferences enable_web_security byte mapping'
 	},
 	@{
 		Path = 'src/code/client/cl_awesomium_win32.cpp'
@@ -477,6 +487,21 @@ $adapterAnchors = @(
 	},
 	@{
 		Path = 'src/code/client/cl_awesomium_win32.cpp'
+		Literal = 'CL_AWE_IMPORT( webPrefsEnablePluginsSet, "_Awe_WebPreferences_enable_plugins_set@8" );'
+		Description = 'SDK WebPreferences enable_plugins setter import'
+	},
+	@{
+		Path = 'src/code/client/cl_awesomium_win32.cpp'
+		Literal = 'cl_awe.webPrefsEnablePluginsSet( cl_awesomium.webPreferences, true );'
+		Description = 'retail WebPreferences enable_plugins projection'
+	},
+	@{
+		Path = 'src/code/client/cl_awesomium_win32.cpp'
+		Literal = 'cl_awe.webPrefsEnableWebSecuritySet( cl_awesomium.webPreferences, false );'
+		Description = 'retail WebPreferences disable-web-security projection'
+	},
+	@{
+		Path = 'src/code/client/cl_awesomium_win32.cpp'
 		Literal = 'cl_awe.webViewSetZoom = reinterpret_cast<awe_webview_set_zoom_fn>( CL_Awesomium_ResolveOptionalImport( "_Awe_WebView_SetZoom@8" ) );'
 		Description = 'optional WebView SetZoom SDK import'
 	},
@@ -527,18 +552,18 @@ $adapterAnchors = @(
 	},
 	@{
 		Path = 'src/code/client/cl_awesomium_win32.cpp'
-		Literal = 'CL_Awesomium_BuildUserScript( cl_awesomium.startupScript, sizeof( cl_awesomium.startupScript ), playerName, appId, steamIdLow, steamIdHigh );'
+		Literal = 'CL_Awesomium_BuildUserScript( cl_awesomium.startupScript, sizeof( cl_awesomium.startupScript ), playerName, appId, steamIdLow, steamIdHigh, initialConfigJson );'
 		Description = 'WebConfig user-script bootstrap projection'
 	},
 	@{
 		Path = 'src/code/client/cl_awesomium_win32.cpp'
-		Literal = "SetCvar:function(name,value){config.cvars[(name||'').toLowerCase()]=String(value);return true;}"
-		Description = 'startup qz_instance SetCvar return-valued projection'
+		Literal = "SetCvar:function(name,value){var k=canon(name);if(!k){return false;}value=String(value||'');config.cvars[k]=value;return queue('set',k+'\\n'+value);}"
+		Description = 'startup qz_instance SetCvar native request projection'
 	},
 	@{
 		Path = 'src/code/client/cl_awesomium_win32.cpp'
-		Literal = "ResetCvar:function(name){delete config.cvars[(name||'').toLowerCase()];return true;}"
-		Description = 'startup qz_instance ResetCvar return-valued projection'
+		Literal = "ResetCvar:function(name){var k=canon(name);if(!k){return false;}delete config.cvars[k];return queue('reset',k);}"
+		Description = 'startup qz_instance ResetCvar native request projection'
 	},
 	@{
 		Path = 'src/code/client/cl_awesomium_win32.cpp'
@@ -549,6 +574,21 @@ $adapterAnchors = @(
 		Path = 'src/code/client/cl_awesomium_win32.cpp'
 		Literal = 'pakName = CL_Awesomium_AllocWideString( "web.pak" );'
 		Description = 'retail web.pak DataPakSource literal'
+	},
+	@{
+		Path = 'src/code/client/cl_cgame.c'
+		Literal = 'QLLoadHandler_PollLiveDocumentReady();'
+		Description = 'live load-handler document-ready polling'
+	},
+	@{
+		Path = 'src/code/client/cl_cgame.c'
+		Literal = 'CL_Awesomium_ExecuteJavascript( scriptBuffer, "" )'
+		Description = 'document-ready launcher script execution through WebView'
+	},
+	@{
+		Path = 'src/code/client/cl_cgame.c'
+		Literal = 'CL_LauncherRequestData( scriptPath, (void **)&scriptBuffer, &scriptLength )'
+		Description = 'document-ready launcher script source lookup'
 	},
 	@{
 		Path = 'src/code/client/cl_cgame.c'
@@ -619,8 +659,33 @@ $sdkDependencyAnchors = @(
 	},
 	@{
 		Path = 'src/code/quakelive_steam.vcxproj'
-		Literal = '<Target Name="CopyAwesomiumRuntime" AfterTargets="Build" Condition="''$(QLBuildOnlineServices)''!=''0'' and ''$(AwesomiumRuntimeDll)''!='''' and Exists(''$(AwesomiumRuntimeDll)'')">'
+		Literal = '<Target Name="CopyAwesomiumRuntime" AfterTargets="Build" Condition="''$(QLBuildOnlineServices)''!=''0'' and ''$(AwesomiumRuntimeDir)''!=''''">'
 		Description = 'external Awesomium runtime copy target'
+	},
+	@{
+		Path = 'src/code/quakelive_steam.vcxproj'
+		Literal = '<AwesomiumRuntimeRootFile Include="$(AwesomiumRuntimeDir)\avcodec-53.dll" Condition="Exists(''$(AwesomiumRuntimeDir)\avcodec-53.dll'')" />'
+		Description = 'Awesomium runtime FFmpeg codec sidecar'
+	},
+	@{
+		Path = 'src/code/quakelive_steam.vcxproj'
+		Literal = '<AwesomiumRuntimeRootFile Include="$(AwesomiumRuntimeDir)\icudt.dll" Condition="Exists(''$(AwesomiumRuntimeDir)\icudt.dll'')" />'
+		Description = 'Awesomium runtime ICU sidecar'
+	},
+	@{
+		Path = 'src/code/quakelive_steam.vcxproj'
+		Literal = '<AwesomiumRuntimeRootFile Include="$(AwesomiumRuntimeDir)\libGLESv2.dll" Condition="Exists(''$(AwesomiumRuntimeDir)\libGLESv2.dll'')" />'
+		Description = 'Awesomium runtime GLES sidecar'
+	},
+	@{
+		Path = 'src/code/quakelive_steam.vcxproj'
+		Literal = '<ProjectReference Include="awesomium_process.vcxproj" Condition="''$(QLBuildOnlineServices)''!=''0'' and ''$(AwesomiumSdkDir)''!=''''">'
+		Description = 'online client builds SDK-backed Awesomium child-process host'
+	},
+	@{
+		Path = 'src/code/quakelive_steam.vcxproj'
+		Literal = '<AdditionalProperties>QLBuildOnlineServices=$(QLBuildOnlineServices);AwesomiumSdkDir=$(AwesomiumSdkDir)</AdditionalProperties>'
+		Description = 'Awesomium child-process project receives SDK build properties'
 	},
 	@{
 		Path = 'src/code/win32/awesomium_process.rc'

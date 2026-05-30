@@ -4913,7 +4913,7 @@
       "signature": "static qboolean CG_DrawAwardPlayer(rectDef_t *rect, int ownerDraw)",
       "string_refs": [],
       "relocation_refs": [],
-      "comment": "Retail endgame award-player ownerdraw shared by `CG_MOST_VALUABLE_OFFENSIVE_PLYR` through `CG_MOST_DAMAGEDEALT_PLYR` (`0x4B..0x50`). The ownerdraw switch lands here directly, and the body resolves the winning client image handle for the requested award slot before painting it into the `summary_award*_player` rect. Current source reconstructs that slot with a cgame-owned profile-image helper while still deriving winners from active score rows until the dedicated retail award-result payload is recovered."
+      "comment": "Retail endgame award-player ownerdraw shared by `CG_MOST_VALUABLE_OFFENSIVE_PLYR` through `CG_MOST_DAMAGEDEALT_PLYR` (`0x4B..0x50`). The ownerdraw switch lands here directly, and the body resolves the winning client image handle for the requested award slot before painting it into the `summary_award*_player` rect. Current source reconstructs that slot with a cgame-owned profile-image helper fed by the recovered `CS_AWARD_*` configstrings produced by qagame."
     },
     {
       "address": "0x100368A0",

@@ -211,6 +211,7 @@ def test_awesomium_load_failure_hides_host_and_suppresses_error_publish_until_re
 	assert 'Cvar_Set( "web_browserActive", "0" );' in hide_browser_block
 	assert "cls.keyCatchers &= ~KEYCATCH_BROWSER;" in hide_browser_block
 	assert "KEYCATCH_BROWSER" not in update_block
+	assert "QLLoadHandler_PollLiveDocumentReady();" in update_block
 	assert "ownsOverlay = CL_WebHost_SurfaceReadyForOverlay( qtrue );" in ownership_block
 	assert "cls.keyCatchers |= KEYCATCH_BROWSER;" in ownership_block
 	assert 'CL_SetCvarIfChanged( "web_browserActive", ownsOverlay ? "1" : "0" );' in ownership_block
@@ -358,14 +359,17 @@ def test_awesomium_win32_backend_documents_retail_slot_to_export_substitution() 
 	)
 	prepare_config_block = _extract_function_block(
 		cl_awesomium,
-		"static qboolean CL_Awesomium_PrepareConfig( const char *runtimePath, const char *basePath, const char *playerName, unsigned int appId, unsigned int steamIdLow, unsigned int steamIdHigh ) {",
+		"static qboolean CL_Awesomium_PrepareConfig( const char *runtimePath, const char *basePath, const char *playerName, unsigned int appId, unsigned int steamIdLow, unsigned int steamIdHigh, const char *initialConfigJson ) {",
+	)
+	prepare_prefs_block = _extract_function_block(
+		cl_awesomium, "static qboolean CL_Awesomium_PreparePreferences( void ) {"
 	)
 	create_session_block = _extract_function_block(
 		cl_awesomium, "static qboolean CL_Awesomium_CreateSession( const char *runtimePath, const char *basePath ) {"
 	)
 	startup_block = _extract_function_block(
 		cl_awesomium,
-		'extern "C" qboolean CL_Awesomium_Startup( const char *runtimePath, const char *basePath, const char *playerName, unsigned int appId, unsigned int steamIdLow, unsigned int steamIdHigh, int width, int height ) {',
+		'extern "C" qboolean CL_Awesomium_Startup( const char *runtimePath, const char *basePath, const char *playerName, unsigned int appId, unsigned int steamIdLow, unsigned int steamIdHigh, int width, int height, const char *initialConfigJson ) {',
 	)
 	open_url_block = _extract_function_block(
 		cl_awesomium, 'extern "C" qboolean CL_Awesomium_OpenURL( const char *url ) {'
@@ -446,6 +450,8 @@ def test_awesomium_win32_backend_documents_retail_slot_to_export_substitution() 
 		'{ 0x004F2D30u, 0x0052C6A4u, "WebConfig::WebConfig", "CL_Awesomium_PrepareConfig", "_Awe_new_WebConfig@0", CL_AWE_RETAIL_BOOTSTRAP_SCOPE_C_EXPORT },',
 		'{ 0x004F2D30u, 0x0052C6A0u, "WebCore::Initialize", "CL_Awesomium_Startup", "_Awe_WebCore_Initialize@4", CL_AWE_RETAIL_BOOTSTRAP_SCOPE_C_EXPORT },',
 		'{ 0x004F2D30u, 0x0052C698u, "WebPreferences::WebPreferences", "CL_Awesomium_PreparePreferences", "_Awe_new_WebPreferences@0", CL_AWE_RETAIL_BOOTSTRAP_SCOPE_C_EXPORT },',
+		'{ 0x004F2D30u, 0x00000002u, "WebPreferences::enable_plugins byte", "CL_Awesomium_PreparePreferences", "_Awe_WebPreferences_enable_plugins_set@8", CL_AWE_RETAIL_BOOTSTRAP_SCOPE_C_EXPORT },',
+		'{ 0x004F2D30u, 0x00000008u, "WebPreferences::enable_web_security byte", "CL_Awesomium_PreparePreferences", "_Awe_WebPreferences_enable_web_security_set@8", CL_AWE_RETAIL_BOOTSTRAP_SCOPE_C_EXPORT },',
 		'{ 0x004F2D30u, 0x00000000u, "WebCore::CreateWebSession slot 0x00", "CL_Awesomium_CreateSession", "_Awe_WebCore_CreateWebSession@12", CL_AWE_RETAIL_BOOTSTRAP_SCOPE_C_EXPORT },',
 		'{ 0x004F2D30u, 0x00000018u, "WebSession bootstrap slot 0x18", "CL_Awesomium_CreateSession", "_Awe_WebSession_Initialize@4", CL_AWE_RETAIL_BOOTSTRAP_SCOPE_C_EXPORT },',
 		'{ 0x004F2A10u, 0x0000001Cu, "WebSession::ClearCache slot 0x1C", "CL_Awesomium_ClearCache", "_Awe_WebSession_ClearCache@4", CL_AWE_RETAIL_BOOTSTRAP_SCOPE_C_EXPORT },',
@@ -472,6 +478,8 @@ def test_awesomium_win32_backend_documents_retail_slot_to_export_substitution() 
 	for expected in (
 		'CL_AWE_IMPORT( newWebConfig, "_Awe_new_WebConfig@0" );',
 		'CL_AWE_IMPORT( newWebPreferences, "_Awe_new_WebPreferences@0" );',
+		'CL_AWE_IMPORT( webPrefsEnablePluginsSet, "_Awe_WebPreferences_enable_plugins_set@8" );',
+		'CL_AWE_IMPORT( webPrefsEnableWebSecuritySet, "_Awe_WebPreferences_enable_web_security_set@8" );',
 		'CL_AWE_IMPORT( webCoreInitialize, "_Awe_WebCore_Initialize@4" );',
 		'CL_AWE_IMPORT( webCoreShutdown, "_Awe_WebCore_Shutdown@0" );',
 		'CL_AWE_IMPORT( webCoreCreateWebSession, "_Awe_WebCore_CreateWebSession@12" );',
@@ -503,6 +511,16 @@ def test_awesomium_win32_backend_documents_retail_slot_to_export_substitution() 
 
 	assert "for ( i = 0; cl_aweBootstrapRetailMappings[i].retailMember; i++ ) {" in count_bootstrap_block
 	assert "cl_aweBootstrapRetailMappings[i].retailOwnerAddress != 0u" in count_bootstrap_block
+	assert "cl_awe.webPrefsEnablePluginsSet( cl_awesomium.webPreferences, true );" in prepare_prefs_block
+	assert "cl_awe.webPrefsEnableWebSecuritySet( cl_awesomium.webPreferences, false );" in prepare_prefs_block
+	for retail_default in (
+		"webPrefsEnableJavascriptSet",
+		"webPrefsEnableLocalStorageSet",
+		"webPrefsEnableDatabasesSet",
+		"webPrefsAllowFileAccessSet",
+		"webPrefsAllowUniversalAccessSet",
+	):
+		assert retail_default not in cl_awesomium
 	assert 'cl_awesomium.module = CL_Awesomium_LoadLibraryCandidate( "awesomium.dll", loadError, sizeof( loadError ) );' in load_block
 	assert 'CL_Awesomium_AppendPath( libraryPath, sizeof( libraryPath ), runtimePath, "awesomium.dll" );' in load_block
 	assert 'CL_Awesomium_AppendPath( libraryPath, sizeof( libraryPath ), basePath, "awesomium.dll" );' in load_block
@@ -522,7 +540,7 @@ def test_awesomium_win32_backend_documents_retail_slot_to_export_substitution() 
 		'CL_Awesomium_AppendPath( packagePath, sizeof( packagePath ), assetsPath, "web.pak" );',
 		'CL_Awesomium_AppendPath( packagePath, sizeof( packagePath ), sessionPath, "web.pak" );',
 		'CL_Awesomium_AppendPath( childProcessPath, sizeof( childProcessPath ), sessionPath, "awesomium_process.exe" );',
-		"CL_Awesomium_BuildUserScript( cl_awesomium.startupScript, sizeof( cl_awesomium.startupScript ), playerName, appId, steamIdLow, steamIdHigh );",
+		"CL_Awesomium_BuildUserScript( cl_awesomium.startupScript, sizeof( cl_awesomium.startupScript ), playerName, appId, steamIdLow, steamIdHigh, initialConfigJson );",
 		'!CL_Awesomium_SetConfigString( cl_awe.webConfigAssetProtocolSet, cl_awesomium.webConfig, "asset" )',
 		"!CL_Awesomium_SetConfigString( cl_awe.webConfigChildProcessPathSet, cl_awesomium.webConfig, childProcessPath )",
 		"!CL_Awesomium_SetConfigString( cl_awe.webConfigLogPathSet, cl_awesomium.webConfig, logPath )",
@@ -605,10 +623,30 @@ def test_awesomium_sdk_dependency_is_external_and_non_replicated() -> None:
 		"ValidateAwesomiumSdk",
 		"Awesomium\\WebCore.h",
 		"awesomium.dll",
+		"avcodec-53.dll",
+		"avformat-53.dll",
+		"avutil-51.dll",
+		"icudt.dll",
+		"libEGL.dll",
+		"libGLESv2.dll",
+		"AwesomiumRuntimeRootFile",
+		"AwesomiumRuntimeLocaleFile",
 		"CopyAwesomiumRuntime",
+		'<Copy SourceFiles="@(AwesomiumRuntimeRootFile)" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true"',
+		'<Copy SourceFiles="@(AwesomiumRuntimeLocaleFile)" DestinationFiles="@(AwesomiumRuntimeLocaleFile->\'$(OutDir)locales\\%(RecursiveDir)%(Filename)%(Extension)\')"',
+		'<ProjectReference Include="awesomium_process.vcxproj" Condition="\'$(QLBuildOnlineServices)\'!=\'0\' and \'$(AwesomiumSdkDir)\'!=\'\'">',
+		"<AdditionalProperties>QLBuildOnlineServices=$(QLBuildOnlineServices);AwesomiumSdkDir=$(AwesomiumSdkDir)</AdditionalProperties>",
 		"The SDK remains external and is not vendored.",
 	):
 		assert expected in steam_project
+
+	for disallowed in (
+		"BuildAwesomiumImportLib",
+		"AwesomiumImportLib",
+		"awesomium.def",
+		"awesomium_import.lib",
+	):
+		assert disallowed not in steam_project
 
 	assert 'VALUE "CompanyName", "Quake Live Reverse\\0"' in process_rc
 	assert 'VALUE "FileDescription", "Quake Live Reverse Awesomium child-process host\\0"' in process_rc
@@ -927,6 +965,7 @@ def test_awesomium_listener_vtable_wiring_is_source_visible() -> None:
 def test_awesomium_qz_method_table_preserves_retail_return_flags() -> None:
 	cl_cgame = _read_text(CL_CGAME_PATH)
 	cl_awesomium = _read_text(CL_AWESOMIUM_WIN32_PATH)
+	cl_main = _read_text(CL_MAIN_PATH)
 
 	method_call_block = _extract_function_block(
 		cl_cgame, "static qboolean QLJSHandler_OnMethodCall( const char *methodName, const char **arguments, int argumentCount ) {"
@@ -937,7 +976,15 @@ def test_awesomium_qz_method_table_preserves_retail_return_flags() -> None:
 	)
 	startup_script_block = _extract_function_block(
 		cl_awesomium,
-		"static void CL_Awesomium_BuildUserScript( char *buffer, size_t bufferSize, const char *playerName, unsigned int appId, unsigned int steamIdLow, unsigned int steamIdHigh ) {",
+		"static void CL_Awesomium_BuildUserScript( char *buffer, size_t bufferSize, const char *playerName, unsigned int appId, unsigned int steamIdLow, unsigned int steamIdHigh, const char *initialConfigJson ) {",
+	)
+	dispatch_event_block = _extract_function_block(
+		cl_main,
+		"static void CL_WebView_DispatchLiveEvent( const char *name, const char *payload ) {",
+	)
+	publish_event_block = _extract_function_block(
+		cl_main,
+		"void CL_WebView_PublishEvent( const char *name, const char *payload ) {",
 	)
 
 	for expected in (
@@ -962,14 +1009,79 @@ def test_awesomium_qz_method_table_preserves_retail_return_flags() -> None:
 	assert "Cvar_Reset( arguments[0] );" in return_call_block
 
 	for expected in (
-		"SetCvar:function(name,value){config.cvars[(name||'').toLowerCase()]=String(value);return true;}",
-		"ResetCvar:function(name){delete config.cvars[(name||'').toLowerCase()];return true;}",
+		"const char *configJson;",
+		"configJson = ( initialConfigJson && initialConfigJson[0] ) ? initialConfigJson : \"null\";",
+		"window.__qlr_initial_config_applied=applyNativeConfig(%s);",
+		"var nativeQueue=window.__qlr_native_requests=window.__qlr_native_requests||[];",
+		"return queue('cmd',cmd);",
+		"SetCvar:function(name,value){var k=canon(name);if(!k){return false;}value=String(value||'');config.cvars[k]=value;return queue('set',k+'\\\\n'+value);}",
+		"ResetCvar:function(name){var k=canon(name);if(!k){return false;}delete config.cvars[k];return queue('reset',k);}",
 		"Invite GetAllUGC GetNextKeyDown SetFavoriteServer NoOp",
-		"bind('GetCvar',function(n){return config.cvars[(n||'').toLowerCase()]||'';});",
-		"bind('SetCvar',function(n,v){config.cvars[(n||'').toLowerCase()]=String(v||'');return true;});",
-		"bind('ResetCvar',function(n){delete config.cvars[(n||'').toLowerCase()];return true;});",
+		"bind('GetCvar',function(n){var k=canon(n);if(k&&typeof config.cvars[k]==='undefined'){queue('get',k);}return config.cvars[k]||'';});",
+		"bind('SetCvar',function(n,v){var k=canon(n);if(!k){return false;}v=String(v||'');config.cvars[k]=v;return queue('set',k+'\\\\n'+v);});",
+		"bind('ResetCvar',function(n){var k=canon(n);if(!k){return false;}delete config.cvars[k];return queue('reset',k);});",
+		"window.__qlr_apply_native_config=applyNativeConfig;window.__qlr_set_native_cvar=setNativeCvar;",
+		"if(f){for(var k in qz){f[k]=qz[k];}}window.qz_instance=qz;",
 	):
 		assert expected in startup_script_block
+	assert "char\tstartupScript[196608];" in cl_awesomium
+	assert "#define CL_AWE_STARTUP_SCRIPT_RETRY_FRAMES 240" in cl_awesomium
+	assert "#define CL_AWE_STARTUP_SCRIPT_RETRY_INTERVAL 10" in cl_awesomium
+	assert "char\tstartupRetryScript[256];" in cl_awesomium
+	assert "CL_Awesomium_BuildRetryScript( cl_awesomium.startupRetryScript, sizeof( cl_awesomium.startupRetryScript ) );" in cl_awesomium
+	assert "script = cl_awesomium.startupRetryScript;" in cl_awesomium
+
+	for expected in (
+		"#define CL_WEB_NATIVE_REQUESTS_PER_FRAME 1",
+		"#define CL_WEB_NATIVE_REQUEST_STARTUP_DELAY_FRAMES 120",
+		"#define CL_WEB_NATIVE_REQUEST_IDLE_POLL_FRAMES 15",
+		"#define CL_WEB_NATIVE_REQUEST_LOADING_POLL_FRAMES 30",
+		"#define CL_WEB_NATIVE_CONFIG_SYNC_FRAMES 300",
+		"initialConfigJson = (char *)Z_Malloc( CL_WEB_NATIVE_CONFIG_BUFFER_SIZE );",
+		"CL_WebHost_BuildConfigJson( initialConfigJson, CL_WEB_NATIVE_CONFIG_BUFFER_SIZE );",
+		"CL_Awesomium_Startup( homePath, basePath, cl_webHost.playerName, cl_webHost.appId, cl_webHost.steamIdLow, cl_webHost.steamIdHigh, cls.glconfig.vidWidth, cls.glconfig.vidHeight, initialConfigJson )",
+		"cl_webHost.configSynced = qtrue;",
+		"cl_webHost.nextNativeRequestPollFrame = cl_webHost.frameSequence + CL_WEB_NATIVE_REQUEST_STARTUP_DELAY_FRAMES;",
+		'Q_strcat( context->buffer, context->bufferSize, "\\\"" );',
+		'Q_strcat( context->buffer, context->bufferSize, "\\":\\"" );',
+		'Q_strcat( context->buffer, context->bufferSize, ",\\"key\\":\\"" );',
+		'Q_strcat( buffer, bufferSize, "\\",\\"cvars\\":{" );',
+		'Q_strcat( buffer, bufferSize, "},\\"binds\\":[" );',
+		"static void CL_WebHost_PumpNativeJavascriptRequests( void );",
+		"static void CL_WebHost_SyncConfigSnapshot( void );",
+		"cl_webHost.frameSequence < cl_webHost.nextNativeRequestPollFrame",
+		"CL_Awesomium_IsLoading()",
+		"CL_Awesomium_PopJavascriptRequest( request, sizeof( request ) )",
+		'CL_WebHost_ProcessNativeJavascriptRequest( request );',
+		'Cbuf_ExecuteText( EXEC_APPEND, va( "%s\\n", payload ) );',
+		"Cvar_VariableStringBuffer( name, value, sizeof( value ) );",
+		"Cvar_Set( name, value );",
+		"Cvar_Reset( name );",
+		"CL_WebHost_UpdateBrowserCvarCache( name, value );",
+		"CL_WebHost_PumpNativeJavascriptRequests();",
+		"CL_WebHost_SyncConfigSnapshot();",
+	):
+		assert expected in cl_cgame
+
+	for expected in (
+		"typedef void *(__stdcall *awe_webview_execute_javascript_with_result_fn)",
+		"_Awe_WebView_ExecuteJavascriptWithResult@12",
+		"_Awe_JSValue_ToInteger@4",
+		"_Awe_delete_JSValue@4",
+		"CL_Awesomium_PopJavascriptRequest",
+		"window.__qlr_native_requests||[]",
+		"window.__qlr_native_read=String(q.shift())",
+	):
+		assert expected in cl_awesomium
+
+	for expected in (
+		"CL_WebHost_HasDrawableSurface()",
+		"JSON.parse(p)",
+		"window.EnginePublish",
+		'CL_Awesomium_ExecuteJavascript( script, "" );',
+	):
+		assert expected in dispatch_event_block
+	assert "CL_WebView_DispatchLiveEvent( event->name, event->payload );" in publish_event_block
 
 
 def test_awesomium_tagged_info_string_comm_notice_wiring_matches_retail_slot() -> None:
@@ -1079,6 +1191,12 @@ def test_awesomium_document_ready_stages_launcher_script_bundle_before_ready_eve
 	load_scripts_block = _extract_function_block(
 		cl_cgame, "static void QLLoadHandler_LoadDocumentScripts( void ) {"
 	)
+	execute_script_block = _extract_function_block(
+		cl_cgame, "static void QLLoadHandler_ExecuteDocumentScript( const char *scriptPath, char *scriptBuffer, int scriptLength ) {"
+	)
+	poll_ready_block = _extract_function_block(
+		cl_cgame, "static void QLLoadHandler_PollLiveDocumentReady( void ) {"
+	)
 	document_ready_block = _extract_function_block(
 		cl_cgame, "static void QLLoadHandler_OnDocumentReady( void ) {"
 	)
@@ -1091,10 +1209,22 @@ def test_awesomium_document_ready_stages_launcher_script_bundle_before_ready_eve
 
 	assert "int CL_WebPak_GetFileList( const char *path, const char *extension, char *listbuf, int bufsize );" in client_h
 	assert "int\t\tFS_GetPakFileList( const pack_t *pack, const char *path, const char *extension, char *listbuf, int bufsize );" in qcommon_h
+	assert "int\t\t\tloadedDocumentScriptCount;" in cl_cgame
+	assert "int\t\t\texecutedDocumentScriptCount;" in cl_cgame
+	assert "int\t\t\tfailedDocumentScriptCount;" in cl_cgame
 	assert 'count = CL_WebPak_GetFileList( "js", ".js", fileList, sizeof( fileList ) );' in load_scripts_block
 	assert 'Com_sprintf( scriptPath, sizeof( scriptPath ), "js/%s", cursor );' in load_scripts_block
-	assert "CL_LauncherRequestData( scriptPath, &scriptBuffer, &scriptLength )" in load_scripts_block
+	assert "CL_LauncherRequestData( scriptPath, (void **)&scriptBuffer, &scriptLength )" in load_scripts_block
+	assert "cl_webHost.loadedDocumentScriptCount++;" in load_scripts_block
+	assert "QLLoadHandler_ExecuteDocumentScript( scriptPath, scriptBuffer, scriptLength );" in load_scripts_block
+	assert "scriptBuffer[scriptLength] = '\\0';" in execute_script_block
+	assert 'CL_Awesomium_ExecuteJavascript( scriptBuffer, "" )' in execute_script_block
+	assert "cl_webHost.executedDocumentScriptCount++;" in execute_script_block
+	assert "cl_webHost.failedDocumentScriptCount++;" in execute_script_block
 	assert "Z_Free( scriptBuffer );" in load_scripts_block
+	assert "if ( CL_Awesomium_IsLoading() ) {" in poll_ready_block
+	assert "QLLoadHandler_OnFinishLoadingFrame();" in poll_ready_block
+	assert "QLLoadHandler_OnDocumentReady();" in poll_ready_block
 	assert "QLLoadHandler_LoadDocumentScripts();" in document_ready_block
 	assert "QLJSHandler_BindQzInstance();" in document_ready_block
 	assert "sourceCount = FS_GetPakFileList( cl_webPak, path, extension, sourceList, sizeof( sourceList ) );" in webpak_list_block
@@ -1324,10 +1454,16 @@ def test_awesomium_map_list_reconstructs_retail_arena_catalog() -> None:
 	assert "longName = Info_ValueForKey( info, ARENA_INFO_KEY_LONGNAME );" in parse_block
 	assert "typeList = Info_ValueForKey( info, ARENA_INFO_KEY_TYPE );" in parse_block
 	assert 'CL_WebHost_AppendMapDescriptorJson( mapName, longName, typeBits, buffer, bufferSize, entryCount );' in parse_block
-	assert 'CL_WebHost_TypeStringHasToken( typeList, "duel" )' in type_bits_block
-	assert 'CL_WebHost_TypeStringHasToken( typeList, "race" )' in type_bits_block
-	assert 'CL_WebHost_TypeStringHasToken( typeList, "dom" )' in type_bits_block
-	assert 'CL_WebHost_TypeStringHasToken( typeList, "rr" )' in type_bits_block
+	assert 'CL_WebHost_TypeStringContains( typeList, "duel" )' in type_bits_block
+	assert 'CL_WebHost_TypeStringContains( typeList, "race" )' in type_bits_block
+	assert 'CL_WebHost_TypeStringContains( typeList, "overload" )' in type_bits_block
+	assert 'CL_WebHost_TypeStringContains( typeList, "hh" )' in type_bits_block
+	assert 'CL_WebHost_TypeStringContains( typeList, "har" )' in type_bits_block
+	assert 'CL_WebHost_TypeStringContains( typeList, "ft" )' in type_bits_block
+	assert 'CL_WebHost_TypeStringContains( typeList, "dom" )' in type_bits_block
+	assert 'CL_WebHost_TypeStringContains( typeList, "ad" )' in type_bits_block
+	assert 'CL_WebHost_TypeStringContains( typeList, "rr" )' in type_bits_block
+	assert "return typeBits ? typeBits" not in type_bits_block
 	assert 'count = FS_GetFileList( "maps", ".bsp", fileList, sizeof( fileList ) );' in fallback_block
 
 

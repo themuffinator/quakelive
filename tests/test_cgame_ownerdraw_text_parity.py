@@ -416,6 +416,827 @@ def test_spectator_messages_use_retail_copy_family() -> None:
         assert stale not in block
 
 
+def test_spec_and_player_preview_ownerdraws_match_retail_dispatch_cluster() -> None:
+    source = CG_NEWDRAW.read_text(encoding="utf-8")
+    main_source = CG_MAIN.read_text(encoding="utf-8")
+    hlil_source = CGAME_HLIL.read_text(encoding="utf-8")
+    ghidra_source = CGAME_GHIDRA.read_text(encoding="utf-8")
+    menudef_source = MENUDEF_H.read_text(encoding="utf-8")
+    spectator_menu = SPECTATOR_MENU.read_text(encoding="utf-8")
+    spectator_follow_menu = SPECTATOR_FOLLOW_MENU.read_text(encoding="utf-8")
+    all_menu_source = "\n".join(
+        path.read_text(encoding="utf-8") for path in (REPO_ROOT / "src" / "ui").glob("*.menu")
+    )
+    ownerdraw_block = _block_from_marker(source, "void CG_OwnerDraw(")
+    value_block = _block_from_marker(source, "float CG_GetValue")
+    width_block = _block_from_marker(main_source, "static int CG_OwnerDrawWidth")
+    key_block = _block_from_marker(main_source, "static qboolean CG_OwnerDrawHandleKey")
+    display_context_block = _block_from_marker(main_source, "static void CG_InitDisplayContext")
+    spectator_block = _block_from_marker(source, "static void CG_DrawSpectatorMessages")
+    player_head_block = _block_from_marker(source, "static void CG_DrawPlayerHead")
+    player_model_block = _block_from_marker(source, "static void CG_DrawPlayerModel")
+    armor_icon_block = _block_from_marker(source, "static void CG_DrawPlayerArmorIcon")
+    retail_switch = _block_from_marker(ghidra_source, "void FUN_1003b0f0")
+    retail_spectator = _text_between(
+        hlil_source,
+        "10034d70    int32_t __fastcall sub_10034d70",
+        "100350c0",
+    )
+    retail_player_head = _text_between(
+        hlil_source,
+        "1002f950    int80_t sub_1002f950",
+        "1002fc70",
+    )
+    retail_player_model = _text_between(
+        hlil_source,
+        "10034980    int32_t __convention",
+        "10034a00",
+    )
+    retail_armor_icon = _text_between(
+        hlil_source,
+        "1002e3f0    void __convention",
+        "1002e500",
+    )
+    constants = {}
+    for line in menudef_source.splitlines():
+        parts = line.split()
+        if len(parts) < 3 or parts[0] != "#define":
+            continue
+        try:
+            constants[parts[1]] = int(parts[2], 0)
+        except ValueError:
+            continue
+
+    assert constants["CG_SPEC_MESSAGES"] == 35
+    assert constants["CG_PLAYER_HEAD"] == 36
+    assert constants["CG_PLAYERMODEL"] == 37
+    assert constants["CG_PLAYER_ARMOR_ICON"] == 38
+    assert constants["CG_PLAYER_ARMOR_ICON2D"] == 39
+
+    for expected in (
+        "case 0x23:\n    FUN_10034d70();",
+        "case 0x24:\n    FUN_1002f950();",
+        "case 0x25:\n    FUN_10034980();",
+        "case 0x26:\n    FUN_1002e3f0(param_8 & 0x10000000);",
+        "case 0x27:\n    FUN_1002e3f0(1);",
+    ):
+        assert expected in retail_switch
+
+    for expected in (
+        "case CG_SPEC_MESSAGES:",
+        "CG_DrawSpectatorMessages( &rect, scale, color, textStyle );",
+        "case CG_PLAYER_HEAD:",
+        "CG_DrawPlayerHead( &rect, ownerDrawFlags & CG_SHOW_2DONLY );",
+        "case CG_PLAYERMODEL:",
+        "CG_DrawPlayerModel( &rect );",
+        "case CG_PLAYER_ARMOR_ICON:",
+        "CG_DrawPlayerArmorIcon( &rect, ownerDrawFlags & CG_SHOW_2DONLY );",
+        "case CG_PLAYER_ARMOR_ICON2D:",
+        "CG_DrawPlayerArmorIcon( &rect, qtrue );",
+    ):
+        assert expected in ownerdraw_block
+
+    for expected in (
+        "Round In Progress",
+        "SPECTATOR MODE",
+        "Press mouse button 1 to cycle through players",
+        "waiting to play",
+        "press ESC and use the JOIN buttons",
+        "to enter the game",
+        'CG_FindBrowserOverlayByName( "comp_specfollowhud_menu" )',
+    ):
+        assert expected in spectator_block
+    for expected in (
+        '"Round In Progress"',
+        '"SPECTATOR MODE"',
+    ):
+        assert expected in retail_spectator
+    for expected in (
+        '"Press mouse button 1 to cycle through players"',
+        '"press ESC and use the JOIN buttons"',
+        '"to enter the game"',
+    ):
+        assert expected in hlil_source
+
+    for expected in (
+        "if ( cg.damageTime && cg.time - cg.damageTime < DAMAGE_TIME )",
+        "cg.headStartYaw = 180 + cg.damageX * 45;",
+        "frac = frac * frac * ( 3 - 2 * frac );",
+        "CG_DrawHead( x, rect->y, rect->w, rect->h, cg.snap->ps.clientNum, angles );",
+    ):
+        assert expected in player_head_block
+    for expected in (
+        "data_10ab8f9c",
+        "data_10ab8fa0",
+        "return sub_10009490",
+    ):
+        assert expected in retail_player_head
+
+    for expected in (
+        "clientNum = cg.spectatorTrackedClient;",
+        "clientNum = cg.snap->ps.clientNum;",
+        "weaponNum = CG_ClientPreviewWeapon( clientNum );",
+        "VectorSet( previewAngles, 5.0f, 210.0f, 0.0f );",
+        "CG_DrawClientModelPreview( rect, clientNum, weaponNum, previewAngles, qtrue );",
+    ):
+        assert expected in player_model_block
+    for expected in (
+        "data_10a249cc",
+        "data_10a9c7a0",
+        "0x43520000",
+        "return sub_10008c40",
+    ):
+        assert expected in retail_player_model
+
+    for expected in (
+        "if ( draw2D || ( !cg_draw3dIcons.integer && cg_drawIcons.integer) )",
+        "CG_DrawPic( rect->x, rect->y + rect->h/2 + 1, rect->w, rect->h, cgs.media.armorIcon );",
+        "origin[0] = 90;",
+        "origin[2] = -10;",
+        "angles[YAW] = ( cg.time & 2047 ) * 360 / 2048.0;",
+        "CG_Draw3DModel( rect->x, rect->y, rect->w, rect->h, cgs.media.armorModel, 0, origin, angles );",
+    ):
+        assert expected in armor_icon_block
+    for expected in (
+        "data_10a5f418",
+        "data_10a5f414",
+        "data_10a64a4c != 0",
+        "data_10a69a2c != 0",
+        "data_10b7102c != 0",
+    ):
+        assert expected in retail_armor_icon
+
+    assert spectator_menu.count("ownerdraw CG_SPEC_MESSAGES") == 2
+    assert spectator_follow_menu.count("ownerdraw CG_SPEC_MESSAGES") == 2
+    for absent_menu_draw in (
+        "CG_PLAYER_HEAD",
+        "CG_PLAYERMODEL",
+        "CG_PLAYER_ARMOR_ICON",
+        "CG_PLAYER_ARMOR_ICON2D",
+    ):
+        assert f"ownerdraw {absent_menu_draw}" not in all_menu_source
+
+    for callback_block in (value_block, width_block, key_block):
+        for draw_name in (
+            "CG_SPEC_MESSAGES",
+            "CG_PLAYER_HEAD",
+            "CG_PLAYERMODEL",
+            "CG_PLAYER_ARMOR_ICON",
+            "CG_PLAYER_ARMOR_ICON2D",
+        ):
+            assert draw_name not in callback_block
+    assert "cgDC.ownerDrawItem = &CG_OwnerDraw;" in display_context_block
+    assert "cgDC.getValue = &CG_GetValue;" in display_context_block
+    assert "cgDC.ownerDrawWidth = &CG_OwnerDrawWidth;" in display_context_block
+    assert "cgDC.ownerDrawHandleKey = &CG_OwnerDrawHandleKey;" in display_context_block
+
+
+def test_player_status_ownerdraws_40_to_44_match_retail_dispatch_values_and_menus() -> None:
+    source = CG_NEWDRAW.read_text(encoding="utf-8")
+    main_source = CG_MAIN.read_text(encoding="utf-8")
+    hlil_source = CGAME_HLIL.read_text(encoding="utf-8")
+    ghidra_source = CGAME_GHIDRA.read_text(encoding="utf-8")
+    menudef_source = MENUDEF_H.read_text(encoding="utf-8")
+    hud_menu = (REPO_ROOT / "src" / "ui" / "hud.menu").read_text(encoding="utf-8")
+    all_menu_source = "\n".join(
+        path.read_text(encoding="utf-8") for path in (REPO_ROOT / "src" / "ui").glob("*.menu")
+    )
+    ownerdraw_block = _block_from_marker(source, "void CG_OwnerDraw(")
+    value_block = _block_from_marker(source, "float CG_GetValue")
+    width_block = _block_from_marker(main_source, "static int CG_OwnerDrawWidth")
+    key_block = _block_from_marker(main_source, "static qboolean CG_OwnerDrawHandleKey")
+    display_context_block = _block_from_marker(main_source, "static void CG_InitDisplayContext")
+    armor_value_block = _block_from_marker(source, "static void CG_DrawPlayerArmorValue")
+    armor_100_block = _block_from_marker(source, "static void CG_DrawPlayerArmorBar100")
+    armor_200_block = _block_from_marker(source, "static void CG_DrawPlayerArmorBar200")
+    tiered_block = _block_from_marker(source, "static void CG_DrawArmorTieredColorized")
+    health_block = _block_from_marker(source, "static void CG_DrawPlayerHealth")
+    retail_switch = _block_from_marker(ghidra_source, "void FUN_1003b0f0")
+    retail_value = _text_between(
+        hlil_source,
+        "10031610    long double sub_10031610",
+        "100316ab",
+    )
+    retail_armor_value = _text_between(
+        hlil_source,
+        "1002e500    void __convention",
+        "1002e660",
+    )
+    retail_armor_100 = _text_between(
+        hlil_source,
+        "1002efb0    int32_t sub_1002efb0",
+        "1002f0c0",
+    )
+    retail_armor_200 = _text_between(
+        hlil_source,
+        "1002f0c0    void sub_1002f0c0",
+        "1002f1f0",
+    )
+    retail_tiered = _text_between(
+        hlil_source,
+        '1002f780    int32_t __convention("regparm") sub_1002f780',
+        "1002f860",
+    )
+    retail_health = _text_between(
+        hlil_source,
+        "1002fdf0    void __convention",
+        "1002ff50",
+    )
+    def menu_ownerdraw_count(menu_source: str, ownerdraw: str) -> int:
+        return sum(
+            1
+            for line in menu_source.splitlines()
+            if line.split()[:2] == ["ownerdraw", ownerdraw]
+        )
+
+    for ownerdraw, value in (
+        ("CG_PLAYER_ARMOR_VALUE", "40"),
+        ("CG_PLAYER_ARMOR_BAR_100", "41"),
+        ("CG_PLAYER_ARMOR_BAR_200", "42"),
+        ("CG_ARMORTIERED_COLORIZED", "43"),
+        ("CG_PLAYER_HEALTH", "44"),
+    ):
+        assert any(line.split()[:3] == ["#define", ownerdraw, value] for line in menudef_source.splitlines())
+        assert ownerdraw not in width_block
+        assert ownerdraw not in key_block
+
+    for expected in (
+        "case 0x28:\n    FUN_1002e500(param_12,param_13,param_14,param_16,param_10);",
+        "case 0x29:\n    FUN_1002efb0(param_15);",
+        "case 0x2a:\n    FUN_1002f0c0(param_15);",
+        "case 0x2b:\n    FUN_1002f780(param_15);",
+        "case 0x2c:\n    FUN_1002fdf0(param_12,param_13,param_14,param_16,param_10);",
+    ):
+        assert expected in retail_switch
+
+    for expected in (
+        "case CG_PLAYER_ARMOR_VALUE:",
+        "CG_DrawPlayerArmorValue( &rect, scale, color, shader, textStyle, align );",
+        "case CG_PLAYER_ARMOR_BAR_100:",
+        "CG_DrawPlayerArmorBar100( &rect, shader );",
+        "case CG_PLAYER_ARMOR_BAR_200:",
+        "CG_DrawPlayerArmorBar200( &rect, shader );",
+        "case CG_ARMORTIERED_COLORIZED:",
+        "CG_DrawArmorTieredColorized(&rect);",
+        "case CG_PLAYER_HEALTH:",
+        "CG_DrawPlayerHealth( &rect, scale, color, shader, textStyle, align );",
+    ):
+        assert expected in ownerdraw_block
+
+    assert "case CG_PLAYER_ARMOR_VALUE:" in value_block
+    assert "return ps->stats[STAT_ARMOR];" in value_block
+    assert "case CG_PLAYER_HEALTH:" in value_block
+    assert "return ps->stats[STAT_HEALTH];" in value_block
+    for absent_value in (
+        "CG_PLAYER_ARMOR_BAR_100",
+        "CG_PLAYER_ARMOR_BAR_200",
+        "CG_ARMORTIERED_COLORIZED",
+    ):
+        assert absent_value not in value_block
+    for expected in (
+        "case 0x28",
+        "return float.t(*(esi + 0xfc))",
+        "case 0x2c",
+        "return float.t(*(esi + 0xec))",
+    ):
+        assert expected in retail_value
+
+    for expected in (
+        "value = ps->stats[STAT_ARMOR];",
+        "if ( shader ) {",
+        "CG_DrawPic( rect->x, rect->y, rect->w, rect->h, shader );",
+        'Com_sprintf( num, sizeof( num ), "%i", value );',
+        "y = rect->y + CG_Text_Height( num, scale, 0 );",
+        "CG_AlignTextX( &x, num, scale, align );",
+        "CG_Text_Paint( x, y, scale, color, num, 0, 0, textStyle );",
+    ):
+        assert expected in armor_value_block
+    for expected in (
+        "int32_t ebp = *(data_10a6f8c4 + 0xfc)",
+        "if (arg1 != 0)",
+        "(*(data_1074cccc + 0x138))(arg6)",
+        "if (arg8 == 1)",
+        "else if (arg8 == 2)",
+        "var_4 = fconvert.s(fconvert.t(ebx[1]) + float.t(var_4))",
+        "sub_10008440(fconvert.s(fconvert.t(*ebx)), fconvert.s(fconvert.t(var_4)), arg4,",
+    ):
+        assert expected in retail_armor_value
+
+    for expected in (
+        "armor = cg.snap->ps.stats[STAT_ARMOR];",
+        "Vector4Copy( CG_TeamColor( cg.snap->ps.persistant[PERS_TEAM] ), barColor );",
+        "ratio = CG_BarValueFraction( armor, 100 );",
+        "shader = cgs.media.armorBar100;",
+        "CG_DrawBarFillFromRight( rect, shader, ratio, barColor );",
+    ):
+        assert expected in armor_100_block
+    for expected in (
+        "float.t(*(ecx + 0xfc))",
+        "var_8 = 100f",
+        "float var_4_1 = fconvert.s(float.t(1) - fconvert.t(var_8_1) / x87_r6_2)",
+        "fconvert.t(arg1[2]) + fconvert.t(*arg1)",
+        "sub_10012710",
+    ):
+        assert expected in retail_armor_100
+
+    for expected in (
+        "excessArmor = armor - 100;",
+        "if ( excessArmor <= 0 ) {",
+        "Vector4Copy( CG_TeamColor( cg.snap->ps.persistant[PERS_TEAM] ), barColor );",
+        "ratio = CG_BarValueFraction( excessArmor, 100 );",
+        "shader = cgs.media.armorBar200;",
+        "CG_DrawBarFillFromBottom( rect, shader, ratio, barColor );",
+    ):
+        assert expected in armor_200_block
+    for expected in (
+        "float.t(*(ecx + 0xfc)) - fconvert.t(100.0)",
+        "return",
+        "float var_4 = fconvert.s(float.t(1) - fconvert.t(var_8_3) / x87_r5_2)",
+        "fconvert.t(arg1[1]) + fconvert.t(arg1[3])",
+        "sub_10012710",
+    ):
+        assert expected in retail_armor_200
+
+    for expected in (
+        "CG_GetArmorTierColorForTier( cg.snap->ps.stats[STAT_ARMOR_TIER], color );",
+        "color[3] = 0.5f;",
+        "CG_FillRect( rect->x, rect->y, rect->w, rect->h, color );",
+    ):
+        assert expected in tiered_block
+    for expected in (
+        "int32_t eax_3 = *(data_10a6f8c4 + 0x124)",
+        "0x3f800000",
+        "var_8_1 = *(arg3 + 0xc)",
+        "(*(data_1074cccc + 0x138))(&var_14)",
+        "sub_100126a0(fconvert.s(fconvert.t(*arg4)))",
+    ):
+        assert expected in retail_tiered
+
+    for expected in (
+        "value = ps->stats[STAT_HEALTH];",
+        "if (shader) {",
+        "CG_DrawPic(rect->x, rect->y, rect->w, rect->h, shader);",
+        'Com_sprintf (num, sizeof(num), "%i", value);',
+        "y = rect->y + CG_Text_Height( num, scale, 0 );",
+        "CG_AlignTextX( &x, num, scale, align );",
+        "CG_Text_Paint( x, y, scale, color, num, 0, 0, textStyle );",
+    ):
+        assert expected in health_block
+    for expected in (
+        "int32_t ebp = *(data_10a6f8c4 + 0xec)",
+        "if (arg1 != 0)",
+        "(*(data_1074cccc + 0x138))(arg6)",
+        "if (arg8 == 1)",
+        "else if (arg8 == 2)",
+        "var_4 = fconvert.s(fconvert.t(ebx[1]) + float.t(var_4))",
+        "sub_10008440(fconvert.s(fconvert.t(*ebx)), fconvert.s(fconvert.t(var_4)), arg4,",
+    ):
+        assert expected in retail_health
+
+    assert menu_ownerdraw_count(hud_menu, "CG_PLAYER_ARMOR_BAR_100") == 1
+    assert menu_ownerdraw_count(hud_menu, "CG_PLAYER_ARMOR_BAR_200") == 1
+    assert menu_ownerdraw_count(all_menu_source, "CG_PLAYER_ARMOR_VALUE") == 7
+    assert menu_ownerdraw_count(all_menu_source, "CG_ARMORTIERED_COLORIZED") == 5
+    assert menu_ownerdraw_count(all_menu_source, "CG_PLAYER_HEALTH") == 7
+
+    assert "cgDC.ownerDrawItem = &CG_OwnerDraw;" in display_context_block
+    assert "cgDC.getValue = &CG_GetValue;" in display_context_block
+    assert "cgDC.ownerDrawWidth = &CG_OwnerDrawWidth;" in display_context_block
+    assert "cgDC.ownerDrawHandleKey = &CG_OwnerDrawHandleKey;" in display_context_block
+
+
+def test_health_bar_and_ammo_ownerdraws_45_to_49_match_retail_dispatch_values_and_menus() -> None:
+    source = CG_NEWDRAW.read_text(encoding="utf-8")
+    main_source = CG_MAIN.read_text(encoding="utf-8")
+    hlil_source = CGAME_HLIL.read_text(encoding="utf-8")
+    ghidra_source = CGAME_GHIDRA.read_text(encoding="utf-8")
+    menudef_source = MENUDEF_H.read_text(encoding="utf-8")
+    hud_menu = (REPO_ROOT / "src" / "ui" / "hud.menu").read_text(encoding="utf-8")
+    all_menu_source = "\n".join(
+        path.read_text(encoding="utf-8") for path in (REPO_ROOT / "src" / "ui").glob("*.menu")
+    )
+    ownerdraw_block = _block_from_marker(source, "void CG_OwnerDraw(")
+    value_block = _block_from_marker(source, "float CG_GetValue")
+    width_block = _block_from_marker(main_source, "static int CG_OwnerDrawWidth")
+    key_block = _block_from_marker(main_source, "static qboolean CG_OwnerDrawHandleKey")
+    display_context_block = _block_from_marker(main_source, "static void CG_InitDisplayContext")
+    health_100_block = _block_from_marker(source, "static void CG_DrawPlayerHealthBar100")
+    health_200_block = _block_from_marker(source, "static void CG_DrawPlayerHealthBar200")
+    ammo_icon_block = _block_from_marker(source, "static void CG_DrawPlayerAmmoIcon")
+    ammo_value_block = _block_from_marker(source, "static void CG_DrawPlayerAmmoValue")
+    retail_switch = _block_from_marker(ghidra_source, "void FUN_1003b0f0")
+    retail_value = _text_between(
+        hlil_source,
+        "10031610    long double sub_10031610",
+        "100316ab",
+    )
+    retail_health_100 = _text_between(
+        hlil_source,
+        "1002ed50    int32_t sub_1002ed50",
+        "1002ee50",
+    )
+    retail_health_200 = _text_between(
+        hlil_source,
+        "1002ee50    int32_t sub_1002ee50",
+        "1002efb0",
+    )
+    retail_ammo_icon = _text_between(
+        hlil_source,
+        '1002e660    void* __convention("regparm") sub_1002e660',
+        "1002e7c0",
+    )
+    retail_ammo_value = _text_between(
+        hlil_source,
+        '1002e7c0    int32_t __convention("regparm") sub_1002e7c0',
+        "1002e9b0",
+    )
+    def menu_ownerdraw_count(menu_source: str, ownerdraw: str) -> int:
+        return sum(
+            1
+            for line in menu_source.splitlines()
+            if line.split()[:2] == ["ownerdraw", ownerdraw]
+        )
+
+    for ownerdraw, value in (
+        ("CG_PLAYER_HEALTH_BAR_100", "45"),
+        ("CG_PLAYER_HEALTH_BAR_200", "46"),
+        ("CG_PLAYER_AMMO_ICON", "47"),
+        ("CG_PLAYER_AMMO_ICON2D", "48"),
+        ("CG_PLAYER_AMMO_VALUE", "49"),
+    ):
+        assert any(line.split()[:3] == ["#define", ownerdraw, value] for line in menudef_source.splitlines())
+        assert ownerdraw not in width_block
+        assert ownerdraw not in key_block
+
+    for expected in (
+        "case 0x2d:\n    FUN_1002ed50(param_15);",
+        "case 0x2e:\n    FUN_1002ee50(param_15);",
+        "case 0x2f:\n    FUN_1002e660(param_8 & 0x10000000);",
+        "case 0x30:\n    FUN_1002e660(1);",
+        "case 0x31:\n    FUN_1002e7c0(param_12,param_13,param_15,param_16,param_10);",
+    ):
+        assert expected in retail_switch
+
+    for expected in (
+        "case CG_PLAYER_HEALTH_BAR_100:",
+        "CG_DrawPlayerHealthBar100( &rect, shader );",
+        "case CG_PLAYER_HEALTH_BAR_200:",
+        "CG_DrawPlayerHealthBar200( &rect, shader );",
+        "case CG_PLAYER_AMMO_ICON:",
+        "CG_DrawPlayerAmmoIcon( &rect, ownerDrawFlags & CG_SHOW_2DONLY );",
+        "case CG_PLAYER_AMMO_ICON2D:",
+        "CG_DrawPlayerAmmoIcon( &rect, qtrue );",
+        "case CG_PLAYER_AMMO_VALUE:",
+        "CG_DrawPlayerAmmoValue( &rect, scale, color, shader, textStyle, align );",
+    ):
+        assert expected in ownerdraw_block
+
+    assert "case CG_PLAYER_AMMO_VALUE:" in value_block
+    assert "return ps->ammo[cent->currentState.weapon];" in value_block
+    for absent_value in (
+        "CG_PLAYER_HEALTH_BAR_100",
+        "CG_PLAYER_HEALTH_BAR_200",
+        "CG_PLAYER_AMMO_ICON",
+        "CG_PLAYER_AMMO_ICON2D",
+    ):
+        assert absent_value not in value_block
+    for expected in (
+        "case 0x31",
+        "int32_t eax_3 = *(ecx * 0x2d0 + 0x10abbb90)",
+        "if (eax_3 != 0)",
+        "return float.t(*(esi + (eax_3 << 2) + 0x1ac))",
+    ):
+        assert expected in retail_value
+
+    for expected in (
+        "health = cg.snap->ps.stats[STAT_HEALTH];",
+        "maxHealth = CG_PlayerMaxHealth();",
+        "Vector4Copy( CG_TeamColor( cg.snap->ps.persistant[PERS_TEAM] ), barColor );",
+        "ratio = CG_BarValueFraction( health, maxHealth );",
+        "shader = cgs.media.healthBar100;",
+        "CG_DrawBarFill( rect, shader, ratio, barColor );",
+    ):
+        assert expected in health_100_block
+    for expected in (
+        "float.t(*(ecx + 0xec))",
+        "float.t(*(ecx + 0x108))",
+        "var_8 = var_4",
+        "float var_8_1 = fconvert.s(fconvert.t(var_4_2) / x87_r6_2)",
+        "sub_10012710(fconvert.s(fconvert.t(*arg1)), fconvert.s(fconvert.t(arg1[1])),",
+    ):
+        assert expected in retail_health_100
+
+    for expected in (
+        "excessHealth = health - maxHealth;",
+        "if ( excessHealth <= 0 ) {",
+        "Vector4Copy( CG_TeamColor( cg.snap->ps.persistant[PERS_TEAM] ), barColor );",
+        "ratio = CG_BarValueFraction( excessHealth, maxHealth );",
+        "shader = cgs.media.healthBar200;",
+        "CG_DrawBarFillFromBottom( rect, shader, ratio, barColor );",
+    ):
+        assert expected in health_200_block
+    for expected in (
+        "*(ecx + 0xec) - result",
+        "if (not(0f <= xmm0))",
+        "if (xmm0 f<= 0)",
+        "float var_8_1 = fconvert.s(float.t(1) - fconvert.t(var_4_4) / x87_r6_2)",
+        "fconvert.t(arg1[1]) + fconvert.t(arg1[3])",
+        "sub_10012710",
+    ):
+        assert expected in retail_health_200
+
+    for expected in (
+        "if ( draw2D || (!cg_draw3dIcons.integer && cg_drawIcons.integer) )",
+        "weapon = cg.predictedPlayerState.weapon;",
+        "icon = cg_weapons[ weapon ].ammoIcon;",
+        "CG_DrawPic( rect->x, rect->y, rect->w, rect->h, icon );",
+        "weapon = cent->currentState.weapon;",
+        "origin[0] = 70;",
+        "angles[YAW] = 90 + 20 * sin( cg.time / 1000.0 );",
+        "CG_Draw3DModel( rect->x, rect->y, rect->w, rect->h, cg_weapons[ weapon ].ammoModel, 0, origin, angles );",
+    ):
+        assert expected in ammo_icon_block
+    for expected in (
+        "if (arg2 != 0)",
+        "data_10a9c2a0 * 0x88",
+        "data_10a69a2c != 0",
+        "data_10b7102c != 0",
+        "var_18 = 0x428c0000",
+        "fconvert.t(20.0) + fconvert.t(90.0)",
+    ):
+        assert expected in retail_ammo_icon
+
+    for expected in (
+        "weapon = cent->currentState.weapon;",
+        "if ( weapon <= WP_NONE || weapon >= WP_NUM_WEAPONS ) {",
+        "if ( weapon == WP_GAUNTLET || weapon == WP_GRAPPLING_HOOK ) {",
+        "value = ps->ammo[weapon];",
+        "if ( value == -1 ) {",
+        "if ( cgs.media.infiniteAmmoShader ) {",
+        "iconSize = rect->w;",
+        "CG_DrawPic( iconX, rect->y, iconSize, iconSize, cgs.media.infiniteAmmoShader );",
+        "CG_AlignTextX( &x, num, scale, align );",
+        "CG_Text_Paint( x, y, scale, color, num, 0, 0, textStyle );",
+    ):
+        assert expected in ammo_value_block
+    for expected in (
+        "if (result != 0 && result != 1 && result != 0xa)",
+        "int32_t esi_1 = *(ecx_1 + (result << 2) + 0x1ac)",
+        "if (esi_1 s> 0xffffffff)",
+        "if (arg5 != 0)",
+        "sub_100575e0(&data_100687a8)",
+        "if (esi_1 == 0xffffffff)",
+        "if (arg7 == 1)",
+        "else if (arg7 == 2)",
+        "data_10a5f4e8",
+    ):
+        assert expected in retail_ammo_value
+
+    assert menu_ownerdraw_count(hud_menu, "CG_PLAYER_HEALTH_BAR_100") == 1
+    assert menu_ownerdraw_count(hud_menu, "CG_PLAYER_HEALTH_BAR_200") == 1
+    assert menu_ownerdraw_count(all_menu_source, "CG_PLAYER_AMMO_ICON") == 0
+    assert menu_ownerdraw_count(all_menu_source, "CG_PLAYER_AMMO_ICON2D") == 5
+    assert menu_ownerdraw_count(all_menu_source, "CG_PLAYER_AMMO_VALUE") == 6
+
+    assert "cgDC.ownerDrawItem = &CG_OwnerDraw;" in display_context_block
+    assert "cgDC.getValue = &CG_GetValue;" in display_context_block
+    assert "cgDC.ownerDrawWidth = &CG_OwnerDrawWidth;" in display_context_block
+    assert "cgDC.ownerDrawHandleKey = &CG_OwnerDrawHandleKey;" in display_context_block
+
+
+def test_item_score_race_and_oneflag_ownerdraws_50_to_54_match_retail_dispatch_values_and_menus() -> None:
+    source = CG_NEWDRAW.read_text(encoding="utf-8")
+    main_source = CG_MAIN.read_text(encoding="utf-8")
+    hlil_source = CGAME_HLIL.read_text(encoding="utf-8")
+    ghidra_source = CGAME_GHIDRA.read_text(encoding="utf-8")
+    menudef_source = MENUDEF_H.read_text(encoding="utf-8")
+    all_menu_source = "\n".join(
+        path.read_text(encoding="utf-8") for path in (REPO_ROOT / "src" / "ui").glob("*.menu")
+    )
+    ownerdraw_block = _block_from_marker(source, "void CG_OwnerDraw(")
+    value_block = _block_from_marker(source, "float CG_GetValue")
+    width_block = _block_from_marker(main_source, "static int CG_OwnerDrawWidth")
+    key_block = _block_from_marker(main_source, "static qboolean CG_OwnerDrawHandleKey")
+    display_context_block = _block_from_marker(main_source, "static void CG_InitDisplayContext")
+    item_block = _block_from_marker(source, "static void CG_DrawPlayerItem")
+    compact_score_block = _block_from_marker(source, "static qboolean CG_BuildCompactScoreValueText")
+    player_score_block = _block_from_marker(source, "static void CG_DrawPlayerScore")
+    score_value_block = _block_from_marker(source, "static void CG_DrawScoreValue")
+    race_times_block = _block_from_marker(source, "static qboolean CG_RaceBuildTimesStrings")
+    race_block = _block_from_marker(source, "static void CG_DrawRaceStatusAndTimes")
+    oneflag_block = _block_from_marker(source, "static void CG_OneFlagStatus")
+    retail_switch = _block_from_marker(ghidra_source, "void FUN_1003b0f0")
+    retail_item = _text_between(
+        hlil_source,
+        "1002fc70    float sub_1002fc70",
+        "1002fdf0",
+    )
+    retail_race = _text_between(
+        hlil_source,
+        "1002f1f0    int32_t __convention",
+        "1002f5d0",
+    )
+    retail_oneflag = _text_between(
+        hlil_source,
+        "10030ff0    void sub_10030ff0",
+        "100310f0",
+    )
+    retail_score = _text_between(
+        hlil_source,
+        "100323d0    void* __convention",
+        "10032520",
+    )
+
+    def menu_ownerdraw_count(menu_source: str, ownerdraw: str) -> int:
+        return sum(
+            1
+            for line in menu_source.splitlines()
+            if line.split()[:2] == ["ownerdraw", ownerdraw]
+        )
+
+    for ownerdraw, value in (
+        ("CG_PLAYER_ITEM", "50"),
+        ("CG_PLAYER_SCORE", "51"),
+        ("CG_RACE_STATUS", "52"),
+        ("CG_RACE_TIMES", "53"),
+        ("CG_ONEFLAG_STATUS", "54"),
+    ):
+        assert any(line.split()[:3] == ["#define", ownerdraw, value] for line in menudef_source.splitlines())
+        assert ownerdraw not in width_block
+        assert ownerdraw not in key_block
+
+    for expected in (
+        "case 0x32:\n    FUN_1002fc70(param_13);",
+        "case 0x33:",
+        "case 0x53:",
+        "case 0x56:",
+        "FUN_100323d0(param_7,param_13,param_16,param_10);",
+        "case 0x34:",
+        "case 0x35:",
+        "FUN_1002f1f0(param_13,param_10);",
+        "case 0x36:\n    FUN_10030ff0();",
+    ):
+        assert expected in retail_switch
+
+    for expected in (
+        "case CG_PLAYER_ITEM:",
+        "CG_DrawPlayerItem( &rect, scale, ownerDrawFlags & CG_SHOW_2DONLY );",
+        "case CG_PLAYER_SCORE:",
+        "CG_DrawScoreValue( &rect, scale, color, shader, textStyle, ownerDraw );",
+        "case CG_ONEFLAG_STATUS:",
+        "CG_OneFlagStatus(&rect);",
+        "case CG_RACE_STATUS:",
+        "case CG_RACE_TIMES:",
+        "CG_DrawRaceStatusAndTimes( &rect, scale, color, textStyle, ownerDraw );",
+    ):
+        assert expected in ownerdraw_block
+
+    assert "case CG_PLAYER_SCORE:" in value_block
+    assert "return cg.snap->ps.persistant[PERS_SCORE];" in value_block
+    for absent_value in (
+        "CG_PLAYER_ITEM",
+        "CG_RACE_STATUS",
+        "CG_RACE_TIMES",
+        "CG_ONEFLAG_STATUS",
+    ):
+        assert absent_value not in value_block
+
+    for expected in (
+        "int32_t esi = *(result i+ 0xf0)",
+        "sub_10051770(esi, edi)",
+        "*((result << 3) + &data_10067298) == 6",
+        "*(eax_4 + 0x114)",
+        "*(eax_4 + 0x118)",
+        '"%d%%"',
+        "fconvert.t(arg1) * fconvert.t(0.25)",
+    ):
+        assert expected in retail_item
+
+    for expected in (
+        "value = cg.snap->ps.stats[STAT_HOLDABLE_ITEM];",
+        "CG_RegisterItemVisuals( value );",
+        "CG_DrawPic( rect->x, rect->y, rect->w, rect->h, cg_items[ value ].icon );",
+        "CG_Draw3DModel(rect->x, rect->y, rect->w, rect->h, cg_items[ value ].models[0], 0, origin, angles );",
+        "BG_HoldableForItemTag( bg_itemlist[ value ].giTag ) == HI_INVULNERABILITY",
+        "cg.snap->ps.stats[STAT_PLAYER_ITEM_TIME]",
+        "cg.snap->ps.stats[STAT_PLAYER_ITEM_TIME_MAX]",
+        'Com_sprintf( progressText, sizeof( progressText ), "%d%%", progressPercent );',
+        "progressScale = scale * 0.25f;",
+        "CG_Text_Paint( rect->x + ( rect->w - progressWidth ) * 0.5f, rect->y + rect->h, progressScale,",
+    ):
+        assert expected in item_block
+
+    for expected in (
+        "if (result == 0x33)",
+        "if (edx != 2)",
+        "ecx = *(result + 0x12c)",
+        "ecx = *(*(result + 0xb4) * 0x738 + 0x10a41e1c)",
+        "if (ecx != 0xffffd8f1)",
+        "ecx == 0x7fffffff || ecx s< 0",
+        "sub_100012a0(ecx)",
+        "sub_10008440",
+    ):
+        assert expected in retail_score
+
+    for expected in (
+        "if ( value == SCORE_NOT_PRESENT ) {",
+        "if ( cgs.gametype == GT_RACE ) {",
+        "if ( value == 0x7fffffff || value < 0 ) {",
+        'Q_strncpyz( buffer, "-", bufferSize );',
+        "CG_FormatSignedWholeSeconds( value )",
+        'Com_sprintf( buffer, bufferSize, "%i", value );',
+    ):
+        assert expected in compact_score_block
+    for expected in (
+        "value = cg.snap->ps.persistant[PERS_SCORE];",
+        "if ( cgs.gametype == GT_RACE ) {",
+        "value = cgs.clientinfo[clientNum].score;",
+        "CG_BuildCompactScoreValueText( value, num, sizeof( num ) )",
+        "CG_Text_Paint( rect->x, rect->y, scale, color, num, 0, 0, textStyle );",
+    ):
+        assert expected in player_score_block
+    for expected in (
+        "case CG_PLAYER_SCORE:",
+        "CG_DrawPlayerScore( rect, scale, color, shader, textStyle );",
+        "case CG_1STPLACE:",
+        "value = cgs.scores1;",
+        "case CG_2NDPLACE:",
+        "value = cgs.scores2;",
+    ):
+        assert expected in score_value_block
+
+    for expected in (
+        "data_10a3ff14 == 2",
+        "if (arg3 == 0x34)",
+        'sub_100575e0("Bind \'kill\' to respawn")',
+        'sub_100575e0("Press %s to respawn.")',
+        '"LAST TIME"',
+        '"CURRENT RUN"',
+        "else if (arg3 == 0x35)",
+        "sub_10001320(data_10abaab8)",
+    ):
+        assert expected in retail_race
+
+    for expected in (
+        'Q_strncpyz( primary, "Warmup", primarySize );',
+        'Com_sprintf( primary, primarySize, "Cur %s", timeBuffer );',
+        'Com_sprintf( primary, primarySize, "Last %s", timeBuffer );',
+        'Q_strncpyz( primary, "Ready", primarySize );',
+        'Com_sprintf( secondary, secondarySize, "Best %s (%s)", timeBuffer, deltaText );',
+        'Com_sprintf( secondary, secondarySize, "Best %s", timeBuffer );',
+        'Com_sprintf( secondary, secondarySize, "Leader %s", timeBuffer );',
+    ):
+        assert expected in race_times_block
+    for expected in (
+        "if ( ownerDraw == CG_RACE_STATUS ) {",
+        "text = CG_GetRaceStatusText();",
+        "if ( ownerDraw != CG_RACE_TIMES ) {",
+        "CG_RaceBuildTimesStrings( primary, sizeof( primary ), secondary, sizeof( secondary ) )",
+        "lineHeight = ( rect->h > 0.0f ) ? rect->h : ( scale * 12.0f );",
+        "CG_Text_Paint( rect->x, rect->y + rect->h + lineHeight, scale, color, secondary, 0, 0, textStyle );",
+    ):
+        assert expected in race_block
+
+    for expected in (
+        "data_10a3ff14 == 6",
+        "data_10a403fc",
+        "if (eax == 3 || eax == 4)",
+        "var_4 = 9",
+        "var_4 = 0xfffffff7",
+        "(&data_10a5fc2c)[esi_1]",
+        "sub_100126a0",
+    ):
+        assert expected in retail_oneflag
+
+    for expected in (
+        "if (cgs.gametype != GT_1FCTF) {",
+        "shader = cgs.media.poiFlagAtBaseNeutralShader;",
+        "shader = cgs.media.poiFlagTakenNeutralShader;",
+        "shader = cgs.media.poiFlagDroppedNeutralShader;",
+        "shader = cgs.media.poiFlagStolenNeutralShader;",
+        "if ( cgs.scores1 == SCORE_NOT_PRESENT || cgs.scores1 < cgs.scores2 ) {",
+        "if ( cgs.scores2 == SCORE_NOT_PRESENT || cgs.scores2 <= cgs.scores1 ) {",
+        "yOffset = 9.0f;",
+        "yOffset = -9.0f;",
+        "trap_R_SetColor( colorWhite );",
+        "CG_DrawPic( rect->x, rect->y + yOffset, rect->w, rect->h, shader );",
+        "trap_R_SetColor( NULL );",
+    ):
+        assert expected in oneflag_block
+    assert "cgs.media.flagShader[shaderIndex]" not in oneflag_block
+
+    assert menu_ownerdraw_count(all_menu_source, "CG_PLAYER_ITEM") == 6
+    assert menu_ownerdraw_count(all_menu_source, "CG_PLAYER_SCORE") == 4
+    assert menu_ownerdraw_count(all_menu_source, "CG_RACE_STATUS") == 5
+    assert menu_ownerdraw_count(all_menu_source, "CG_RACE_TIMES") == 5
+    assert menu_ownerdraw_count(all_menu_source, "CG_ONEFLAG_STATUS") == 6
+
+    assert "cgDC.ownerDrawItem = &CG_OwnerDraw;" in display_context_block
+    assert "cgDC.getValue = &CG_GetValue;" in display_context_block
+    assert "cgDC.ownerDrawWidth = &CG_OwnerDrawWidth;" in display_context_block
+    assert "cgDC.ownerDrawHandleKey = &CG_OwnerDrawHandleKey;" in display_context_block
+
+
 def test_level_timer_uses_retail_clock_format() -> None:
     source = CG_NEWDRAW.read_text(encoding="utf-8")
     draw_source = CG_DRAW.read_text(encoding="utf-8")
@@ -1018,6 +1839,78 @@ def test_front_panel_ownerdraw_trio_matches_retail_dispatch_and_callback_surface
     assert "ownerdraw CG_GAME_LIMIT" in endscoreteam_menu
 
 
+def test_gametype_ownerdraw_trio_matches_retail_dispatch_and_callback_surface() -> None:
+    source = CG_NEWDRAW.read_text(encoding="utf-8")
+    main_source = CG_MAIN.read_text(encoding="utf-8")
+    menudef_source = MENUDEF_H.read_text(encoding="utf-8")
+    ghidra_source = CGAME_GHIDRA.read_text(encoding="utf-8")
+    ownerdraw_block = _block_from_marker(source, "void CG_OwnerDraw(")
+    retail_ownerdraw_block = _block_from_marker(ghidra_source, "void FUN_1003b0f0")
+    value_block = _block_from_marker(source, "float CG_GetValue")
+    width_block = _block_from_marker(main_source, "static int CG_OwnerDrawWidth")
+    key_block = _block_from_marker(main_source, "static qboolean CG_OwnerDrawHandleKey")
+    display_context_block = _block_from_marker(main_source, "static void CG_InitDisplayContext")
+    icon_case = _text_between(ownerdraw_block, "case CG_GAME_TYPE_ICON:", "case CG_GAME_TYPE_MAP:")
+    map_case = _text_between(ownerdraw_block, "case CG_GAME_TYPE_MAP:", "case CG_GAME_TYPE:")
+    type_case = _text_between(ownerdraw_block, "case CG_GAME_TYPE:", "case CG_GAME_STATUS:")
+    menu_text = {
+        path.name: path.read_text(encoding="utf-8")
+        for path in (REPO_ROOT / "src" / "ui").glob("*.menu")
+    }
+
+    def menu_hits_for(ownerdraw: str) -> set[str]:
+        return {
+            name
+            for name, text in menu_text.items()
+            if any(line.split()[:2] == ["ownerdraw", ownerdraw] for line in text.splitlines())
+        }
+
+    assert any(line.split()[:3] == ["#define", "CG_GAME_TYPE", "4"] for line in menudef_source.splitlines())
+    assert any(line.split()[:3] == ["#define", "CG_GAME_TYPE_ICON", "5"] for line in menudef_source.splitlines())
+    assert any(line.split()[:3] == ["#define", "CG_GAME_TYPE_MAP", "6"] for line in menudef_source.splitlines())
+
+    assert "CG_DrawGameTypeIcon(&rect);" in icon_case
+    assert "CG_DrawGameTypeMap( &rect, scale, color, textStyle, align );" in map_case
+    assert "CG_DrawGameType( &rect, scale, color, textStyle, align );" in type_case
+
+    assert "case 4:" in retail_ownerdraw_block
+    assert "FUN_10034c20(&local_18,param_13,param_14,param_16,param_10);" in retail_ownerdraw_block
+    assert "case 5:" in retail_ownerdraw_block
+    assert "FUN_10034840();" in retail_ownerdraw_block
+    assert "case 6:" in retail_ownerdraw_block
+    assert "FUN_100344b0(&local_18,param_13,param_14,param_16,param_10);" in retail_ownerdraw_block
+
+    assert "case CG_GAME_TYPE:" in width_block
+    assert "return CG_Text_Width( CG_GameTypeString(), scale, 0 );" in width_block
+    assert "CG_GAME_TYPE_ICON" not in width_block
+    assert "CG_GAME_TYPE_MAP" not in width_block
+
+    for ownerdraw in ("CG_GAME_TYPE", "CG_GAME_TYPE_ICON", "CG_GAME_TYPE_MAP"):
+        assert ownerdraw not in value_block
+        assert ownerdraw not in key_block
+
+    assert "cgDC.ownerDrawItem = &CG_OwnerDraw;" in display_context_block
+    assert "cgDC.getValue = &CG_GetValue;" in display_context_block
+    assert "cgDC.ownerDrawWidth = &CG_OwnerDrawWidth;" in display_context_block
+    assert "cgDC.ownerDrawHandleKey = &CG_OwnerDrawHandleKey;" in display_context_block
+
+    assert menu_hits_for("CG_GAME_TYPE") == {
+        "endscorenoteam.menu",
+        "endscoreteam.menu",
+        "end_scoreboard_ffa.menu",
+        "end_scoreboard_race.menu",
+        "end_scoreboard_rr.menu",
+    }
+    assert menu_hits_for("CG_GAME_TYPE_ICON") == {
+        "hud.menu",
+        "intro.menu",
+        "min_hud.menu",
+        "spectator.menu",
+        "spectator_follow.menu",
+    }
+    assert menu_hits_for("CG_GAME_TYPE_MAP") == {"intro.menu"}
+
+
 def test_gametype_icons_use_retail_tga_registration_path() -> None:
     newdraw_source = CG_NEWDRAW.read_text(encoding="utf-8")
     main_source = CG_MAIN.read_text(encoding="utf-8")
@@ -1190,12 +2083,399 @@ def test_first_twenty_limit_count_map_and_vote_draws_match_retail_origins() -> N
     assert "if (arg1 == 0x13 || arg1 == 0x14 || arg1 == 0x15)" in retail_vote_gametype
     assert "arg2[1]) - fconvert.t(8.0)" in retail_vote_gametype
     assert 'CG_GetVoteSlotString( slot, "Gametype", buffer, sizeof( buffer ) );' in vote_gametype_block
-    assert "CG_Text_Paint( rect->x, rect->y - 8.0f, scale, color, buffer, 0, 0, textStyle );" in vote_gametype_block
+    assert "CG_AlignTextX( &x, buffer, scale, align );" in vote_gametype_block
+    assert "CG_Text_Paint( x, rect->y - 8.0f, scale, color, buffer, 0, 0, textStyle );" in vote_gametype_block
     assert "CG_GetTextPosition" not in vote_gametype_block
     assert "case CG_VOTEGAMETYPE1:" in ownerdraw_block
-    assert "CG_DrawVoteGametype(&rect, scale, color, textStyle, 1);" in ownerdraw_block
+    assert "CG_DrawVoteGametype(&rect, scale, color, textStyle, 1, align);" in ownerdraw_block
     assert "case CG_VOTEGAMETYPE2:" in ownerdraw_block
-    assert "CG_DrawVoteGametype(&rect, scale, color, textStyle, 2);" in ownerdraw_block
+    assert "CG_DrawVoteGametype(&rect, scale, color, textStyle, 2, align);" in ownerdraw_block
+
+
+def test_vote_gametype_and_map_first_five_match_retail_dispatch_alignment_and_payloads() -> None:
+    source = CG_NEWDRAW.read_text(encoding="utf-8")
+    main_source = CG_MAIN.read_text(encoding="utf-8")
+    servercmds_source = CG_SERVERCMDS.read_text(encoding="utf-8")
+    menudef_source = MENUDEF_H.read_text(encoding="utf-8")
+    endgamevote_menu = (REPO_ROOT / "src" / "ui" / "endgamevote.menu").read_text(encoding="utf-8")
+    all_menu_source = "\n".join(
+        path.read_text(encoding="utf-8")
+        for path in (REPO_ROOT / "src" / "ui").glob("*.menu")
+    )
+    hlil_source = CGAME_HLIL.read_text(encoding="utf-8")
+    ghidra_source = CGAME_GHIDRA.read_text(encoding="utf-8")
+    ownerdraw_block = _block_from_marker(source, "void CG_OwnerDraw(")
+    retail_ownerdraw_block = _block_from_marker(ghidra_source, "void FUN_1003b0f0")
+    vote_gametype_block = _block_from_marker(source, "static void CG_DrawVoteGametype")
+    vote_map_block = _block_from_marker(source, "static void CG_DrawVoteMapSlot")
+    vote_cvar_name_block = _block_from_marker(source, "static void CG_BuildVoteSlotCvarName")
+    vote_string_block = _block_from_marker(source, "static void CG_GetVoteSlotString")
+    set_vote_cvar_block = _block_from_marker(servercmds_source, "static void CG_SetRotationVoteSlotCvar")
+    parse_rotation_block = _block_from_marker(servercmds_source, "static void CG_ParseRotationVoteConfigStrings")
+    value_block = _block_from_marker(source, "float CG_GetValue")
+    width_block = _block_from_marker(main_source, "static int CG_OwnerDrawWidth")
+    key_block = _block_from_marker(main_source, "static qboolean CG_OwnerDrawHandleKey")
+    display_context_block = _block_from_marker(main_source, "static void CG_InitDisplayContext")
+    retail_vote_map = _text_between(
+        hlil_source,
+        '100355d0    void* __convention("regparm") sub_100355d0',
+        "10035660",
+    )
+    retail_vote_gametype = _text_between(
+        hlil_source,
+        '100356f0    void* __convention("regparm") sub_100356f0',
+        "10035790",
+    )
+
+    for ownerdraw, value in (
+        ("CG_VOTEGAMETYPE1", "19"),
+        ("CG_VOTEGAMETYPE2", "20"),
+        ("CG_VOTEGAMETYPE3", "21"),
+        ("CG_VOTEMAP1", "22"),
+        ("CG_VOTEMAP2", "23"),
+    ):
+        assert any(line.split()[:3] == ["#define", ownerdraw, value] for line in menudef_source.splitlines())
+        assert ownerdraw not in value_block
+        assert ownerdraw not in width_block
+        assert ownerdraw not in key_block
+
+    for expected in (
+        "case 0x13:",
+        "case 0x14:",
+        "case 0x15:",
+        "FUN_100356f0(param_13,param_14,param_16,param_10);",
+        "case 0x16:",
+        "case 0x17:",
+        "FUN_100355d0(param_13,param_14,param_16,param_10);",
+    ):
+        assert expected in retail_ownerdraw_block
+
+    for expected in (
+        "if (arg1 == 0x13 || arg1 == 0x14 || arg1 == 0x15)",
+        "sub_1002e050(arg6, edx, result_1, fconvert.s(fconvert.t(arg3)))",
+        "fconvert.t(arg2[1]) - fconvert.t(8.0)",
+    ):
+        assert expected in retail_vote_gametype
+
+    for expected in (
+        "if (arg1 == 0x16 || arg1 == 0x17 || arg1 == 0x18)",
+        "sub_1002e050(arg6, edx, result_1, fconvert.s(fconvert.t(arg3)))",
+        "fconvert.s(fconvert.t(*arg2))",
+        "fconvert.s(fconvert.t(arg2[1]))",
+    ):
+        assert expected in retail_vote_map
+
+    for expected in (
+        'CG_GetVoteSlotString( slot, "Gametype", buffer, sizeof( buffer ) );',
+        "x = rect->x;",
+        "CG_AlignTextX( &x, buffer, scale, align );",
+        "CG_Text_Paint( x, rect->y - 8.0f, scale, color, buffer, 0, 0, textStyle );",
+    ):
+        assert expected in vote_gametype_block
+
+    for expected in (
+        'CG_GetVoteSlotString( slot, "Map", buffer, sizeof( buffer ) );',
+        "x = rect->x;",
+        "CG_AlignTextX( &x, buffer, scale, align );",
+        "CG_Text_Paint( x, rect->y, scale, color, buffer, 0, 0, textStyle );",
+    ):
+        assert expected in vote_map_block
+
+    for expected in (
+        "CG_DrawVoteGametype(&rect, scale, color, textStyle, 1, align);",
+        "CG_DrawVoteGametype(&rect, scale, color, textStyle, 2, align);",
+        "CG_DrawVoteGametype(&rect, scale, color, textStyle, 3, align);",
+        "CG_DrawVoteMapSlot(&rect, scale, color, textStyle, 1, align);",
+        "CG_DrawVoteMapSlot(&rect, scale, color, textStyle, 2, align);",
+    ):
+        assert expected in ownerdraw_block
+
+    for stale in (
+        "CG_DrawVoteGametype(&rect, scale, color, textStyle, 1);",
+        "CG_DrawVoteMapSlot(&rect, scale, color, textStyle, 1);",
+        "CG_Text_Paint( rect->x, rect->y - 8.0f, scale, color, buffer, 0, 0, textStyle );",
+        "CG_Text_Paint( rect->x, rect->y, scale, color, buffer, 0, 0, textStyle );",
+        "CG_GetTextPosition",
+    ):
+        assert stale not in vote_gametype_block
+        assert stale not in vote_map_block
+
+    assert 'Com_sprintf( buffer, bufferSize, "ui_vote%s%i", suffix, slot );' in vote_cvar_name_block
+    assert "if ( slot < 1 || slot > 3 ) {" in vote_string_block
+    assert "trap_Cvar_VariableStringBuffer( name, buffer, bufferSize );" in vote_string_block
+    assert 'Com_sprintf( key, sizeof( key ), "ui_vote%s%i", suffix, slot + 1 );' in set_vote_cvar_block
+    assert 'CG_SetRotationVoteSlotCvar( slot, "Map", mapName );' in parse_rotation_block
+    assert 'CG_SetRotationVoteSlotCvar( slot, "Gametype", voteGametype );' in parse_rotation_block
+
+    for ownerdraw in ("CG_VOTEGAMETYPE1", "CG_VOTEGAMETYPE2", "CG_VOTEGAMETYPE3"):
+        assert f"ownerdraw {ownerdraw}" in endgamevote_menu
+    assert "ownerdraw CG_VOTEMAP1" not in all_menu_source
+    assert "ownerdraw CG_VOTEMAP2" not in all_menu_source
+
+    assert "cgDC.ownerDrawItem = &CG_OwnerDraw;" in display_context_block
+    assert "cgDC.getValue = &CG_GetValue;" in display_context_block
+    assert "cgDC.ownerDrawWidth = &CG_OwnerDrawWidth;" in display_context_block
+    assert "cgDC.ownerDrawHandleKey = &CG_OwnerDrawHandleKey;" in display_context_block
+
+
+def test_vote_name_and_count_next_five_match_retail_dispatch_alignment_and_payloads() -> None:
+    source = CG_NEWDRAW.read_text(encoding="utf-8")
+    main_source = CG_MAIN.read_text(encoding="utf-8")
+    servercmds_source = CG_SERVERCMDS.read_text(encoding="utf-8")
+    menudef_source = MENUDEF_H.read_text(encoding="utf-8")
+    endgamevote_menu = (REPO_ROOT / "src" / "ui" / "endgamevote.menu").read_text(encoding="utf-8")
+    hlil_source = CGAME_HLIL.read_text(encoding="utf-8")
+    ghidra_source = CGAME_GHIDRA.read_text(encoding="utf-8")
+    ownerdraw_block = _block_from_marker(source, "void CG_OwnerDraw(")
+    retail_ownerdraw_block = _block_from_marker(ghidra_source, "void FUN_1003b0f0")
+    vote_name_block = _block_from_marker(source, "static void CG_DrawVoteName")
+    vote_count_block = _block_from_marker(source, "static void CG_DrawVoteCount")
+    set_vote_cvar_block = _block_from_marker(servercmds_source, "static void CG_SetRotationVoteSlotCvar")
+    parse_rotation_block = _block_from_marker(servercmds_source, "static void CG_ParseRotationVoteConfigStrings")
+    value_block = _block_from_marker(source, "float CG_GetValue")
+    width_block = _block_from_marker(main_source, "static int CG_OwnerDrawWidth")
+    key_block = _block_from_marker(main_source, "static qboolean CG_OwnerDrawHandleKey")
+    display_context_block = _block_from_marker(main_source, "static void CG_InitDisplayContext")
+    retail_vote_name = _text_between(
+        hlil_source,
+        '10035660    void* __convention("regparm") sub_10035660',
+        "100356f0",
+    )
+    retail_vote_count = _text_between(
+        hlil_source,
+        "10035820    void __convention",
+        "10035920",
+    )
+
+    for ownerdraw, value in (
+        ("CG_VOTENAME1", "28"),
+        ("CG_VOTENAME2", "29"),
+        ("CG_VOTENAME3", "30"),
+        ("CG_VOTECOUNT1", "31"),
+        ("CG_VOTECOUNT2", "32"),
+    ):
+        assert any(line.split()[:3] == ["#define", ownerdraw, value] for line in menudef_source.splitlines())
+        assert f"ownerdraw {ownerdraw}" in endgamevote_menu
+        assert ownerdraw not in value_block
+        assert ownerdraw not in width_block
+        assert ownerdraw not in key_block
+
+    for expected in (
+        "case 0x1c:",
+        "case 0x1d:",
+        "case 0x1e:",
+        "FUN_10035660(param_13,param_14,param_16,param_10);",
+        "case 0x1f:",
+        "case 0x20:",
+        "FUN_10035820(&local_18,param_12,param_13,param_14,param_16,param_10);",
+    ):
+        assert expected in retail_ownerdraw_block
+
+    for expected in (
+        "if (arg1 == 0x1c || arg1 == 0x1d || arg1 == 0x1e)",
+        "sub_1002e050(arg6, edx, result_1, fconvert.s(fconvert.t(arg3)))",
+        "fconvert.s(fconvert.t(*arg2))",
+        "fconvert.s(fconvert.t(arg2[1]))",
+    ):
+        assert expected in retail_vote_name
+
+    for expected in (
+        "if (arg3 == 0x1f || arg3 == 0x20 || arg3 == 0x21)",
+        'eax_1, ecx_5 = sub_100575e0("Votes: %s")',
+        "if (arg9 == 1)",
+        "else if (arg9 == 2)",
+        "fconvert.s(fconvert.t(arg4[1]))",
+    ):
+        assert expected in retail_vote_count
+
+    for expected in (
+        'CG_GetVoteSlotString( slot, "Name", buffer, sizeof( buffer ) );',
+        'CG_GetVoteSlotString( slot, "Map", buffer, sizeof( buffer ) );',
+        "x = rect->x;",
+        "CG_AlignTextX( &x, buffer, scale, align );",
+        "CG_Text_Paint( x, rect->y, scale, color, buffer, 0, 0, textStyle );",
+    ):
+        assert expected in vote_name_block
+
+    for expected in (
+        'CG_GetVoteSlotString( slot, "Count", countText, sizeof( countText ) );',
+        'Com_sprintf( buffer, sizeof( buffer ), "Votes: %s", countText );',
+        "x = rect->x;",
+        "CG_AlignTextX( &x, buffer, scale, align );",
+        "CG_Text_Paint( x, rect->y, scale, color, buffer, 0, 0, textStyle );",
+    ):
+        assert expected in vote_count_block
+
+    for expected in (
+        "CG_DrawVoteName(&rect, scale, color, textStyle, 1, align);",
+        "CG_DrawVoteName(&rect, scale, color, textStyle, 2, align);",
+        "CG_DrawVoteName(&rect, scale, color, textStyle, 3, align);",
+        "CG_DrawVoteCount(&rect, scale, color, textStyle, 1, align);",
+        "CG_DrawVoteCount(&rect, scale, color, textStyle, 2, align);",
+    ):
+        assert expected in ownerdraw_block
+
+    for stale in (
+        "CG_DrawVoteName(&rect, scale, color, textStyle, 1);",
+        "CG_Text_Paint( rect->x, rect->y, scale, color, buffer, 0, 0, textStyle );",
+        "CG_GetTextPosition",
+    ):
+        assert stale not in vote_name_block
+
+    assert 'Com_sprintf( key, sizeof( key ), "ui_vote%s%i", suffix, slot + 1 );' in set_vote_cvar_block
+    assert 'CG_SetRotationVoteSlotCvar( slot, "Name", voteName );' in parse_rotation_block
+    assert 'CG_SetRotationVoteSlotCvar( slot, "Count", voteCount );' in parse_rotation_block
+
+    assert "cgDC.ownerDrawItem = &CG_OwnerDraw;" in display_context_block
+    assert "cgDC.getValue = &CG_GetValue;" in display_context_block
+    assert "cgDC.ownerDrawWidth = &CG_OwnerDrawWidth;" in display_context_block
+    assert "cgDC.ownerDrawHandleKey = &CG_OwnerDrawHandleKey;" in display_context_block
+
+
+def test_vote_shot_count3_and_timer_match_retail_dispatch_assets_and_payloads() -> None:
+    source = CG_NEWDRAW.read_text(encoding="utf-8")
+    main_source = CG_MAIN.read_text(encoding="utf-8")
+    servercmds_source = CG_SERVERCMDS.read_text(encoding="utf-8")
+    menudef_source = MENUDEF_H.read_text(encoding="utf-8")
+    endgamevote_menu = (REPO_ROOT / "src" / "ui" / "endgamevote.menu").read_text(encoding="utf-8")
+    hlil_source = CGAME_HLIL.read_text(encoding="utf-8")
+    ghidra_source = CGAME_GHIDRA.read_text(encoding="utf-8")
+    ownerdraw_block = _block_from_marker(source, "void CG_OwnerDraw(")
+    retail_ownerdraw_block = _block_from_marker(ghidra_source, "void FUN_1003b0f0")
+    vote_shot_block = _block_from_marker(source, "static void CG_DrawVoteShot")
+    vote_count_block = _block_from_marker(source, "static void CG_DrawVoteCount")
+    vote_timer_block = _block_from_marker(source, "static void CG_DrawVoteTimer")
+    set_vote_cvar_block = _block_from_marker(servercmds_source, "static void CG_SetRotationVoteSlotCvar")
+    parse_rotation_block = _block_from_marker(servercmds_source, "static void CG_ParseRotationVoteConfigStrings")
+    value_block = _block_from_marker(source, "float CG_GetValue")
+    width_block = _block_from_marker(main_source, "static int CG_OwnerDrawWidth")
+    key_block = _block_from_marker(main_source, "static qboolean CG_OwnerDrawHandleKey")
+    display_context_block = _block_from_marker(main_source, "static void CG_InitDisplayContext")
+    retail_vote_shot = _text_between(
+        hlil_source,
+        "10035790    int32_t __convention",
+        "10035820",
+    )
+    retail_vote_count = _text_between(
+        hlil_source,
+        "10035820    void __convention",
+        "10035920",
+    )
+    retail_vote_timer = _text_between(
+        hlil_source,
+        "10035920    void sub_10035920",
+        "10035a10",
+    )
+
+    for ownerdraw, value in (
+        ("CG_VOTESHOT1", "25"),
+        ("CG_VOTESHOT2", "26"),
+        ("CG_VOTESHOT3", "27"),
+        ("CG_VOTECOUNT3", "33"),
+        ("CG_VOTETIMER", "34"),
+    ):
+        assert any(line.split()[:3] == ["#define", ownerdraw, value] for line in menudef_source.splitlines())
+        assert f"ownerdraw {ownerdraw}" in endgamevote_menu
+        assert ownerdraw not in value_block
+        assert ownerdraw not in width_block
+        assert ownerdraw not in key_block
+
+    for expected in (
+        "case 0x19:",
+        "case 0x1a:",
+        "case 0x1b:",
+        "FUN_10035790();",
+        "case 0x21:",
+        "FUN_10035820(&local_18,param_12,param_13,param_14,param_16,param_10);",
+        "case 0x22:",
+        "FUN_10035920(param_13,param_14,param_16,param_10);",
+    ):
+        assert expected in retail_ownerdraw_block
+
+    for expected in (
+        "if (arg1 == 0x19 || arg1 == 0x1a || arg1 == 0x1b)",
+        'eax_2 = "default"',
+        'sub_100575e0("levelshots/preview/%s")',
+        "return sub_100126a0(fconvert.s(fconvert.t(*arg2)))",
+    ):
+        assert expected in retail_vote_shot
+
+    for expected in (
+        "if (arg3 == 0x1f || arg3 == 0x20 || arg3 == 0x21)",
+        'eax_1, ecx_5 = sub_100575e0("Votes: %s")',
+        "if (arg9 == 1)",
+        "else if (arg9 == 2)",
+        "fconvert.s(fconvert.t(arg4[1]))",
+    ):
+        assert expected in retail_vote_count
+
+    for expected in (
+        "data_10a3ffc4 - data_10a9c1ec + 0x4e20",
+        '"Voting has ended."',
+        '"Voting ends in %i second."',
+        '"Voting ends in %i seconds."',
+        "if (eax_5 == 1)",
+        "else if (eax_5 == 2)",
+        "fconvert.s(fconvert.t(ebx[1]))",
+    ):
+        assert expected in retail_vote_timer
+
+    for expected in (
+        "if ( slot < 1 || slot > 3 ) {",
+        'CG_GetVoteSlotString( slot, "Shot", previewToken, sizeof( previewToken ) );',
+        'Q_strncpyz( previewToken, "default", sizeof( previewToken ) );',
+        'Com_sprintf( path, sizeof( path ), "levelshots/preview/%s", previewToken );',
+        "cache = &cg_voteShotCache[slot - 1];",
+        "cache->handle = trap_R_RegisterShaderNoMip( path );",
+        "CG_DrawPic( rect->x, rect->y, rect->w, rect->h, cache->handle );",
+    ):
+        assert expected in vote_shot_block
+
+    for expected in (
+        'CG_GetVoteSlotString( slot, "Count", countText, sizeof( countText ) );',
+        'Com_sprintf( buffer, sizeof( buffer ), "Votes: %s", countText );',
+        "CG_AlignTextX( &x, buffer, scale, align );",
+        "CG_Text_Paint( x, rect->y, scale, color, buffer, 0, 0, textStyle );",
+    ):
+        assert expected in vote_count_block
+
+    for expected in (
+        "remaining = ( cgs.voteTime - cg.time + 20000 ) / 1000;",
+        'Q_strncpyz( buffer, "Voting has ended.", sizeof( buffer ) );',
+        'Com_sprintf( buffer, sizeof( buffer ), "Voting ends in %i second.", remaining );',
+        'Com_sprintf( buffer, sizeof( buffer ), "Voting ends in %i seconds.", remaining );',
+        "CG_AlignTextX( &x, buffer, scale, align );",
+        "CG_Text_Paint( x, rect->y, scale, color, buffer, 0, 0, textStyle );",
+    ):
+        assert expected in vote_timer_block
+
+    for expected in (
+        "CG_DrawVoteShot(&rect, 1);",
+        "CG_DrawVoteShot(&rect, 2);",
+        "CG_DrawVoteShot(&rect, 3);",
+        "CG_DrawVoteCount(&rect, scale, color, textStyle, 3, align);",
+        "CG_DrawVoteTimer(&rect, scale, color, textStyle, align);",
+    ):
+        assert expected in ownerdraw_block
+
+    for stale in (
+        "VOTE_TIME - ( cg.time - cgs.voteTime ) + 999",
+        '"Vote %is"',
+        "CG_GetTextPosition",
+    ):
+        assert stale not in vote_timer_block
+        assert stale not in vote_count_block
+
+    assert 'Com_sprintf( key, sizeof( key ), "ui_vote%s%i", suffix, slot + 1 );' in set_vote_cvar_block
+    assert 'CG_SetRotationVoteSlotCvar( slot, "Shot", voteShot );' in parse_rotation_block
+    assert 'CG_SetRotationVoteSlotCvar( slot, "Count", voteCount );' in parse_rotation_block
+    assert 'trap_Cvar_Set( "ui_voteactive", cgs.voteTime ? "1" : "0" );' in servercmds_source
+    assert 'trap_Cvar_Set( "ui_votestring", cgs.voteString );' in servercmds_source
+
+    assert "cgDC.ownerDrawItem = &CG_OwnerDraw;" in display_context_block
+    assert "cgDC.getValue = &CG_GetValue;" in display_context_block
+    assert "cgDC.ownerDrawWidth = &CG_OwnerDrawWidth;" in display_context_block
+    assert "cgDC.ownerDrawHandleKey = &CG_OwnerDrawHandleKey;" in display_context_block
 
 
 def test_second_twenty_vote_and_local_player_ownerdraws_match_retail_wiring() -> None:
@@ -1265,7 +2545,7 @@ def test_second_twenty_vote_and_local_player_ownerdraws_match_retail_wiring() ->
     )
 
     assert "if (arg1 == 0x13 || arg1 == 0x14 || arg1 == 0x15)" in hlil_source
-    assert "CG_DrawVoteGametype(&rect, scale, color, textStyle, 3);" in ownerdraw_block
+    assert "CG_DrawVoteGametype(&rect, scale, color, textStyle, 3, align);" in ownerdraw_block
     assert "CG_GetTextPosition" not in vote_gametype_block
 
     for expected in (
@@ -1275,12 +2555,14 @@ def test_second_twenty_vote_and_local_player_ownerdraws_match_retail_wiring() ->
     ):
         assert expected in retail_vote_map
     assert 'CG_GetVoteSlotString( slot, "Map", buffer, sizeof( buffer ) );' in vote_map_block
-    assert "CG_Text_Paint( rect->x, rect->y, scale, color, buffer, 0, 0, textStyle );" in vote_map_block
+    assert "CG_AlignTextX( &x, buffer, scale, align );" in vote_map_block
+    assert "CG_Text_Paint( x, rect->y, scale, color, buffer, 0, 0, textStyle );" in vote_map_block
     assert "CG_GetTextPosition" not in vote_map_block
 
     assert "if (arg1 == 0x1c || arg1 == 0x1d || arg1 == 0x1e)" in retail_vote_name
     assert 'CG_GetVoteSlotString( slot, "Name", buffer, sizeof( buffer ) );' in vote_name_block
-    assert "CG_Text_Paint( rect->x, rect->y, scale, color, buffer, 0, 0, textStyle );" in vote_name_block
+    assert "CG_AlignTextX( &x, buffer, scale, align );" in vote_name_block
+    assert "CG_Text_Paint( x, rect->y, scale, color, buffer, 0, 0, textStyle );" in vote_name_block
     assert "CG_GetTextPosition" not in vote_name_block
 
     for expected in (
@@ -1321,11 +2603,11 @@ def test_second_twenty_vote_and_local_player_ownerdraws_match_retail_wiring() ->
 
     for expected in (
         "case CG_VOTEMAP1:",
-        "CG_DrawVoteMapSlot(&rect, scale, color, textStyle, 1);",
+        "CG_DrawVoteMapSlot(&rect, scale, color, textStyle, 1, align);",
         "case CG_VOTESHOT1:",
         "CG_DrawVoteShot(&rect, 1);",
         "case CG_VOTENAME1:",
-        "CG_DrawVoteName(&rect, scale, color, textStyle, 1);",
+        "CG_DrawVoteName(&rect, scale, color, textStyle, 1, align);",
         "case CG_VOTECOUNT1:",
         "CG_DrawVoteCount(&rect, scale, color, textStyle, 1, align);",
         "case CG_VOTETIMER:",

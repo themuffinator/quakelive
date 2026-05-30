@@ -233,6 +233,7 @@ def test_spawn_restart_and_game_consumers_follow_retail_nextmap_payload_wiring()
 def test_host_factory_parser_enforces_retail_required_definition_keys() -> None:
 	sv_ccmds = (REPO_ROOT / "src/code/server/sv_ccmds.c").read_text(encoding="utf-8")
 
+	basegt_block = _extract_function_block(sv_ccmds, "static qboolean SV_FactoryMapBaseGametype( const char *token, gametype_t *outType ) {")
 	parse_block = _extract_function_block(sv_ccmds, "static svFactoryDefinition_t *SV_FactoryParseDefinition( svFactoryParseState_t *state, const char *sourceFile ) {")
 	register_block = _extract_function_block(sv_ccmds, "static qboolean SV_FactoryRegisterDefinition( svFactoryDefinition_t *definition ) {")
 
@@ -249,6 +250,8 @@ def test_host_factory_parser_enforces_retail_required_definition_keys() -> None:
 	assert 'Q_stricmp( key, "description" )' in sv_ccmds
 	assert 'Q_stricmp( key, "tags" )' in sv_ccmds
 	assert "SV_FactoryParseTags( state, tags, &tagCount )" in sv_ccmds
+	assert '{ "overload", GT_OBELISK }' in basegt_block
+	assert '{ "obelisk", GT_OBELISK }' not in basegt_block
 	assert "definition->author = author;" in sv_ccmds
 	assert "definition->description = description;" in sv_ccmds
 	assert "definition->tagCount = tagCount;" in sv_ccmds

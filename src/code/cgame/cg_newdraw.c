@@ -249,6 +249,10 @@ static const char *CG_FormatSignedWholeSeconds( int milliseconds ) {
 	const char	*signPrefix;
 	int		wholeSeconds;
 
+	if ( milliseconds == 0 ) {
+		return "-";
+	}
+
 	signPrefix = "";
 	absoluteMilliseconds = (unsigned int)milliseconds;
 
@@ -263,6 +267,37 @@ static const char *CG_FormatSignedWholeSeconds( int milliseconds ) {
 	}
 
 	return va( "%s%1.0fs", signPrefix, (double)wholeSeconds );
+}
+
+/*
+=============
+CG_BuildCompactScoreValueText
+
+Builds the retail compact score string used by CG_PLAYER_SCORE, CG_1STPLACE,
+and CG_2NDPLACE.
+=============
+*/
+static qboolean CG_BuildCompactScoreValueText( int value, char *buffer, size_t bufferSize ) {
+	if ( !buffer || bufferSize <= 0 ) {
+		return qfalse;
+	}
+
+	buffer[0] = '\0';
+	if ( value == SCORE_NOT_PRESENT ) {
+		return qfalse;
+	}
+
+	if ( cgs.gametype == GT_RACE ) {
+		if ( value == 0x7fffffff || value < 0 ) {
+			Q_strncpyz( buffer, "-", bufferSize );
+		} else {
+			Q_strncpyz( buffer, CG_FormatSignedWholeSeconds( value ), bufferSize );
+		}
+		return qtrue;
+	}
+
+	Com_sprintf( buffer, bufferSize, "%i", value );
+	return qtrue;
 }
 
 /*
@@ -304,9 +339,9 @@ static void CG_DrawMatchEndCondition( rectDef_t *rect, float scale, vec4_t color
 static void CG_DrawMatchStatus( rectDef_t *rect, float scale, vec4_t color, int textStyle, int align );
 static void CG_DrawRoundLabel( rectDef_t *rect, float scale, vec4_t color, int textStyle, int align );
 static void CG_DrawLocalTime(rectDef_t *rect, float scale, vec4_t color, int textStyle, int align);
-static void CG_DrawVoteGametype(rectDef_t *rect, float scale, vec4_t color, int textStyle, int slot);
-static void CG_DrawVoteName(rectDef_t *rect, float scale, vec4_t color, int textStyle, int slot);
-static void CG_DrawVoteMapSlot(rectDef_t *rect, float scale, vec4_t color, int textStyle, int slot);
+static void CG_DrawVoteGametype(rectDef_t *rect, float scale, vec4_t color, int textStyle, int slot, int align);
+static void CG_DrawVoteName(rectDef_t *rect, float scale, vec4_t color, int textStyle, int slot, int align);
+static void CG_DrawVoteMapSlot(rectDef_t *rect, float scale, vec4_t color, int textStyle, int slot, int align);
 static void CG_DrawVoteCount(rectDef_t *rect, float scale, vec4_t color, int textStyle, int slot, int align);
 static void CG_DrawVoteTimer(rectDef_t *rect, float scale, vec4_t color, int textStyle, int align);
 static void CG_DrawScoreboxFollowBackground(rectDef_t *rect, qhandle_t shader, vec4_t color);
@@ -2195,7 +2230,6 @@ static void CG_DrawPlayerCount( rectDef_t *rect, float scale, vec4_t color, int 
 	char	buffer[8];
 	team_t	team;
 	int		count;
-	int		width;
 
 	if ( !rect ) {
 		return;
@@ -2204,8 +2238,7 @@ static void CG_DrawPlayerCount( rectDef_t *rect, float scale, vec4_t color, int 
 	team = CG_GetRoundPlayerCountTeam( friendly );
 	count = ( team == TEAM_RED || team == TEAM_BLUE ) ? cgs.matchTeamCount[team] : 0;
 	Com_sprintf( buffer, sizeof( buffer ), "%i", count );
-	width = CG_Text_Width( buffer, scale, 0 );
-	CG_Text_Paint( rect->x + ( rect->w - width ) * 0.5f, rect->y + rect->h, scale, color, buffer, 0, 0, textStyle );
+	CG_Text_Paint( rect->x, rect->y, scale, color, buffer, 0, 0, textStyle );
 }
 
 /*
@@ -2481,15 +2514,14 @@ static qhandle_t CG_GetProfileFallbackShader( void ) {
 =============
 CG_DrawSpectatorProfileImage
 
-Draws the tracked player's avatar or fallback profile image.
+Draws the tracked player's avatar/model icon.
 =============
 */
-static void CG_DrawSpectatorProfileImage(rectDef_t *rect, int slot) {
+static void CG_DrawSpectatorProfileImage( rectDef_t *rect, int slot ) {
 	const clientInfo_t *ci;
 	qhandle_t shader;
-	vec4_t modulate;
 
-	if ( !rect || !cg_drawProfileImages.integer ) {
+	if ( !rect ) {
 		return;
 	}
 
@@ -2498,19 +2530,18 @@ static void CG_DrawSpectatorProfileImage(rectDef_t *rect, int slot) {
 		return;
 	}
 
-	shader = ci->modelIcon;
-	if ( !shader ) {
-		shader = CG_GetProfileFallbackShader();
+	shader = 0;
+	if ( cg_drawProfileImages.integer && ( ci->identityLow || ci->identityHigh ) ) {
+		shader = trap_QL_GetAvatarImageHandle( ci->identityLow, ci->identityHigh );
 	}
-
+	if ( !shader ) {
+		shader = ci->modelIcon;
+	}
 	if ( !shader ) {
 		return;
 	}
 
-	Vector4Set( modulate, 1.0f, 1.0f, 1.0f, CG_SpectatorSlotFollowed( slot ) ? 1.0f : 0.6f );
-	trap_R_SetColor( modulate );
 	CG_DrawPic( rect->x, rect->y, rect->w, rect->h, shader );
-	trap_R_SetColor( NULL );
 }
 
 /*
@@ -2653,21 +2684,33 @@ Draws the health and armor comparison bar for a spectator slot.
 =============
 */
 static void CG_DrawSpectatorComparison( rectDef_t *rect, float scale, vec4_t color, int textStyle, int ownerDraw ) {
+	static int comparisonLastClient[2] = { -1, -1 };
+	static int comparisonLastHealth[2];
+	static int comparisonLastDamageTime[2];
+	const score_t *score;
 	const clientInfo_t *ci;
-	const clientInfo_t *other;
+	const centity_t *cent;
 	vec4_t healthColor;
 	vec4_t armorColor;
-	vec4_t textColor;
-	vec4_t markerColor = { 1.0f, 1.0f, 1.0f, 0.35f };
-	vec4_t baseColor = { 0.0f, 0.0f, 0.0f, 0.45f };
+	vec4_t damageColor;
 	float healthWidth;
 	float armorWidth;
-	float markerX;
-	int otherSlot;
+	float damageWidth;
+	float healthX;
+	float armorX;
+	float damageX;
+	float healthScale;
+	int damageTime;
+	int lostHealth;
 	int health;
 	int armor;
+	int maxHealth;
 	int slot;
-	char buffer[32];
+	qboolean localClient;
+
+	(void)scale;
+	(void)color;
+	(void)textStyle;
 
 	if ( !rect ) {
 		return;
@@ -2678,8 +2721,12 @@ static void CG_DrawSpectatorComparison( rectDef_t *rect, float scale, vec4_t col
 		return;
 	}
 
+	score = CG_SpectatorClientScore( slot );
 	ci = CG_SpectatorClientInfo( slot );
-	if ( !ci ) {
+	if ( !score || !ci ) {
+		return;
+	}
+	if ( score->client < 0 || score->client >= MAX_GENTITIES ) {
 		return;
 	}
 
@@ -2687,62 +2734,82 @@ static void CG_DrawSpectatorComparison( rectDef_t *rect, float scale, vec4_t col
 		return;
 	}
 
-	otherSlot = ( slot == 0 ) ? 1 : 0;
-	other = CG_SpectatorClientInfo( otherSlot );
+	cent = &cg_entities[score->client];
+	localClient = (qboolean)( cg.snap && score->client == cg.snap->ps.clientNum );
+	if ( !localClient && !cent->currentValid ) {
+		return;
+	}
 
-	health = ci->health;
-	armor = ci->armor;
+	if ( localClient ) {
+		health = cg.snap->ps.stats[STAT_HEALTH];
+		armor = cg.snap->ps.stats[STAT_ARMOR];
+		maxHealth = cg.snap->ps.stats[STAT_MAX_HEALTH];
+		damageTime = (int)cg.damageTime;
+	} else {
+		health = ci->health;
+		armor = ci->armor;
+		maxHealth = ci->handicap;
+		damageTime = cent->pe.painTime;
+	}
 	if ( health < 0 ) {
 		health = 0;
 	}
 	if ( armor < 0 ) {
 		armor = 0;
 	}
+	if ( maxHealth <= 0 ) {
+		maxHealth = 100;
+	}
 
 	CG_GetColorForHealth( health, armor, healthColor );
-	CG_GetArmorTierColor( armor, armorColor );
+	Vector4Set( armorColor, 0.0f, 1.0f, 1.0f, 1.0f );
+	Vector4Set( damageColor, 1.0f, 0.0f, 0.0f, 0.5f );
 	if ( !cg_specDuelHealthColor.integer ) {
-		healthColor[0] = 1.0f;
-		healthColor[1] = 1.0f;
-		healthColor[2] = 1.0f;
-		armorColor[0] = 1.0f;
-		armorColor[1] = 1.0f;
-		armorColor[2] = 1.0f;
+		Vector4Set( healthColor, 1.0f, 0.8f, 0.2f, 1.0f );
+		Vector4Set( damageColor, 1.0f, 0.0f, 0.0f, 1.0f );
 	}
 
-	healthColor[3] = 0.85f;
-	armorColor[3] = 0.7f;
-
-	CG_FillRect( rect->x, rect->y, rect->w, rect->h, baseColor );
-
-	healthWidth = rect->w * Com_Clamp( 0.0f, 1.0f, (float)health / 200.0f );
+	healthScale = (float)maxHealth * 2.0f;
+	if ( healthScale <= 0.0f ) {
+		healthScale = 200.0f;
+	}
+	healthWidth = rect->w * Com_Clamp( 0.0f, 1.0f, (float)health / healthScale );
 	armorWidth = rect->w * Com_Clamp( 0.0f, 1.0f, (float)armor / 200.0f );
+	healthX = ( slot == 0 ) ? rect->x + rect->w - healthWidth : rect->x;
+	armorX = ( slot == 0 ) ? rect->x + rect->w - armorWidth : rect->x;
 
-	CG_FillRect( rect->x, rect->y, healthWidth, rect->h * 0.65f, healthColor );
-	CG_FillRect( rect->x, rect->y + rect->h * 0.65f, armorWidth, rect->h * 0.35f, armorColor );
+	if ( comparisonLastClient[slot] != score->client ) {
+		comparisonLastClient[slot] = score->client;
+		comparisonLastHealth[slot] = health;
+		comparisonLastDamageTime[slot] = 0;
+	} else if ( health >= comparisonLastHealth[slot] ) {
+		comparisonLastHealth[slot] = health;
+		comparisonLastDamageTime[slot] = 0;
+	} else if ( damageTime > 0 && cg.time - damageTime < 2000 ) {
+		comparisonLastDamageTime[slot] = damageTime;
+	} else if ( !comparisonLastDamageTime[slot] || cg.time - comparisonLastDamageTime[slot] >= 2000 ) {
+		comparisonLastHealth[slot] = health;
+		comparisonLastDamageTime[slot] = 0;
+	}
 
-	if ( other ) {
-		float comparison;
-		float otherComparison;
-
-		comparison = Com_Clamp( 0.0f, 1.0f, (float)( health + armor ) / 400.0f );
-		otherComparison = Com_Clamp( 0.0f, 1.0f, (float)( other->health + other->armor ) / 400.0f );
-
-		markerX = rect->x + rect->w * otherComparison - 1.0f;
-		CG_FillRect( markerX, rect->y, 2.0f, rect->h, markerColor );
-
-		if ( comparison > otherComparison && markerColor[3] < 0.6f ) {
-			markerColor[3] = 0.6f;
+	if ( healthWidth > 0.0f ) {
+		CG_FillRect( healthX, rect->y + 2.0f, healthWidth, 8.0f, healthColor );
+	}
+	if ( comparisonLastHealth[slot] > health && comparisonLastDamageTime[slot] &&
+		cg.time - comparisonLastDamageTime[slot] < 2000 ) {
+		lostHealth = comparisonLastHealth[slot] - health;
+		damageWidth = rect->w * Com_Clamp( 0.0f, 1.0f, (float)lostHealth / healthScale );
+		if ( damageWidth > healthWidth ) {
+			damageWidth = healthWidth;
+		}
+		damageX = ( slot == 0 ) ? healthX - damageWidth : healthX + healthWidth;
+		if ( damageWidth > 0.0f ) {
+			CG_FillRect( damageX, rect->y + 2.0f, damageWidth, 8.0f, damageColor );
 		}
 	}
-
-	Vector4Copy( color, textColor );
-	if ( textColor[3] <= 0.0f ) {
-		textColor[3] = 1.0f;
+	if ( armorWidth > 0.0f ) {
+		CG_FillRect( armorX, rect->y + 10.0f, armorWidth, 2.0f, armorColor );
 	}
-
-	Com_sprintf( buffer, sizeof( buffer ), "%d / %d", health, armor );
-	CG_Text_Paint( rect->x + 2, rect->y + rect->h - 2, scale, textColor, buffer, 0, 0, textStyle );
 }
 
 /*
@@ -4050,14 +4117,17 @@ CG_DrawVoteGametype
 Renders the gametype label text for the specified vote slot.
 =============
 */
-static void CG_DrawVoteGametype(rectDef_t *rect, float scale, vec4_t color, int textStyle, int slot) {
+static void CG_DrawVoteGametype(rectDef_t *rect, float scale, vec4_t color, int textStyle, int slot, int align) {
 	char	buffer[MAX_CVAR_VALUE_STRING];
+	float	x;
 
 	CG_GetVoteSlotString( slot, "Gametype", buffer, sizeof( buffer ) );
 	if ( !buffer[0] ) {
 		return;
 	}
-	CG_Text_Paint( rect->x, rect->y - 8.0f, scale, color, buffer, 0, 0, textStyle );
+	x = rect->x;
+	CG_AlignTextX( &x, buffer, scale, align );
+	CG_Text_Paint( x, rect->y - 8.0f, scale, color, buffer, 0, 0, textStyle );
 }
 
 /*
@@ -4067,8 +4137,9 @@ CG_DrawVoteName
 Shows the prettified map name for the selected vote slot.
 =============
 */
-static void CG_DrawVoteName(rectDef_t *rect, float scale, vec4_t color, int textStyle, int slot) {
+static void CG_DrawVoteName(rectDef_t *rect, float scale, vec4_t color, int textStyle, int slot, int align) {
 	char	buffer[MAX_CVAR_VALUE_STRING];
+	float	x;
 
 	CG_GetVoteSlotString( slot, "Name", buffer, sizeof( buffer ) );
 	if ( !buffer[0] ) {
@@ -4077,7 +4148,9 @@ static void CG_DrawVoteName(rectDef_t *rect, float scale, vec4_t color, int text
 			return;
 		}
 	}
-	CG_Text_Paint( rect->x, rect->y, scale, color, buffer, 0, 0, textStyle );
+	x = rect->x;
+	CG_AlignTextX( &x, buffer, scale, align );
+	CG_Text_Paint( x, rect->y, scale, color, buffer, 0, 0, textStyle );
 }
 
 /*
@@ -4087,14 +4160,17 @@ CG_DrawVoteMapSlot
 Outputs the raw map name string for the vote slot widget.
 =============
 */
-static void CG_DrawVoteMapSlot(rectDef_t *rect, float scale, vec4_t color, int textStyle, int slot) {
+static void CG_DrawVoteMapSlot(rectDef_t *rect, float scale, vec4_t color, int textStyle, int slot, int align) {
 	char	buffer[MAX_CVAR_VALUE_STRING];
+	float	x;
 
 	CG_GetVoteSlotString( slot, "Map", buffer, sizeof( buffer ) );
 	if ( !buffer[0] ) {
 		return;
 	}
-	CG_Text_Paint( rect->x, rect->y, scale, color, buffer, 0, 0, textStyle );
+	x = rect->x;
+	CG_AlignTextX( &x, buffer, scale, align );
+	CG_Text_Paint( x, rect->y, scale, color, buffer, 0, 0, textStyle );
 }
 
 /*
@@ -5571,7 +5647,7 @@ static qboolean CG_BuildPlacementWeaponMetricText( int ownerDraw, const score_t 
 	}
 
 	if ( normalized >= CG_1ST_PLYR_FRAGS_G && normalized <= CG_1ST_PLYR_FRAGS_HMG ) {
-		Com_sprintf( buffer, bufferSize, "%i", stats->weaponFrags[weapon] );
+		Com_sprintf( buffer, bufferSize, "%d", stats->weaponFrags[weapon] );
 		return qtrue;
 	}
 
@@ -5913,10 +5989,10 @@ static qboolean CG_BuildPlacementMetricText( int ownerDraw, const score_t *score
 		Com_sprintf( buffer, bufferSize, "%i", score->ping );
 		return qtrue;
 	case CG_1ST_PLYR_WINS:
-		Com_sprintf( buffer, bufferSize, "%i", ci->wins );
+		Com_sprintf( buffer, bufferSize, "%d/%d", ci->wins, ci->losses );
 		return qtrue;
 	case CG_1ST_PLYR_ACC:
-		Com_sprintf( buffer, bufferSize, "%i%%", score->accuracy );
+		Com_sprintf( buffer, bufferSize, "%d%%", score->accuracy );
 		return qtrue;
 	case CG_1ST_PLYR_FLAG:
 		return qfalse;
@@ -6056,7 +6132,7 @@ static qboolean CG_DrawPlacementDamageOwnerDraw( rectDef_t *rect, float scale, v
 =============
 CG_DrawPlacementWinsOwnerDraw
 
-Draws the tracked wins tally for a placement scorebox slot.
+Draws the tracked wins/losses tally for a placement scorebox slot.
 =============
 */
 static qboolean CG_DrawPlacementWinsOwnerDraw( rectDef_t *rect, float scale, vec4_t color, int textStyle, int slot ) {
@@ -6074,7 +6150,7 @@ static qboolean CG_DrawPlacementWinsOwnerDraw( rectDef_t *rect, float scale, vec
 		return qfalse;
 	}
 
-	Com_sprintf( buffer, sizeof( buffer ), "%i", ci->wins );
+	Com_sprintf( buffer, sizeof( buffer ), "%d/%d", ci->wins, ci->losses );
 	CG_Text_Paint( rect->x, rect->y + rect->h, scale, color, buffer, 0, 0, textStyle );
 	return qtrue;
 }
@@ -6102,15 +6178,19 @@ static void CG_DrawPlacementPingOwnerDraw( rectDef_t *rect, float scale, vec4_t 
 	}
 
 	Vector4Copy( color, drawColor );
-	if ( score->ping >= 80 ) {
+	if ( score->ping > 40 ) {
 		drawColor[0] = 1.0f;
-		drawColor[1] = 0.2f;
-		drawColor[2] = 0.2f;
-	} else if ( score->ping >= 40 ) {
-		drawColor[0] = 1.0f;
-		drawColor[1] = 0.85f;
-		drawColor[2] = 0.2f;
+		if ( score->ping > 80 ) {
+			drawColor[1] = 0.0f;
+		} else {
+			drawColor[1] = 1.0f;
+		}
+	} else {
+		drawColor[0] = 0.0f;
+		drawColor[1] = 1.0f;
 	}
+	drawColor[2] = 0.0f;
+	drawColor[3] = 0.8f;
 
 	(void)CG_DrawPlacementMetricTextOwnerDraw( rect, scale, drawColor, textStyle, ownerDraw );
 }
@@ -6501,6 +6581,7 @@ Reports whether an ownerdraw should refresh competitive scoreboard cache.
 static qboolean CG_IsCompetitiveScoreOwnerDraw( int ownerDraw ) {
 	if ( ownerDraw == CG_ROUNDTIMER || ownerDraw == CG_OVERTIME ||
 		ownerDraw == CG_PLAYER_COUNTS ||
+		ownerDraw == CG_1STPLACE || ownerDraw == CG_2NDPLACE ||
 		ownerDraw == CG_1ST_PLACE_SCORE || ownerDraw == CG_2ND_PLACE_SCORE ||
 		ownerDraw == CG_1ST_PLYR || ownerDraw == CG_1ST_PLYR_SCORE ||
 		ownerDraw == CG_1ST_PLYR_HEALTH_ARMOR || ownerDraw == CG_1ST_PLYR_AVATAR ||
@@ -7831,13 +7912,11 @@ Draws the local player score at the retail ownerdraw origin.
 static void CG_DrawPlayerScore( rectDef_t *rect, float scale, vec4_t color, qhandle_t shader, int textStyle ) {
 	char	num[16];
 	int	value;
-	qboolean raceScore;
 
 	if ( !rect || !cg.snap ) {
 		return;
 	}
 
-	raceScore = qfalse;
 	value = cg.snap->ps.persistant[PERS_SCORE];
 	if ( cgs.gametype == GT_RACE ) {
 		int clientNum = cg.snap->ps.clientNum;
@@ -7847,7 +7926,6 @@ static void CG_DrawPlayerScore( rectDef_t *rect, float scale, vec4_t color, qhan
 		}
 
 		value = cgs.clientinfo[clientNum].score;
-		raceScore = qtrue;
 	}
 
 	if (shader) {
@@ -7855,17 +7933,8 @@ static void CG_DrawPlayerScore( rectDef_t *rect, float scale, vec4_t color, qhan
 		CG_DrawPic(rect->x, rect->y, rect->w, rect->h, shader);
 		trap_R_SetColor( NULL );
 	} else {
-		if ( value == SCORE_NOT_PRESENT ) {
+		if ( !CG_BuildCompactScoreValueText( value, num, sizeof( num ) ) ) {
 			return;
-		}
-		if ( raceScore ) {
-			if ( value == 0x7fffffff || value < 0 ) {
-				Q_strncpyz( num, "-", sizeof( num ) );
-			} else {
-				Q_strncpyz( num, CG_FormatSignedWholeSeconds( value ), sizeof( num ) );
-			}
-		} else {
-			Com_sprintf (num, sizeof(num), "%i", value);
 		}
 		CG_Text_Paint( rect->x, rect->y, scale, color, num, 0, 0, textStyle );
 	}
@@ -8211,23 +8280,28 @@ retail case CG_BLUE_SCORE: CG_DrawTeamScore( rect, scale, color, textStyle, TEAM
 =============
 */
 static void CG_DrawScoreValue( rectDef_t *rect, float scale, vec4_t color, qhandle_t shader, int textStyle, int ownerDraw ) {
+	char	num[16];
+	int	value;
+
 	switch ( ownerDraw ) {
 	case CG_PLAYER_SCORE:
 		CG_DrawPlayerScore( rect, scale, color, shader, textStyle );
 		return;
 	case CG_1STPLACE:
-		if ( cgs.scores1 != SCORE_NOT_PRESENT ) {
-			CG_Text_Paint( rect->x, rect->y, scale, color, va( "%2i", cgs.scores1 ), 0, 0, textStyle );
-		}
-		return;
+		value = cgs.scores1;
+		break;
 	case CG_2NDPLACE:
-		if ( cgs.scores2 != SCORE_NOT_PRESENT ) {
-			CG_Text_Paint( rect->x, rect->y, scale, color, va( "%2i", cgs.scores2 ), 0, 0, textStyle );
-		}
-		return;
+		value = cgs.scores2;
+		break;
 	default:
 		return;
 	}
+
+	if ( !rect || !CG_BuildCompactScoreValueText( value, num, sizeof( num ) ) ) {
+		return;
+	}
+
+	CG_Text_Paint( rect->x, rect->y, scale, color, num, 0, 0, textStyle );
 }
 
 /*
@@ -8468,32 +8542,52 @@ Draws the retail 1FCTF ownerdraw icon.
 =============
 */
 static void CG_OneFlagStatus(rectDef_t *rect) {
-	int		shaderIndex;
+	qhandle_t	shader;
+	float		yOffset;
 
 	if (cgs.gametype != GT_1FCTF) {
 		return;
 	}
 
-	if ( cgs.flagStatus < FLAG_ATBASE || cgs.flagStatus > FLAG_DROPPED ) {
+	shader = 0;
+	yOffset = 0.0f;
+	switch ( cgs.flagStatus ) {
+	case FLAG_ATBASE:
+		shader = cgs.media.poiFlagAtBaseNeutralShader;
+		break;
+	case FLAG_TAKEN:
+		shader = cgs.media.poiFlagTakenNeutralShader;
+		break;
+	case FLAG_DROPPED:
+		shader = cgs.media.poiFlagDroppedNeutralShader;
+		break;
+	case FLAG_TAKEN_RED:
+		shader = cgs.media.poiFlagStolenNeutralShader;
+		if ( cgs.scores1 == SCORE_NOT_PRESENT || cgs.scores1 < cgs.scores2 ) {
+			yOffset = 9.0f;
+		} else {
+			yOffset = -9.0f;
+		}
+		break;
+	case FLAG_TAKEN_BLUE:
+		shader = cgs.media.poiFlagStolenNeutralShader;
+		if ( cgs.scores2 == SCORE_NOT_PRESENT || cgs.scores2 <= cgs.scores1 ) {
+			yOffset = 9.0f;
+		} else {
+			yOffset = -9.0f;
+		}
+		break;
+	default:
 		return;
 	}
 
-	shaderIndex = 0;
-	switch ( cgs.flagStatus ) {
-	case FLAG_TAKEN_RED:
-		shaderIndex = 1;
-		break;
-	case FLAG_TAKEN_BLUE:
-		shaderIndex = 2;
-		break;
-	case FLAG_DROPPED:
-		shaderIndex = 3;
-		break;
-	default:
-		break;
+	if ( !shader ) {
+		return;
 	}
 
-	CG_DrawPic( rect->x, rect->y, rect->w, rect->h, cgs.media.flagShader[shaderIndex] );
+	trap_R_SetColor( colorWhite );
+	CG_DrawPic( rect->x, rect->y + yOffset, rect->w, rect->h, shader );
+	trap_R_SetColor( NULL );
 }
 
 /*
@@ -10218,7 +10312,7 @@ static void CG_Draw2ndPlaceScore( rectDef_t *rect, float scale, vec4_t color, in
 		return;
 	}
 
-	if ( cg.snap && cg.snap->ps.pm_type != PM_SPECTATOR && !CG_ShowPlayerIsFirstPlace() ) {
+	if ( cg.snap && cg.snap->ps.persistant[PERS_TEAM] != TEAM_SPECTATOR && !CG_ShowPlayerIsFirstPlace() ) {
 		clientNum = cg.snap->ps.clientNum;
 		if ( clientNum >= 0 && clientNum < cgs.maxclients && clientNum < MAX_CLIENTS ) {
 			rank = cg.snap->ps.persistant[PERS_RANK];
@@ -10233,7 +10327,7 @@ static void CG_Draw2ndPlaceScore( rectDef_t *rect, float scale, vec4_t color, in
 			}
 
 			ci = &cgs.clientinfo[clientNum];
-			Q_strncpyz( nameBuffer, ( ci->name[0] ) ? ci->name : "Unknown", sizeof( nameBuffer ) );
+			Q_strncpyz( nameBuffer, ci->name, sizeof( nameBuffer ) );
 			Com_sprintf( rankBuffer, sizeof( rankBuffer ), "%d. ", localRank );
 			CG_DrawPlacementScoreLine( rect, scale, color, textStyle, rankBuffer, nameBuffer, valueBuffer );
 			return;
@@ -10897,22 +10991,22 @@ rect.y = y;
 		CG_DrawMapName( &rect, scale, color, textStyle );
 		break;
 	case CG_VOTEGAMETYPE1:
-		CG_DrawVoteGametype(&rect, scale, color, textStyle, 1);
+		CG_DrawVoteGametype(&rect, scale, color, textStyle, 1, align);
 		break;
 	case CG_VOTEGAMETYPE2:
-		CG_DrawVoteGametype(&rect, scale, color, textStyle, 2);
+		CG_DrawVoteGametype(&rect, scale, color, textStyle, 2, align);
 		break;
 	case CG_VOTEGAMETYPE3:
-		CG_DrawVoteGametype(&rect, scale, color, textStyle, 3);
+		CG_DrawVoteGametype(&rect, scale, color, textStyle, 3, align);
 		break;
 	case CG_VOTEMAP1:
-		CG_DrawVoteMapSlot(&rect, scale, color, textStyle, 1);
+		CG_DrawVoteMapSlot(&rect, scale, color, textStyle, 1, align);
 		break;
 	case CG_VOTEMAP2:
-		CG_DrawVoteMapSlot(&rect, scale, color, textStyle, 2);
+		CG_DrawVoteMapSlot(&rect, scale, color, textStyle, 2, align);
 		break;
 	case CG_VOTEMAP3:
-		CG_DrawVoteMapSlot(&rect, scale, color, textStyle, 3);
+		CG_DrawVoteMapSlot(&rect, scale, color, textStyle, 3, align);
 		break;
 	case CG_VOTESHOT1:
 		CG_DrawVoteShot(&rect, 1);
@@ -10924,13 +11018,13 @@ rect.y = y;
 		CG_DrawVoteShot(&rect, 3);
 		break;
 	case CG_VOTENAME1:
-		CG_DrawVoteName(&rect, scale, color, textStyle, 1);
+		CG_DrawVoteName(&rect, scale, color, textStyle, 1, align);
 		break;
 	case CG_VOTENAME2:
-		CG_DrawVoteName(&rect, scale, color, textStyle, 2);
+		CG_DrawVoteName(&rect, scale, color, textStyle, 2, align);
 		break;
 	case CG_VOTENAME3:
-		CG_DrawVoteName(&rect, scale, color, textStyle, 3);
+		CG_DrawVoteName(&rect, scale, color, textStyle, 3, align);
 		break;
 	case CG_VOTECOUNT1:
 		CG_DrawVoteCount(&rect, scale, color, textStyle, 1, align);
@@ -11164,7 +11258,7 @@ rect.y = y;
 	case CG_1STPLACE:
 		CG_DrawScoreValue( &rect, scale, color, shader, textStyle, ownerDraw );
 		break;
-  case CG_1STPLACE_PLYR_MODEL:
+	case CG_1STPLACE_PLYR_MODEL:
 		CG_DrawFirstPlaceModel( &rect, qfalse );
 		break;
 	case CG_1STPLACE_PLYR_MODEL_ACTIVE:
@@ -11173,12 +11267,12 @@ rect.y = y;
 	case CG_2NDPLACE:
 		CG_DrawScoreValue( &rect, scale, color, shader, textStyle, ownerDraw );
 		break;
-  case CG_1ST_PLACE_SCORE:
-    CG_Draw1stPlaceScore(&rect, scale, color, textStyle);
-                break;
-  case CG_2ND_PLACE_SCORE:
-    CG_Draw2ndPlaceScore(&rect, scale, color, textStyle);
-                break;
+	case CG_1ST_PLACE_SCORE:
+		CG_Draw1stPlaceScore(&rect, scale, color, textStyle);
+		break;
+	case CG_2ND_PLACE_SCORE:
+		CG_Draw2ndPlaceScore(&rect, scale, color, textStyle);
+		break;
 	case CG_PLAYER_OBIT:
 		CG_DrawPlayerObituary(&rect, scale, color, textStyle);
 		break;

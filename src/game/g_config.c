@@ -330,6 +330,8 @@ void G_Config_ResetFactoryManagedCvars( void ) {
 	trap_Cvar_Set( "g_ammoPackHack", STRINGIZE( DEFAULT_AMMO_PACK_HACK ) );
 	trap_Cvar_Set( "g_weaponRespawn", STRINGIZE( DEFAULT_WEAPON_RESPAWN_SECONDS ) );
 	// Pickup_Weapon reads the VM mirror directly, matching retail HLIL.
+	// Force Cvar_Update past its modification-count fast path.
+	g_weaponRespawn.modificationCount = -1;
 	trap_Cvar_Update( &g_weaponRespawn );
 	trap_Cvar_Set( "g_ammoRespawn", STRINGIZE( DEFAULT_AMMO_RESPAWN_SECONDS ) );
 	trap_Cvar_Set( "g_respawn_delay_min", STRINGIZE( DEFAULT_RESPAWN_DELAY_MIN_MILLISECONDS ) );

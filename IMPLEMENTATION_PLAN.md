@@ -1,6 +1,6 @@
 # Implementation Plan
 
-Last updated: 2026-05-28
+Last updated: 2026-05-30
 
 This file now tracks only active repo-level work. Detailed closure narratives
 live in the dedicated subsystem audits under `docs/reverse-engineering/`.
@@ -44,6 +44,418 @@ disabled, until a documented open replacement path exists.
   pick and close remaining `src/ui/menudef.h` ownerdraw IDs.
 
 ## Active work
+
+### Task A151: Tighten native game API handoff parity [COMPLETED]
+Priority: High
+Primary areas: `src/code/server/sv_game.c`,
+`src/code/client/cl_cgame.c`,
+`tests/test_game_native_export_helper_parity.py`
+Parity estimate: **before 99.9% -> after 100%** for the scoped native
+qagame/cgame API-version handoff and retained QVM fallback ownership slice.
+Repo-wide parity remains **98%** because unrelated portability,
+online-service, packaging, and source-legacy surfaces are unchanged.
+
+Completed work:
+
+1. Rechecked the retail `qagamex86.dll` and `cgamex86.dll` `dllEntry`
+   evidence: qagame reports native API `10`, and cgame reports native API `8`.
+2. Split the native-load API constants from the legacy VM fallback constants
+   at the qagame and cgame loader call sites.
+3. Added structural coverage that pins native API handoff, legacy fallback API
+   handoff, and the retained retail QVM fallback ownership note.
+4. Revalidated the focused native-export and qcommon fallback-VM parity probes.
+
+### Task A150: Close item/score/race cgame ownerdraw parity [COMPLETED]
+Priority: High
+Primary areas: `src/code/cgame/cg_newdraw.c`,
+`tests/test_cgame_ownerdraw_text_parity.py`,
+`tests/test_cgame_displaycontext_parity.py`,
+`docs/reverse-engineering/cg-ownerdrawtype-parity-index.md`,
+`docs/reverse-engineering/cgame-mapping.md`
+Parity estimate: **before 99% -> after 100%** for the selected
+`CG_PLAYER_ITEM`, `CG_PLAYER_SCORE`, `CG_RACE_STATUS`, `CG_RACE_TIMES`,
+and `CG_ONEFLAG_STATUS` ownerdraw set. Repo-wide parity remains **98%**
+because unrelated compatibility, source-legacy, and packaging surfaces are
+unchanged.
+
+Completed work:
+
+1. Rechecked the retail `cgamex86.dll` dispatcher and HLIL leaves for raw
+   ownerdraw cases `0x32`, `0x33`, `0x34`, `0x35`, and `0x36`.
+2. Confirmed current source preserves the retail holdable item branch, compact
+   score wrapper, Race status/timing shared leaf, callback participation, and
+   shipped menu reachability for the selected five.
+3. Restored the `CG_ONEFLAG_STATUS` visible leaf to the retail
+   `gfx/2d/flag_status/*` shader bank, white draw color, and stolen-flag
+   score-dependent y offset.
+4. Added focused structural coverage for constants, dispatcher routes,
+   `CG_GetValue` participation, width/key callback absence, display-context
+   wiring, retail HLIL anchors, and menu reachability.
+5. Refreshed the cgame ownerdraw and mapping ledgers for the selected five.
+
+### Task A149: Close selected 122-126 cgame ownerdraw parity [COMPLETED]
+Priority: High
+Primary areas: `src/code/cgame/cg_newdraw.c`,
+`src/code/cgame/cg_servercmds.c`, `src/code/game/g_cmds.c`,
+`tests/test_cgame_displaycontext_parity.py`,
+`docs/reverse-engineering/cg-ownerdrawtype-parity-index.md`,
+`docs/reverse-engineering/cgame-mapping.md`
+Parity estimate: **before 99% -> after 100%** for the selected
+`CG_1ST_PLYR_FRAGS_LG`, `CG_1ST_PLYR_FRAGS_RG`,
+`CG_1ST_PLYR_FRAGS_PG`, `CG_1ST_PLYR_FRAGS_BFG`, and
+`CG_1ST_PLYR_FRAGS_CG` ownerdraw set. Repo-wide parity remains **98%**
+because unrelated compatibility, source-legacy, and packaging surfaces are
+unchanged.
+
+Completed work:
+
+1. Rechecked the retail `cgamex86.dll` dispatcher, `0x100368A0` weapon-frag
+   leaf, and `0x1002E2B0` placement weapon resolver for raw ownerdraw cases
+   `0x7a` through `0x7e`.
+2. Confirmed the retail resolver maps LG/RG/PG/BFG to weapon indexes `6`
+   through `9` and maps CG to `0xd`, preserving the Quake Live enum gap before
+   nailgun/prox/chaingun.
+3. Pinned the qagame-to-cgame compact `scorestats` weapon-frag wiring around
+   the retail LG, RG, PG, BFG, CG lane inside the full frag order.
+4. Added focused structural coverage for constants, retail target-group
+   membership, resolver returns, weapon mapping, server send path, cgame parse
+   path, dispatcher guard, callback absence, and direct-switch absence.
+5. Refreshed the cgame ownerdraw and mapping ledgers for the selected five.
+
+### Task A148: Harden selected 75-79 cgame award ownerdraw parity [COMPLETED]
+Priority: High
+Primary areas: `tests/test_cgame_displaycontext_parity.py`,
+`docs/reverse-engineering/cg-ownerdrawtype-parity-index.md`,
+`docs/reverse-engineering/cgame-mapping.md`
+Parity estimate: **before 99% -> after 100%** for the selected
+`CG_MOST_VALUABLE_OFFENSIVE_PLYR`,
+`CG_MOST_VALUABLE_DEFENSIVE_PLYR`, `CG_MOST_VALUABLE_PLYR`,
+`CG_BEST_ITEMCONTROL_PLYR`, and `CG_MOST_ACCURATE_PLYR` ownerdraw set.
+Repo-wide parity remains **98%** because unrelated compatibility,
+source-legacy, and packaging surfaces are unchanged.
+
+Completed work:
+
+1. Rechecked the retail `cgamex86.dll` ownerdraw dispatcher route for raw
+   cases `0x4b` through `0x4f`, all landing on the shared award-player image
+   leaf at `0x1003A0D0`.
+2. Verified the selected ownerdraws are handled before the source
+   `CG_OwnerDraw` switch by `CG_DrawAwardPlayer`, fed by qagame-produced
+   `CS_AWARD_*` configstrings and rendered through the profile-image helper.
+3. Added focused structural coverage for constants, retail target routing,
+   qagame producer wiring, cgame configstring consumption, shipped
+   end-scoreboard menu reachability, display-context callbacks, and absence
+   from value/width/key callback routes.
+4. Refreshed the cgame ownerdraw and mapping ledgers so the award lane now
+   documents the recovered configstring-backed profile-image path.
+
+### Task A147: Close selected 117-121 cgame ownerdraw parity [COMPLETED]
+Priority: High
+Primary areas: `src/code/cgame/cg_newdraw.c`,
+`src/code/cgame/cg_servercmds.c`, `src/code/game/g_cmds.c`,
+`tests/test_cgame_displaycontext_parity.py`,
+`docs/reverse-engineering/cg-ownerdrawtype-parity-index.md`,
+`docs/reverse-engineering/cgame-mapping.md`
+Parity estimate: **before 99% -> after 100%** for the selected
+`CG_1ST_PLYR_FRAGS_G`, `CG_1ST_PLYR_FRAGS_MG`,
+`CG_1ST_PLYR_FRAGS_SG`, `CG_1ST_PLYR_FRAGS_GL`, and
+`CG_1ST_PLYR_FRAGS_RL` ownerdraw set. Repo-wide parity remains **98%**
+because unrelated compatibility, source-legacy, and packaging surfaces are
+unchanged.
+
+Completed work:
+
+1. Rechecked the retail `cgamex86.dll` dispatcher and HLIL leaf at
+   `0x100368A0`, including the placement weapon-index helper, weapon-frag
+   cache read, `%d` format literal, and baseline text paint.
+2. Tightened the placement weapon-frag formatter to the retail `%d` literal.
+3. Pinned the qagame-to-cgame compact `scorestats` weapon-frag wiring around
+   the retail G, MG, SG, GL, RL prefix order.
+4. Added focused structural coverage for constants, retail target-group
+   membership, weapon mapping, server send path, cgame parse path, dispatcher
+   guard, callback absence, and direct-switch absence.
+5. Refreshed the cgame ownerdraw and mapping ledgers for the selected five.
+
+### Task A146: Close health/ammo cgame ownerdraw parity [COMPLETED]
+Priority: High
+Primary areas: `tests/test_cgame_ownerdraw_text_parity.py`,
+`docs/reverse-engineering/cg-ownerdrawtype-parity-index.md`,
+`docs/reverse-engineering/cgame-mapping.md`
+Parity estimate: **before 99% -> after 100%** for the selected
+`CG_PLAYER_HEALTH_BAR_100`, `CG_PLAYER_HEALTH_BAR_200`,
+`CG_PLAYER_AMMO_ICON`, `CG_PLAYER_AMMO_ICON2D`, and `CG_PLAYER_AMMO_VALUE`
+ownerdraw set. Repo-wide parity remains **98%** because unrelated
+compatibility, source-legacy, and packaging surfaces are unchanged.
+
+Completed work:
+
+1. Rechecked the retail `cgamex86.dll` dispatcher and HLIL leaves for raw
+   ownerdraw cases `0x2d`, `0x2e`, `0x2f`, `0x30`, and `0x31`.
+2. Confirmed current source preserves the retail primary/excess health-bar
+   split, ammo icon 2D/3D branches, finite ammo text/shader rendering, and
+   infinite-ammo icon fallback.
+3. Added focused structural coverage for constants, dispatcher routes,
+   `CG_GetValue` participation, width/key callback absence, display-context
+   wiring, and shipped menu reachability.
+
+### Task A145: Close local status cgame ownerdraw parity [COMPLETED]
+Priority: High
+Primary areas: `tests/test_cgame_ownerdraw_text_parity.py`,
+`docs/reverse-engineering/cg-ownerdrawtype-parity-index.md`,
+`docs/reverse-engineering/cgame-mapping.md`
+Parity estimate: **before 99% -> after 100%** for the selected
+`CG_PLAYER_ARMOR_VALUE`, `CG_PLAYER_ARMOR_BAR_100`,
+`CG_PLAYER_ARMOR_BAR_200`, `CG_ARMORTIERED_COLORIZED`, and
+`CG_PLAYER_HEALTH` ownerdraw set. Repo-wide parity remains **98%** because
+unrelated compatibility, source-legacy, and packaging surfaces are unchanged.
+
+Completed work:
+
+1. Rechecked the retail `cgamex86.dll` dispatcher and HLIL leaves for raw
+   ownerdraw cases `0x28`, `0x29`, `0x2a`, `0x2b`, and `0x2c`.
+2. Confirmed current source preserves the retail armor/health
+   shader-or-aligned-number paths, armor primary/excess bar clipping, and
+   replicated armor-tier color fill.
+3. Added focused structural coverage for constants, dispatcher routes,
+   `CG_GetValue` participation, width/key callback absence, display-context
+   wiring, and shipped menu reachability.
+
+### Task A144: Close selected 112-116 cgame ownerdraw parity [COMPLETED]
+Priority: High
+Primary areas: `src/code/cgame/cg_newdraw.c`,
+`tests/test_cgame_displaycontext_parity.py`,
+`docs/reverse-engineering/cg-ownerdrawtype-parity-index.md`,
+`docs/reverse-engineering/cgame-mapping.md`
+Parity estimate: **before 96% -> after 100%** for the selected
+`CG_1ST_PLYR_ACC`, `CG_1ST_PLYR_FLAG`, `CG_1ST_PLYR_AVATAR`,
+`CG_1ST_PLYR_TIMEOUT_COUNT`, and `CG_1ST_PLYR_HEALTH_ARMOR` ownerdraw
+set. Repo-wide parity remains **98%** because unrelated compatibility,
+source-legacy, and packaging surfaces are unchanged.
+
+Completed work:
+
+1. Rechecked the retail `cgamex86.dll` dispatcher and HLIL leaves for
+   `0x10036570`, `0x10036720`, `0x100366A0`, `0x10033040`, plus the raw
+   `0x73` no-op gap.
+2. Tightened total accuracy formatting to the retail `%d%%` literal and kept
+   the placement flag route on the cached country-flag shader path.
+3. Restored the placement avatar selection order: native avatar handle when
+   `cg_drawProfileImages` and a replicated identity are available, then the
+   cached model icon fallback, with no source-only dimming or armor fallback.
+4. Rebuilt the spectator comparison ownerdraw around retail-style health and
+   armor bands, including local playerState stat reads, tracked-client
+   fallback, fixed retail colors, the short-lived damage-loss segment,
+   primary-slot right alignment, cvar color gating, and removal of the
+   non-retail text/marker overlay.
+5. Added focused structural coverage for the five selected ownerdraw IDs and
+   refreshed the cgame ownerdraw and mapping ledgers.
+
+### Task A143: Close spectator/player-preview cgame ownerdraw parity [COMPLETED]
+Priority: High
+Primary areas: `tests/test_cgame_ownerdraw_text_parity.py`,
+`docs/reverse-engineering/cg-ownerdrawtype-parity-index.md`,
+`docs/reverse-engineering/cgame-mapping.md`
+Parity estimate: **before 99% -> after 100%** for the selected
+`CG_SPEC_MESSAGES`, `CG_PLAYER_HEAD`, `CG_PLAYERMODEL`,
+`CG_PLAYER_ARMOR_ICON`, and `CG_PLAYER_ARMOR_ICON2D` ownerdraw set.
+Repo-wide parity remains **98%** because unrelated compatibility,
+source-legacy, and packaging surfaces are unchanged.
+
+Completed work:
+
+1. Rechecked the retail `cgamex86.dll` dispatcher and HLIL leaves for raw
+   ownerdraw cases `0x23`, `0x24`, `0x25`, `0x26`, and `0x27`.
+2. Confirmed current source preserves the spectator message copy family, local
+   head damage/idle interpolation, tracked/local model preview, and shared
+   armor 2D/3D icon behavior.
+3. Added focused structural coverage for constants, dispatcher routes, shipped
+   menu reachability, and absence from the value/width/key callback paths.
+
+### Task A142: Close vote shot/timer cgame ownerdraw parity [COMPLETED]
+Priority: High
+Primary areas: `tests/test_cgame_ownerdraw_text_parity.py`,
+`docs/reverse-engineering/cg-ownerdrawtype-parity-index.md`,
+`docs/reverse-engineering/cgame-mapping.md`
+Parity estimate: **before 99% -> after 100%** for the selected
+`CG_VOTESHOT1`, `CG_VOTESHOT2`, `CG_VOTESHOT3`, `CG_VOTECOUNT3`, and
+`CG_VOTETIMER` ownerdraw set. Repo-wide parity remains **98%** because
+unrelated compatibility, source-legacy, and packaging surfaces are unchanged.
+
+Completed work:
+
+1. Rechecked the retail `cgamex86.dll` dispatcher and HLIL leaves for raw
+   ownerdraw cases `0x19`, `0x1a`, `0x1b`, `0x21`, and `0x22`.
+2. Confirmed current source preserves the retail vote preview path, default
+   preview fallback, third vote-count label, timer text family, cvar payload
+   wiring, and absence of value/width/key callback participation.
+3. Added focused structural coverage for dispatcher slots, shipped menu usage,
+   `ui_vote%s%i` shot/count payload transport, and vote active/string bridge
+   state used by the timer menu.
+
+### Task A141: Close vote name/count cgame ownerdraw parity [COMPLETED]
+Priority: High
+Primary areas: `src/code/cgame/cg_newdraw.c`,
+`tests/test_cgame_ownerdraw_text_parity.py`,
+`tests/test_cgame_displaycontext_parity.py`,
+`docs/reverse-engineering/cg-ownerdrawtype-parity-index.md`,
+`docs/reverse-engineering/cgame-mapping.md`
+Parity estimate: **before 95% -> after 100%** for the selected
+`CG_VOTENAME1`, `CG_VOTENAME2`, `CG_VOTENAME3`, `CG_VOTECOUNT1`, and
+`CG_VOTECOUNT2` ownerdraw set. Repo-wide parity remains **98%** because
+unrelated compatibility, source-legacy, and packaging surfaces are unchanged.
+
+Completed work:
+
+1. Rechecked the retail `cgamex86.dll` dispatcher and HLIL leaves for raw
+   ownerdraw cases `0x1c` through `0x20`.
+2. Restored the retail text-width alignment path for vote-name labels while
+   preserving the `Name` then `Map` fallback payload order and raw rect-y
+   paint origin.
+3. Added focused structural coverage for dispatcher slots, display-context
+   callbacks, `ui_vote%s%i` name/count payload wiring, shipped menu usage, and
+   absence of value/width/key callback participation.
+
+### Task A140: Close selected 107-111 cgame ownerdraw parity [COMPLETED]
+Priority: High
+Primary areas: `src/code/cgame/cg_newdraw.c`,
+`tests/test_cgame_displaycontext_parity.py`,
+`docs/reverse-engineering/cg-ownerdrawtype-parity-index.md`,
+`docs/reverse-engineering/cgame-mapping.md`
+Parity estimate: **before 98% -> after 100%** for the selected
+`CG_1ST_PLYR_DEATHS`, `CG_1ST_PLYR_DMG`, `CG_1ST_PLYR_TIME`,
+`CG_1ST_PLYR_PING`, and `CG_1ST_PLYR_WINS` ownerdraw set. Repo-wide
+parity remains **98%** because unrelated compatibility, source-legacy, and
+packaging surfaces are unchanged.
+
+Completed work:
+
+1. Rechecked the retail `cgamex86.dll` dispatcher and HLIL leaves for
+   `0x10036320`, `0x10036770`, `0x10036070`, and `0x10036450`, plus the raw
+   `0x6d` no-op gap.
+2. Tightened the placement ping ownerdraw to use the retail `>40` and `>80`
+   warning-color thresholds, forced blue to `0.0`, and forced alpha to `0.8`
+   before painting.
+3. Restored the wins slot to the retail preformatted `%d/%d` wins/losses text
+   path rather than the source-only bare wins count.
+4. Added focused structural coverage for the five selected ownerdraw IDs,
+   including dispatcher routes, metric helpers, the no-op time case, retail
+   color evidence, and the absence of value/width/key callback wiring.
+5. Updated the cgame ownerdraw and mapping ledgers with the exact placement
+   metric and ping-color evidence.
+
+### Task A139: Close vote gametype/map cgame ownerdraw parity [COMPLETED]
+Priority: High
+Primary areas: `src/code/cgame/cg_newdraw.c`,
+`tests/test_cgame_ownerdraw_text_parity.py`,
+`tests/test_cgame_displaycontext_parity.py`,
+`docs/reverse-engineering/cg-ownerdrawtype-parity-index.md`,
+`docs/reverse-engineering/cgame-mapping.md`
+Parity estimate: **before 94% -> after 100%** for the selected
+`CG_VOTEGAMETYPE1`, `CG_VOTEGAMETYPE2`, `CG_VOTEGAMETYPE3`,
+`CG_VOTEMAP1`, and `CG_VOTEMAP2` ownerdraw set. Repo-wide parity remains
+**98%** because unrelated compatibility, source-legacy, and packaging
+surfaces are unchanged.
+
+Completed work:
+
+1. Rechecked the retail `cgamex86.dll` dispatcher and HLIL leaves for raw
+   ownerdraw cases `0x13` through `0x17`.
+2. Restored the retail text-width alignment path for vote gametype and raw-map
+   labels while preserving the gametype row's `rect->y - 8.0f` paint bias.
+3. Added focused structural coverage for dispatcher slots, display-context
+   callbacks, `ui_vote%s%i` cvar payload wiring, menu reachability, and the
+   absence of value/width/key callback participation.
+
+### Task A138: Tighten 83-87 cgame placement ownerdraw parity [COMPLETED]
+Priority: High
+Primary areas: `src/code/cgame/cg_newdraw.c`,
+`tests/test_cgame_displaycontext_parity.py`,
+`docs/reverse-engineering/cg-ownerdrawtype-parity-index.md`,
+`docs/reverse-engineering/cgame-mapping.md`
+Parity estimate: **before 98% -> after 100%** for the selected
+`CG_1STPLACE`, `CG_1ST_PLACE_SCORE`, `CG_1STPLACE_PLYR_MODEL`,
+`CG_2NDPLACE`, and `CG_2ND_PLACE_SCORE` ownerdraw set. Repo-wide parity
+remains **98%** because unrelated compatibility, source-legacy, and packaging
+surfaces are unchanged.
+
+Completed work:
+
+1. Rechecked the retail `cgamex86.dll` HLIL and committed Ghidra dispatcher for
+   raw ownerdraw cases `0x53` through `0x57`.
+2. Restored compact placement score formatting through the shared retail score
+   helper, including Race `[-]Ns` text and the `SCORE_NOT_PRESENT` skip.
+3. Wired the compact placement ownerdraws into the competitive score-cache
+   touch path used by HUD-only placement layouts.
+4. Tightened the wide second-place row to use the retail spectator-team gate
+   before choosing between the local player row and cached runner-up row.
+5. Refreshed focused structural tests and ownerdraw/mapping ledgers for the
+   completed placement lane.
+
+### Task A137: Close selected 100-105 cgame ownerdraw parity [COMPLETED]
+Priority: High
+Primary areas: `src/code/cgame/cg_newdraw.c`,
+`tests/test_cgame_displaycontext_parity.py`,
+`docs/reverse-engineering/cg-ownerdrawtype-parity-index.md`
+Parity estimate: **before 98% -> after 100%** for the selected
+`CG_TEAM_PLYR_COUNT`, `CG_ENEMY_PLYR_COUNT`, `CG_1ST_PLYR`,
+`CG_1ST_PLYR_READY`, and `CG_1ST_PLYR_SCORE` ownerdraw set. Repo-wide
+parity remains **98%** because unrelated compatibility, source-legacy, and
+packaging surfaces are unchanged.
+
+Completed work:
+
+1. Rechecked the retail `cgamex86.dll` dispatcher and HLIL leaves for
+   `0x10033650`, `0x10035BD0`, `0x10037BA0`, and `0x10035F30`.
+2. Corrected the friendly/enemy round player-count ownerdraws to paint the
+   cached team count at the raw ownerdraw origin, matching the retail
+   `sub_10033650` text path instead of the older centered source behavior.
+3. Added focused structural coverage for the five selected ownerdraw IDs,
+   including dispatcher routes, pre-switch `CG_1ST_PLYR_READY` handling, raw
+   text origins, and the absence of value/width/key callback wiring.
+4. Updated the cgame ownerdraw and mapping ledgers with the raw-origin
+   player-count evidence.
+
+### Task A136: Close gametype cgame ownerdraw parity [COMPLETED]
+Priority: High
+Primary areas: `tests/test_cgame_ownerdraw_text_parity.py`,
+`docs/reverse-engineering/cg-ownerdrawtype-parity-index.md`,
+`docs/reverse-engineering/cgame-mapping.md`
+Parity estimate: **before 98% -> after 100%** for the selected
+`CG_GAME_TYPE`, `CG_GAME_TYPE_ICON`, and `CG_GAME_TYPE_MAP` ownerdraw trio.
+Repo-wide parity remains **98%** because unrelated compatibility,
+source-legacy, and packaging surfaces are unchanged.
+
+Completed work:
+
+1. Rechecked the retail `cgamex86.dll` dispatcher evidence for raw ownerdraw
+   cases `4`, `5`, and `6`, mapped to `CG_DrawGameType`,
+   `CG_DrawGameTypeIcon`, and `CG_DrawGameTypeMap`.
+2. Confirmed the current source preserves the direct draw routes, keeps only
+   `CG_GAME_TYPE` on the ownerdraw-width callback, and leaves the trio out of
+   the value and key-handler callbacks.
+3. Added focused structural coverage for the dispatcher, display-context
+   callbacks, shipped menu reachability, gametype icon registration path, and
+   intro-panel gametype-map wiring.
+
+### Task A135: Restore retail post-process gamma capture path [COMPLETED]
+Priority: High
+Primary areas: `src/code/renderer/tr_init.c`,
+`docs/renderer_cvar_matrix.md`, `tests/test_engine_cvar_retail_parity.py`
+Parity estimate: **before 99% -> after 100%** for the selected
+renderer post-process gamma ownership lane. Repo-wide parity remains **98%**
+because unrelated compatibility, source-legacy, and packaging surfaces are
+unchanged.
+
+Completed work:
+
+1. Rechecked the retail `quakelive_steam.exe` HLIL/Ghidra evidence for
+   `r_enablePostProcess`, `r_enableColorCorrect`, the `p_gammaRecip`
+   color-correct uniform, and the legacy Win32 gamma ramp fallback.
+2. Removed the reconstruction-only `r_enablePostProcess` force-off so the
+   shader-backed color-correct pass owns final `r_gamma` output by default,
+   matching retail and improving Windows desktop/PrintScreen capture parity.
+3. Updated cvar parity tests and renderer cvar documentation to reflect the
+   restored retail default and fallback boundary.
 
 ### Task A134: Close player/opponent UI ownerdraw parity [COMPLETED]
 Priority: High

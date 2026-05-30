@@ -1126,7 +1126,9 @@ def test_default_hud_score_widgets_refresh_the_competitive_score_cache() -> None
 	refresh_block = _block_from_marker(source, "static qboolean CG_IsCompetitiveScoreOwnerDraw")
 
 	for ownerdraw in (
+		"CG_1STPLACE",
 		"CG_1ST_PLACE_SCORE",
+		"CG_2NDPLACE",
 		"CG_2ND_PLACE_SCORE",
 		"CG_TEAM_PLYR_COUNT",
 		"CG_ENEMY_PLYR_COUNT",

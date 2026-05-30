@@ -1316,7 +1316,7 @@ utility helpers outside that widened control surface.
 
 ## Important Disagreements And Split Paths
 
-- `dllEntry` writes `0xA` through its third out-parameter. In the native Quake Live loader contract this is an API-version handoff, not a reliable export-count field; the returned qagame export table continues past the 10 `VM_CallNativeExports` slots used by the current engine call switch.
+- `dllEntry` writes `0xA` through its third out-parameter. In the native Quake Live loader contract this is an API-version handoff, not a reliable export-count field; the returned qagame export table starts at the recovered shutdown/run-frame/register-cvars/init ordering and carries the 19-slot native export slab. The host dispatch now covers the live engine-call slots while `GAME_NATIVE_EXPORT_REGISTER_CVARS` remains a required table entry that retail also reaches from the qagame init path.
 - `ClientThink` at `0x10035410` is visible in HLIL and in the native export table, but the committed `functions.csv` still does not emit that function start.
 - `G_CheckClientFlood` at `0x100341E0` is a descriptive retail-only split from the broader `ClientThink_real` path. It shares the same `floodCount` / `floodLastTime` state used by the current source tree, but unlike `g_cmds.c::G_FloodLimited` it drops over-limit clients directly from the active-client path instead of only rate-limiting commands.
 - `ClientThink_real` is a clean retail boundary at `0x10034C90`, and the surrounding `ClientEvents` (`0x10034860`) plus `StuckInOtherClient` (`0x10034B50`) splits are now settled.

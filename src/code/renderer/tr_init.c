@@ -1404,8 +1404,7 @@ void R_Register( void )
 	r_glReserved = ri.Cvar_Get( "r_gl_reserved", "0", CVAR_ROM | CVAR_PROTECTED );
 
 	// HLIL: post-processing and color-correct are 0/1 gates; bloom keeps the retail 0/1/2 mode selection.
-	r_enablePostProcess = ri.Cvar_Get( "r_enablePostProcess", "0", CVAR_ROM );
-	ri.Cvar_Set( "r_enablePostProcess", "0" );
+	r_enablePostProcess = ri.Cvar_Get( "r_enablePostProcess", "1", CVAR_ARCHIVE | CVAR_LATCH | CVAR_CLOUD );
 	r_enableBloom = ri.Cvar_Get( "r_enableBloom", "1", CVAR_ARCHIVE | CVAR_LATCH | CVAR_CLOUD );
 	r_enableColorCorrect = ri.Cvar_Get( "r_enableColorCorrect", "1", CVAR_ARCHIVE | CVAR_LATCH | CVAR_CLOUD );
 	r_postProcessActive = ri.Cvar_Get( "r_postProcessActive", "0", CVAR_TEMP | CVAR_ROM );

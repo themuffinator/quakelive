@@ -508,6 +508,55 @@ def test_ui_retail_gameinfo_paths_do_not_bootstrap_map_rotation_cache() -> None:
     assert "UI_LoadMapRotations();" not in load_gameinfo_slice
 
 
+def test_ui_arena_file_loader_matches_retail_catalog_limits_and_tokens() -> None:
+    ui_gameinfo = (REPO_ROOT / "src/code/ui/ui_gameinfo.c").read_text(encoding="utf-8")
+    ui_local = (REPO_ROOT / "src/code/ui/ui_local.h").read_text(encoding="utf-8")
+    bg_public = (REPO_ROOT / "src/code/game/bg_public.h").read_text(encoding="utf-8")
+
+    arena_type_block = _extract_function_block(ui_gameinfo, "static int UI_ArenaTypeBits( const char *type ) {")
+    load_block = _extract_function_block(ui_gameinfo, "void UI_LoadArenas( void ) {")
+
+    assert "#define MAX_MAPS 256" in ui_local
+    assert "#define\tMAX_ARENAS_TEXT\t\t0x4000" in bg_public
+    assert '#include "../../game/match_state_keys.h"' in ui_gameinfo
+    assert 'trap_FS_GetFileList("scripts", ".arena", dirlist, 1024 );' in load_block
+    assert '"WARNING: not enough memory in pool to load all arenas\\n"' in load_block
+    assert '"WARNING: not anough memory in pool to load all arenas\\n"' not in load_block
+    assert "Info_ValueForKey(ui_arenaInfos[n], ARENA_INFO_KEY_MAP)" in load_block
+    assert "Info_ValueForKey(ui_arenaInfos[n], ARENA_INFO_KEY_LONGNAME)" in load_block
+    assert 'String_Alloc(va("levelshots/preview/%s", uiInfo.mapList[uiInfo.mapCount].mapLoadName))' in load_block
+    assert "UI_ArenaTypeBits( Info_ValueForKey( ui_arenaInfos[n], ARENA_INFO_KEY_TYPE ) )" in load_block
+
+    for expected in (
+        'strstr( type, "duel" )',
+        'strstr( type, "race" )',
+        'strstr( type, "tdm" )',
+        'strstr( type, "ca" )',
+        'strstr( type, "oneflag" )',
+        'strstr( type, "overload" )',
+        'strstr( type, "hh" )',
+        'strstr( type, "har" )',
+        'strstr( type, "ft" )',
+        'strstr( type, "dom" )',
+        'strstr( type, "ad" )',
+        'strstr( type, "rr" )',
+    ):
+        assert expected in arena_type_block
+
+    for forbidden in (
+        '"single"',
+        '"team"',
+        '"clanarena"',
+        '"harvester"',
+        '"freeze"',
+        '"freezetag"',
+        '"domination"',
+        '"attackdefend"',
+        '"redrover"',
+    ):
+        assert forbidden not in arena_type_block
+
+
 def test_ui_retail_ruleset_cache_scaffolding_is_removed() -> None:
     ui_gameinfo = (REPO_ROOT / "src/code/ui/ui_gameinfo.c").read_text(encoding="utf-8")
     ui_local = (REPO_ROOT / "src/code/ui/ui_local.h").read_text(encoding="utf-8")

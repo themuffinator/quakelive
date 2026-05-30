@@ -17,6 +17,7 @@ CG_NEWDRAW_PATH = REPO_ROOT / "src" / "code" / "cgame" / "cg_newdraw.c"
 CG_PLAYERS_PATH = REPO_ROOT / "src" / "code" / "cgame" / "cg_players.c"
 CG_SERVERCMDS_PATH = REPO_ROOT / "src" / "code" / "cgame" / "cg_servercmds.c"
 G_BOT_PATH = REPO_ROOT / "src" / "code" / "game" / "g_bot.c"
+BG_PUBLIC_PATH = REPO_ROOT / "src" / "code" / "game" / "bg_public.h"
 G_CLIENT_PATH = REPO_ROOT / "src" / "code" / "game" / "g_client.c"
 G_CMDS_PATH = REPO_ROOT / "src" / "code" / "game" / "g_cmds.c"
 G_MAIN_PATH = REPO_ROOT / "src" / "code" / "game" / "g_main.c"
@@ -783,6 +784,7 @@ def test_arena_metadata_uses_shared_key_contract() -> None:
 	sv_ccmds = _read_text(SV_CCMDS_PATH)
 	cl_cgame = _read_text(CL_CGAME_PATH)
 	g_bot = _read_text(G_BOT_PATH)
+	bg_public = _read_text(BG_PUBLIC_PATH)
 
 	for expected in (
 		'#define ARENA_INFO_KEY_MAP "map"',
@@ -799,11 +801,18 @@ def test_arena_metadata_uses_shared_key_contract() -> None:
 	assert '#include "../../game/match_state_keys.h"' in sv_ccmds
 	assert '#include "../../game/match_state_keys.h"' in cl_cgame
 	assert '#include "../game/match_state_keys.h"' in g_bot
+	assert "#define\tMAX_ARENAS_TEXT\t\t0x4000" in bg_public
+	assert "#define CL_WEB_MAX_MAPS 256" in cl_cgame
 
 	sv_lookup_snippet = _snippet_after(
 		sv_ccmds,
 		"static const char *SV_GetArenaInfoByMap( const char *map ) {",
 		24,
+	)
+	sv_type_support_snippet = _snippet_after(
+		sv_ccmds,
+		"static qboolean SV_ArenaTypeSupportsGametype( const char *types, gametype_t gametype ) {",
+		50,
 	)
 	sv_gametype_snippet = _snippet_after(
 		sv_ccmds,
@@ -847,6 +856,28 @@ def test_arena_metadata_uses_shared_key_contract() -> None:
 		"Info_ValueForKey( arenaInfo, ARENA_INFO_KEY_LONGNAME )",
 	):
 		assert expected in sv_lookup_snippet + sv_gametype_snippet + sv_title_snippet
+
+	for expected in (
+		'SV_ArenaTypeContains( types, "duel" )',
+		'SV_ArenaTypeContains( types, "race" )',
+		'SV_ArenaTypeContains( types, "overload" )',
+		'SV_ArenaTypeContains( types, "hh" )',
+		'SV_ArenaTypeContains( types, "har" )',
+		'SV_ArenaTypeContains( types, "ft" )',
+		'SV_ArenaTypeContains( types, "dom" )',
+		'SV_ArenaTypeContains( types, "ad" )',
+		'SV_ArenaTypeContains( types, "rr" )',
+	):
+		assert expected in sv_type_support_snippet
+
+	for forbidden in (
+		'"clanarena"',
+		'"obelisk"',
+		'"freezetag"',
+		'"attackdefend"',
+		'"redrover"',
+	):
+		assert forbidden not in sv_type_support_snippet
 
 	for expected in (
 		"mapName = Info_ValueForKey( info, ARENA_INFO_KEY_MAP );",
