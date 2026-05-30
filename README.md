@@ -1,4 +1,4 @@
-# Quake Live Source Reconstruction Project
+# Quake Live Source Reconstruction Project (QLSRP)
 
 [![Audit](https://img.shields.io/badge/Read-Audit-1f6feb)](AUDIT.md)
 [![Work Queue](https://img.shields.io/badge/View-Work%20Queue-2ea44f)](IMPLEMENTATION_PLAN.md)
@@ -125,3 +125,11 @@ assumptions. The canonical workflow is documented in
   [id-Software/Quake-III-Arena](https://github.com/id-Software/Quake-III-Arena)
 - This project exists to reconstruct the retail Quake Live codebase as accurately as
   possible: [Quake Live](https://www.quakelive.com/)
+
+---
+
+## Disclaimer
+
+Quake Live Source Reconstruction Project (QLSRP) is an independent project and is not affiliated with, endorsed by, or sponsored by id Software, Bethesda, or ZeniMax Media. Quake Live is a trademark of ZeniMax Media Inc.
+
+The software is provided "as is" without warranty of any kind. QLSRP is experimental software under active development and requires a legitimate Quake Live installation.
