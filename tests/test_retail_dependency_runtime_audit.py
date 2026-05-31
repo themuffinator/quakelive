@@ -102,6 +102,8 @@ def test_hosted_nightly_uses_preinstalled_vs2022_toolset() -> None:
 	assert "--asset-output-root artifacts/nightly/release-assets" in nightly_workflow
 	assert "gh release create" in nightly_workflow
 	assert "gh release upload" in nightly_workflow
+	assert "--latest" in nightly_workflow
+	assert "--latest=false" not in nightly_workflow
 	assert "--prerelease" not in nightly_workflow
 	assert "prerelease=false" in nightly_workflow
 	assert "nightly-release-manifest.json" in nightly_workflow

@@ -415,7 +415,9 @@ void SCR_DrawScreenField( stereoFrame_t stereoFrame ) {
 		browserPendingSurface = browserDrawableSurface ? qfalse : qtrue;
 	}
 
-	if ( uiFullscreen && browserPendingSurface ) {
+	if ( browserOverlayRequested && cls.state == CA_DISCONNECTED ) {
+		uiFullscreen = qtrue;
+	} else if ( uiFullscreen && browserPendingSurface ) {
 		uiFullscreen = qfalse;
 	}
 	if ( uiFullscreen
@@ -423,9 +425,13 @@ void SCR_DrawScreenField( stereoFrame_t stereoFrame ) {
 		uiFullscreen = qfalse;
 	}
 	if ( uiFullscreen
+		&& !browserOverlayRequested
 		&& !( cls.keyCatchers & KEYCATCH_UI )
 		&& !( ( cls.keyCatchers & KEYCATCH_BROWSER ) && CL_WebHost_HasDrawableSurface() ) ) {
 		uiFullscreen = qfalse;
+	}
+	if ( browserDrawableSurface ) {
+		uiFullscreen = qtrue;
 	}
 
 	if ( !uiFullscreen ) {
@@ -468,7 +474,7 @@ void SCR_DrawScreenField( stereoFrame_t stereoFrame ) {
 	}
 
 	// the menu draws next
-	if ( cls.keyCatchers & KEYCATCH_UI && uivm && !browserDrawableSurface ) {
+	if ( cls.keyCatchers & KEYCATCH_UI && uivm && !browserOverlayRequested ) {
 		VM_Call( uivm, UI_REFRESH, cls.realtime );
 	}
 

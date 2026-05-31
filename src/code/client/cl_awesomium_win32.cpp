@@ -54,6 +54,7 @@ typedef void (__stdcall *awe_webcore_update_fn)( void *core );
 typedef void *(__stdcall *awe_webcore_create_session_fn)( void *core, const unsigned short *dataPath, void *preferences );
 typedef void *(__stdcall *awe_webcore_create_view_fn)( void *core, int width, int height, void *session, int type );
 typedef void (__stdcall *awe_webcore_set_string_fn)( void *object, const unsigned short *value );
+typedef void (__stdcall *awe_webcore_set_object_fn)( void *object, void *value );
 typedef void (__stdcall *awe_webprefs_set_bool_fn)( void *preferences, bool value );
 typedef void *(__stdcall *awe_new_datapak_source_fn)( const unsigned short *pakPath );
 typedef void (__stdcall *awe_websession_void_fn)( void *session );
@@ -85,6 +86,7 @@ typedef int (__stdcall *awe_bitmap_dimension_fn)( void *surface );
 typedef const byte *(__stdcall *awe_bitmap_buffer_fn)( void *surface );
 typedef bool (__stdcall *awe_bitmap_bool_fn)( void *surface );
 typedef void (__stdcall *awe_bitmap_set_bool_fn)( void *surface, bool value );
+typedef void (__stdcall *awe_webstring_array_push_fn)( void *arrayObject, const unsigned short *value );
 typedef int (__stdcall *awe_jsvalue_to_integer_fn)( void *value );
 
 typedef struct {
@@ -116,6 +118,7 @@ typedef struct {
 	awe_webcore_create_session_fn	webCoreCreateWebSession;
 	awe_webcore_create_view_fn		webCoreCreateWebView;
 	awe_webcore_set_string_fn		webConfigAssetProtocolSet;
+	awe_webcore_set_object_fn		webConfigAdditionalOptionsSet;
 	awe_webcore_set_string_fn		webConfigChildProcessPathSet;
 	awe_webcore_set_string_fn		webConfigLogPathSet;
 	awe_webcore_set_string_fn		webConfigPackagePathSet;
@@ -123,6 +126,7 @@ typedef struct {
 	awe_webcore_set_string_fn		webConfigUserScriptSet;
 	awe_webprefs_set_bool_fn			webPrefsEnablePluginsSet;
 	awe_webprefs_set_bool_fn			webPrefsEnableWebSecuritySet;
+	awe_webprefs_set_bool_fn			webPrefsEnableGpuAccelerationSet;
 	awe_new_datapak_source_fn		newDataPakSource;
 	awe_delete_object_fn			deleteDataPakSource;
 	awe_new_weburl_fn				newWebURL;
@@ -162,6 +166,9 @@ typedef struct {
 	awe_bitmap_buffer_fn			bitmapBuffer;
 	awe_bitmap_bool_fn				bitmapIsDirty;
 	awe_bitmap_set_bool_fn			bitmapSetIsDirty;
+	awe_new_void_fn					newWebStringArray;
+	awe_webstring_array_push_fn		webStringArrayPush;
+	awe_delete_object_fn			deleteWebStringArray;
 	awe_jsvalue_to_integer_fn		jsValueToInteger;
 	awe_delete_object_fn			deleteJSValue;
 } clAwesomiumImports_t;
@@ -414,6 +421,7 @@ static qboolean CL_Awesomium_LoadImports( const char *runtimePath, const char *b
 	CL_AWE_IMPORT( webCoreCreateWebSession, "_Awe_WebCore_CreateWebSession@12" );
 	CL_AWE_IMPORT( webCoreCreateWebView, "_Awe_WebCore_CreateWebView_0@20" );
 	cl_awe.webConfigAssetProtocolSet = reinterpret_cast<awe_webcore_set_string_fn>( CL_Awesomium_ResolveOptionalImport( "_Awe_WebConfig_asset_protocol_set@8" ) );
+	cl_awe.webConfigAdditionalOptionsSet = reinterpret_cast<awe_webcore_set_object_fn>( CL_Awesomium_ResolveOptionalImport( "_Awe_WebConfig_additional_options_set@8" ) );
 	CL_AWE_IMPORT( webConfigChildProcessPathSet, "_Awe_WebConfig_child_process_path_set@8" );
 	CL_AWE_IMPORT( webConfigLogPathSet, "_Awe_WebConfig_log_path_set@8" );
 	CL_AWE_IMPORT( webConfigPackagePathSet, "_Awe_WebConfig_package_path_set@8" );
@@ -421,6 +429,7 @@ static qboolean CL_Awesomium_LoadImports( const char *runtimePath, const char *b
 	cl_awe.webConfigUserScriptSet = reinterpret_cast<awe_webcore_set_string_fn>( CL_Awesomium_ResolveOptionalImport( "_Awe_WebConfig_user_script_set@8" ) );
 	CL_AWE_IMPORT( webPrefsEnablePluginsSet, "_Awe_WebPreferences_enable_plugins_set@8" );
 	CL_AWE_IMPORT( webPrefsEnableWebSecuritySet, "_Awe_WebPreferences_enable_web_security_set@8" );
+	cl_awe.webPrefsEnableGpuAccelerationSet = reinterpret_cast<awe_webprefs_set_bool_fn>( CL_Awesomium_ResolveOptionalImport( "_Awe_WebPreferences_enable_gpu_acceleration_set@8" ) );
 	CL_AWE_IMPORT( newDataPakSource, "_Awe_new_DataPakSource@4" );
 	CL_AWE_IMPORT( deleteDataPakSource, "_Awe_delete_DataPakSource@4" );
 	CL_AWE_IMPORT( newWebURL, "_Awe_new_WebURL_1@4" );
@@ -455,6 +464,9 @@ static qboolean CL_Awesomium_LoadImports( const char *runtimePath, const char *b
 	CL_AWE_IMPORT( bitmapHeight, "_Awe_BitmapSurface_height@4" );
 	CL_AWE_IMPORT( bitmapIsDirty, "_Awe_BitmapSurface_is_dirty@4" );
 	CL_AWE_IMPORT( bitmapSetIsDirty, "_Awe_BitmapSurface_set_is_dirty@8" );
+	cl_awe.newWebStringArray = reinterpret_cast<awe_new_void_fn>( CL_Awesomium_ResolveOptionalImport( "_Awe_new_WebStringArray_0@0" ) );
+	cl_awe.webStringArrayPush = reinterpret_cast<awe_webstring_array_push_fn>( CL_Awesomium_ResolveOptionalImport( "_Awe_WebStringArray_Push@8" ) );
+	cl_awe.deleteWebStringArray = reinterpret_cast<awe_delete_object_fn>( CL_Awesomium_ResolveOptionalImport( "_Awe_delete_WebStringArray@4" ) );
 	cl_awe.bitmapRowSpan = reinterpret_cast<awe_bitmap_dimension_fn>( GetProcAddress( cl_awesomium.module, "_Awe_BitmapSurface_row_span@4" ) );
 	cl_awe.bitmapBuffer = reinterpret_cast<awe_bitmap_buffer_fn>( GetProcAddress( cl_awesomium.module, "_Awe_BitmapSurface_buffer@4" ) );
 	cl_awe.webViewIsLoading = reinterpret_cast<awe_webview_query_bool_fn>( GetProcAddress( cl_awesomium.module, "_Awe_WebView_IsLoading@4" ) );
@@ -528,6 +540,51 @@ static qboolean CL_Awesomium_SetConfigString( awe_webcore_set_string_fn setter, 
 
 	setter( config, wide );
 	delete[] (wchar_t *)wide;
+	return qtrue;
+}
+
+/*
+=============
+CL_Awesomium_SetConfigStringArrayOptions
+=============
+*/
+static qboolean CL_Awesomium_SetConfigStringArrayOptions( awe_webcore_set_object_fn setter, void *config, const char **values, int valueCount ) {
+	void *options;
+	int i;
+
+	if ( !setter || !cl_awe.newWebStringArray || !cl_awe.webStringArrayPush || !cl_awe.deleteWebStringArray ) {
+		return qtrue;
+	}
+	if ( !values || valueCount <= 0 ) {
+		return qtrue;
+	}
+
+	options = cl_awe.newWebStringArray();
+	if ( !options ) {
+		CL_Awesomium_SetError( "could not allocate Awesomium WebStringArray" );
+		return qfalse;
+	}
+
+	for ( i = 0; i < valueCount; i++ ) {
+		unsigned short *wide;
+
+		if ( !values[i] || !values[i][0] ) {
+			continue;
+		}
+
+		wide = CL_Awesomium_AllocWideString( values[i] );
+		if ( !wide ) {
+			cl_awe.deleteWebStringArray( options );
+			CL_Awesomium_SetError( "could not convert string array option for Awesomium" );
+			return qfalse;
+		}
+
+		cl_awe.webStringArrayPush( options, wide );
+		delete[] (wchar_t *)wide;
+	}
+
+	setter( config, options );
+	cl_awe.deleteWebStringArray( options );
 	return qtrue;
 }
 
@@ -724,11 +781,16 @@ CL_Awesomium_PrepareConfig
 */
 static qboolean CL_Awesomium_PrepareConfig( const char *runtimePath, const char *basePath, const char *playerName, unsigned int appId, unsigned int steamIdLow, unsigned int steamIdHigh, const char *initialConfigJson ) {
 	char childProcessPath[MAX_PATH];
+	char childProcessConfigPath[MAX_PATH];
 	char logPath[MAX_PATH];
 	char packagePath[MAX_PATH];
 	char packageRoot[MAX_PATH];
 	const char *sessionPath;
 	const char *assetsPath;
+	const char *awesomiumOptions[] = {
+		"--no-sandbox",
+		"--single-process"
+	};
 
 	Com_Printf( "Awesomium startup phase: creating WebConfig\n" );
 	cl_awesomium.webConfig = cl_awe.newWebConfig();
@@ -738,20 +800,22 @@ static qboolean CL_Awesomium_PrepareConfig( const char *runtimePath, const char 
 	}
 
 	sessionPath = runtimePath;
-	assetsPath = basePath && basePath[0] ? basePath : runtimePath;
+	assetsPath = runtimePath && runtimePath[0] ? runtimePath : basePath;
 
 	CL_Awesomium_AppendPath( childProcessPath, sizeof( childProcessPath ), assetsPath, "awesomium_process.exe" );
+	strncpy( childProcessConfigPath, "awesomium_process.exe", sizeof( childProcessConfigPath ) - 1 );
+	childProcessConfigPath[sizeof( childProcessConfigPath ) - 1] = '\0';
 	CL_Awesomium_AppendPath( logPath, sizeof( logPath ), sessionPath, "awesomium.log" );
 	CL_Awesomium_AppendPath( packagePath, sizeof( packagePath ), assetsPath, "web.pak" );
 	strncpy( packageRoot, assetsPath, sizeof( packageRoot ) - 1 );
 	packageRoot[sizeof( packageRoot ) - 1] = '\0';
-	if ( !CL_Awesomium_FileExists( packagePath ) && sessionPath && sessionPath[0] ) {
-		CL_Awesomium_AppendPath( packagePath, sizeof( packagePath ), sessionPath, "web.pak" );
-		strncpy( packageRoot, sessionPath, sizeof( packageRoot ) - 1 );
+	if ( !CL_Awesomium_FileExists( packagePath ) && basePath && basePath[0] ) {
+		CL_Awesomium_AppendPath( packagePath, sizeof( packagePath ), basePath, "web.pak" );
+		strncpy( packageRoot, basePath, sizeof( packageRoot ) - 1 );
 		packageRoot[sizeof( packageRoot ) - 1] = '\0';
 	}
-	if ( !CL_Awesomium_FileExists( childProcessPath ) && sessionPath && sessionPath[0] ) {
-		CL_Awesomium_AppendPath( childProcessPath, sizeof( childProcessPath ), sessionPath, "awesomium_process.exe" );
+	if ( !CL_Awesomium_FileExists( childProcessPath ) && basePath && basePath[0] ) {
+		CL_Awesomium_AppendPath( childProcessPath, sizeof( childProcessPath ), basePath, "awesomium_process.exe" );
 	}
 	CL_Awesomium_BuildUserScript( cl_awesomium.startupScript, sizeof( cl_awesomium.startupScript ), playerName, appId, steamIdLow, steamIdHigh, initialConfigJson );
 	CL_Awesomium_BuildRetryScript( cl_awesomium.startupRetryScript, sizeof( cl_awesomium.startupRetryScript ) );
@@ -766,7 +830,8 @@ static qboolean CL_Awesomium_PrepareConfig( const char *runtimePath, const char 
 
 	Com_Printf( "Awesomium startup phase: applying WebConfig\n" );
 	if ( !CL_Awesomium_SetConfigString( cl_awe.webConfigAssetProtocolSet, cl_awesomium.webConfig, "asset" )
-		|| !CL_Awesomium_SetConfigString( cl_awe.webConfigChildProcessPathSet, cl_awesomium.webConfig, childProcessPath )
+		|| !CL_Awesomium_SetConfigStringArrayOptions( cl_awe.webConfigAdditionalOptionsSet, cl_awesomium.webConfig, awesomiumOptions, sizeof( awesomiumOptions ) / sizeof( awesomiumOptions[0] ) )
+		|| !CL_Awesomium_SetConfigString( cl_awe.webConfigChildProcessPathSet, cl_awesomium.webConfig, childProcessConfigPath )
 		|| !CL_Awesomium_SetConfigString( cl_awe.webConfigLogPathSet, cl_awesomium.webConfig, logPath )
 		|| !CL_Awesomium_SetConfigString( cl_awe.webConfigPackagePathSet, cl_awesomium.webConfig, packageRoot )
 		|| !CL_Awesomium_SetConfigString( cl_awe.webConfigUserAgentSet, cl_awesomium.webConfig, "Mozilla/5.0 (Windows NT 10.0; Win32; x86) QuakeLiveReverse/1.0" )
@@ -793,6 +858,9 @@ static qboolean CL_Awesomium_PreparePreferences( void ) {
 	Com_Printf( "Awesomium startup phase: applying WebPreferences\n" );
 	cl_awe.webPrefsEnablePluginsSet( cl_awesomium.webPreferences, true );
 	cl_awe.webPrefsEnableWebSecuritySet( cl_awesomium.webPreferences, false );
+	if ( cl_awe.webPrefsEnableGpuAccelerationSet ) {
+		cl_awe.webPrefsEnableGpuAccelerationSet( cl_awesomium.webPreferences, false );
+	}
 	return qtrue;
 }
 
@@ -828,22 +896,22 @@ static qboolean CL_Awesomium_CreateSession( const char *runtimePath, const char 
 	}
 
 	sessionPath = runtimePath;
-	assetsPath = basePath && basePath[0] ? basePath : runtimePath;
+	assetsPath = runtimePath && runtimePath[0] ? runtimePath : basePath;
 	CL_Awesomium_AppendPath( pakPath, sizeof( pakPath ), assetsPath, "web.pak" );
-	if ( !CL_Awesomium_FileExists( pakPath ) && sessionPath && sessionPath[0] ) {
-		CL_Awesomium_AppendPath( pakPath, sizeof( pakPath ), sessionPath, "web.pak" );
+	if ( !CL_Awesomium_FileExists( pakPath ) && basePath && basePath[0] ) {
+		CL_Awesomium_AppendPath( pakPath, sizeof( pakPath ), basePath, "web.pak" );
 	}
 	if ( !CL_Awesomium_FileExists( pakPath ) ) {
 		CL_Awesomium_SetError( "web.pak was not found in runtimePath or basePath; install or stage web assets" );
 		return qfalse;
 	}
 
-	pakName = CL_Awesomium_AllocWideString( "web.pak" );
+	pakName = CL_Awesomium_AllocWideString( pakPath );
 	if ( !pakName ) {
 		CL_Awesomium_SetError( "could not convert web.pak path for Awesomium" );
 		return qfalse;
 	}
-	Com_Printf( "Awesomium startup phase: creating DataPakSource\n" );
+	Com_Printf( "Awesomium startup phase: creating DataPakSource from %s\n", pakPath );
 	cl_awesomium.dataPakSource = cl_awe.newDataPakSource( pakName );
 	delete[] (wchar_t *)pakName;
 	if ( !cl_awesomium.dataPakSource ) {

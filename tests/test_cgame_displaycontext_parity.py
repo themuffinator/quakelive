@@ -1038,9 +1038,9 @@ def test_cgame_placement_scorebox_widgets_match_retail_split_ownerdraws() -> Non
 	for block in (frags_block, deaths_block, damage_block, wins_block):
 		assert "if ( !rect ) {" in block
 
-	assert 'Com_sprintf( buffer, sizeof( buffer ), "%i", CG_GetPlacementFragCount( score ) );' in frags_block
-	assert 'Com_sprintf( buffer, sizeof( buffer ), "%i", score->deaths );' in deaths_block
-	assert 'Com_sprintf( buffer, sizeof( buffer ), "%i", score->damage );' in damage_block
+	assert 'Com_sprintf( buffer, sizeof( buffer ), "%d", CG_GetPlacementFragCount( score ) );' in frags_block
+	assert 'Com_sprintf( buffer, sizeof( buffer ), "%d", score->deaths );' in deaths_block
+	assert 'Com_sprintf( buffer, sizeof( buffer ), "%d", score->damage );' in damage_block
 	assert 'Com_sprintf( buffer, sizeof( buffer ), "%d/%d", ci->wins, ci->losses );' in wins_block
 
 	assert "case CG_1ST_PLYR_FLAG:" in build_metric_block
@@ -1079,6 +1079,7 @@ def test_cgame_placement_metric_wrappers_restore_retail_direct_owners() -> None:
 	weapon_shots_block = _block_from_marker(source, "static void CG_DrawPlacementWeaponShotsOwnerDraw")
 	weapon_damage_block = _block_from_marker(source, "static void CG_DrawPlacementWeaponDamageOwnerDraw")
 	weapon_accuracy_block = _block_from_marker(source, "static void CG_DrawPlacementWeaponAccuracyOwnerDraw")
+	pickup_summary_block = _block_from_marker(source, "static void CG_DrawPlacementPickupSummaryOwnerDraw")
 	pickup_count_block = _block_from_marker(source, "static void CG_DrawPlacementPickupCountOwnerDraw")
 	pickup_average_block = _block_from_marker(source, "static void CG_DrawPlacementPickupAverageOwnerDraw")
 	award_count_block = _block_from_marker(source, "static void CG_DrawPlacementAwardCountOwnerDraw")
@@ -1121,12 +1122,46 @@ def test_cgame_placement_metric_wrappers_restore_retail_direct_owners() -> None:
 		weapon_hits_block,
 		weapon_shots_block,
 		weapon_damage_block,
-		weapon_accuracy_block,
 		pickup_count_block,
 		pickup_average_block,
 		award_count_block,
 	):
 		assert "(void)CG_DrawPlacementMetricTextOwnerDraw( rect, scale, color, textStyle, ownerDraw );" in wrapper_block
+
+	for expected in (
+		"if ( !rect || !CG_ResolvePlacementMetricOwnerDraw( ownerDraw, &slot, NULL ) ) {",
+		"weapon = CG_GetPlacementMetricWeapon( ownerDraw );",
+		"score = CG_GetPlacementScore( slot );",
+		"stats = CG_GetPlacementScoreStats( score );",
+		"otherScore = CG_GetPlacementScore( slot == 0 ? 1 : 0 );",
+		"otherStats = CG_GetPlacementScoreStats( otherScore );",
+		"otherValue = otherStats ? otherStats->weaponAccuracy[weapon] : 0;",
+		"if ( stats->weaponAccuracy[weapon] > otherValue ) {",
+		"drawColor[0] = 1.0f;",
+		"drawColor[1] = 1.0f;",
+		"drawColor[2] = 1.0f;",
+		"drawColor[3] = 0.8f;",
+		"(void)CG_DrawPlacementMetricTextOwnerDraw( rect, scale, drawColor, textStyle, ownerDraw );",
+	):
+		assert expected in weapon_accuracy_block
+
+	for expected in (
+		"score = CG_GetPlacementScore( slot );",
+		"stats = CG_GetPlacementScoreStats( score );",
+		"for ( index = 0; index < CG_SCORESTAT_PICKUP_COUNT; index++ ) {",
+		"if ( stats->pickupCounts[index] <= 0 ) {",
+		"iconHandle = CG_GetTeamPickupSummaryIconHandle( TEAM_FREE, cgPlacementPickupSummaryIcons[index] );",
+		"CG_DrawPic( drawX, drawY, rect->w, rect->h, iconHandle );",
+		'Com_sprintf( countText, sizeof( countText ), "%d", stats->pickupCounts[index] );',
+		'Com_sprintf( averageText, sizeof( averageText ), "%3.2f", stats->pickupAvgSeconds[index] );',
+		"if ( slot == 0 ) {",
+		"CG_Text_Paint( textX, drawY + 15.0f, scale, color, countText, 0, 0, textStyle );",
+		"CG_Text_Paint( textX + 15.0f, drawY + 15.0f, scale, color, averageText, 0, 0, textStyle );",
+		"} else {",
+		"CG_Text_Paint( textX - 15.0f, drawY + 15.0f, scale, color, averageText, 0, 0, textStyle );",
+		"drawY += 15.0f;",
+	):
+		assert expected in pickup_summary_block
 
 	for expected in (
 		"if ( !rect || !CG_IsRetailPlacementMetricOwnerDraw( ownerDraw ) ) {",
@@ -1137,6 +1172,7 @@ def test_cgame_placement_metric_wrappers_restore_retail_direct_owners() -> None:
 		"CG_DrawPlacementWeaponShotsOwnerDraw( rect, scale, color, textStyle, ownerDraw );",
 		"CG_DrawPlacementWeaponDamageOwnerDraw( rect, scale, color, textStyle, ownerDraw );",
 		"CG_DrawPlacementWeaponAccuracyOwnerDraw( rect, scale, color, textStyle, ownerDraw );",
+		"CG_DrawPlacementPickupSummaryOwnerDraw( rect, scale, color, textStyle, ownerDraw );",
 		"CG_DrawPlacementPickupCountOwnerDraw( rect, scale, color, textStyle, ownerDraw );",
 		"CG_DrawPlacementPickupAverageOwnerDraw( rect, scale, color, textStyle, ownerDraw );",
 		"CG_DrawPlacementAwardCountOwnerDraw( rect, scale, color, textStyle, ownerDraw );",
@@ -1443,7 +1479,7 @@ def test_cgame_first_player_weapon_hit_shot_and_damage_slice_matches_retail_scor
 		"if ( normalized >= CG_1ST_PLYR_SHOTS_MG && normalized <= CG_1ST_PLYR_SHOTS_HMG ) {",
 		'Com_sprintf( buffer, bufferSize, "%d", stats->weaponShots[weapon] );',
 		"if ( normalized >= CG_1ST_PLYR_DMG_G && normalized <= CG_1ST_PLYR_DMG_HMG ) {",
-		'Com_sprintf( buffer, bufferSize, "%i", stats->weaponDamage[weapon] );',
+		'Com_sprintf( buffer, bufferSize, "%d", stats->weaponDamage[weapon] );',
 		'Q_strncpyz( buffer, "-", bufferSize );',
 	):
 		assert expected in build_block
@@ -1531,9 +1567,9 @@ def test_cgame_first_player_weapon_damage_accuracy_and_pickup_slice_matches_reta
 
 	for expected in (
 		"if ( normalized >= CG_1ST_PLYR_DMG_G && normalized <= CG_1ST_PLYR_DMG_HMG ) {",
-		'Com_sprintf( buffer, bufferSize, "%i", stats->weaponDamage[weapon] );',
+		'Com_sprintf( buffer, bufferSize, "%d", stats->weaponDamage[weapon] );',
 		"if ( normalized >= CG_1ST_PLYR_ACC_MG && normalized <= CG_1ST_PLYR_ACC_HMG ) {",
-		'Com_sprintf( buffer, bufferSize, "%i%%", stats->weaponAccuracy[weapon] );',
+		'Com_sprintf( buffer, bufferSize, "%d%%", stats->weaponAccuracy[weapon] );',
 		"( hits * 100 ) / shots",
 	):
 		if expected == "( hits * 100 ) / shots":
@@ -1548,7 +1584,7 @@ def test_cgame_first_player_weapon_damage_accuracy_and_pickup_slice_matches_reta
 		"total += stats->pickupCounts[index];",
 		"if ( normalized >= CG_1ST_PLYR_PICKUPS_RA && normalized <= CG_1ST_PLYR_PICKUPS_MH ) {",
 		"index = normalized - CG_1ST_PLYR_PICKUPS_RA;",
-		'Com_sprintf( buffer, bufferSize, "%i", stats->pickupCounts[index] );',
+		'Com_sprintf( buffer, bufferSize, "%d", stats->pickupCounts[index] );',
 	):
 		assert expected in pickup_metric_block
 
@@ -1624,19 +1660,19 @@ def test_cgame_first_player_pickup_average_awards_and_second_player_start_slice_
 		"if ( normalized >= CG_1ST_PLYR_AVG_PICKUP_TIME_RA && normalized <= CG_1ST_PLYR_AVG_PICKUP_TIME_MH ) {",
 		"index = normalized - CG_1ST_PLYR_AVG_PICKUP_TIME_RA;",
 		"if ( stats->pickupCounts[index] <= 0 ) {",
-		"buffer[0] = '\\0';",
+		'Q_strncpyz( buffer, "-", bufferSize );',
 		'Com_sprintf( buffer, bufferSize, "%3.2f", stats->pickupAvgSeconds[index] );',
 	):
 		assert expected in pickup_metric_block
-	assert 'Q_strncpyz( buffer, "-", bufferSize );' not in average_block
+	assert "buffer[0] = '\\0';" not in average_block
 
 	for expected in (
 		"case CG_1ST_PLYR_EXCELLENT:",
-		'Com_sprintf( buffer, bufferSize, "%i", score->excellentCount );',
+		'Com_sprintf( buffer, bufferSize, "%d", score->excellentCount );',
 		"case CG_1ST_PLYR_IMPRESSIVE:",
-		'Com_sprintf( buffer, bufferSize, "%i", score->impressiveCount );',
+		'Com_sprintf( buffer, bufferSize, "%d", score->impressiveCount );',
 		"case CG_1ST_PLYR_HUMILIATION:",
-		'Com_sprintf( buffer, bufferSize, "%i", score->guantletCount );',
+		'Com_sprintf( buffer, bufferSize, "%d", score->guantletCount );',
 	):
 		assert expected in build_metric_block
 
@@ -1910,9 +1946,9 @@ def test_cgame_second_player_weapon_shot_tail_damage_and_accuracy_head_slice_mat
 		"if ( normalized >= CG_1ST_PLYR_SHOTS_MG && normalized <= CG_1ST_PLYR_SHOTS_HMG ) {",
 		'Com_sprintf( buffer, bufferSize, "%d", stats->weaponShots[weapon] );',
 		"if ( normalized >= CG_1ST_PLYR_DMG_G && normalized <= CG_1ST_PLYR_DMG_HMG ) {",
-		'Com_sprintf( buffer, bufferSize, "%i", stats->weaponDamage[weapon] );',
+		'Com_sprintf( buffer, bufferSize, "%d", stats->weaponDamage[weapon] );',
 		"if ( normalized >= CG_1ST_PLYR_ACC_MG && normalized <= CG_1ST_PLYR_ACC_HMG ) {",
-		'Com_sprintf( buffer, bufferSize, "%i%%", stats->weaponAccuracy[weapon] );',
+		'Com_sprintf( buffer, bufferSize, "%d%%", stats->weaponAccuracy[weapon] );',
 	):
 		assert expected in weapon_metric_block
 
@@ -1994,7 +2030,7 @@ def test_cgame_second_player_accuracy_pickup_average_and_award_slice_matches_ret
 
 	for expected in (
 		"if ( normalized >= CG_1ST_PLYR_ACC_MG && normalized <= CG_1ST_PLYR_ACC_HMG ) {",
-		'Com_sprintf( buffer, bufferSize, "%i%%", stats->weaponAccuracy[weapon] );',
+		'Com_sprintf( buffer, bufferSize, "%d%%", stats->weaponAccuracy[weapon] );',
 	):
 		assert expected in weapon_metric_block
 
@@ -2006,7 +2042,7 @@ def test_cgame_second_player_accuracy_pickup_average_and_award_slice_matches_ret
 		"index = normalized - CG_1ST_PLYR_PICKUPS_RA;",
 		"if ( normalized >= CG_1ST_PLYR_AVG_PICKUP_TIME_RA && normalized <= CG_1ST_PLYR_AVG_PICKUP_TIME_MH ) {",
 		"index = normalized - CG_1ST_PLYR_AVG_PICKUP_TIME_RA;",
-		"buffer[0] = '\\0';",
+		'Q_strncpyz( buffer, "-", bufferSize );',
 	):
 		assert expected in pickup_metric_block
 
@@ -2015,11 +2051,11 @@ def test_cgame_second_player_accuracy_pickup_average_and_award_slice_matches_ret
 		"CG_ResolvePlacementMetricOwnerDraw( ownerDraw, NULL, &normalized );",
 		"switch ( normalized ) {",
 		"case CG_1ST_PLYR_EXCELLENT:",
-		'Com_sprintf( buffer, bufferSize, "%i", score->excellentCount );',
+		'Com_sprintf( buffer, bufferSize, "%d", score->excellentCount );',
 		"case CG_1ST_PLYR_IMPRESSIVE:",
-		'Com_sprintf( buffer, bufferSize, "%i", score->impressiveCount );',
+		'Com_sprintf( buffer, bufferSize, "%d", score->impressiveCount );',
 		"case CG_1ST_PLYR_HUMILIATION:",
-		'Com_sprintf( buffer, bufferSize, "%i", score->guantletCount );',
+		'Com_sprintf( buffer, bufferSize, "%d", score->guantletCount );',
 		"CG_BuildPlacementWeaponMetricText( normalized, score, buffer, bufferSize )",
 		"CG_BuildPlacementPickupMetricText( normalized, score, buffer, bufferSize )",
 	):
@@ -3654,13 +3690,13 @@ def test_cgame_selected_107_to_111_ownerdraws_match_retail_metric_and_noop_route
 	assert "CG_1ST_PLYR_TIME" not in dispatch_block
 
 	for expected in (
-		'Com_sprintf( buffer, sizeof( buffer ), "%i", score->deaths );',
+		'Com_sprintf( buffer, sizeof( buffer ), "%d", score->deaths );',
 		"CG_Text_Paint( rect->x, rect->y + rect->h, scale, color, buffer, 0, 0, textStyle );",
 	):
 		assert expected in deaths_block
 
 	for expected in (
-		'Com_sprintf( buffer, sizeof( buffer ), "%i", score->damage );',
+		'Com_sprintf( buffer, sizeof( buffer ), "%d", score->damage );',
 		"CG_Text_Paint( rect->x, rect->y + rect->h, scale, color, buffer, 0, 0, textStyle );",
 	):
 		assert expected in damage_block
@@ -4699,6 +4735,1298 @@ def test_cgame_selected_147_to_151_ownerdraws_match_retail_weapon_shot_tail_wiri
 		assert name not in value_block
 		assert name not in width_block
 		assert name not in key_block
+
+
+def test_cgame_selected_152_to_156_ownerdraws_match_retail_weapon_shot_damage_wiring() -> None:
+	source = CG_NEWDRAW.read_text(encoding="utf-8")
+	main_source = CG_MAIN.read_text(encoding="utf-8")
+	servercmds_source = CG_SERVERCMDS.read_text(encoding="utf-8")
+	game_cmds_source = G_CMDS.read_text(encoding="utf-8")
+	hlil_source = CGAME_HLIL.read_text(encoding="utf-8")
+	constants = _menudef_ownerdraw_constants()
+	weapon_block = _block_from_marker(source, "static weapon_t CG_GetPlacementMetricWeapon( int ownerDraw )")
+	build_block = _block_from_marker(source, "static qboolean CG_BuildPlacementWeaponMetricText")
+	dispatch_block = _block_from_marker(source, "static qboolean CG_DrawPlacementMetricOwnerDraw")
+	ownerdraw_block = _block_from_marker(source, "void CG_OwnerDraw(")
+	value_block = _block_from_marker(source, "float CG_GetValue")
+	width_block = _block_from_marker(main_source, "static int CG_OwnerDrawWidth")
+	key_block = _block_from_marker(main_source, "static qboolean CG_OwnerDrawHandleKey")
+	cgame_accuracy_order_block = _block_from_marker(servercmds_source, "static const weapon_t cgScoreStatAccuracyWeapons")
+	cgame_frag_order_block = _block_from_marker(servercmds_source, "static const weapon_t cgScoreStatFragWeapons")
+	scorestats_parse_block = _block_from_marker(servercmds_source, "static void CG_ParseScoreStats")
+	game_accuracy_order_block = _block_from_marker(game_cmds_source, "static const weapon_t scorestatAccuracyWeapons")
+	game_frag_order_block = _block_from_marker(game_cmds_source, "static const weapon_t scorestatFragWeapons")
+	game_scorestats_send_block = _block_from_marker(game_cmds_source, "static void G_SendScoreStatsMessage")
+	retail_weapon_resolver_block = _text_between(
+		hlil_source,
+		"1002e2b0    int32_t __convention(\"regparm\") sub_1002e2b0",
+		"1002e319",
+	)
+	retail_weapon_shots_block = _text_between(
+		hlil_source,
+		"10036b00    void sub_10036b00",
+		"10036c30",
+	)
+	retail_weapon_damage_block = _text_between(
+		hlil_source,
+		"10036c30    void sub_10036c30",
+		"10036d60",
+	)
+	selected_shots = {
+		"CG_1ST_PLYR_SHOTS_PL",
+		"CG_1ST_PLYR_SHOTS_HMG",
+	}
+	selected_damage = {
+		"CG_1ST_PLYR_DMG_G",
+		"CG_1ST_PLYR_DMG_MG",
+		"CG_1ST_PLYR_DMG_SG",
+	}
+
+	assert constants["CG_1ST_PLYR_SHOTS_PL"] == 0x98
+	assert constants["CG_1ST_PLYR_SHOTS_HMG"] == 0x99
+	assert constants["CG_1ST_PLYR_DMG_G"] == 0x9a
+	assert constants["CG_1ST_PLYR_DMG_MG"] == 0x9b
+	assert constants["CG_1ST_PLYR_DMG_SG"] == 0x9c
+	assert {constants[name] for name in selected_shots} <= _retail_cg_ownerdraw_cases_for_target("FUN_10036b00")
+	assert {constants[name] for name in selected_damage} <= _retail_cg_ownerdraw_cases_for_target("FUN_10036c30")
+
+	for expected in (
+		"case 0x80, 0x8c, 0x98, 0xa5, 0xb1, 0xda, 0xe6, 0xf2, 0xff, 0x10b",
+		"return 0xc",
+		"case 0x81, 0x8d, 0x99, 0xa6, 0xb2, 0xdb, 0xe7, 0xf3, 0x100, 0x10c",
+		"return 0xe",
+		"case 0x75, 0x9a, 0xcf, 0xf4",
+		"return 1",
+		"case 0x76, 0x82, 0x8e, 0x9b, 0xa7, 0xd0, 0xdc, 0xe8, 0xf5, 0x101",
+		"return 2",
+		"case 0x77, 0x83, 0x8f, 0x9c, 0xa8, 0xd1, 0xdd, 0xe9, 0xf6, 0x102",
+		"return 3",
+	):
+		assert expected in retail_weapon_resolver_block
+
+	for expected in (
+		"int32_t eax_1 = sub_1002e2b0(ebx)",
+		"&data_10a6038c",
+		"sub_100575e0(&data_10068e44)",
+		"sub_10008440(fconvert.s(fconvert.t(*esi_1))",
+	):
+		assert expected in retail_weapon_shots_block
+
+	for expected in (
+		"int32_t eax_1 = sub_1002e2b0(ebx)",
+		"&data_10a6040c",
+		"sub_100575e0(&data_10068e44)",
+		"sub_10008440(fconvert.s(fconvert.t(*esi_1))",
+	):
+		assert expected in retail_weapon_damage_block
+
+	for expected in (
+		"WP_NAILGUN,\n\tWP_PROX_LAUNCHER,\n\tWP_HEAVY_MACHINEGUN",
+	):
+		assert expected in cgame_accuracy_order_block
+		assert expected in game_accuracy_order_block
+
+	for expected in (
+		"WP_GAUNTLET,\n\tWP_MACHINEGUN,\n\tWP_SHOTGUN,",
+	):
+		assert expected in cgame_frag_order_block
+		assert expected in game_frag_order_block
+
+	for expected in (
+		"weapon = cgScoreStatAccuracyWeapons[j];",
+		"cg.scoreStats[clientNum].weaponShots[weapon] = value;",
+		"weapon = cgScoreStatFragWeapons[j];",
+		"cg.scoreStats[clientNum].weaponDamage[weapon] = value;",
+	):
+		assert expected in scorestats_parse_block
+
+	for expected in (
+		"G_AppendScoreStatsWeaponValues( payload, sizeof( payload ), cl->pers.accuracy_shots, scorestatAccuracyWeapons, SCORESTAT_ACCURACY_WEAPON_COUNT );",
+		"G_AppendScoreStatsWeaponValues( payload, sizeof( payload ), cl->pers.weaponDamage, scorestatFragWeapons, SCORESTAT_DMG_WEAPON_COUNT );",
+	):
+		assert expected in game_scorestats_send_block
+
+	for expected in (
+		"case CG_1ST_PLYR_SHOTS_PL:",
+		"return WP_PROX_LAUNCHER;",
+		"case CG_1ST_PLYR_SHOTS_HMG:",
+		"return WP_HEAVY_MACHINEGUN;",
+		"case CG_1ST_PLYR_DMG_G:",
+		"return WP_GAUNTLET;",
+		"case CG_1ST_PLYR_DMG_MG:",
+		"return WP_MACHINEGUN;",
+		"case CG_1ST_PLYR_DMG_SG:",
+		"return WP_SHOTGUN;",
+	):
+		assert expected in weapon_block
+
+	for expected in (
+		"if ( normalized >= CG_1ST_PLYR_SHOTS_MG && normalized <= CG_1ST_PLYR_SHOTS_HMG ) {",
+		'Com_sprintf( buffer, bufferSize, "%d", stats->weaponShots[weapon] );',
+		"if ( normalized >= CG_1ST_PLYR_DMG_G && normalized <= CG_1ST_PLYR_DMG_HMG ) {",
+		'Com_sprintf( buffer, bufferSize, "%d", stats->weaponDamage[weapon] );',
+		'Q_strncpyz( buffer, "-", bufferSize );',
+	):
+		assert expected in build_block
+
+	assert "CG_DrawPlacementWeaponShotsOwnerDraw( rect, scale, color, textStyle, ownerDraw );" in dispatch_block
+	assert "CG_DrawPlacementWeaponDamageOwnerDraw( rect, scale, color, textStyle, ownerDraw );" in dispatch_block
+
+	for name in selected_shots | selected_damage:
+		assert f"case {name}:" not in ownerdraw_block
+		assert name not in value_block
+		assert name not in width_block
+		assert name not in key_block
+
+
+def test_cgame_selected_157_to_161_ownerdraws_match_retail_weapon_damage_wiring() -> None:
+	source = CG_NEWDRAW.read_text(encoding="utf-8")
+	main_source = CG_MAIN.read_text(encoding="utf-8")
+	servercmds_source = CG_SERVERCMDS.read_text(encoding="utf-8")
+	game_cmds_source = G_CMDS.read_text(encoding="utf-8")
+	hlil_source = CGAME_HLIL.read_text(encoding="utf-8")
+	constants = _menudef_ownerdraw_constants()
+	weapon_block = _block_from_marker(source, "static weapon_t CG_GetPlacementMetricWeapon( int ownerDraw )")
+	build_block = _block_from_marker(source, "static qboolean CG_BuildPlacementWeaponMetricText")
+	dispatch_block = _block_from_marker(source, "static qboolean CG_DrawPlacementMetricOwnerDraw")
+	ownerdraw_block = _block_from_marker(source, "void CG_OwnerDraw(")
+	value_block = _block_from_marker(source, "float CG_GetValue")
+	width_block = _block_from_marker(main_source, "static int CG_OwnerDrawWidth")
+	key_block = _block_from_marker(main_source, "static qboolean CG_OwnerDrawHandleKey")
+	cgame_frag_order_block = _block_from_marker(servercmds_source, "static const weapon_t cgScoreStatFragWeapons")
+	scorestats_parse_block = _block_from_marker(servercmds_source, "static void CG_ParseScoreStats")
+	game_frag_order_block = _block_from_marker(game_cmds_source, "static const weapon_t scorestatFragWeapons")
+	game_scorestats_send_block = _block_from_marker(game_cmds_source, "static void G_SendScoreStatsMessage")
+	retail_weapon_resolver_block = _text_between(
+		hlil_source,
+		"1002e2b0    int32_t __convention(\"regparm\") sub_1002e2b0",
+		"1002e319",
+	)
+	retail_weapon_damage_block = _text_between(
+		hlil_source,
+		"10036c30    void sub_10036c30",
+		"10036d60",
+	)
+	selected = {
+		"CG_1ST_PLYR_DMG_GL",
+		"CG_1ST_PLYR_DMG_RL",
+		"CG_1ST_PLYR_DMG_LG",
+		"CG_1ST_PLYR_DMG_RG",
+		"CG_1ST_PLYR_DMG_PG",
+	}
+
+	assert constants["CG_1ST_PLYR_DMG_GL"] == 0x9d
+	assert constants["CG_1ST_PLYR_DMG_RL"] == 0x9e
+	assert constants["CG_1ST_PLYR_DMG_LG"] == 0x9f
+	assert constants["CG_1ST_PLYR_DMG_RG"] == 0xa0
+	assert constants["CG_1ST_PLYR_DMG_PG"] == 0xa1
+	assert {constants[name] for name in selected} <= _retail_cg_ownerdraw_cases_for_target("FUN_10036c30")
+
+	for expected in (
+		"case 0x78, 0x84, 0x90, 0x9d, 0xa9, 0xd2, 0xde, 0xea, 0xf7, 0x103",
+		"return 4",
+		"case 0x79, 0x85, 0x91, 0x9e, 0xaa, 0xd3, 0xdf, 0xeb, 0xf8, 0x104",
+		"return 5",
+		"case 0x7a, 0x86, 0x92, 0x9f, 0xab, 0xd4, 0xe0, 0xec, 0xf9, 0x105",
+		"return 6",
+		"case 0x7b, 0x87, 0x93, 0xa0, 0xac, 0xd5, 0xe1, 0xed, 0xfa, 0x106",
+		"return 7",
+		"case 0x7c, 0x88, 0x94, 0xa1, 0xad, 0xd6, 0xe2, 0xee, 0xfb, 0x107",
+		"return 8",
+	):
+		assert expected in retail_weapon_resolver_block
+
+	for expected in (
+		"int32_t eax_1 = sub_1002e2b0(ebx)",
+		"&data_10a6040c",
+		"sub_100575e0(&data_10068e44)",
+		"sub_10008440(fconvert.s(fconvert.t(*esi_1))",
+	):
+		assert expected in retail_weapon_damage_block
+
+	for expected in (
+		"WP_GRENADE_LAUNCHER,\n\tWP_ROCKET_LAUNCHER,\n\tWP_LIGHTNING,\n\tWP_RAILGUN,\n\tWP_PLASMAGUN,",
+	):
+		assert expected in cgame_frag_order_block
+		assert expected in game_frag_order_block
+
+	for expected in (
+		"weapon = cgScoreStatFragWeapons[j];",
+		"cg.scoreStats[clientNum].weaponDamage[weapon] = value;",
+	):
+		assert expected in scorestats_parse_block
+
+	for expected in (
+		"G_AppendScoreStatsWeaponValues( payload, sizeof( payload ), cl->pers.weaponDamage, scorestatFragWeapons, SCORESTAT_DMG_WEAPON_COUNT );",
+	):
+		assert expected in game_scorestats_send_block
+
+	for expected in (
+		"case CG_1ST_PLYR_DMG_GL:",
+		"return WP_GRENADE_LAUNCHER;",
+		"case CG_1ST_PLYR_DMG_RL:",
+		"return WP_ROCKET_LAUNCHER;",
+		"case CG_1ST_PLYR_DMG_LG:",
+		"return WP_LIGHTNING;",
+		"case CG_1ST_PLYR_DMG_RG:",
+		"return WP_RAILGUN;",
+		"case CG_1ST_PLYR_DMG_PG:",
+		"return WP_PLASMAGUN;",
+	):
+		assert expected in weapon_block
+
+	for expected in (
+		"if ( normalized >= CG_1ST_PLYR_DMG_G && normalized <= CG_1ST_PLYR_DMG_HMG ) {",
+		'Com_sprintf( buffer, bufferSize, "%d", stats->weaponDamage[weapon] );',
+		'Q_strncpyz( buffer, "-", bufferSize );',
+	):
+		assert expected in build_block
+
+	assert "CG_DrawPlacementWeaponDamageOwnerDraw( rect, scale, color, textStyle, ownerDraw );" in dispatch_block
+
+	for name in selected:
+		assert f"case {name}:" not in ownerdraw_block
+		assert name not in value_block
+		assert name not in width_block
+		assert name not in key_block
+
+
+def test_cgame_selected_162_to_166_ownerdraws_match_retail_weapon_damage_tail_wiring() -> None:
+	source = CG_NEWDRAW.read_text(encoding="utf-8")
+	main_source = CG_MAIN.read_text(encoding="utf-8")
+	servercmds_source = CG_SERVERCMDS.read_text(encoding="utf-8")
+	game_cmds_source = G_CMDS.read_text(encoding="utf-8")
+	hlil_source = CGAME_HLIL.read_text(encoding="utf-8")
+	constants = _menudef_ownerdraw_constants()
+	weapon_block = _block_from_marker(source, "static weapon_t CG_GetPlacementMetricWeapon( int ownerDraw )")
+	build_block = _block_from_marker(source, "static qboolean CG_BuildPlacementWeaponMetricText")
+	dispatch_block = _block_from_marker(source, "static qboolean CG_DrawPlacementMetricOwnerDraw")
+	ownerdraw_block = _block_from_marker(source, "void CG_OwnerDraw(")
+	value_block = _block_from_marker(source, "float CG_GetValue")
+	width_block = _block_from_marker(main_source, "static int CG_OwnerDrawWidth")
+	key_block = _block_from_marker(main_source, "static qboolean CG_OwnerDrawHandleKey")
+	cgame_frag_order_block = _block_from_marker(servercmds_source, "static const weapon_t cgScoreStatFragWeapons")
+	scorestats_parse_block = _block_from_marker(servercmds_source, "static void CG_ParseScoreStats")
+	game_frag_order_block = _block_from_marker(game_cmds_source, "static const weapon_t scorestatFragWeapons")
+	game_scorestats_send_block = _block_from_marker(game_cmds_source, "static void G_SendScoreStatsMessage")
+	retail_weapon_resolver_block = _text_between(
+		hlil_source,
+		"1002e2b0    int32_t __convention(\"regparm\") sub_1002e2b0",
+		"1002e319",
+	)
+	retail_weapon_damage_block = _text_between(
+		hlil_source,
+		"10036c30    void sub_10036c30",
+		"10036d60",
+	)
+	selected = {
+		"CG_1ST_PLYR_DMG_BFG",
+		"CG_1ST_PLYR_DMG_CG",
+		"CG_1ST_PLYR_DMG_NG",
+		"CG_1ST_PLYR_DMG_PL",
+		"CG_1ST_PLYR_DMG_HMG",
+	}
+
+	assert constants["CG_1ST_PLYR_DMG_BFG"] == 0xa2
+	assert constants["CG_1ST_PLYR_DMG_CG"] == 0xa3
+	assert constants["CG_1ST_PLYR_DMG_NG"] == 0xa4
+	assert constants["CG_1ST_PLYR_DMG_PL"] == 0xa5
+	assert constants["CG_1ST_PLYR_DMG_HMG"] == 0xa6
+	assert {constants[name] for name in selected} <= _retail_cg_ownerdraw_cases_for_target("FUN_10036c30")
+
+	for expected in (
+		"case 0x7d, 0x89, 0x95, 0xa2, 0xae, 0xd7, 0xe3, 0xef, 0xfc, 0x108",
+		"return 9",
+		"case 0x7e, 0x8a, 0x96, 0xa3, 0xaf, 0xd8, 0xe4, 0xf0, 0xfd, 0x109",
+		"return 0xd",
+		"case 0x7f, 0x8b, 0x97, 0xa4, 0xb0, 0xd9, 0xe5, 0xf1, 0xfe, 0x10a",
+		"return 0xb",
+		"case 0x80, 0x8c, 0x98, 0xa5, 0xb1, 0xda, 0xe6, 0xf2, 0xff, 0x10b",
+		"return 0xc",
+		"case 0x81, 0x8d, 0x99, 0xa6, 0xb2, 0xdb, 0xe7, 0xf3, 0x100, 0x10c",
+		"return 0xe",
+	):
+		assert expected in retail_weapon_resolver_block
+
+	for expected in (
+		"int32_t eax_1 = sub_1002e2b0(ebx)",
+		"&data_10a6040c",
+		"sub_100575e0(&data_10068e44)",
+		"sub_10008440(fconvert.s(fconvert.t(*esi_1))",
+	):
+		assert expected in retail_weapon_damage_block
+
+	for expected in (
+		"WP_BFG,\n\tWP_CHAINGUN,\n\tWP_NAILGUN,\n\tWP_PROX_LAUNCHER,\n\tWP_HEAVY_MACHINEGUN",
+	):
+		assert expected in cgame_frag_order_block
+		assert expected in game_frag_order_block
+	assert "#define CG_SCORESTAT_DMG_WEAPON_COUNT\t\t13" in servercmds_source
+	assert "#define SCORESTAT_DMG_WEAPON_COUNT\t\t13" in game_cmds_source
+
+	for expected in (
+		"weapon = cgScoreStatFragWeapons[j];",
+		"cg.scoreStats[clientNum].weaponDamage[weapon] = value;",
+	):
+		assert expected in scorestats_parse_block
+
+	for expected in (
+		"G_AppendScoreStatsWeaponValues( payload, sizeof( payload ), cl->pers.weaponDamage, scorestatFragWeapons, SCORESTAT_DMG_WEAPON_COUNT );",
+	):
+		assert expected in game_scorestats_send_block
+
+	for expected in (
+		"case CG_1ST_PLYR_DMG_BFG:",
+		"return WP_BFG;",
+		"case CG_1ST_PLYR_DMG_CG:",
+		"return WP_CHAINGUN;",
+		"case CG_1ST_PLYR_DMG_NG:",
+		"return WP_NAILGUN;",
+		"case CG_1ST_PLYR_DMG_PL:",
+		"return WP_PROX_LAUNCHER;",
+		"case CG_1ST_PLYR_DMG_HMG:",
+		"return WP_HEAVY_MACHINEGUN;",
+	):
+		assert expected in weapon_block
+
+	for expected in (
+		"if ( normalized >= CG_1ST_PLYR_DMG_G && normalized <= CG_1ST_PLYR_DMG_HMG ) {",
+		'Com_sprintf( buffer, bufferSize, "%d", stats->weaponDamage[weapon] );',
+		'Q_strncpyz( buffer, "-", bufferSize );',
+	):
+		assert expected in build_block
+
+	assert "CG_DrawPlacementWeaponDamageOwnerDraw( rect, scale, color, textStyle, ownerDraw );" in dispatch_block
+
+	for name in selected:
+		assert f"case {name}:" not in ownerdraw_block
+		assert name not in value_block
+		assert name not in width_block
+		assert name not in key_block
+
+
+def test_cgame_selected_167_to_171_ownerdraws_match_retail_weapon_accuracy_head_wiring() -> None:
+	source = CG_NEWDRAW.read_text(encoding="utf-8")
+	main_source = CG_MAIN.read_text(encoding="utf-8")
+	servercmds_source = CG_SERVERCMDS.read_text(encoding="utf-8")
+	game_cmds_source = G_CMDS.read_text(encoding="utf-8")
+	hlil_source = CGAME_HLIL.read_text(encoding="utf-8")
+	constants = _menudef_ownerdraw_constants()
+	weapon_block = _block_from_marker(source, "static weapon_t CG_GetPlacementMetricWeapon( int ownerDraw )")
+	build_block = _block_from_marker(source, "static qboolean CG_BuildPlacementWeaponMetricText")
+	dispatch_block = _block_from_marker(source, "static qboolean CG_DrawPlacementMetricOwnerDraw")
+	accuracy_wrapper_block = _block_from_marker(source, "static void CG_DrawPlacementWeaponAccuracyOwnerDraw")
+	ownerdraw_block = _block_from_marker(source, "void CG_OwnerDraw(")
+	value_block = _block_from_marker(source, "float CG_GetValue")
+	width_block = _block_from_marker(main_source, "static int CG_OwnerDrawWidth")
+	key_block = _block_from_marker(main_source, "static qboolean CG_OwnerDrawHandleKey")
+	cgame_accuracy_order_block = _block_from_marker(servercmds_source, "static const weapon_t cgScoreStatAccuracyWeapons")
+	scorestats_parse_block = _block_from_marker(servercmds_source, "static void CG_ParseScoreStats")
+	game_accuracy_order_block = _block_from_marker(game_cmds_source, "static const weapon_t scorestatAccuracyWeapons")
+	game_scorestats_send_block = _block_from_marker(game_cmds_source, "static void G_SendScoreStatsMessage")
+	retail_weapon_resolver_block = _text_between(
+		hlil_source,
+		"1002e2b0    int32_t __convention(\"regparm\") sub_1002e2b0",
+		"1002e319",
+	)
+	retail_weapon_accuracy_block = _text_between(
+		hlil_source,
+		"10036d60    void __convention(\"regparm\") sub_10036d60",
+		"10036eb0",
+	)
+	selected = {
+		"CG_1ST_PLYR_ACC_MG",
+		"CG_1ST_PLYR_ACC_SG",
+		"CG_1ST_PLYR_ACC_GL",
+		"CG_1ST_PLYR_ACC_RL",
+		"CG_1ST_PLYR_ACC_LG",
+	}
+
+	assert constants["CG_1ST_PLYR_ACC_MG"] == 0xa7
+	assert constants["CG_1ST_PLYR_ACC_SG"] == 0xa8
+	assert constants["CG_1ST_PLYR_ACC_GL"] == 0xa9
+	assert constants["CG_1ST_PLYR_ACC_RL"] == 0xaa
+	assert constants["CG_1ST_PLYR_ACC_LG"] == 0xab
+	assert {constants[name] for name in selected} <= _retail_cg_ownerdraw_cases_for_target("FUN_10036d60")
+
+	for expected in (
+		"case 0x76, 0x82, 0x8e, 0x9b, 0xa7, 0xd0, 0xdc, 0xe8, 0xf5, 0x101",
+		"return 2",
+		"case 0x77, 0x83, 0x8f, 0x9c, 0xa8, 0xd1, 0xdd, 0xe9, 0xf6, 0x102",
+		"return 3",
+		"case 0x78, 0x84, 0x90, 0x9d, 0xa9, 0xd2, 0xde, 0xea, 0xf7, 0x103",
+		"return 4",
+		"case 0x79, 0x85, 0x91, 0x9e, 0xaa, 0xd3, 0xdf, 0xeb, 0xf8, 0x104",
+		"return 5",
+		"case 0x7a, 0x86, 0x92, 0x9f, 0xab, 0xd4, 0xe0, 0xec, 0xf9, 0x105",
+		"return 6",
+	):
+		assert expected in retail_weapon_resolver_block
+
+	for expected in (
+		"int32_t eax = sub_1002e2b0(arg1)",
+		"&data_10a6034c",
+		'sub_100575e0("%d%%")',
+		"if (*((ecx_3 << 2) + &data_10a6034c) s> *(((edx * 0x9a + eax) << 2) + &data_10a6034c))",
+		"*arg5 = 0x3f800000",
+		"arg5[1] = 0x3f800000",
+		"arg5[2] = 0x3f800000",
+		"arg5[3] = 0x3f4ccccd",
+		"sub_10008440(fconvert.s(fconvert.t(*edi))",
+	):
+		assert expected in retail_weapon_accuracy_block
+
+	for expected in (
+		"WP_MACHINEGUN,\n\tWP_SHOTGUN,\n\tWP_GRENADE_LAUNCHER,\n\tWP_ROCKET_LAUNCHER,\n\tWP_LIGHTNING,",
+	):
+		assert expected in cgame_accuracy_order_block
+		assert expected in game_accuracy_order_block
+	assert "#define CG_SCORESTAT_ACCURACY_WEAPON_COUNT\t12" in servercmds_source
+	assert "#define SCORESTAT_ACCURACY_WEAPON_COUNT\t12" in game_cmds_source
+
+	for expected in (
+		"weapon = cgScoreStatAccuracyWeapons[j];",
+		"cg.scoreStats[clientNum].weaponHits[weapon] = value;",
+		"cg.scoreStats[clientNum].weaponShots[weapon] = value;",
+		"hits = cg.scoreStats[clientNum].weaponHits[weapon];",
+		"shots = cg.scoreStats[clientNum].weaponShots[weapon];",
+		"cg.scoreStats[clientNum].weaponAccuracy[weapon] = ( shots > 0 ) ? ( hits * 100 ) / shots : 0;",
+	):
+		assert expected in scorestats_parse_block
+
+	for expected in (
+		"G_AppendScoreStatsWeaponValues( payload, sizeof( payload ), cl->pers.accuracy_hits, scorestatAccuracyWeapons, SCORESTAT_ACCURACY_WEAPON_COUNT );",
+		"G_AppendScoreStatsWeaponValues( payload, sizeof( payload ), cl->pers.accuracy_shots, scorestatAccuracyWeapons, SCORESTAT_ACCURACY_WEAPON_COUNT );",
+	):
+		assert expected in game_scorestats_send_block
+
+	for expected in (
+		"case CG_1ST_PLYR_ACC_MG:",
+		"return WP_MACHINEGUN;",
+		"case CG_1ST_PLYR_ACC_SG:",
+		"return WP_SHOTGUN;",
+		"case CG_1ST_PLYR_ACC_GL:",
+		"return WP_GRENADE_LAUNCHER;",
+		"case CG_1ST_PLYR_ACC_RL:",
+		"return WP_ROCKET_LAUNCHER;",
+		"case CG_1ST_PLYR_ACC_LG:",
+		"return WP_LIGHTNING;",
+	):
+		assert expected in weapon_block
+
+	for expected in (
+		"if ( normalized >= CG_1ST_PLYR_ACC_MG && normalized <= CG_1ST_PLYR_ACC_HMG ) {",
+		'Com_sprintf( buffer, bufferSize, "%d%%", stats->weaponAccuracy[weapon] );',
+		'Q_strncpyz( buffer, "-", bufferSize );',
+	):
+		assert expected in build_block
+
+	for expected in (
+		"otherScore = CG_GetPlacementScore( slot == 0 ? 1 : 0 );",
+		"otherValue = otherStats ? otherStats->weaponAccuracy[weapon] : 0;",
+		"if ( stats->weaponAccuracy[weapon] > otherValue ) {",
+		"drawColor[0] = 1.0f;",
+		"drawColor[1] = 1.0f;",
+		"drawColor[2] = 1.0f;",
+		"drawColor[3] = 0.8f;",
+	):
+		assert expected in accuracy_wrapper_block
+
+	assert "CG_DrawPlacementWeaponAccuracyOwnerDraw( rect, scale, color, textStyle, ownerDraw );" in dispatch_block
+
+	for name in selected:
+		assert f"case {name}:" not in ownerdraw_block
+		assert name not in value_block
+		assert name not in width_block
+		assert name not in key_block
+
+
+def test_cgame_selected_172_to_176_ownerdraws_match_retail_weapon_accuracy_mid_wiring() -> None:
+	source = CG_NEWDRAW.read_text(encoding="utf-8")
+	main_source = CG_MAIN.read_text(encoding="utf-8")
+	servercmds_source = CG_SERVERCMDS.read_text(encoding="utf-8")
+	game_cmds_source = G_CMDS.read_text(encoding="utf-8")
+	hlil_source = CGAME_HLIL.read_text(encoding="utf-8")
+	constants = _menudef_ownerdraw_constants()
+	weapon_block = _block_from_marker(source, "static weapon_t CG_GetPlacementMetricWeapon( int ownerDraw )")
+	build_block = _block_from_marker(source, "static qboolean CG_BuildPlacementWeaponMetricText")
+	dispatch_block = _block_from_marker(source, "static qboolean CG_DrawPlacementMetricOwnerDraw")
+	accuracy_wrapper_block = _block_from_marker(source, "static void CG_DrawPlacementWeaponAccuracyOwnerDraw")
+	ownerdraw_block = _block_from_marker(source, "void CG_OwnerDraw(")
+	value_block = _block_from_marker(source, "float CG_GetValue")
+	width_block = _block_from_marker(main_source, "static int CG_OwnerDrawWidth")
+	key_block = _block_from_marker(main_source, "static qboolean CG_OwnerDrawHandleKey")
+	cgame_accuracy_order_block = _block_from_marker(servercmds_source, "static const weapon_t cgScoreStatAccuracyWeapons")
+	scorestats_parse_block = _block_from_marker(servercmds_source, "static void CG_ParseScoreStats")
+	game_accuracy_order_block = _block_from_marker(game_cmds_source, "static const weapon_t scorestatAccuracyWeapons")
+	game_scorestats_send_block = _block_from_marker(game_cmds_source, "static void G_SendScoreStatsMessage")
+	retail_weapon_resolver_block = _text_between(
+		hlil_source,
+		"1002e2b0    int32_t __convention(\"regparm\") sub_1002e2b0",
+		"1002e319",
+	)
+	retail_weapon_accuracy_block = _text_between(
+		hlil_source,
+		"10036d60    void __convention(\"regparm\") sub_10036d60",
+		"10036eb0",
+	)
+	selected = {
+		"CG_1ST_PLYR_ACC_RG",
+		"CG_1ST_PLYR_ACC_PG",
+		"CG_1ST_PLYR_ACC_BFG",
+		"CG_1ST_PLYR_ACC_CG",
+		"CG_1ST_PLYR_ACC_NG",
+	}
+
+	assert constants["CG_1ST_PLYR_ACC_RG"] == 0xac
+	assert constants["CG_1ST_PLYR_ACC_PG"] == 0xad
+	assert constants["CG_1ST_PLYR_ACC_BFG"] == 0xae
+	assert constants["CG_1ST_PLYR_ACC_CG"] == 0xaf
+	assert constants["CG_1ST_PLYR_ACC_NG"] == 0xb0
+	assert {constants[name] for name in selected} <= _retail_cg_ownerdraw_cases_for_target("FUN_10036d60")
+
+	for expected in (
+		"case 0x7b, 0x87, 0x93, 0xa0, 0xac, 0xd5, 0xe1, 0xed, 0xfa, 0x106",
+		"return 7",
+		"case 0x7c, 0x88, 0x94, 0xa1, 0xad, 0xd6, 0xe2, 0xee, 0xfb, 0x107",
+		"return 8",
+		"case 0x7d, 0x89, 0x95, 0xa2, 0xae, 0xd7, 0xe3, 0xef, 0xfc, 0x108",
+		"return 9",
+		"case 0x7e, 0x8a, 0x96, 0xa3, 0xaf, 0xd8, 0xe4, 0xf0, 0xfd, 0x109",
+		"return 0xd",
+		"case 0x7f, 0x8b, 0x97, 0xa4, 0xb0, 0xd9, 0xe5, 0xf1, 0xfe, 0x10a",
+		"return 0xb",
+	):
+		assert expected in retail_weapon_resolver_block
+
+	for expected in (
+		"int32_t eax = sub_1002e2b0(arg1)",
+		"&data_10a6034c",
+		'sub_100575e0("%d%%")',
+		"if (*((ecx_3 << 2) + &data_10a6034c) s> *(((edx * 0x9a + eax) << 2) + &data_10a6034c))",
+		"*arg5 = 0x3f800000",
+		"arg5[1] = 0x3f800000",
+		"arg5[2] = 0x3f800000",
+		"arg5[3] = 0x3f4ccccd",
+		"sub_10008440(fconvert.s(fconvert.t(*edi))",
+	):
+		assert expected in retail_weapon_accuracy_block
+
+	for expected in (
+		"WP_RAILGUN,\n\tWP_PLASMAGUN,\n\tWP_BFG,\n\tWP_CHAINGUN,\n\tWP_NAILGUN,",
+	):
+		assert expected in cgame_accuracy_order_block
+		assert expected in game_accuracy_order_block
+	assert "#define CG_SCORESTAT_ACCURACY_WEAPON_COUNT\t12" in servercmds_source
+	assert "#define SCORESTAT_ACCURACY_WEAPON_COUNT\t12" in game_cmds_source
+
+	for expected in (
+		"weapon = cgScoreStatAccuracyWeapons[j];",
+		"cg.scoreStats[clientNum].weaponHits[weapon] = value;",
+		"cg.scoreStats[clientNum].weaponShots[weapon] = value;",
+		"hits = cg.scoreStats[clientNum].weaponHits[weapon];",
+		"shots = cg.scoreStats[clientNum].weaponShots[weapon];",
+		"cg.scoreStats[clientNum].weaponAccuracy[weapon] = ( shots > 0 ) ? ( hits * 100 ) / shots : 0;",
+	):
+		assert expected in scorestats_parse_block
+
+	for expected in (
+		"G_AppendScoreStatsWeaponValues( payload, sizeof( payload ), cl->pers.accuracy_hits, scorestatAccuracyWeapons, SCORESTAT_ACCURACY_WEAPON_COUNT );",
+		"G_AppendScoreStatsWeaponValues( payload, sizeof( payload ), cl->pers.accuracy_shots, scorestatAccuracyWeapons, SCORESTAT_ACCURACY_WEAPON_COUNT );",
+	):
+		assert expected in game_scorestats_send_block
+
+	for expected in (
+		"case CG_1ST_PLYR_ACC_RG:",
+		"return WP_RAILGUN;",
+		"case CG_1ST_PLYR_ACC_PG:",
+		"return WP_PLASMAGUN;",
+		"case CG_1ST_PLYR_ACC_BFG:",
+		"return WP_BFG;",
+		"case CG_1ST_PLYR_ACC_CG:",
+		"return WP_CHAINGUN;",
+		"case CG_1ST_PLYR_ACC_NG:",
+		"return WP_NAILGUN;",
+	):
+		assert expected in weapon_block
+
+	for expected in (
+		"if ( normalized >= CG_1ST_PLYR_ACC_MG && normalized <= CG_1ST_PLYR_ACC_HMG ) {",
+		'Com_sprintf( buffer, bufferSize, "%d%%", stats->weaponAccuracy[weapon] );',
+		'Q_strncpyz( buffer, "-", bufferSize );',
+	):
+		assert expected in build_block
+
+	for expected in (
+		"otherScore = CG_GetPlacementScore( slot == 0 ? 1 : 0 );",
+		"otherValue = otherStats ? otherStats->weaponAccuracy[weapon] : 0;",
+		"if ( stats->weaponAccuracy[weapon] > otherValue ) {",
+		"drawColor[0] = 1.0f;",
+		"drawColor[1] = 1.0f;",
+		"drawColor[2] = 1.0f;",
+		"drawColor[3] = 0.8f;",
+	):
+		assert expected in accuracy_wrapper_block
+
+	assert "CG_DrawPlacementWeaponAccuracyOwnerDraw( rect, scale, color, textStyle, ownerDraw );" in dispatch_block
+
+	for name in selected:
+		assert f"case {name}:" not in ownerdraw_block
+		assert name not in value_block
+		assert name not in width_block
+		assert name not in key_block
+
+
+def test_cgame_selected_177_to_181_ownerdraws_match_retail_accuracy_tail_and_pickup_wiring() -> None:
+	source = CG_NEWDRAW.read_text(encoding="utf-8")
+	main_source = CG_MAIN.read_text(encoding="utf-8")
+	local_source = CG_LOCAL.read_text(encoding="utf-8")
+	servercmds_source = CG_SERVERCMDS.read_text(encoding="utf-8")
+	game_cmds_source = G_CMDS.read_text(encoding="utf-8")
+	hlil_source = CGAME_HLIL.read_text(encoding="utf-8")
+	constants = _menudef_ownerdraw_constants()
+	weapon_block = _block_from_marker(source, "static weapon_t CG_GetPlacementMetricWeapon( int ownerDraw )")
+	weapon_metric_block = _block_from_marker(source, "static qboolean CG_BuildPlacementWeaponMetricText")
+	pickup_metric_block = _block_from_marker(source, "static qboolean CG_BuildPlacementPickupMetricText")
+	pickup_summary_block = _block_from_marker(source, "static void CG_DrawPlacementPickupSummaryOwnerDraw")
+	dispatch_block = _block_from_marker(source, "static qboolean CG_DrawPlacementMetricOwnerDraw")
+	ownerdraw_block = _block_from_marker(source, "void CG_OwnerDraw(")
+	value_block = _block_from_marker(source, "float CG_GetValue")
+	width_block = _block_from_marker(main_source, "static int CG_OwnerDrawWidth")
+	key_block = _block_from_marker(main_source, "static qboolean CG_OwnerDrawHandleKey")
+	cgame_accuracy_order_block = _block_from_marker(servercmds_source, "static const weapon_t cgScoreStatAccuracyWeapons")
+	scorestats_parse_block = _block_from_marker(servercmds_source, "static void CG_ParseScoreStats")
+	game_accuracy_order_block = _block_from_marker(game_cmds_source, "static const weapon_t scorestatAccuracyWeapons")
+	game_pickup_order_block = _block_from_marker(game_cmds_source, "static const teamScoreStatIndex_t scorestatPlacementPickupTeamStats")
+	game_pickup_average_block = _block_from_marker(game_cmds_source, "static float G_GetPlacementPickupAverageSeconds")
+	game_scorestats_send_block = _block_from_marker(game_cmds_source, "static void G_SendScoreStatsMessage")
+	retail_weapon_resolver_block = _text_between(
+		hlil_source,
+		"1002e2b0    int32_t __convention(\"regparm\") sub_1002e2b0",
+		"1002e319",
+	)
+	retail_weapon_accuracy_block = _text_between(
+		hlil_source,
+		"10036d60    void __convention(\"regparm\") sub_10036d60",
+		"10036eb0",
+	)
+	retail_pickup_block = _text_between(
+		hlil_source,
+		"10036eb0    uint32_t __convention(\"regparm\") sub_10036eb0",
+		"10037730",
+	)
+	selected_accuracy = {
+		"CG_1ST_PLYR_ACC_PL",
+		"CG_1ST_PLYR_ACC_HMG",
+	}
+	selected_pickups = {
+		"CG_1ST_PLYR_PICKUPS",
+		"CG_1ST_PLYR_PICKUPS_RA",
+		"CG_1ST_PLYR_PICKUPS_YA",
+	}
+
+	assert constants["CG_1ST_PLYR_ACC_PL"] == 0xb1
+	assert constants["CG_1ST_PLYR_ACC_HMG"] == 0xb2
+	assert constants["CG_1ST_PLYR_PICKUPS"] == 0xb3
+	assert constants["CG_1ST_PLYR_PICKUPS_RA"] == 0xb4
+	assert constants["CG_1ST_PLYR_PICKUPS_YA"] == 0xb5
+	assert {constants[name] for name in selected_accuracy} <= _retail_cg_ownerdraw_cases_for_target("FUN_10036d60")
+	assert {constants[name] for name in selected_pickups} <= _retail_cg_ownerdraw_cases_for_target("FUN_10036eb0")
+
+	for expected in (
+		"case 0x80, 0x8c, 0x98, 0xa5, 0xb1, 0xda, 0xe6, 0xf2, 0xff, 0x10b",
+		"return 0xc",
+		"case 0x81, 0x8d, 0x99, 0xa6, 0xb2, 0xdb, 0xe7, 0xf3, 0x100, 0x10c",
+		"return 0xe",
+	):
+		assert expected in retail_weapon_resolver_block
+
+	for expected in (
+		"int32_t eax = sub_1002e2b0(arg1)",
+		"&data_10a6034c",
+		'sub_100575e0("%d%%")',
+		"*arg5 = 0x3f800000",
+		"arg5[3] = 0x3f4ccccd",
+	):
+		assert expected in retail_weapon_accuracy_block
+
+	for expected in (
+		"result = arg1 - 0xb3",
+		"lookup_table_100376c4",
+		"data_10a5f798",
+		"data_10a5f79c",
+		"data_10a5f7a0",
+		"data_10a5f7a4",
+		"*(edi_2 + 0x10a602d8)",
+		"*(edi_2 + 0x10a602e0)",
+		"*(edi_2 + 0x10a602e8)",
+		"*(edi_2 + 0x10a602f0)",
+		"*(edi_2 + 0x10a602dc)",
+		"*(edi_2 + 0x10a602e4)",
+		"&data_10068e44",
+		'sub_100575e0("%3.2f")',
+		"case 1",
+		"*(esi_1 + 0x10a602d8)",
+		"case 2",
+		"esi_4 = esi * 0x268 + 0x10a602e0",
+		"sub_10008440(fconvert.s(fconvert.t(fconvert.s(fconvert.t(*arg2))))",
+	):
+		assert expected in retail_pickup_block
+
+	assert "CG_SCORESTAT_PICKUP_RA = 0,\n\tCG_SCORESTAT_PICKUP_YA,\n\tCG_SCORESTAT_PICKUP_GA,\n\tCG_SCORESTAT_PICKUP_MH," in local_source
+	assert "int\t\t\tpickupCounts[CG_SCORESTAT_PICKUP_COUNT];" in local_source
+	assert "float\t\t\tpickupAvgSeconds[CG_SCORESTAT_PICKUP_COUNT];" in local_source
+
+	for expected in (
+		"WP_PROX_LAUNCHER,\n\tWP_HEAVY_MACHINEGUN",
+	):
+		assert expected in cgame_accuracy_order_block
+		assert expected in game_accuracy_order_block
+
+	for expected in (
+		"weapon = cgScoreStatAccuracyWeapons[j];",
+		"cg.scoreStats[clientNum].weaponHits[weapon] = value;",
+		"cg.scoreStats[clientNum].weaponShots[weapon] = value;",
+		"cg.scoreStats[clientNum].weaponAccuracy[weapon] = ( shots > 0 ) ? ( hits * 100 ) / shots : 0;",
+		"cg.scoreStats[clientNum].pickupCounts[j] = value;",
+		"cg.scoreStats[clientNum].pickupAvgSeconds[j] = value;",
+	):
+		assert expected in scorestats_parse_block
+
+	for expected in (
+		"TEAMSTAT_PICKUPS_RA,\n\tTEAMSTAT_PICKUPS_YA,\n\tTEAMSTAT_PICKUPS_GA,\n\tTEAMSTAT_PICKUPS_MH",
+	):
+		assert expected in game_pickup_order_block
+
+	for expected in (
+		"intervalCount = cl->pers.pickupIntervalCount[pickupIndex];",
+		"totalIntervalMs = cl->pers.pickupIntervalTotalMs[pickupIndex];",
+		"return ( (float)totalIntervalMs / 1000.0f ) / (float)intervalCount;",
+	):
+		assert expected in game_pickup_average_block
+
+	for expected in (
+		"G_AppendScoreStatsWeaponValues( payload, sizeof( payload ), cl->pers.accuracy_hits, scorestatAccuracyWeapons, SCORESTAT_ACCURACY_WEAPON_COUNT );",
+		"G_AppendScoreStatsWeaponValues( payload, sizeof( payload ), cl->pers.accuracy_shots, scorestatAccuracyWeapons, SCORESTAT_ACCURACY_WEAPON_COUNT );",
+		"teamStatIndex = scorestatPlacementPickupTeamStats[pickupIndex];",
+		"countValue = cl->pers.teamScoreStats[teamStatIndex];",
+		"avgSeconds = G_GetPlacementPickupAverageSeconds( cl, (scorestatPickupIndex_t)pickupIndex );",
+		'Com_sprintf( valueEntry, sizeof( valueEntry ), " %3.2f", avgSeconds );',
+	):
+		assert expected in game_scorestats_send_block
+
+	for expected in (
+		"case CG_1ST_PLYR_ACC_PL:",
+		"return WP_PROX_LAUNCHER;",
+		"case CG_1ST_PLYR_ACC_HMG:",
+		"return WP_HEAVY_MACHINEGUN;",
+	):
+		assert expected in weapon_block
+
+	for expected in (
+		"if ( normalized >= CG_1ST_PLYR_ACC_MG && normalized <= CG_1ST_PLYR_ACC_HMG ) {",
+		'Com_sprintf( buffer, bufferSize, "%d%%", stats->weaponAccuracy[weapon] );',
+	):
+		assert expected in weapon_metric_block
+
+	for expected in (
+		"if ( normalized == CG_1ST_PLYR_PICKUPS ) {",
+		"total += stats->pickupCounts[index];",
+		'Com_sprintf( buffer, bufferSize, "%d", total );',
+		"if ( normalized >= CG_1ST_PLYR_PICKUPS_RA && normalized <= CG_1ST_PLYR_PICKUPS_MH ) {",
+		"index = normalized - CG_1ST_PLYR_PICKUPS_RA;",
+		'Com_sprintf( buffer, bufferSize, "%d", stats->pickupCounts[index] );',
+	):
+		assert expected in pickup_metric_block
+
+	for expected in (
+		"static const cgTeamPickupSummaryIcon_t cgPlacementPickupSummaryIcons[CG_SCORESTAT_PICKUP_COUNT]",
+		"CG_TEAM_PICKUP_SUMMARY_ICON_RA",
+		"CG_TEAM_PICKUP_SUMMARY_ICON_YA",
+		"CG_TEAM_PICKUP_SUMMARY_ICON_GA",
+		"CG_TEAM_PICKUP_SUMMARY_ICON_MH",
+		"iconHandle = CG_GetTeamPickupSummaryIconHandle( TEAM_FREE, cgPlacementPickupSummaryIcons[index] );",
+		"CG_DrawPic( drawX, drawY, rect->w, rect->h, iconHandle );",
+		'Com_sprintf( countText, sizeof( countText ), "%d", stats->pickupCounts[index] );',
+		'Com_sprintf( averageText, sizeof( averageText ), "%3.2f", stats->pickupAvgSeconds[index] );',
+		"CG_Text_Paint( textX, drawY + 15.0f, scale, color, countText, 0, 0, textStyle );",
+		"CG_Text_Paint( textX + 15.0f, drawY + 15.0f, scale, color, averageText, 0, 0, textStyle );",
+	):
+		assert expected in source
+
+	for expected in (
+		"CG_DrawPlacementWeaponAccuracyOwnerDraw( rect, scale, color, textStyle, ownerDraw );",
+		"CG_DrawPlacementPickupSummaryOwnerDraw( rect, scale, color, textStyle, ownerDraw );",
+		"CG_DrawPlacementPickupCountOwnerDraw( rect, scale, color, textStyle, ownerDraw );",
+	):
+		assert expected in dispatch_block
+
+	for name in selected_accuracy | selected_pickups:
+		assert f"case {name}:" not in ownerdraw_block
+		assert name not in value_block
+		assert name not in width_block
+		assert name not in key_block
+
+
+def test_cgame_selected_182_to_186_ownerdraws_match_retail_pickup_tail_and_average_wiring() -> None:
+	source = CG_NEWDRAW.read_text(encoding="utf-8")
+	main_source = CG_MAIN.read_text(encoding="utf-8")
+	local_source = CG_LOCAL.read_text(encoding="utf-8")
+	servercmds_source = CG_SERVERCMDS.read_text(encoding="utf-8")
+	game_cmds_source = G_CMDS.read_text(encoding="utf-8")
+	hlil_source = CGAME_HLIL.read_text(encoding="utf-8")
+	constants = _menudef_ownerdraw_constants()
+	pickup_metric_block = _block_from_marker(source, "static qboolean CG_BuildPlacementPickupMetricText")
+	dispatch_block = _block_from_marker(source, "static qboolean CG_DrawPlacementMetricOwnerDraw")
+	ownerdraw_block = _block_from_marker(source, "void CG_OwnerDraw(")
+	value_block = _block_from_marker(source, "float CG_GetValue")
+	width_block = _block_from_marker(main_source, "static int CG_OwnerDrawWidth")
+	key_block = _block_from_marker(main_source, "static qboolean CG_OwnerDrawHandleKey")
+	scorestats_parse_block = _block_from_marker(servercmds_source, "static void CG_ParseScoreStats")
+	duel_scores_block = _block_from_marker(servercmds_source, "static void CG_ParseDuelScores")
+	game_pickup_order_block = _block_from_marker(game_cmds_source, "static const teamScoreStatIndex_t scorestatPlacementPickupTeamStats")
+	game_pickup_average_block = _block_from_marker(game_cmds_source, "static float G_GetPlacementPickupAverageSeconds")
+	game_scorestats_send_block = _block_from_marker(game_cmds_source, "static void G_SendScoreStatsMessage")
+	retail_pickup_count_block = _text_between(
+		hlil_source,
+		"10036eb0    uint32_t __convention(\"regparm\") sub_10036eb0",
+		"10037730    int32_t __convention(\"regparm\") sub_10037730",
+	)
+	retail_pickup_average_block = _text_between(
+		hlil_source,
+		"10037730    int32_t __convention(\"regparm\") sub_10037730",
+		"10037990    void* __convention(\"regparm\") sub_10037990",
+	)
+	selected_counts = {
+		"CG_1ST_PLYR_PICKUPS_GA",
+		"CG_1ST_PLYR_PICKUPS_MH",
+	}
+	selected_averages = {
+		"CG_1ST_PLYR_AVG_PICKUP_TIME_RA",
+		"CG_1ST_PLYR_AVG_PICKUP_TIME_YA",
+		"CG_1ST_PLYR_AVG_PICKUP_TIME_GA",
+	}
+
+	assert constants["CG_1ST_PLYR_PICKUPS_GA"] == 0xb6
+	assert constants["CG_1ST_PLYR_PICKUPS_MH"] == 0xb7
+	assert constants["CG_1ST_PLYR_AVG_PICKUP_TIME_RA"] == 0xb8
+	assert constants["CG_1ST_PLYR_AVG_PICKUP_TIME_YA"] == 0xb9
+	assert constants["CG_1ST_PLYR_AVG_PICKUP_TIME_GA"] == 0xba
+	assert {constants[name] for name in selected_counts} <= _retail_cg_ownerdraw_cases_for_target("FUN_10036eb0")
+	assert {constants[name] for name in selected_averages} <= _retail_cg_ownerdraw_cases_for_target("FUN_10037730")
+
+	for expected in (
+		"result = arg1 - 0xb3",
+		"lookup_table_100376c4",
+		"case 3",
+		"*(esi_5 + 0x10a9ced4)",
+		"case 4",
+		"esi_4 = esi * 0x268 + 0x10a602f0",
+		"&data_10068e44",
+		"sub_10008440(",
+	):
+		assert expected in retail_pickup_count_block
+
+	for expected in (
+		"if (arg3 - 0xb8 u<= 0x5d)",
+		"lookup_table_10037928",
+		"case 0",
+		"if (*(eax + 0x10a602d8) == 0)",
+		"*(eax + 0x10a602dc)",
+		"case 1",
+		"if (*(eax_3 + 0x10a602e0) == 0)",
+		"*(eax_3 + 0x10a602e4)",
+		"case 2",
+		"if (*(eax_7 + 0x10a602e8) == 0)",
+		"*(eax_7 + 0x10a602ec)",
+		"&data_10068420",
+		'sub_100575e0("%3.2f")',
+		"sub_10008780()",
+	):
+		assert expected in retail_pickup_average_block
+
+	assert "CG_SCORESTAT_PICKUP_RA = 0,\n\tCG_SCORESTAT_PICKUP_YA,\n\tCG_SCORESTAT_PICKUP_GA,\n\tCG_SCORESTAT_PICKUP_MH," in local_source
+	assert "int\t\t\tpickupCounts[CG_SCORESTAT_PICKUP_COUNT];" in local_source
+	assert "float\t\t\tpickupAvgSeconds[CG_SCORESTAT_PICKUP_COUNT];" in local_source
+
+	for expected in (
+		"TEAMSTAT_PICKUPS_RA,\n\tTEAMSTAT_PICKUPS_YA,\n\tTEAMSTAT_PICKUPS_GA,\n\tTEAMSTAT_PICKUPS_MH",
+	):
+		assert expected in game_pickup_order_block
+
+	for expected in (
+		"intervalCount = cl->pers.pickupIntervalCount[pickupIndex];",
+		"totalIntervalMs = cl->pers.pickupIntervalTotalMs[pickupIndex];",
+		"return ( (float)totalIntervalMs / 1000.0f ) / (float)intervalCount;",
+	):
+		assert expected in game_pickup_average_block
+
+	for expected in (
+		"cg.scoreStats[clientNum].pickupCounts[j] = value;",
+		"cg.scoreStats[clientNum].pickupAvgSeconds[j] = value;",
+	):
+		assert expected in scorestats_parse_block
+
+	for expected in (
+		"cg.scoreStats[clientNum].pickupCounts[CG_SCORESTAT_PICKUP_GA] = atoi( CG_Argv( baseArg + 17 ) );",
+		"cg.scoreStats[clientNum].pickupAvgSeconds[CG_SCORESTAT_PICKUP_GA] = (float)atof( CG_Argv( baseArg + 18 ) );",
+		"cg.scoreStats[clientNum].pickupCounts[CG_SCORESTAT_PICKUP_MH] = atoi( CG_Argv( baseArg + 19 ) );",
+		"cg.scoreStats[clientNum].pickupAvgSeconds[CG_SCORESTAT_PICKUP_MH] = (float)atof( CG_Argv( baseArg + 20 ) );",
+	):
+		assert expected in duel_scores_block
+
+	for expected in (
+		"teamStatIndex = scorestatPlacementPickupTeamStats[pickupIndex];",
+		"countValue = cl->pers.teamScoreStats[teamStatIndex];",
+		"avgSeconds = G_GetPlacementPickupAverageSeconds( cl, (scorestatPickupIndex_t)pickupIndex );",
+		'Com_sprintf( valueEntry, sizeof( valueEntry ), " %3.2f", avgSeconds );',
+	):
+		assert expected in game_scorestats_send_block
+
+	for expected in (
+		"if ( normalized >= CG_1ST_PLYR_PICKUPS_RA && normalized <= CG_1ST_PLYR_PICKUPS_MH ) {",
+		"index = normalized - CG_1ST_PLYR_PICKUPS_RA;",
+		'Com_sprintf( buffer, bufferSize, "%d", stats->pickupCounts[index] );',
+		"if ( normalized >= CG_1ST_PLYR_AVG_PICKUP_TIME_RA && normalized <= CG_1ST_PLYR_AVG_PICKUP_TIME_MH ) {",
+		"index = normalized - CG_1ST_PLYR_AVG_PICKUP_TIME_RA;",
+		"if ( stats->pickupCounts[index] <= 0 ) {",
+		'Q_strncpyz( buffer, "-", bufferSize );',
+		'Com_sprintf( buffer, bufferSize, "%3.2f", stats->pickupAvgSeconds[index] );',
+	):
+		assert expected in pickup_metric_block
+
+	average_start = pickup_metric_block.index("if ( normalized >= CG_1ST_PLYR_AVG_PICKUP_TIME_RA")
+	assert "buffer[0] = '\\0';" not in pickup_metric_block[average_start:]
+
+	for expected in (
+		"CG_DrawPlacementPickupCountOwnerDraw( rect, scale, color, textStyle, ownerDraw );",
+		"CG_DrawPlacementPickupAverageOwnerDraw( rect, scale, color, textStyle, ownerDraw );",
+	):
+		assert expected in dispatch_block
+
+	for name in selected_counts | selected_averages:
+		assert f"case {name}:" not in ownerdraw_block
+		assert name not in value_block
+		assert name not in width_block
+		assert name not in key_block
+
+
+def test_cgame_selected_187_to_191_ownerdraws_match_retail_average_award_and_progression_boundary() -> None:
+	source = CG_NEWDRAW.read_text(encoding="utf-8")
+	main_source = CG_MAIN.read_text(encoding="utf-8")
+	local_source = CG_LOCAL.read_text(encoding="utf-8")
+	servercmds_source = CG_SERVERCMDS.read_text(encoding="utf-8")
+	game_cmds_source = G_CMDS.read_text(encoding="utf-8")
+	hlil_source = CGAME_HLIL.read_text(encoding="utf-8")
+	constants = _menudef_ownerdraw_constants()
+	guard_block = _block_from_marker(source, "static qboolean CG_IsRetailPlacementMetricOwnerDraw")
+	pickup_metric_block = _block_from_marker(source, "static qboolean CG_BuildPlacementPickupMetricText")
+	build_metric_block = _block_from_marker(source, "static qboolean CG_BuildPlacementMetricText")
+	dispatch_block = _block_from_marker(source, "static qboolean CG_DrawPlacementMetricOwnerDraw")
+	ownerdraw_block = _block_from_marker(source, "void CG_OwnerDraw(")
+	value_block = _block_from_marker(source, "float CG_GetValue")
+	width_block = _block_from_marker(main_source, "static int CG_OwnerDrawWidth")
+	key_block = _block_from_marker(main_source, "static qboolean CG_OwnerDrawHandleKey")
+	scorestats_parse_block = _block_from_marker(servercmds_source, "static void CG_ParseScoreStats")
+	duel_scores_block = _block_from_marker(servercmds_source, "static void CG_ParseDuelScores")
+	game_duel_row_block = _block_from_marker(game_cmds_source, "static void G_BuildDuelScoreboardRow")
+	game_scorestats_send_block = _block_from_marker(game_cmds_source, "static void G_SendScoreStatsMessage")
+	retail_pickup_average_block = _text_between(
+		hlil_source,
+		"10037730    int32_t __convention(\"regparm\") sub_10037730",
+		"10037990    void* __convention(\"regparm\") sub_10037990",
+	)
+	retail_award_block = _text_between(
+		hlil_source,
+		"10037990    void* __convention(\"regparm\") sub_10037990",
+		"10037ba0",
+	)
+	selected_average = {"CG_1ST_PLYR_AVG_PICKUP_TIME_MH"}
+	selected_awards = {
+		"CG_1ST_PLYR_EXCELLENT",
+		"CG_1ST_PLYR_IMPRESSIVE",
+		"CG_1ST_PLYR_HUMILIATION",
+	}
+	selected_no_route = {"CG_1ST_PLYR_PR"}
+
+	assert constants["CG_1ST_PLYR_AVG_PICKUP_TIME_MH"] == 0xbb
+	assert constants["CG_1ST_PLYR_EXCELLENT"] == 0xbc
+	assert constants["CG_1ST_PLYR_IMPRESSIVE"] == 0xbd
+	assert constants["CG_1ST_PLYR_HUMILIATION"] == 0xbe
+	assert constants["CG_1ST_PLYR_PR"] == 0xbf
+	assert {constants[name] for name in selected_average} <= _retail_cg_ownerdraw_cases_for_target("FUN_10037730")
+	assert {constants[name] for name in selected_awards} <= _retail_cg_ownerdraw_cases_for_target("FUN_10037990")
+	assert constants["CG_1ST_PLYR_PR"] not in _retail_cg_ownerdraw_case_values()
+
+	for expected in (
+		"lookup_table_10037928",
+		"case 3",
+		"if (*(eax_10 + 0x10a602f0) == 0)",
+		"*(eax_10 + 0x10a602f4)",
+		"&data_10068420",
+		'sub_100575e0("%3.2f")',
+		"sub_10008780()",
+	):
+		assert expected in retail_pickup_average_block
+
+	for expected in (
+		"if (*result != 0 || data_10a6f8b8 == 1)",
+		"result = arg3 - 0xbc",
+		"lookup_table_10037b40",
+		"case nullptr",
+		"*(esi_1 + 0x10a60298)",
+		"case 1",
+		"*(esi_1 + 0x10a60294)",
+		"case 2",
+		"*(esi_1 + 0x10a6029c)",
+		"&data_10068e44",
+		"sub_10008440(",
+	):
+		assert expected in retail_award_block
+
+	assert "CG_SCORESTAT_PICKUP_RA = 0,\n\tCG_SCORESTAT_PICKUP_YA,\n\tCG_SCORESTAT_PICKUP_GA,\n\tCG_SCORESTAT_PICKUP_MH," in local_source
+	assert "int\t\t\tprogressionPr;" in local_source
+	assert "int\t\t\tprogressionTier;" in local_source
+
+	for expected in (
+		"if ( normalized >= CG_1ST_PLYR_AVG_PICKUP_TIME_RA && normalized <= CG_1ST_PLYR_AVG_PICKUP_TIME_MH ) {",
+		"index = normalized - CG_1ST_PLYR_AVG_PICKUP_TIME_RA;",
+		"if ( stats->pickupCounts[index] <= 0 ) {",
+		'Q_strncpyz( buffer, "-", bufferSize );',
+		'Com_sprintf( buffer, bufferSize, "%3.2f", stats->pickupAvgSeconds[index] );',
+	):
+		assert expected in pickup_metric_block
+
+	for expected in (
+		"case CG_1ST_PLYR_EXCELLENT:",
+		'Com_sprintf( buffer, bufferSize, "%d", score->excellentCount );',
+		"case CG_1ST_PLYR_IMPRESSIVE:",
+		'Com_sprintf( buffer, bufferSize, "%d", score->impressiveCount );',
+		"case CG_1ST_PLYR_HUMILIATION:",
+		'Com_sprintf( buffer, bufferSize, "%d", score->guantletCount );',
+	):
+		assert expected in build_metric_block
+
+	for expected in (
+		"cg.scores[i].impressiveCount = atoi( CG_Argv( baseArg + 9 ) );",
+		"cg.scores[i].excellentCount = atoi( CG_Argv( baseArg + 10 ) );",
+		"cg.scores[i].guantletCount = atoi( CG_Argv( baseArg + 11 ) );",
+	):
+		assert expected in duel_scores_block
+
+	for expected in (
+		"impressiveCount = cl->ps.persistant[PERS_IMPRESSIVE_COUNT];",
+		"excellentCount = cl->ps.persistant[PERS_EXCELLENT_COUNT];",
+		"gauntletCount = cl->ps.persistant[PERS_GAUNTLET_FRAG_COUNT];",
+		"impressiveCount,\n\t\texcellentCount,\n\t\tgauntletCount,",
+	):
+		assert expected in game_duel_row_block
+
+	for expected in (
+		"cg.scoreStats[clientNum].progressionPr = value;",
+		"cg.scoreStats[clientNum].progressionTier = value;",
+	):
+		assert expected in scorestats_parse_block
+
+	for expected in (
+		"progressionPr = G_GetPlacementProgressionPr( cl );",
+		"progressionTier = G_GetPlacementProgressionTier( cl );",
+		'Com_sprintf( valueEntry, sizeof( valueEntry ), " %i", progressionPr );',
+		'Com_sprintf( valueEntry, sizeof( valueEntry ), " %i", progressionTier );',
+	):
+		assert expected in game_scorestats_send_block
+
+	for expected in (
+		"ownerDraw >= CG_1ST_PLYR_AVG_PICKUP_TIME_RA && ownerDraw <= CG_1ST_PLYR_AVG_PICKUP_TIME_MH",
+		"ownerDraw >= CG_1ST_PLYR_EXCELLENT && ownerDraw <= CG_1ST_PLYR_HUMILIATION",
+	):
+		assert expected in guard_block
+
+	for expected in (
+		"CG_DrawPlacementPickupAverageOwnerDraw( rect, scale, color, textStyle, ownerDraw );",
+		"CG_DrawPlacementAwardCountOwnerDraw( rect, scale, color, textStyle, ownerDraw );",
+	):
+		assert expected in dispatch_block
+
+	for name in selected_average | selected_awards | selected_no_route:
+		assert f"case {name}:" not in ownerdraw_block
+		assert name not in value_block
+		assert name not in width_block
+		assert name not in key_block
+
+	assert "CG_1ST_PLYR_PR" not in guard_block
+	assert "CG_1ST_PLYR_PR" not in build_metric_block
+
+
+def test_cgame_selected_192_to_196_ownerdraws_match_retail_second_player_head_and_tier_boundary() -> None:
+	source = CG_NEWDRAW.read_text(encoding="utf-8")
+	main_source = CG_MAIN.read_text(encoding="utf-8")
+	hlil_source = CGAME_HLIL.read_text(encoding="utf-8")
+	constants = _menudef_ownerdraw_constants()
+	resolve_block = _block_from_marker(source, "static qboolean CG_ResolvePlacementMetricOwnerDraw")
+	guard_block = _block_from_marker(source, "static qboolean CG_IsRetailPlacementMetricOwnerDraw")
+	name_text_block = _block_from_marker(source, "static qboolean CG_BuildSpectatorPlayerNameText")
+	name_block = _block_from_marker(source, "static void CG_DrawSpectatorPlayerName")
+	score_block = _block_from_marker(source, "static void CG_DrawSpectatorPlayerScore")
+	secondary_status_block = _block_from_marker(source, "static void CG_DrawSpectatorSecondaryStatus")
+	build_metric_block = _block_from_marker(source, "static qboolean CG_BuildPlacementMetricText")
+	dispatch_block = _block_from_marker(source, "static qboolean CG_DrawPlacementMetricOwnerDraw")
+	frags_block = _block_from_marker(source, "static qboolean CG_DrawPlacementFragsOwnerDraw")
+	competitive_block = _block_from_marker(source, "static qboolean CG_IsCompetitiveScoreOwnerDraw")
+	ownerdraw_block = _block_from_marker(source, "void CG_OwnerDraw(")
+	value_block = _block_from_marker(source, "float CG_GetValue")
+	width_block = _block_from_marker(main_source, "static int CG_OwnerDrawWidth")
+	key_block = _block_from_marker(main_source, "static qboolean CG_OwnerDrawHandleKey")
+	retail_name_block = _text_between(
+		hlil_source,
+		"10035bd0    int32_t __convention(\"regparm\") sub_10035bd0",
+		"10035f30    void __convention(\"regparm\") sub_10035f30",
+	)
+	retail_score_block = _text_between(
+		hlil_source,
+		"10035f30    void __convention(\"regparm\") sub_10035f30",
+		"10036070    void __convention(\"regparm\") sub_10036070",
+	)
+	retail_frags_block = _text_between(
+		hlil_source,
+		"100361f0    void __convention(\"regparm\") sub_100361f0",
+		"10036320    void __convention(\"regparm\") sub_10036320",
+	)
+	retail_secondary_status_block = _text_between(
+		hlil_source,
+		"10037d60    void* sub_10037d60",
+		"10037f80    void __convention(\"regparm\") sub_10037f80",
+	)
+	selected = {
+		"CG_1ST_PLYR_TIER",
+		"CG_2ND_PLYR",
+		"CG_2ND_PLYR_READY",
+		"CG_2ND_PLYR_SCORE",
+		"CG_2ND_PLYR_FRAGS",
+	}
+
+	assert constants["CG_1ST_PLYR_TIER"] == 0xc0
+	assert constants["CG_2ND_PLYR"] == 0xc1
+	assert constants["CG_2ND_PLYR_READY"] == 0xc2
+	assert constants["CG_2ND_PLYR_SCORE"] == 0xc3
+	assert constants["CG_2ND_PLYR_FRAGS"] == 0xc4
+	assert constants["CG_1ST_PLYR_TIER"] not in _retail_cg_ownerdraw_case_values()
+	assert {constants["CG_2ND_PLYR"]} <= _retail_cg_ownerdraw_cases_for_target("FUN_10035bd0")
+	assert {constants["CG_2ND_PLYR_READY"]} <= _retail_cg_ownerdraw_cases_for_target("FUN_10037d60")
+	assert {constants["CG_2ND_PLYR_SCORE"]} <= _retail_cg_ownerdraw_cases_for_target("FUN_10035f30")
+	assert {constants["CG_2ND_PLYR_FRAGS"]} <= _retail_cg_ownerdraw_cases_for_target("FUN_100361f0")
+
+	for expected in (
+		"if (arg4 s< 0xc1 || arg4 s> 0x11a)",
+		"var_84 = 0x10a40488",
+		'sub_100575e0("%s%s")',
+		"&data_10068420",
+		"sub_10008440(",
+	):
+		assert expected in retail_name_block
+
+	for expected in (
+		"if (arg4 != 0x69)",
+		"esi = data_10a4045c",
+		"&data_10068e44",
+		"&data_10068420",
+		"sub_10008440(",
+	):
+		assert expected in retail_score_block
+
+	for expected in (
+		"if (arg1 s< 0xc1 || arg1 s> 0x11a)",
+		"ebx = 1",
+		"0x10a602ac",
+		"&data_10068e44",
+		"sub_10008440(",
+	):
+		assert expected in retail_frags_block
+
+	for expected in (
+		"data_10a6044c",
+		"data_10a4045c",
+		"data_10a40458",
+		"\"LEADS\"",
+		"\"TIED\"",
+		"\"TRAILS\"",
+		"\"NOT READY\"",
+		"\"READY\"",
+	):
+		assert expected in retail_secondary_status_block
+
+	for expected in (
+		"if ( ownerDraw >= CG_1ST_PLYR_READY && ownerDraw <= CG_1ST_PLYR_TIER ) {",
+		"} else if ( ownerDraw >= CG_2ND_PLYR_READY && ownerDraw <= CG_2ND_PLYR_TIER ) {",
+		"resolvedSlot = 1;",
+		"resolvedOwnerDraw = ownerDraw - ( CG_2ND_PLYR - CG_1ST_PLYR );",
+	):
+		assert expected in resolve_block
+
+	for expected in (
+		"Q_strncpyz( nameBuffer, cgs.secondPlaceName, nameBufferSize );",
+		'Q_strncpyz( nameBuffer, "-", nameBufferSize );',
+		'Com_sprintf( nameBuffer, nameBufferSize, "%s...", truncated );',
+	):
+		assert expected in name_text_block
+
+	for expected in (
+		"if ( !rect || !CG_BuildSpectatorPlayerNameText( slot, scale, nameBuffer, sizeof( nameBuffer ) ) ) {",
+		"CG_AlignTextX( &x, nameBuffer, scale, align );",
+		"CG_Text_Paint( x, rect->y, scale, color, nameBuffer, 0, 0, textStyle );",
+	):
+		assert expected in name_block
+
+	for expected in (
+		"score = ( slot == 0 ) ? cgs.scores1 : cgs.scores2;",
+		"if ( score == SCORE_NOT_PRESENT || score == CG_SCORE_FORFEIT ) {",
+		'Q_strncpyz( buffer, "-", sizeof( buffer ) );',
+		'Com_sprintf( buffer, sizeof( buffer ), "%d", score );',
+		"CG_AlignTextX( &x, buffer, scale, align );",
+	):
+		assert expected in score_block
+
+	for expected in (
+		"CG_DrawSpectatorStatusLabel( rect, 1 );",
+		"if ( ownerDraw == CG_2ND_PLYR_READY ) {",
+		"CG_DrawSpectatorSecondaryStatus( rect );",
+	):
+		if expected == "CG_DrawSpectatorStatusLabel( rect, 1 );":
+			assert expected in secondary_status_block
+		else:
+			assert expected in dispatch_block
+
+	for expected in (
+		"case CG_1ST_PLYR_FRAGS:",
+		"return CG_DrawPlacementFragsOwnerDraw( rect, scale, color, textStyle, slot );",
+	):
+		assert expected in dispatch_block
+	assert 'Com_sprintf( buffer, bufferSize, "%d", CG_GetPlacementFragCount( score ) );' in build_metric_block
+	assert 'Com_sprintf( buffer, sizeof( buffer ), "%d", CG_GetPlacementFragCount( score ) );' in frags_block
+
+	for expected in (
+		"case CG_2ND_PLYR: {",
+		"CG_DrawSpectatorPlayerName(&rect, scale, color, textStyle, 1, align);",
+		"case CG_2ND_PLYR_SCORE:",
+		"CG_DrawSpectatorPlayerScore(&rect, scale, color, textStyle, 1, align);",
+	):
+		assert expected in ownerdraw_block
+
+	for expected in (
+		"ownerDraw == CG_2ND_PLYR || ownerDraw == CG_2ND_PLYR_SCORE",
+		"if ( CG_IsPlacementMetricOwnerDraw( ownerDraw ) ) {",
+	):
+		assert expected in competitive_block
+
+	for name in selected:
+		assert name not in value_block
+		assert name not in width_block
+		assert name not in key_block
+
+	for name in ("CG_1ST_PLYR_TIER", "CG_2ND_PLYR_READY", "CG_2ND_PLYR_FRAGS"):
+		assert f"case {name}:" not in ownerdraw_block
+	assert "CG_1ST_PLYR_TIER" not in guard_block
+	assert "CG_1ST_PLYR_TIER" not in build_metric_block
 
 
 def test_cgame_intro_panel_and_player_count_widgets_restore_retail_detail_and_cap_rules() -> None:
@@ -13254,7 +14582,7 @@ def test_cgame_selected_player_and_placement_weapon_helpers_restore_retail_split
 		'Com_sprintf( buffer, bufferSize, "%d", stats->weaponFrags[weapon] );',
 		'Com_sprintf( buffer, bufferSize, "%d", stats->weaponHits[weapon] );',
 		'Com_sprintf( buffer, bufferSize, "%d", stats->weaponShots[weapon] );',
-		'Com_sprintf( buffer, bufferSize, "%i", stats->weaponDamage[weapon] );',
-		'Com_sprintf( buffer, bufferSize, "%i%%", stats->weaponAccuracy[weapon] );',
+		'Com_sprintf( buffer, bufferSize, "%d", stats->weaponDamage[weapon] );',
+		'Com_sprintf( buffer, bufferSize, "%d%%", stats->weaponAccuracy[weapon] );',
 	):
 		assert expected in build_block

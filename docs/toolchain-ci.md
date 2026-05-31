@@ -83,8 +83,9 @@ The Windows package also writes `nightly-release-manifest.json` and
 `SHA256SUMS.txt`; the final workflow job assembles the same release-style index
 for all uploaded nightly package archives, stages `release-notes.md`, and
 publishes those files plus `version.json` as release assets. The release is
-tagged with the nightly artifact version and is updated in place when the same
-workflow run is retried. The packages intentionally do not include retail pk3
+tagged with the nightly artifact version, explicitly marked with GitHub's
+Latest release label, and updated in place when the same workflow run is
+retried. The packages intentionally do not include retail pk3
 files, the retail launcher DLL payload, Steam credentials, live-service
 material, or reverse clean-room comparison DLLs; those prototypes stay in the
 reverse-engineering harness lanes instead of the runtime packages. Versioning

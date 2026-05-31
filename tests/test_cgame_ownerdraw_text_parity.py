@@ -1847,6 +1847,579 @@ def test_gauntlet_impressive_rampage_midair_and_perfect_ownerdraws_70_to_74_matc
     assert "cgDC.ownerDrawHandleKey = &CG_OwnerDrawHandleKey;" in display_context_block
 
 
+def test_award_player_ownerdraws_75_to_79_match_retail_preswitch_profile_wiring() -> None:
+    source = CG_NEWDRAW.read_text(encoding="utf-8")
+    main_source = CG_MAIN.read_text(encoding="utf-8")
+    hlil_source = CGAME_HLIL.read_text(encoding="utf-8")
+    ghidra_source = CGAME_GHIDRA.read_text(encoding="utf-8")
+    menudef_source = MENUDEF_H.read_text(encoding="utf-8")
+    game_source = (REPO_ROOT / "src" / "code" / "game" / "g_main.c").read_text(encoding="utf-8")
+    bg_public_source = (REPO_ROOT / "src" / "code" / "game" / "bg_public.h").read_text(encoding="utf-8")
+    all_menu_source = "\n".join(
+        path.read_text(encoding="utf-8") for path in (REPO_ROOT / "src" / "ui").glob("*.menu")
+    )
+    ownerdraw_block = _block_from_marker(source, "void CG_OwnerDraw(")
+    value_block = _block_from_marker(source, "float CG_GetValue")
+    width_block = _block_from_marker(main_source, "static int CG_OwnerDrawWidth")
+    key_block = _block_from_marker(main_source, "static qboolean CG_OwnerDrawHandleKey")
+    display_context_block = _block_from_marker(main_source, "static void CG_InitDisplayContext")
+    award_config_block = _block_from_marker(source, "static int CG_AwardConfigStringIndex")
+    award_client_block = _block_from_marker(source, "static int CG_GetAwardClientNum")
+    award_player_block = _block_from_marker(source, "static qboolean CG_DrawAwardPlayer")
+    competitive_refresh_block = _block_from_marker(source, "static qboolean CG_IsCompetitiveScoreOwnerDraw")
+    game_award_block = _block_from_marker(game_source, "static void G_UpdateAwardConfigstrings")
+    retail_switch = _block_from_marker(ghidra_source, "void FUN_1003b0f0(")
+    retail_award = _text_between(
+        hlil_source,
+        "1003a0d0    void* __convention(\"regparm\") sub_1003a0d0",
+        "1003a1c0",
+    )
+
+    def menu_ownerdraw_count(menu_source: str, ownerdraw: str) -> int:
+        return sum(
+            1
+            for line in menu_source.splitlines()
+            if line.split()[:2] == ["ownerdraw", ownerdraw]
+        )
+
+    selected = (
+        ("CG_MOST_VALUABLE_OFFENSIVE_PLYR", "75", "0x4b", "CS_AWARD_MOST_VALUABLE_OFFENSIVE", "data_10a5fdbc"),
+        ("CG_MOST_VALUABLE_DEFENSIVE_PLYR", "76", "0x4c", "CS_AWARD_MOST_VALUABLE_DEFENSIVE", "data_10a5fdc0"),
+        ("CG_MOST_VALUABLE_PLYR", "77", "0x4d", "CS_AWARD_MOST_VALUABLE", "data_10a5fdc4"),
+        ("CG_BEST_ITEMCONTROL_PLYR", "78", "0x4e", "CS_AWARD_BEST_ITEMCONTROL", "data_10a5fdb8"),
+        ("CG_MOST_ACCURATE_PLYR", "79", "0x4f", "CS_AWARD_MOST_ACCURATE", "data_10a5fdb4"),
+    )
+
+    for ownerdraw, value, raw_case, configstring, retail_cache in selected:
+        assert any(line.split()[:3] == ["#define", ownerdraw, value] for line in menudef_source.splitlines())
+        assert f"case {raw_case}:" in retail_switch
+        assert f"case {raw_case}" in retail_award
+        assert retail_cache in retail_award
+        assert f"case {ownerdraw}:" in award_config_block
+        assert f"return {configstring};" in award_config_block
+        assert f"#define {configstring}\t" in bg_public_source
+        assert f"G_SetAwardConfigstring( {configstring}," in game_award_block
+        assert f"case {ownerdraw}:" not in ownerdraw_block
+        assert ownerdraw not in value_block
+        assert ownerdraw not in width_block
+        assert ownerdraw not in key_block
+    assert "return CG_IsAwardOwnerDraw( ownerDraw );" in competitive_refresh_block
+
+    for expected in (
+        "case 0x4b:",
+        "case 0x4c:",
+        "case 0x4d:",
+        "case 0x4e:",
+        "case 0x4f:",
+        "case 0x50:",
+        "FUN_1003a0d0();",
+    ):
+        assert expected in retail_switch
+
+    for expected in (
+        "if ( CG_DrawAwardPlayer( &rect, ownerDraw ) ) {",
+        "return;",
+        "switch (ownerDraw)",
+    ):
+        assert expected in ownerdraw_block
+    assert ownerdraw_block.index("if ( CG_DrawAwardPlayer( &rect, ownerDraw ) ) {") < ownerdraw_block.index("switch (ownerDraw)")
+
+    for expected in (
+        "configStringIndex = CG_AwardConfigStringIndex( ownerDraw );",
+        "configString = CG_ConfigString( configStringIndex );",
+        "return atoi( configString );",
+    ):
+        assert expected in award_client_block
+    for expected in (
+        "if ( !CG_IsAwardOwnerDraw( ownerDraw ) ) {",
+        "clientNum = CG_GetAwardClientNum( ownerDraw );",
+        "clientNum < 0 || clientNum >= cgs.maxclients",
+        "CG_DrawProfileModel( rect, clientNum, qtrue );",
+    ):
+        assert expected in award_player_block
+
+    for expected in (
+        "if (arg1 - 0x4b u> 5)",
+        "result = data_10a5fdbc * 0x738 + &data_10a41cf0",
+        "result = data_10a5fdc0 * 0x738 + &data_10a41cf0",
+        "result = data_10a5fdc4 * 0x738 + &data_10a41cf0",
+        "result = data_10a5fdb8 * 0x738 + &data_10a41cf0",
+        "result = data_10a5fdb4 * 0x738 + &data_10a41cf0",
+        "sub_100126a0",
+    ):
+        assert expected in retail_award
+
+    assert menu_ownerdraw_count(all_menu_source, "CG_MOST_VALUABLE_OFFENSIVE_PLYR") == 5
+    assert menu_ownerdraw_count(all_menu_source, "CG_MOST_VALUABLE_DEFENSIVE_PLYR") == 5
+    assert menu_ownerdraw_count(all_menu_source, "CG_MOST_VALUABLE_PLYR") == 5
+    assert menu_ownerdraw_count(all_menu_source, "CG_BEST_ITEMCONTROL_PLYR") == 3
+    assert menu_ownerdraw_count(all_menu_source, "CG_MOST_ACCURATE_PLYR") == 4
+
+    assert "cgDC.ownerDrawItem = &CG_OwnerDraw;" in display_context_block
+    assert "cgDC.getValue = &CG_GetValue;" in display_context_block
+    assert "cgDC.ownerDrawWidth = &CG_OwnerDrawWidth;" in display_context_block
+    assert "cgDC.ownerDrawHandleKey = &CG_OwnerDrawHandleKey;" in display_context_block
+
+
+def test_damage_award_spectator_and_firstplace_ownerdraws_80_to_84_match_retail_mixed_wiring() -> None:
+    source = CG_NEWDRAW.read_text(encoding="utf-8")
+    main_source = CG_MAIN.read_text(encoding="utf-8")
+    hlil_source = CGAME_HLIL.read_text(encoding="utf-8")
+    ghidra_source = CGAME_GHIDRA.read_text(encoding="utf-8")
+    menudef_source = MENUDEF_H.read_text(encoding="utf-8")
+    game_source = (REPO_ROOT / "src" / "code" / "game" / "g_main.c").read_text(encoding="utf-8")
+    bg_public_source = (REPO_ROOT / "src" / "code" / "game" / "bg_public.h").read_text(encoding="utf-8")
+    all_menu_source = "\n".join(
+        path.read_text(encoding="utf-8") for path in (REPO_ROOT / "src" / "ui").glob("*.menu")
+    )
+    ownerdraw_block = _block_from_marker(source, "void CG_OwnerDraw(")
+    value_block = _block_from_marker(source, "float CG_GetValue")
+    width_block = _block_from_marker(main_source, "static int CG_OwnerDrawWidth")
+    key_block = _block_from_marker(main_source, "static qboolean CG_OwnerDrawHandleKey")
+    display_context_block = _block_from_marker(main_source, "static void CG_InitDisplayContext")
+    award_config_block = _block_from_marker(source, "static int CG_AwardConfigStringIndex")
+    award_client_block = _block_from_marker(source, "static int CG_GetAwardClientNum")
+    award_player_block = _block_from_marker(source, "static qboolean CG_DrawAwardPlayer")
+    competitive_refresh_block = _block_from_marker(source, "static qboolean CG_IsCompetitiveScoreOwnerDraw")
+    score_value_block = _block_from_marker(source, "static void CG_DrawScoreValue")
+    first_score_block = _block_from_marker(source, "static void CG_Draw1stPlaceScore")
+    spectator_draw_block = _block_from_marker(source, "void CG_DrawTeamSpectators")
+    match_winner_block = _block_from_marker(source, "static void CG_DrawMatchWinner")
+    game_award_block = _block_from_marker(game_source, "static void G_UpdateAwardConfigstrings")
+    retail_switch = _block_from_marker(ghidra_source, "void FUN_1003b0f0(")
+    retail_award = _text_between(
+        hlil_source,
+        "1003a0d0    void* __convention(\"regparm\") sub_1003a0d0",
+        "1003a1c0",
+    )
+
+    def menu_ownerdraw_count(menu_source: str, ownerdraw: str) -> int:
+        return sum(
+            1
+            for line in menu_source.splitlines()
+            if line.split()[:2] == ["ownerdraw", ownerdraw]
+        )
+
+    for ownerdraw, value in (
+        ("CG_MOST_DAMAGEDEALT_PLYR", "80"),
+        ("CG_SPECTATORS", "81"),
+        ("CG_MATCH_WINNER", "82"),
+        ("CG_1STPLACE", "83"),
+        ("CG_1ST_PLACE_SCORE", "84"),
+    ):
+        assert any(line.split()[:3] == ["#define", ownerdraw, value] for line in menudef_source.splitlines())
+        assert ownerdraw not in value_block
+        assert ownerdraw not in width_block
+        assert ownerdraw not in key_block
+
+    for expected in (
+        "case 0x50:",
+        "FUN_1003a0d0();",
+        "case 0x51:",
+        "if (DAT_10ab69b4 != 0) {",
+        "FUN_100351a0(&local_18,param_12,param_13,param_14);",
+        "case 0x52:",
+        "FUN_10033f00(&local_18,param_13,param_14,param_16,param_10);",
+        "case 0x53:",
+        "FUN_100323d0(param_7,param_13,param_16,param_10);",
+        "case 0x54:",
+        "FUN_10032520(&local_18,param_13,param_16);",
+    ):
+        assert expected in retail_switch
+
+    assert "case 0x50" in retail_award
+    assert "data_10a5fdb0" in retail_award
+    assert "sub_100126a0" in retail_award
+
+    assert "case CG_MOST_DAMAGEDEALT_PLYR:" in award_config_block
+    assert "return CS_AWARD_MOST_DAMAGEDEALT;" in award_config_block
+    assert "#define CS_AWARD_MOST_DAMAGEDEALT\t" in bg_public_source
+    assert "G_SetAwardConfigstring( CS_AWARD_MOST_DAMAGEDEALT," in game_award_block
+    assert "case CG_MOST_DAMAGEDEALT_PLYR:" not in ownerdraw_block
+    assert "return CG_IsAwardOwnerDraw( ownerDraw );" in competitive_refresh_block
+    for expected in (
+        "configStringIndex = CG_AwardConfigStringIndex( ownerDraw );",
+        "configString = CG_ConfigString( configStringIndex );",
+        "return atoi( configString );",
+    ):
+        assert expected in award_client_block
+    for expected in (
+        "if ( !CG_IsAwardOwnerDraw( ownerDraw ) ) {",
+        "clientNum = CG_GetAwardClientNum( ownerDraw );",
+        "clientNum < 0 || clientNum >= cgs.maxclients",
+        "CG_DrawProfileModel( rect, clientNum, qtrue );",
+    ):
+        assert expected in award_player_block
+
+    for expected in (
+        "case CG_SPECTATORS:",
+        "if ( cg.spectatorEntryCount > 0 ) {",
+        "CG_DrawTeamSpectators( &rect, scale, color, shader );",
+        "case CG_MATCH_WINNER:",
+        "CG_DrawMatchWinner( &rect, text_x, text_y, scale, color, textStyle );",
+        "case CG_1STPLACE:",
+        "CG_DrawScoreValue( &rect, scale, color, shader, textStyle, ownerDraw );",
+        "case CG_1ST_PLACE_SCORE:",
+        "CG_Draw1stPlaceScore(&rect, scale, color, textStyle);",
+    ):
+        assert expected in ownerdraw_block
+
+    for expected in (
+        "CG_Text_Paint( x, y, scale, color, entry, 0, 0, 0 );",
+        "cg.spectatorOffset = startIndex + displayedCount;",
+    ):
+        assert expected in spectator_draw_block
+    for expected in (
+        "winnerText = CG_GetMatchWinnerText();",
+        "CG_GetTextPosition( rect, text_x, text_y, &x, &y );",
+        "CG_Text_Paint( x, y, scale, color, winnerText, 0, 0, textStyle );",
+    ):
+        assert expected in match_winner_block
+    for expected in (
+        "case CG_1STPLACE:",
+        "value = cgs.scores1;",
+        "CG_Text_Paint( rect->x, rect->y, scale, color, num, 0, 0, textStyle );",
+    ):
+        assert expected in score_value_block
+    for expected in (
+        "Q_strncpyz( nameBuffer, cgs.firstPlaceName, sizeof( nameBuffer ) );",
+        "CG_DrawPlacementScoreLine( rect, scale, color, textStyle, \"1. \", nameBuffer, valueBuffer );",
+        "CG_Text_Paint( rect->x, rect->y, scale, color, \"1.\", 0, 0, textStyle );",
+    ):
+        assert expected in first_score_block
+    for expected in (
+        "ownerDraw == CG_1STPLACE || ownerDraw == CG_2NDPLACE ||",
+        "ownerDraw == CG_1ST_PLACE_SCORE || ownerDraw == CG_2ND_PLACE_SCORE ||",
+        "ownerDraw == CG_MATCH_WINNER || ownerDraw == CG_PLYR_END_GAME_SCORE ||",
+    ):
+        assert expected in competitive_refresh_block
+
+    assert menu_ownerdraw_count(all_menu_source, "CG_MOST_DAMAGEDEALT_PLYR") == 4
+    assert menu_ownerdraw_count(all_menu_source, "CG_SPECTATORS") == 28
+    assert menu_ownerdraw_count(all_menu_source, "CG_MATCH_WINNER") == 14
+    assert menu_ownerdraw_count(all_menu_source, "CG_1STPLACE") == 1
+    assert menu_ownerdraw_count(all_menu_source, "CG_1ST_PLACE_SCORE") == 6
+
+    assert "cgDC.ownerDrawItem = &CG_OwnerDraw;" in display_context_block
+    assert "cgDC.getValue = &CG_GetValue;" in display_context_block
+    assert "cgDC.ownerDrawWidth = &CG_OwnerDrawWidth;" in display_context_block
+    assert "cgDC.ownerDrawHandleKey = &CG_OwnerDrawHandleKey;" in display_context_block
+
+
+def test_first_model_secondplace_obituary_and_chat_ownerdraws_85_to_89_match_retail_mixed_wiring() -> None:
+    source = CG_NEWDRAW.read_text(encoding="utf-8")
+    main_source = CG_MAIN.read_text(encoding="utf-8")
+    ghidra_source = CGAME_GHIDRA.read_text(encoding="utf-8")
+    menudef_source = MENUDEF_H.read_text(encoding="utf-8")
+    all_menu_source = "\n".join(
+        path.read_text(encoding="utf-8") for path in (REPO_ROOT / "src" / "ui").glob("*.menu")
+    )
+    ownerdraw_block = _block_from_marker(source, "void CG_OwnerDraw(")
+    value_block = _block_from_marker(source, "float CG_GetValue")
+    width_block = _block_from_marker(main_source, "static int CG_OwnerDrawWidth")
+    key_block = _block_from_marker(main_source, "static qboolean CG_OwnerDrawHandleKey")
+    display_context_block = _block_from_marker(main_source, "static void CG_InitDisplayContext")
+    competitive_refresh_block = _block_from_marker(source, "static qboolean CG_IsCompetitiveScoreOwnerDraw")
+    first_model_block = _block_from_marker(source, "static void CG_DrawFirstPlaceModel")
+    score_value_block = _block_from_marker(source, "static void CG_DrawScoreValue")
+    second_score_block = _block_from_marker(source, "static void CG_Draw2ndPlaceScore")
+    obituary_block = _block_from_marker(source, "static void CG_DrawPlayerObituary")
+    new_chat_block = _block_from_marker(source, "static void CG_DrawNewChatArea")
+    retail_switch = _block_from_marker(ghidra_source, "void FUN_1003b0f0(")
+
+    def menu_ownerdraw_count(menu_source: str, ownerdraw: str) -> int:
+        return sum(
+            1
+            for line in menu_source.splitlines()
+            if line.split()[:2] == ["ownerdraw", ownerdraw]
+        )
+
+    for ownerdraw, value in (
+        ("CG_1STPLACE_PLYR_MODEL", "85"),
+        ("CG_2NDPLACE", "86"),
+        ("CG_2ND_PLACE_SCORE", "87"),
+        ("CG_PLAYER_OBIT", "88"),
+        ("CG_AREA_NEW_CHAT", "89"),
+    ):
+        assert any(line.split()[:3] == ["#define", ownerdraw, value] for line in menudef_source.splitlines())
+        assert ownerdraw not in value_block
+        assert ownerdraw not in width_block
+        assert ownerdraw not in key_block
+
+    for expected in (
+        "case 0x55:",
+        "FUN_10034900();",
+        "case 0x56:",
+        "FUN_100323d0(param_7,param_13,param_16,param_10);",
+        "case 0x57:",
+        "FUN_100329a0(&local_18,param_13,param_16);",
+        "case 0x58:",
+        "FUN_1002e9b0(&local_18,param_13);",
+        "case 0x59:",
+        "FUN_10006a10(param_13);",
+    ):
+        assert expected in retail_switch
+
+    for expected in (
+        "case CG_1STPLACE_PLYR_MODEL:",
+        "CG_DrawFirstPlaceModel( &rect, qfalse );",
+        "case CG_2NDPLACE:",
+        "CG_DrawScoreValue( &rect, scale, color, shader, textStyle, ownerDraw );",
+        "case CG_2ND_PLACE_SCORE:",
+        "CG_Draw2ndPlaceScore(&rect, scale, color, textStyle);",
+        "case CG_PLAYER_OBIT:",
+        "CG_DrawPlayerObituary(&rect, scale, color, textStyle);",
+        "case CG_AREA_NEW_CHAT:",
+        "CG_DrawNewChatArea(&rect, scale, color, textStyle);",
+    ):
+        assert expected in ownerdraw_block
+
+    for expected in (
+        "score = CG_GetActiveScoreByIndex( 0 );",
+        "weaponNum = score->bestWeapon;",
+        "weaponNum = CG_ClientPreviewWeapon( score->client );",
+        "VectorSet( previewAngles, 5.0f, 160.0f, 0.0f );",
+        "CG_DrawClientModelPreview( rect, score->client, weaponNum, previewAngles, active );",
+    ):
+        assert expected in first_model_block
+    for expected in (
+        "case CG_2NDPLACE:",
+        "value = cgs.scores2;",
+        "CG_Text_Paint( rect->x, rect->y, scale, color, num, 0, 0, textStyle );",
+    ):
+        assert expected in score_value_block
+    for expected in (
+        "if ( CG_IsTeamWinnerGametype( cgs.gametype ) ) {",
+        "trailingTeam = ( cgs.scores1 < cgs.scores2 ) ? TEAM_RED : TEAM_BLUE;",
+        "cg.snap->ps.persistant[PERS_TEAM] != TEAM_SPECTATOR && !CG_ShowPlayerIsFirstPlace()",
+        "Com_sprintf( rankBuffer, sizeof( rankBuffer ), \"%d. \", localRank );",
+        "Q_strncpyz( nameBuffer, cgs.secondPlaceName, sizeof( nameBuffer ) );",
+        "CG_DrawPlacementScoreLine( rect, scale, color, textStyle, rankBuffer, nameBuffer, valueBuffer );",
+    ):
+        assert expected in second_score_block
+    for expected in (
+        "if ( !cg_drawFragMessages.integer ) {",
+        "CG_PruneObituaryFeed();",
+        "CG_ObituaryColorForIndex( entry->attackerColorIndex, alpha, attackerColor );",
+        "CG_DrawPic( iconX, y - iconSize, iconSize, iconSize, entry->icon );",
+        "CG_Text_Paint( targetX, y, scale, targetColor, entry->targetName, 0, 0, textStyle );",
+    ):
+        assert expected in obituary_block
+    for expected in (
+        "if ( cgs.teamChatActiveMsg[0] ) {",
+        "CG_ArchiveNewChatLine();",
+        "if ( cg.intermissionStarted || ( cg.snap && cg.snap->ps.pm_type == PM_INTERMISSION ) ) {",
+        "maxLines = 4;",
+        "} else if ( cg.scoreBoardShowing ) {",
+        "maxLines = 2;",
+        "if ( !( cg.chatHistoryVisible || cg.scoreBoardShowing ) ) {",
+        "CG_Text_Paint(rect->x, y, scale, color, cgs.teamChatMsgs[index], 0, 0, textStyle);",
+    ):
+        assert expected in new_chat_block
+
+    for expected in (
+        "ownerDraw == CG_1STPLACE || ownerDraw == CG_2NDPLACE ||",
+        "ownerDraw == CG_1ST_PLACE_SCORE || ownerDraw == CG_2ND_PLACE_SCORE ||",
+        "ownerDraw == CG_1STPLACE_PLYR_MODEL ||",
+    ):
+        assert expected in competitive_refresh_block
+    assert "CG_PLAYER_OBIT" not in competitive_refresh_block
+    assert "CG_AREA_NEW_CHAT" not in competitive_refresh_block
+
+    assert menu_ownerdraw_count(all_menu_source, "CG_1STPLACE_PLYR_MODEL") == 5
+    assert menu_ownerdraw_count(all_menu_source, "CG_2NDPLACE") == 1
+    assert menu_ownerdraw_count(all_menu_source, "CG_2ND_PLACE_SCORE") == 6
+    assert menu_ownerdraw_count(all_menu_source, "CG_PLAYER_OBIT") == 24
+    assert menu_ownerdraw_count(all_menu_source, "CG_AREA_NEW_CHAT") == 35
+
+    assert "cgDC.ownerDrawItem = &CG_OwnerDraw;" in display_context_block
+    assert "cgDC.getValue = &CG_GetValue;" in display_context_block
+    assert "cgDC.ownerDrawWidth = &CG_OwnerDrawWidth;" in display_context_block
+    assert "cgDC.ownerDrawHandleKey = &CG_OwnerDrawHandleKey;" in display_context_block
+
+
+def test_endgame_selected_and_follow_ownerdraws_90_to_94_match_retail_mixed_wiring() -> None:
+    source = CG_NEWDRAW.read_text(encoding="utf-8")
+    main_source = CG_MAIN.read_text(encoding="utf-8")
+    ghidra_source = CGAME_GHIDRA.read_text(encoding="utf-8")
+    menudef_source = MENUDEF_H.read_text(encoding="utf-8")
+    all_menu_source = "\n".join(
+        path.read_text(encoding="utf-8") for path in (REPO_ROOT / "src" / "ui").glob("*.menu")
+    )
+    ownerdraw_block = _block_from_marker(source, "void CG_OwnerDraw(")
+    value_block = _block_from_marker(source, "float CG_GetValue")
+    width_block = _block_from_marker(main_source, "static int CG_OwnerDrawWidth")
+    key_block = _block_from_marker(main_source, "static qboolean CG_OwnerDrawHandleKey")
+    display_context_block = _block_from_marker(main_source, "static void CG_InitDisplayContext")
+    competitive_refresh_block = _block_from_marker(source, "static qboolean CG_IsCompetitiveScoreOwnerDraw")
+    endgame_text_block = _block_from_marker(source, "static const char *CG_GetEndGameScoreText")
+    endgame_draw_block = _block_from_marker(source, "static void CG_DrawEndGameScore")
+    selected_score_block = _block_from_marker(source, "score_t *CG_GetSelectedScore")
+    selected_client_block = _block_from_marker(source, "static clientInfo_t *CG_GetSelectedClientInfo")
+    team_color_block = _block_from_marker(source, "static void CG_DrawSelectedPlayerTeamColor")
+    accuracy_block = _block_from_marker(source, "static void CG_DrawSelectedPlayerAccuracy")
+    resolve_weapon_block = _block_from_marker(source, "static const char *CG_ResolveWeaponName")
+    best_weapon_block = _block_from_marker(source, "static void CG_DrawSelectedPlayerBestWeapon")
+    follow_block = _block_from_marker(source, "static void CG_DrawFollowPlayerNameEx")
+    retail_switch = _block_from_marker(ghidra_source, "void FUN_1003b0f0(")
+
+    def menu_ownerdraw_count(menu_source: str, ownerdraw: str) -> int:
+        return sum(
+            1
+            for line in menu_source.splitlines()
+            if line.split()[:2] == ["ownerdraw", ownerdraw]
+        )
+
+    for ownerdraw, value in (
+        ("CG_PLYR_END_GAME_SCORE", "90"),
+        ("CG_PLYR_BEST_WEAPON_NAME", "91"),
+        ("CG_SELECTED_PLYR_TEAM_COLOR", "92"),
+        ("CG_SELECTED_PLYR_ACCURACY", "93"),
+        ("CG_FOLLOW_PLAYER_NAME", "94"),
+    ):
+        assert any(line.split()[:3] == ["#define", ownerdraw, value] for line in menudef_source.splitlines())
+        assert ownerdraw not in value_block
+        assert ownerdraw not in width_block
+        assert ownerdraw not in key_block
+
+    for expected in (
+        "case 0x5a:",
+        "FUN_100346e0(param_13,param_14,param_16);",
+        "case 0x5b:",
+        "FUN_100345f0(param_12,param_13,param_14,param_16);",
+        "case 0x5c:",
+        "FUN_1002f860(param_15);",
+        "case 0x5d:",
+        "FUN_10034590(param_12,param_13,param_14);",
+        "case 0x5e:",
+        "FUN_10033bf0(param_7,param_12,param_13,param_14,param_16,param_10);",
+    ):
+        assert expected in retail_switch
+
+    for expected in (
+        "case CG_PLYR_END_GAME_SCORE:",
+        "CG_DrawEndGameScore( &rect, text_x, text_y, scale, color, textStyle );",
+        "case CG_PLYR_BEST_WEAPON_NAME:",
+        "CG_DrawSelectedPlayerBestWeapon(&rect, scale, color, textStyle);",
+        "case CG_SELECTED_PLYR_TEAM_COLOR:",
+        "CG_DrawSelectedPlayerTeamColor(&rect, color);",
+        "case CG_SELECTED_PLYR_ACCURACY:",
+        "CG_DrawSelectedPlayerAccuracy(&rect, scale, color, textStyle);",
+        "case CG_FOLLOW_PLAYER_NAME:",
+        "CG_DrawFollowPlayerNameEx(&rect, scale, color, textStyle, ownerDraw, align);",
+    ):
+        assert expected in ownerdraw_block
+
+    for expected in (
+        "rank = cg.snap->ps.persistant[PERS_RANK] + 1;",
+        "defends = cg.snap->ps.persistant[PERS_DEFEND_COUNT];",
+        "assists = cg.snap->ps.persistant[PERS_ASSIST_COUNT];",
+        "captures = cg.snap->ps.persistant[PERS_CAPTURES];",
+        '"You forfeited the match."',
+        '"You finished with a score of %d."',
+        '"You finished %s with a score of %d"',
+        '"You had %d assist%s."',
+        '"You had %d defend%s."',
+        '"You had %d flag capture%s."',
+        '"You captured %d skull%s."',
+    ):
+        assert expected in endgame_text_block
+    for expected in (
+        "scoreText = CG_GetEndGameScoreText();",
+        "CG_GetTextPosition( rect, text_x, text_y, &x, &y );",
+        "CG_Text_Paint( x, y, scale, color, scoreText, 0, 0, textStyle );",
+    ):
+        assert expected in endgame_draw_block
+
+    for expected in (
+        "cg.selectedScore < 0 || cg.selectedScore >= cg.numScores || cg.selectedScore >= MAX_CLIENTS",
+        "return &cg.scores[cg.selectedScore];",
+    ):
+        assert expected in selected_score_block
+    for expected in (
+        "score = CG_GetSelectedScore();",
+        "score->client < 0 || score->client >= cgs.maxclients || score->client >= MAX_CLIENTS",
+        "return &cgs.clientinfo[score->client];",
+    ):
+        assert expected in selected_client_block
+    for expected in (
+        "ci = CG_GetSelectedClientInfo();",
+        "switch ( ci->team ) {",
+        "Vector4Set( fill, 1.0f, 0.0f, 0.0f, 0.45f );",
+        "Vector4Set( fill, 0.2f, 0.35f, 1.0f, 0.45f );",
+        "if ( color ) {",
+        "Vector4Set( fill, 1.0f, 0.6f, 0.0f, 0.4f );",
+        "CG_FillRect(rect->x, rect->y, rect->w, rect->h, fill);",
+    ):
+        assert expected in team_color_block
+    for expected in (
+        "score = CG_GetSelectedScore();",
+        'Com_sprintf( buffer, sizeof( buffer ), "%i%%", score->accuracy );',
+        "CG_Text_Paint(rect->x, rect->y, scale, color, buffer, 0, 0, textStyle);",
+    ):
+        assert expected in accuracy_block
+    assert "rect->y + rect->h" not in accuracy_block
+
+    for expected in (
+        'return "Gauntlet";',
+        'return "Grenade";',
+        'return "Rail Gun";',
+        'return "BFG";',
+        'return "Nail Gun";',
+        'return "Proximity Mines";',
+        'return "Chain Gun";',
+        'return "Heavy Machinegun";',
+        "return NULL;",
+    ):
+        assert expected in resolve_weapon_block
+    assert "BG_FindItemForWeapon" not in resolve_weapon_block
+    for expected in (
+        "score = CG_GetSelectedScore();",
+        "weapon = score->bestWeapon;",
+        "weaponName = CG_ResolveWeaponName( weapon );",
+        "if ( !weaponName ) {",
+        "CG_Text_Paint(rect->x, rect->y, scale, color, weaponName, 0, 0, textStyle);",
+    ):
+        assert expected in best_weapon_block
+    assert "weapon = cent->currentState.weapon;" not in best_weapon_block
+    assert '"Unknown"' not in best_weapon_block
+
+    for expected in (
+        "const clientInfo_t *ci = CG_SpectatorClientInfo(0);",
+        "Vector4Copy( color, drawColor );",
+        "if ( cgs.gametype >= GT_TEAM ) {",
+        "Vector4Copy( CG_TeamColor( ci->team ), drawColor );",
+        "drawColor[3] = color[3];",
+        "if ( ownerDraw == CG_FOLLOW_PLAYER_NAME ) {",
+        '"Following - %s"',
+        "Q_strncpyz( buffer, ci->name, sizeof( buffer ) );",
+        "CG_AlignTextX( &x, buffer, scale, align );",
+        "CG_Text_Paint( x, rect->y, scale, drawColor, buffer, 0, 0, textStyle );",
+    ):
+        assert expected in follow_block
+    assert "rect->w - width" not in follow_block
+
+    assert "ownerDraw == CG_MATCH_WINNER || ownerDraw == CG_PLYR_END_GAME_SCORE ||" in competitive_refresh_block
+    for ownerdraw in (
+        "CG_PLYR_BEST_WEAPON_NAME",
+        "CG_SELECTED_PLYR_TEAM_COLOR",
+        "CG_SELECTED_PLYR_ACCURACY",
+        "CG_FOLLOW_PLAYER_NAME",
+    ):
+        assert ownerdraw not in competitive_refresh_block
+
+    assert menu_ownerdraw_count(all_menu_source, "CG_PLYR_END_GAME_SCORE") == 14
+    assert menu_ownerdraw_count(all_menu_source, "CG_PLYR_BEST_WEAPON_NAME") == 8
+    assert menu_ownerdraw_count(all_menu_source, "CG_SELECTED_PLYR_TEAM_COLOR") == 18
+    assert menu_ownerdraw_count(all_menu_source, "CG_SELECTED_PLYR_ACCURACY") == 9
+    assert menu_ownerdraw_count(all_menu_source, "CG_FOLLOW_PLAYER_NAME") == 1
+
+    assert "cgDC.ownerDrawItem = &CG_OwnerDraw;" in display_context_block
+    assert "cgDC.getValue = &CG_GetValue;" in display_context_block
+    assert "cgDC.ownerDrawWidth = &CG_OwnerDrawWidth;" in display_context_block
+    assert "cgDC.ownerDrawHandleKey = &CG_OwnerDrawHandleKey;" in display_context_block
+
+
 def test_level_timer_uses_retail_clock_format() -> None:
     source = CG_NEWDRAW.read_text(encoding="utf-8")
     draw_source = CG_DRAW.read_text(encoding="utf-8")
@@ -2519,6 +3092,405 @@ def test_gametype_ownerdraw_trio_matches_retail_dispatch_and_callback_surface() 
         "spectator_follow.menu",
     }
     assert menu_hits_for("CG_GAME_TYPE_MAP") == {"intro.menu"}
+
+
+def test_front_panel_ownerdraws_1_to_5_match_retail_full_wiring() -> None:
+    source = CG_NEWDRAW.read_text(encoding="utf-8")
+    main_source = CG_MAIN.read_text(encoding="utf-8")
+    servercmds_source = CG_SERVERCMDS.read_text(encoding="utf-8")
+    menudef_source = MENUDEF_H.read_text(encoding="utf-8")
+    ghidra_source = CGAME_GHIDRA.read_text(encoding="utf-8")
+    menu_text = {
+        path.name: path.read_text(encoding="utf-8")
+        for path in (REPO_ROOT / "src" / "ui").glob("*.menu")
+    }
+    ownerdraw_block = _block_from_marker(source, "void CG_OwnerDraw(")
+    retail_ownerdraw_block = _block_from_marker(ghidra_source, "void FUN_1003b0f0")
+    value_block = _block_from_marker(source, "float CG_GetValue")
+    width_block = _block_from_marker(main_source, "static int CG_OwnerDrawWidth")
+    key_block = _block_from_marker(main_source, "static qboolean CG_OwnerDrawHandleKey")
+    display_context_block = _block_from_marker(main_source, "static void CG_InitDisplayContext")
+    server_block = _block_from_marker(source, "static void CG_DrawServerSettings")
+    starting_block = _block_from_marker(source, "static void CG_DrawStartingWeapons")
+    preview_mask_block = _block_from_marker(source, "static unsigned int CG_GetStartingWeaponPreviewMask")
+    token_block = _block_from_marker(main_source, "static const cgRetailWeaponToken_t cgRetailWeaponTokens")
+    token_helper_block = _block_from_marker(main_source, "int CG_StartingWeaponIndexFromToken")
+    limit_block = _block_from_marker(source, "static void CG_DrawGameLimit")
+    type_string_block = _block_from_marker(source, "const char *CG_GameTypeString()")
+    type_draw_block = _block_from_marker(source, "static void CG_DrawGameType( rectDef_t")
+    icon_register_block = _block_from_marker(source, "void CG_RegisterGameTypeIcons")
+    icon_shader_block = _block_from_marker(source, "static qhandle_t CG_GameTypeIconShader")
+    icon_draw_block = _block_from_marker(source, "static void CG_DrawGameTypeIcon")
+    armor_tier_block = _block_from_marker(servercmds_source, "static void CG_ParseArmorTieredConfigString")
+    custom_settings_block = _block_from_marker(servercmds_source, "static void CG_ParseCustomSettingsConfigString")
+    server_settings_block = _block_from_marker(servercmds_source, "static void CG_ParseServerSettingsInfoConfigStrings")
+    serverinfo_block = _block_from_marker(servercmds_source, "void CG_ParseServerinfo")
+
+    def menu_hits_for(ownerdraw: str) -> set[str]:
+        return {
+            name
+            for name, text in menu_text.items()
+            if any(line.split()[:2] == ["ownerdraw", ownerdraw] for line in text.splitlines())
+        }
+
+    for ownerdraw, value in (
+        ("CG_SERVER_SETTINGS", "1"),
+        ("CG_STARTING_WEAPONS", "2"),
+        ("CG_GAME_LIMIT", "3"),
+        ("CG_GAME_TYPE", "4"),
+        ("CG_GAME_TYPE_ICON", "5"),
+    ):
+        assert any(line.split()[:3] == ["#define", ownerdraw, value] for line in menudef_source.splitlines())
+        assert ownerdraw not in value_block
+        assert ownerdraw not in key_block
+
+    for expected in (
+        "case 1:",
+        "FUN_1003a1c0(param_13,param_14);",
+        "case 2:",
+        "FUN_10033910(param_13,param_14,param_16);",
+        "case 3:",
+        "FUN_10033800(&local_18,param_13,param_14,param_16,param_10);",
+        "case 4:",
+        "FUN_10034c20(&local_18,param_13,param_14,param_16,param_10);",
+        "case 5:",
+        "FUN_10034840();",
+    ):
+        assert expected in retail_ownerdraw_block
+
+    for expected in (
+        "case CG_SERVER_SETTINGS:",
+        "CG_DrawServerSettings(&rect, text_x, text_y, scale, color, textStyle);",
+        "case CG_STARTING_WEAPONS:",
+        "CG_DrawStartingWeapons(&rect, text_x, text_y, scale, color, textStyle);",
+        "case CG_GAME_LIMIT:",
+        "CG_DrawGameLimit( &rect, scale, color, textStyle, align );",
+        "case CG_GAME_TYPE_ICON:",
+        "CG_DrawGameTypeIcon(&rect);",
+        "case CG_GAME_TYPE:",
+        "CG_DrawGameType( &rect, scale, color, textStyle, align );",
+    ):
+        assert expected in ownerdraw_block
+
+    for expected in (
+        "weaponMask = (unsigned int)( cgs.customSettingsMask & CUSTOM_SETTING_WEAPON_MASK );",
+        '"AIR CONTROL"',
+        '"RAMP JUMPING"',
+        '"TIERED ARMOR"',
+        '"MODIFIED WEAPON SWITCH"',
+        '"MODIFIED PHYSICS"',
+        '"GRAVITY %i"',
+        '"MODIFIED WEAPONS"',
+        "CG_SERVER_SETTINGS_MAX_TEXT_ROWS_WITH_ICONS",
+        "CG_DrawPic( CG_SERVER_SETTINGS_ICON_X + iconXOffset, y, CG_SERVER_SETTINGS_ICON_SIZE, CG_SERVER_SETTINGS_ICON_SIZE, icon );",
+        "CG_DrawPic( CG_SERVER_SETTINGS_MODIFIED_ICON_X + iconXOffset,",
+    ):
+        assert expected in server_block
+    for expected in (
+        "info = CG_ConfigString( CS_SERVER_SETTINGS_INFO_A );",
+        "SERVER_SETTINGS_KEY_ARMOR_TIERED",
+        "cgs.serverSettingsArmorTiered = (qboolean)( atoi( value ) != 0 );",
+        'trap_Cvar_Set( "cg_armorTiered", value );',
+    ):
+        assert expected in armor_tier_block
+    for expected in (
+        "info = CG_ConfigString( CS_CUSTOM_SETTINGS );",
+        "cgs.customSettingsMask = 0ull;",
+        "cgs.customSettingsMask = value;",
+    ):
+        assert expected in custom_settings_block
+    for expected in (
+        "info = CG_ConfigString( CS_SERVER_SETTINGS_INFO_B );",
+        "SERVER_SETTINGS_KEY_QUAD_DAMAGE_FACTOR",
+        "cgs.serverSettingsQuadFactor = value[0] ? atoi( value ) : 3;",
+        "SERVER_SETTINGS_KEY_GRAVITY",
+        "cgs.serverSettingsGravity = value[0] ? atoi( value ) : 800;",
+    ):
+        assert expected in server_settings_block
+
+    for expected in (
+        "loadoutMask = CG_GetStartingWeaponPreviewMask();",
+        "CG_DrawPic( rect->x + xOffset, rect->y, rect->w, rect->h, shader );",
+        "if ( !CG_LoadoutsEnabled() ) {",
+        'CG_Text_Paint( plusX, plusY, scale, color, "+", 0, 0, textStyle );',
+        "primaryIndex = cg.weaponPrimary;",
+        "primaryIndex = CG_STARTING_WEAPON_ICON_COUNT;",
+        "CG_DrawPic( rect->x + xOffset + rect->w, rect->y, rect->w, rect->h, shader );",
+    ):
+        assert expected in starting_block
+    assert "CG_ConfigString( CS_LOADOUT_MASK )" in preview_mask_block
+    for expected in (
+        '{ "g", WP_GAUNTLET, 1 }',
+        '{ "mg", WP_MACHINEGUN, 2 }',
+        '{ "sg", WP_SHOTGUN, 3 }',
+        '{ "cg", WP_CHAINGUN, 13 }',
+        '{ "hmg", WP_HEAVY_MACHINEGUN, 14 }',
+    ):
+        assert expected in token_block
+    for expected in (
+        "token = COM_ParseExt( &cursor, qtrue );",
+        "weaponToken = CG_RetailWeaponTokenForToken( token );",
+        "return weaponToken->index;",
+    ):
+        assert expected in token_helper_block
+
+    for expected in (
+        'Com_sprintf( buffer, sizeof( buffer ), "Cap Limit: %d", cgs.capturelimit );',
+        'Com_sprintf( buffer, sizeof( buffer ), "Round Limit: %d", cgs.roundlimit );',
+        'Com_sprintf( buffer, sizeof( buffer ), "Score Limit: %d", cgs.scorelimit );',
+        'Com_sprintf( buffer, sizeof( buffer ), "Frag Limit: %d", cgs.fraglimit );',
+        "if ( align == ITEM_ALIGN_CENTER ) {",
+        "CG_Text_Paint( x, rect->y, scale, color, buffer, 0, 0, textStyle );",
+    ):
+        assert expected in limit_block
+    for expected in (
+        "cgs.fraglimit = atoi( Info_ValueForKey( info, SERVERINFO_KEY_FRAGLIMIT ) );",
+        "cgs.capturelimit = atoi( Info_ValueForKey( info, SERVERINFO_KEY_CAPTURELIMIT ) );",
+        "cgs.scorelimit = atoi( Info_ValueForKey( info, SERVERINFO_KEY_SCORELIMIT ) );",
+        "cgs.roundlimit = atoi( Info_ValueForKey( info, SERVERINFO_KEY_ROUNDLIMIT ) );",
+    ):
+        assert expected in serverinfo_block
+
+    for expected in (
+        'return "Free For All";',
+        'return "Duel";',
+        'return "Race";',
+        'return "Attack and Defend";',
+        'return "Red Rover";',
+        'return "Unknown Gametype";',
+    ):
+        assert expected in type_string_block
+    for expected in (
+        "gameType = CG_GameTypeString();",
+        "if ( align == ITEM_ALIGN_CENTER ) {",
+        "x -= CG_Text_Width( gameType, scale, 0 ) * 0.5f;",
+        "CG_Text_Paint( x, rect->y, scale, color, gameType, 0, 0, textStyle );",
+    ):
+        assert expected in type_draw_block
+    assert "ITEM_ALIGN_RIGHT" not in type_draw_block
+
+    for expected in (
+        'cgGameTypeIconShaders[GT_FFA] = trap_R_RegisterShaderNoMip( "ui/assets/hud/ffa.tga" );',
+        'cgGameTypeIconShaders[GT_TOURNAMENT] = trap_R_RegisterShaderNoMip( "ui/assets/hud/duel.tga" );',
+        'cgGameTypeIconShaders[GT_SINGLE_PLAYER] = trap_R_RegisterShaderNoMip( "ui/assets/hud/race.tga" );',
+        'cgGameTypeIconShaders[GT_TEAM] = trap_R_RegisterShaderNoMip( "ui/assets/hud/tdm.tga" );',
+        'cgGameTypeIconShaders[GT_OBELISK] = cgGameTypeIconShaders[GT_FFA];',
+        'cgGameTypeIconShaders[GT_RED_ROVER] = trap_R_RegisterShaderNoMip( "ui/assets/hud/rr.tga" );',
+    ):
+        assert expected in icon_register_block
+    assert ".png" not in icon_register_block
+    assert "return cgGameTypeIconShaders[gametype];" in icon_shader_block
+    assert "shader = CG_GameTypeIconShader( cgs.gametype );" in icon_draw_block
+    assert "CG_DrawPic( rect->x, rect->y, rect->w, rect->h, shader );" in icon_draw_block
+    assert "CG_RegisterGameTypeIcons();" in main_source
+
+    assert "case CG_GAME_TYPE:" in width_block
+    assert "return CG_Text_Width( CG_GameTypeString(), scale, 0 );" in width_block
+    for ownerdraw in ("CG_SERVER_SETTINGS", "CG_STARTING_WEAPONS", "CG_GAME_LIMIT", "CG_GAME_TYPE_ICON"):
+        assert ownerdraw not in width_block
+
+    assert menu_hits_for("CG_SERVER_SETTINGS") == set()
+    assert menu_hits_for("CG_STARTING_WEAPONS") == {"intro.menu"}
+    assert menu_hits_for("CG_GAME_LIMIT") == {"endscoreteam.menu", "intro.menu"}
+    assert menu_hits_for("CG_GAME_TYPE") == {
+        "endscorenoteam.menu",
+        "endscoreteam.menu",
+        "end_scoreboard_ffa.menu",
+        "end_scoreboard_race.menu",
+        "end_scoreboard_rr.menu",
+    }
+    assert menu_hits_for("CG_GAME_TYPE_ICON") == {
+        "hud.menu",
+        "intro.menu",
+        "min_hud.menu",
+        "spectator.menu",
+        "spectator_follow.menu",
+    }
+
+    assert "cgDC.ownerDrawItem = &CG_OwnerDraw;" in display_context_block
+    assert "cgDC.getValue = &CG_GetValue;" in display_context_block
+    assert "cgDC.ownerDrawWidth = &CG_OwnerDrawWidth;" in display_context_block
+    assert "cgDC.ownerDrawHandleKey = &CG_OwnerDrawHandleKey;" in display_context_block
+
+
+def test_front_panel_status_ownerdraws_6_to_10_match_retail_full_wiring() -> None:
+    source = CG_NEWDRAW.read_text(encoding="utf-8")
+    main_source = CG_MAIN.read_text(encoding="utf-8")
+    ghidra_source = CGAME_GHIDRA.read_text(encoding="utf-8")
+    hlil_source = CGAME_HLIL.read_text(encoding="utf-8")
+    menudef_source = MENUDEF_H.read_text(encoding="utf-8")
+    menu_text = {
+        path.name: path.read_text(encoding="utf-8")
+        for path in (REPO_ROOT / "src" / "ui").glob("*.menu")
+    }
+    ownerdraw_block = _block_from_marker(source, "void CG_OwnerDraw(")
+    retail_ownerdraw_block = _block_from_marker(ghidra_source, "void FUN_1003b0f0")
+    value_block = _block_from_marker(source, "float CG_GetValue")
+    width_block = _block_from_marker(main_source, "static int CG_OwnerDrawWidth")
+    key_block = _block_from_marker(main_source, "static qboolean CG_OwnerDrawHandleKey")
+    display_context_block = _block_from_marker(main_source, "static void CG_InitDisplayContext")
+    game_type_map_block = _block_from_marker(source, "static void CG_DrawGameTypeMap")
+    game_status_text_block = _block_from_marker(source, "const char *CG_GetGameStatusText")
+    game_status_draw_block = _block_from_marker(source, "static void CG_DrawGameStatus")
+    match_details_block = _block_from_marker(source, "static void CG_DrawMatchDetails")
+    match_phase_block = _block_from_marker(source, "static const char *CG_GetMatchPhaseText")
+    match_end_block = _block_from_marker(source, "static void CG_DrawMatchEndCondition")
+    match_status_text_block = _block_from_marker(source, "const char *CG_GetMatchStatusText")
+    match_status_draw_block = _block_from_marker(source, "static void CG_DrawMatchStatus")
+
+    def menu_hits_for(ownerdraw: str) -> set[str]:
+        return {
+            name
+            for name, text in menu_text.items()
+            if any(line.split()[:2] == ["ownerdraw", ownerdraw] for line in text.splitlines())
+        }
+
+    for ownerdraw, value in (
+        ("CG_GAME_TYPE_MAP", "6"),
+        ("CG_GAME_STATUS", "7"),
+        ("CG_MATCH_DETAILS", "8"),
+        ("CG_MATCH_END_CONDITION", "9"),
+        ("CG_MATCH_STATUS", "10"),
+    ):
+        assert any(line.split()[:3] == ["#define", ownerdraw, value] for line in menudef_source.splitlines())
+        assert ownerdraw not in value_block
+        assert ownerdraw not in key_block
+
+    for expected in (
+        "case 6:",
+        "FUN_100344b0(&local_18,param_13,param_14,param_16,param_10);",
+        "case 7:",
+        "FUN_10034bd0(param_13,param_14,param_16);",
+        "case 8:",
+        "FUN_10034420(param_13,param_14,param_16);",
+        "case 9:",
+        "FUN_10034280(param_13,param_14,param_16);",
+        "case 10:",
+        "FUN_10034cc0(param_13,param_14,param_16,param_10);",
+    ):
+        assert expected in retail_ownerdraw_block
+
+    for expected in (
+        "case CG_GAME_TYPE_MAP:",
+        "CG_DrawGameTypeMap( &rect, scale, color, textStyle, align );",
+        "case CG_GAME_STATUS:",
+        "CG_DrawGameStatus( &rect, scale, color, textStyle );",
+        "case CG_MATCH_DETAILS:",
+        "CG_DrawMatchDetails( &rect, scale, color, textStyle );",
+        "case CG_MATCH_END_CONDITION:",
+        "CG_DrawMatchEndCondition( &rect, scale, color, textStyle );",
+        "case CG_MATCH_STATUS:",
+        "CG_DrawMatchStatus( &rect, scale, color, textStyle, align );",
+    ):
+        assert expected in ownerdraw_block
+
+    for expected in (
+        "CG_BuildIntroPanelDetailString( detailBuffer, sizeof( detailBuffer ) );",
+        'Com_sprintf( buffer, sizeof( buffer ), "%s - %s", CG_GameTypeString(), detailBuffer );',
+        "CG_AlignTextX( &x, buffer, scale, align );",
+        "CG_Text_Paint( x, rect->y, scale, color, buffer, 0, 0, textStyle );",
+    ):
+        assert expected in game_type_map_block
+    assert "CG_GetTextPosition" not in game_type_map_block
+    assert 'Com_sprintf( buffer, sizeof( buffer ), "%s - %s", CG_GameTypeString(), mapName );' not in game_type_map_block
+    assert 'eax_2, ecx_1 = sub_100575e0("%s - %s")' in hlil_source
+
+    for expected in (
+        "case GT_SINGLE_PLAYER:",
+        "case GT_RED_ROVER:",
+        "cg.snap->ps.persistant[PERS_TEAM] == TEAM_SPECTATOR",
+        '"%s place with %i"',
+        '"Teams are tied at %i"',
+        '"^1Red^7 leads ^4Blue^7, %i to %i"',
+        '"^4Blue^7 leads ^1Red^7, %i to %i"',
+    ):
+        assert expected in game_status_text_block
+    assert "cgs.scores1" not in game_status_text_block
+    assert "CG_GetMatchStatusText" not in game_status_text_block
+    assert "CG_Text_Paint(rect->x, rect->y + rect->h, scale, color, CG_GetGameStatusText(), 0, 0, textStyle);" in game_status_draw_block
+
+    for expected in (
+        'return "MATCH SUMMARY";',
+        'return "MATCH WARMUP";',
+        'return "MATCH IN PROGRESS";',
+    ):
+        assert expected in match_phase_block
+    for expected in (
+        "CG_BuildIntroPanelDetailString( detailBuffer, sizeof( detailBuffer ) );",
+        'Com_sprintf( buffer, sizeof( buffer ), "%s - %s - %s",',
+        "CG_GetMatchPhaseText(), CG_GameTypeShortString(), detailBuffer",
+        "CG_Text_PaintExt( rect->x, rect->y, scale, color, buffer, 0, 0, ITEM_TEXTSTYLE_NORMAL, FONT_DEFAULT );",
+    ):
+        assert expected in match_details_block
+    assert "CG_GetTextPosition" not in match_details_block
+    assert 'sub_100575e0("%s - %s - %s")' in hlil_source
+
+    for expected in (
+        'reason = "Fastest race time within the time limit";',
+        'reason = "Most flag captures within the time limit";',
+        'reason = "Most rounds won within the time limit";',
+        'reason = "Highest score within the time limit";',
+        'reason = "First to reach the mercy limit";',
+        'reason = "First to reach the capture limit";',
+        'reason = "First to reach the round limit";',
+        'reason = "First to reach the score limit";',
+        'reason = "Highest score at the end of the game";',
+        "CG_Text_Paint( rect->x, rect->y, scale, color, reason, 0, 0, textStyle );",
+    ):
+        assert expected in match_end_block
+    assert "CG_GetTextPosition" not in match_end_block
+    for stale in (
+        "Match complete",
+        "Time limit hit",
+        "Capture limit hit",
+        "Score limit hit",
+        "Frag limit hit",
+        "Sudden death",
+    ):
+        assert stale not in match_end_block
+
+    for expected in (
+        "phase = CG_GetMatchPhaseText();",
+        "if ( cgs.scores1 == SCORE_NOT_PRESENT && cgs.scores2 == SCORE_NOT_PRESENT &&",
+        "if ( cgs.gametype == GT_RACE ) {",
+        "CG_FormatSignedMilliseconds( cgs.scores1 )",
+        '"%s - %s^7 leads with a score of %s"',
+        "if ( cgs.gametype >= GT_TEAM && cgs.gametype != GT_RED_ROVER ) {",
+        '"%s - Teams are tied at %i"',
+        '"%s - ^1Red^7 leads ^4Blue^7, %i to %i"',
+        '"%s - ^4Blue^7 leads ^1Red^7, %i to %i"',
+        "cg.snap->ps.persistant[PERS_TEAM] == TEAM_SPECTATOR",
+        '"%s - %s leads with %i"',
+        '"%s - %s place with %i"',
+    ):
+        assert expected in match_status_text_block
+    assert "CG_GetGameStatusText()" not in match_status_text_block
+    assert "if ( !status || !status[0] )" not in match_status_text_block
+    for expected in (
+        "statusText = CG_GetMatchStatusText();",
+        "CG_AlignTextX( &x, statusText, scale, align );",
+        "CG_Text_Paint( x, rect->y, scale, color, statusText, 0, 0, textStyle );",
+    ):
+        assert expected in match_status_draw_block
+    assert "CG_GetTextPosition" not in match_status_draw_block
+
+    assert "case CG_GAME_STATUS:" in width_block
+    assert "return CG_Text_Width( CG_GetGameStatusText(), scale, 0 );" in width_block
+    assert "case CG_MATCH_STATUS:" in width_block
+    assert "return CG_Text_Width( CG_GetMatchStatusText(), scale, 0 );" in width_block
+    for ownerdraw in ("CG_GAME_TYPE_MAP", "CG_MATCH_DETAILS", "CG_MATCH_END_CONDITION"):
+        assert ownerdraw not in width_block
+
+    assert menu_hits_for("CG_GAME_TYPE_MAP") == {"intro.menu"}
+    assert len(menu_hits_for("CG_GAME_STATUS")) == 14
+    assert len(menu_hits_for("CG_MATCH_DETAILS")) == 12
+    assert len(menu_hits_for("CG_MATCH_END_CONDITION")) == 14
+    assert menu_hits_for("CG_MATCH_STATUS") == {"intro.menu"}
+
+    assert "cgDC.ownerDrawItem = &CG_OwnerDraw;" in display_context_block
+    assert "cgDC.getValue = &CG_GetValue;" in display_context_block
+    assert "cgDC.ownerDrawWidth = &CG_OwnerDrawWidth;" in display_context_block
+    assert "cgDC.ownerDrawHandleKey = &CG_OwnerDrawHandleKey;" in display_context_block
 
 
 def test_gametype_icons_use_retail_tga_registration_path() -> None:
@@ -3295,4 +4267,4 @@ def test_placement_frags_use_retail_team_family_kill_rows() -> None:
         assert expected in helper_block
 
     assert "case CG_1ST_PLYR_FRAGS:" in placement_block
-    assert 'Com_sprintf( buffer, bufferSize, "%i", CG_GetPlacementFragCount( score ) );' in placement_block
+    assert 'Com_sprintf( buffer, bufferSize, "%d", CG_GetPlacementFragCount( score ) );' in placement_block

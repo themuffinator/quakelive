@@ -18,7 +18,8 @@ validation surface: bytecode, native, and reverse-engineered targets.
   generates a manifest version like `nightly-YYYYMMDD.<run>-g<shortsha>`,
   uploads versioned workflow artifacts for 30 days, and creates or updates a
   GitHub Release containing the Linux tarball, macOS tarball, Windows zip,
-  release manifest, checksum file, version manifest, and release notes. The
+  release manifest, checksum file, version manifest, and release notes. Each
+  published nightly is explicitly marked as GitHub's Latest release. The
   package excludes retail pk3 files, retail launcher DLL payloads, reverse
   clean-room comparison DLLs, and any live-service credentials.
 

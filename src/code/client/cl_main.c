@@ -2249,6 +2249,10 @@ queues or defers a browser-facing event.
 =============
 */
 static void CL_LogBrowserEventLifecycle( const char *eventName, const char *reason ) {
+	if ( !Cvar_VariableIntegerValue( "web_eventDebug" ) ) {
+		return;
+	}
+
 	Com_DPrintf( "%s browser event: %s (%s [%s])\n",
 		eventName ? eventName : "browser_event",
 		reason ? reason : "event queued",

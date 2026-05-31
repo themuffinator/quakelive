@@ -473,6 +473,25 @@ Expected effect:
 - Awesomium can continue updating in the background while black/empty paints are ignored, rather than corrupting or covering the rest of the renderer.
 - If the browser page still fails to paint, the normal Quake UI, console, and world render should remain visible instead of being replaced by the browser overlay.
 
+## 2026-05-31 disconnected WebUI startup and DataPak path correction
+
+Runtime evidence:
+
+- A VS Code launch with `cwd` set to the repository root no longer matched the retail process working directory beside `web.pak`.
+- `awesomium.log` reported `Unable to load DataPak with path: web.pak`, then repeated `Failed to launch child process`; the client log showed `Awesomium surface not visible: copy=0 ... lastError=4`.
+- While the browser was pending, `SCR_DrawScreenField` still reopened `UIMENU_MAIN` every disconnected frame, repeatedly invoking the native menu `onOpen` path and its `web_stopRefresh`/music actions.
+
+Source reconstruction:
+
+- Disconnected WebUI requests now claim fullscreen ownership as soon as `KEYCATCH_BROWSER`, `web_browserActive`, or `ui_browserAwesomiumPending` is set. Native `UI_REFRESH` is suppressed for the same requested-browser window so `main.menu` is not reopened underneath a live Awesomium startup.
+- The live Awesomium adapter now resolves `awesomium_process.exe` and `web.pak` from `fs_homepath` first, falling back to `fs_basepath`, and passes the resolved `web.pak` path into `DataPakSource`. Retail still uses the literal package member name under the retail install cwd; the source adapter must be deterministic under the repository cwd used by VS Code launches.
+- `WebConfig::child_process_path` is kept as the retail-style helper filename `awesomium_process.exe` after verifying the staged executable exists. The VS Code launch cwd is now the runtime bin directory, and the old absolute path made Chromium's legacy child launcher continue to fail before any child process became visible.
+- The adapter sets Awesomium `additional_options` to `--no-sandbox` and `--single-process`. This reconstructed dynamic-loader host does not include retail's sandbox/broker environment, and runtime evidence showed the old child-process lane repeatedly logging `Failed to launch child process` before any `BitmapSurface` could be produced.
+- The live WebPreferences path explicitly disables Awesomium GPU acceleration when the setter is available. Retail's offscreen menu expects a software `BitmapSurface`; keeping the reconstructed host out of GPU compositing avoids handing the first successful WebUI paint to the same broken post-process/render-cache path that had been corrupting map loading and in-game frames.
+- Dynamic browser surface upload stays in the WebUI pump, not inside `CL_WebHost_DrawBrowserSurface`, matching the retail update/draw split and avoiding texture registration from the draw path.
+- A live Awesomium startup that never produces a contentful `BitmapSurface` is now bounded. After 180 missing-surface frames, the host logs the last Awesomium state, shuts down the live WebCore path, clears browser keycatch/cvars, latches `loadFailed`, and refreshes the bridge so the native menu can regain control instead of freezing behind a permanently pending WebUI owner.
+- Follow-up runtime evidence showed the renderer post-process gate was still being resurrected from archived config state (`r_enablePostProcess 1`), which turned the post-fallback capture into a white frame even after the dead browser owner was cleared. `r_enablePostProcess` is now ROM default `0` and force-reset during renderer registration as a documented stability divergence until the reconstructed post-process FBO/cache path is fixed.
+
 ## 2026-05-28 runtime/update parity correction
 
 Retail evidence:
@@ -489,7 +508,7 @@ Source divergence found:
 
 Fix implemented:
 
-- `CL_Awesomium_CreateSession` now constructs the data source with `DataPakSource("web.pak")` after verifying the file exists in the selected root.
+- `CL_Awesomium_CreateSession` was initially reconstructed to construct the data source with `DataPakSource("web.pak")` after verifying the file exists in the selected root. The 2026-05-31 VS Code launch correction above supersedes that runtime detail for the reconstructed dynamic-loader host: it now passes the resolved `web.pak` path while keeping `WebConfig::package_path` pointed at the selected root.
 - A successful live `BitmapSurface` copy now produces an uploadable browser shader even when sampled RGB values are zero; the visible-pixel check is retained only as a diagnostic.
 - Live Awesomium no longer forces `surfaceDirty` every active frame after `WebCore::Update`; dirty uploads now follow `BitmapSurface::IsDirty` and size rebuilds, matching the retail update cadence.
 

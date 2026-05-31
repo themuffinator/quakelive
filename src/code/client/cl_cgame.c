@@ -157,11 +157,14 @@ static int QLWebHost_CountRecoveredWebCvarMappings( void ) {
 #define CL_WEB_NATIVE_REQUEST_BUSY_POLL_FRAMES 1
 #define CL_WEB_NATIVE_CONFIG_SYNC_FRAMES 300
 #define CL_WEB_NATIVE_CONFIG_BUFFER_SIZE 131072
+#define CL_WEB_LIVE_SURFACE_FAILURE_FRAMES 180
 
 static qboolean CL_OverlayServiceAvailable( void );
 static void CL_WebHost_BuildConfigJson( char *buffer, size_t bufferSize );
 static void CL_WebHost_PumpNativeJavascriptRequests( void );
 static void CL_WebHost_SyncConfigSnapshot( void );
+static void CL_WebHost_CheckLiveAwesomiumSurfaceFailure( void );
+static void CL_ResetBrowserOverlayState( void );
 
 typedef enum {
 	CL_WEB_METHOD_IS_PAK_FILE_PRESENT = 0,
@@ -264,6 +267,7 @@ typedef struct {
 	int			loadedDocumentScriptCount;
 	int			executedDocumentScriptCount;
 	int			failedDocumentScriptCount;
+	int			liveSurfaceMissingFrames;
 	int			surfaceUploadWidth;
 	int			surfaceUploadHeight;
 	uint32_t	appId;
@@ -992,6 +996,7 @@ static void CL_WebHost_ResetRuntime( qboolean clearVisibility ) {
 	cl_webHost.loadedDocumentScriptCount = 0;
 	cl_webHost.executedDocumentScriptCount = 0;
 	cl_webHost.failedDocumentScriptCount = 0;
+	cl_webHost.liveSurfaceMissingFrames = 0;
 	cl_webHost.surfaceUploadWidth = 0;
 	cl_webHost.surfaceUploadHeight = 0;
 	cl_webHost.surfaceShader = 0;
@@ -1924,6 +1929,11 @@ static qboolean QLWebView_WriteSurfacePixels( void ) {
 			}
 			cl_webHost.surfaceHasVisiblePixels = visible;
 			cl_webHost.surfaceHasUiContent = contentful;
+			if ( contentful ) {
+				cl_webHost.liveSurfaceMissingFrames = 0;
+			} else {
+				cl_webHost.liveSurfaceMissingFrames++;
+			}
 			return qtrue;
 		}
 
@@ -1959,6 +1969,7 @@ static qboolean QLWebView_WriteSurfacePixels( void ) {
 
 		cl_webHost.surfaceHasVisiblePixels = qfalse;
 		cl_webHost.surfaceHasUiContent = qfalse;
+		cl_webHost.liveSurfaceMissingFrames++;
 		return qfalse;
 	}
 #endif
@@ -2546,6 +2557,43 @@ static qboolean CL_WebHost_SurfaceReadyForOverlay( qboolean requireShader ) {
 	}
 
 	return qtrue;
+#endif
+}
+
+/*
+=============
+CL_WebHost_CheckLiveAwesomiumSurfaceFailure
+
+Stops the live Awesomium path from owning disconnected screen flow forever when
+WebCore starts but never produces a usable BitmapSurface.
+=============
+*/
+static void CL_WebHost_CheckLiveAwesomiumSurfaceFailure( void ) {
+#if defined( _WIN32 ) && QL_PLATFORM_HAS_ONLINE_SERVICES
+	if ( !cl_webHost.liveAwesomium || !cl_webHost.viewInitialised || !cl_webHost.browserVisible ) {
+		cl_webHost.liveSurfaceMissingFrames = 0;
+		return;
+	}
+
+	if ( cl_webHost.surfaceHasUiContent ) {
+		cl_webHost.liveSurfaceMissingFrames = 0;
+		return;
+	}
+
+	if ( cl_webHost.liveSurfaceMissingFrames < CL_WEB_LIVE_SURFACE_FAILURE_FRAMES ) {
+		return;
+	}
+
+	Com_Printf( "Awesomium WebCore surface failed after %d frames (loading=%d crashed=%d lastError=%d); falling back to native UI\n",
+		cl_webHost.liveSurfaceMissingFrames,
+		CL_Awesomium_IsLoading(),
+		CL_Awesomium_IsCrashed(),
+		CL_Awesomium_LastErrorCode() );
+
+	CL_WebHost_ResetRuntime( qtrue );
+	cl_webHost.loadFailed = qtrue;
+	CL_ResetBrowserOverlayState();
+	CL_RefreshOnlineServicesBridgeState();
 #endif
 }
 
@@ -6052,6 +6100,7 @@ void CL_WebHost_Frame( void ) {
 
 	QLWebCore_Update();
 	QLWebHost_PumpFrame();
+	CL_WebHost_CheckLiveAwesomiumSurfaceFailure();
 	CL_WebHost_UpdateOverlayOwnership();
 #endif
 }
@@ -6074,11 +6123,6 @@ void CL_WebHost_DrawBrowserSurface( void ) {
 		return;
 	}
 
-	if ( !cl_webHost.surfaceShader || cl_webHost.surfaceDirty ) {
-		if ( !QLWebView_UploadSurfaceImage() ) {
-			return;
-		}
-	}
 	if ( !cl_webHost.surfaceShader ) {
 		return;
 	}
@@ -6431,7 +6475,8 @@ typedef char qlRetailGlconfigSizeCheck[( sizeof( qlRetailGlconfig_t ) == 0x2c44 
 CL_GetRetailGlconfig
 
 Retail Quake Live stores GL_ARB_multitexture availability before vidWidth and
-does not expose the legacy smpActive tail slot used by the GPL struct.
+does not expose the engine-local smpActive tail slot retained by the shared
+GPL-era renderer struct.
 ====================
 */
 void CL_GetRetailGlconfig( void *glconfig ) {
@@ -6456,7 +6501,7 @@ void CL_GetRetailGlconfig( void *glconfig ) {
 	retailConfig.deviceSupportsGamma = cls.glconfig.deviceSupportsGamma;
 	retailConfig.textureCompression = cls.glconfig.textureCompression;
 	retailConfig.textureEnvAddAvailable = cls.glconfig.textureEnvAddAvailable;
-	retailConfig.multitextureAvailable = cls.glconfig.maxActiveTextures > 1 ? qtrue : qfalse;
+	retailConfig.multitextureAvailable = cls.glconfig.multitextureAvailable;
 	retailConfig.vidWidth = cls.glconfig.vidWidth;
 	retailConfig.vidHeight = cls.glconfig.vidHeight;
 	retailConfig.windowAspect = cls.glconfig.windowAspect;

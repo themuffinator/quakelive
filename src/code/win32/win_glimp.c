@@ -1379,6 +1379,7 @@ static void GLW_InitExtensions( void )
 	qglMultiTexCoord2fARB = NULL;
 	qglActiveTextureARB = NULL;
 	qglClientActiveTextureARB = NULL;
+	glConfig.multitextureAvailable = qfalse;
 	if ( strstr( glConfig.extensions_string, "GL_ARB_multitexture" )  )
 	{
 		if ( r_ext_multitexture->integer )
@@ -1393,6 +1394,7 @@ static void GLW_InitExtensions( void )
 
 				if ( glConfig.maxActiveTextures > 1 )
 				{
+					glConfig.multitextureAvailable = qtrue;
 					ri.Printf( PRINT_ALL, "...using GL_ARB_multitexture\n" );
 				}
 				else

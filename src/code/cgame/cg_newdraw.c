@@ -5111,6 +5111,13 @@ static const cgTeamPickupSummaryEntry_t cgTeamPickupSummaryEntries[] = {
 	{ CG_TEAMSTAT_PICKUPS_INVIS, CG_TEAMSTAT_TIMEHELD_INVIS, CG_TEAM_PICKUP_SUMMARY_ICON_INVIS, 14 }
 };
 
+static const cgTeamPickupSummaryIcon_t cgPlacementPickupSummaryIcons[CG_SCORESTAT_PICKUP_COUNT] = {
+	CG_TEAM_PICKUP_SUMMARY_ICON_RA,
+	CG_TEAM_PICKUP_SUMMARY_ICON_YA,
+	CG_TEAM_PICKUP_SUMMARY_ICON_GA,
+	CG_TEAM_PICKUP_SUMMARY_ICON_MH
+};
+
 static qhandle_t cgTeamPickupSummaryIconHandles[CG_TEAM_PICKUP_SUMMARY_ICON_COUNT];
 static qhandle_t cgTeamPickupSummaryBlueFlagHandle;
 static qhandle_t cgTeamPickupSummaryNeutralFlagHandle;
@@ -5662,12 +5669,12 @@ static qboolean CG_BuildPlacementWeaponMetricText( int ownerDraw, const score_t 
 	}
 
 	if ( normalized >= CG_1ST_PLYR_DMG_G && normalized <= CG_1ST_PLYR_DMG_HMG ) {
-		Com_sprintf( buffer, bufferSize, "%i", stats->weaponDamage[weapon] );
+		Com_sprintf( buffer, bufferSize, "%d", stats->weaponDamage[weapon] );
 		return qtrue;
 	}
 
 	if ( normalized >= CG_1ST_PLYR_ACC_MG && normalized <= CG_1ST_PLYR_ACC_HMG ) {
-		Com_sprintf( buffer, bufferSize, "%i%%", stats->weaponAccuracy[weapon] );
+		Com_sprintf( buffer, bufferSize, "%d%%", stats->weaponAccuracy[weapon] );
 		return qtrue;
 	}
 
@@ -5710,20 +5717,20 @@ static qboolean CG_BuildPlacementPickupMetricText( int ownerDraw, const score_t 
 		for ( index = 0; index < CG_SCORESTAT_PICKUP_COUNT; index++ ) {
 			total += stats->pickupCounts[index];
 		}
-		Com_sprintf( buffer, bufferSize, "%i", total );
+		Com_sprintf( buffer, bufferSize, "%d", total );
 		return qtrue;
 	}
 
 	if ( normalized >= CG_1ST_PLYR_PICKUPS_RA && normalized <= CG_1ST_PLYR_PICKUPS_MH ) {
 		index = normalized - CG_1ST_PLYR_PICKUPS_RA;
-		Com_sprintf( buffer, bufferSize, "%i", stats->pickupCounts[index] );
+		Com_sprintf( buffer, bufferSize, "%d", stats->pickupCounts[index] );
 		return qtrue;
 	}
 
 	if ( normalized >= CG_1ST_PLYR_AVG_PICKUP_TIME_RA && normalized <= CG_1ST_PLYR_AVG_PICKUP_TIME_MH ) {
 		index = normalized - CG_1ST_PLYR_AVG_PICKUP_TIME_RA;
 		if ( stats->pickupCounts[index] <= 0 ) {
-			buffer[0] = '\0';
+			Q_strncpyz( buffer, "-", bufferSize );
 		} else {
 			Com_sprintf( buffer, bufferSize, "%3.2f", stats->pickupAvgSeconds[index] );
 		}
@@ -5977,16 +5984,16 @@ static qboolean CG_BuildPlacementMetricText( int ownerDraw, const score_t *score
 	case CG_1ST_PLYR_READY:
 		return qfalse;
 	case CG_1ST_PLYR_FRAGS:
-		Com_sprintf( buffer, bufferSize, "%i", CG_GetPlacementFragCount( score ) );
+		Com_sprintf( buffer, bufferSize, "%d", CG_GetPlacementFragCount( score ) );
 		return qtrue;
 	case CG_1ST_PLYR_DEATHS:
-		Com_sprintf( buffer, bufferSize, "%i", score->deaths );
+		Com_sprintf( buffer, bufferSize, "%d", score->deaths );
 		return qtrue;
 	case CG_1ST_PLYR_DMG:
-		Com_sprintf( buffer, bufferSize, "%i", score->damage );
+		Com_sprintf( buffer, bufferSize, "%d", score->damage );
 		return qtrue;
 	case CG_1ST_PLYR_PING:
-		Com_sprintf( buffer, bufferSize, "%i", score->ping );
+		Com_sprintf( buffer, bufferSize, "%d", score->ping );
 		return qtrue;
 	case CG_1ST_PLYR_WINS:
 		Com_sprintf( buffer, bufferSize, "%d/%d", ci->wins, ci->losses );
@@ -5997,13 +6004,13 @@ static qboolean CG_BuildPlacementMetricText( int ownerDraw, const score_t *score
 	case CG_1ST_PLYR_FLAG:
 		return qfalse;
 	case CG_1ST_PLYR_EXCELLENT:
-		Com_sprintf( buffer, bufferSize, "%i", score->excellentCount );
+		Com_sprintf( buffer, bufferSize, "%d", score->excellentCount );
 		return qtrue;
 	case CG_1ST_PLYR_IMPRESSIVE:
-		Com_sprintf( buffer, bufferSize, "%i", score->impressiveCount );
+		Com_sprintf( buffer, bufferSize, "%d", score->impressiveCount );
 		return qtrue;
 	case CG_1ST_PLYR_HUMILIATION:
-		Com_sprintf( buffer, bufferSize, "%i", score->guantletCount );
+		Com_sprintf( buffer, bufferSize, "%d", score->guantletCount );
 		return qtrue;
 	default:
 		break;
@@ -6073,7 +6080,7 @@ static qboolean CG_DrawPlacementFragsOwnerDraw( rectDef_t *rect, float scale, ve
 		return qfalse;
 	}
 
-	Com_sprintf( buffer, sizeof( buffer ), "%i", CG_GetPlacementFragCount( score ) );
+	Com_sprintf( buffer, sizeof( buffer ), "%d", CG_GetPlacementFragCount( score ) );
 	CG_Text_Paint( rect->x, rect->y + rect->h, scale, color, buffer, 0, 0, textStyle );
 	return qtrue;
 }
@@ -6098,7 +6105,7 @@ static qboolean CG_DrawPlacementDeathsOwnerDraw( rectDef_t *rect, float scale, v
 		return qfalse;
 	}
 
-	Com_sprintf( buffer, sizeof( buffer ), "%i", score->deaths );
+	Com_sprintf( buffer, sizeof( buffer ), "%d", score->deaths );
 	CG_Text_Paint( rect->x, rect->y + rect->h, scale, color, buffer, 0, 0, textStyle );
 	return qtrue;
 }
@@ -6123,7 +6130,7 @@ static qboolean CG_DrawPlacementDamageOwnerDraw( rectDef_t *rect, float scale, v
 		return qfalse;
 	}
 
-	Com_sprintf( buffer, sizeof( buffer ), "%i", score->damage );
+	Com_sprintf( buffer, sizeof( buffer ), "%d", score->damage );
 	CG_Text_Paint( rect->x, rect->y + rect->h, scale, color, buffer, 0, 0, textStyle );
 	return qtrue;
 }
@@ -6258,7 +6265,101 @@ Draws the retail first/second placement per-weapon accuracy ownerdraws.
 =============
 */
 static void CG_DrawPlacementWeaponAccuracyOwnerDraw( rectDef_t *rect, float scale, vec4_t color, int textStyle, int ownerDraw ) {
-	(void)CG_DrawPlacementMetricTextOwnerDraw( rect, scale, color, textStyle, ownerDraw );
+	const score_t		*score;
+	const score_t		*otherScore;
+	const cgScoreStats_t	*stats;
+	const cgScoreStats_t	*otherStats;
+	vec4_t			drawColor;
+	weapon_t		weapon;
+	int			otherValue;
+	int			slot;
+
+	if ( !rect || !CG_ResolvePlacementMetricOwnerDraw( ownerDraw, &slot, NULL ) ) {
+		return;
+	}
+
+	Vector4Copy( color, drawColor );
+
+	weapon = CG_GetPlacementMetricWeapon( ownerDraw );
+	score = CG_GetPlacementScore( slot );
+	stats = CG_GetPlacementScoreStats( score );
+	if ( stats && weapon > WP_NONE && weapon < WP_NUM_WEAPONS ) {
+		otherScore = CG_GetPlacementScore( slot == 0 ? 1 : 0 );
+		otherStats = CG_GetPlacementScoreStats( otherScore );
+		otherValue = otherStats ? otherStats->weaponAccuracy[weapon] : 0;
+
+		if ( stats->weaponAccuracy[weapon] > otherValue ) {
+			drawColor[0] = 1.0f;
+			drawColor[1] = 1.0f;
+			drawColor[2] = 1.0f;
+			drawColor[3] = 0.8f;
+		}
+	}
+
+	(void)CG_DrawPlacementMetricTextOwnerDraw( rect, scale, drawColor, textStyle, ownerDraw );
+}
+
+/*
+=============
+CG_DrawPlacementPickupSummaryOwnerDraw
+
+Draws the retail first/second placement pickup summary strip.
+=============
+*/
+static void CG_DrawPlacementPickupSummaryOwnerDraw( rectDef_t *rect, float scale, vec4_t color, int textStyle, int ownerDraw ) {
+	const score_t		*score;
+	const cgScoreStats_t	*stats;
+	float			drawX;
+	float			drawY;
+	int			index;
+	int			slot;
+
+	if ( !rect || !CG_ResolvePlacementMetricOwnerDraw( ownerDraw, &slot, NULL ) ) {
+		return;
+	}
+
+	score = CG_GetPlacementScore( slot );
+	stats = CG_GetPlacementScoreStats( score );
+	if ( !stats ) {
+		return;
+	}
+
+	drawX = (float)(int)rect->x;
+	drawY = (float)(int)rect->y;
+	trap_R_SetColor( NULL );
+
+	for ( index = 0; index < CG_SCORESTAT_PICKUP_COUNT; index++ ) {
+		char		countText[16];
+		char		averageText[16];
+		float		textX;
+		qhandle_t	iconHandle;
+
+		if ( stats->pickupCounts[index] <= 0 ) {
+			continue;
+		}
+
+		iconHandle = CG_GetTeamPickupSummaryIconHandle( TEAM_FREE, cgPlacementPickupSummaryIcons[index] );
+		if ( !iconHandle ) {
+			continue;
+		}
+
+		CG_DrawPic( drawX, drawY, rect->w, rect->h, iconHandle );
+
+		Com_sprintf( countText, sizeof( countText ), "%d", stats->pickupCounts[index] );
+		Com_sprintf( averageText, sizeof( averageText ), "%3.2f", stats->pickupAvgSeconds[index] );
+
+		if ( slot == 0 ) {
+			textX = drawX + 15.0f;
+			CG_Text_Paint( textX, drawY + 15.0f, scale, color, countText, 0, 0, textStyle );
+			CG_Text_Paint( textX + 15.0f, drawY + 15.0f, scale, color, averageText, 0, 0, textStyle );
+		} else {
+			textX = drawX;
+			CG_Text_Paint( textX, drawY + 15.0f, scale, color, countText, 0, 0, textStyle );
+			CG_Text_Paint( textX - 15.0f, drawY + 15.0f, scale, color, averageText, 0, 0, textStyle );
+		}
+
+		drawY += 15.0f;
+	}
 }
 
 /*
@@ -6435,6 +6536,10 @@ static qboolean CG_DrawPlacementMetricOwnerDraw( rectDef_t *rect, float scale, v
 
 	if ( ( ownerDraw >= CG_1ST_PLYR_PICKUPS && ownerDraw <= CG_1ST_PLYR_PICKUPS_MH ) ||
 		( ownerDraw >= CG_2ND_PLYR_PICKUPS && ownerDraw <= CG_2ND_PLYR_PICKUPS_MH ) ) {
+		if ( ownerDraw == CG_1ST_PLYR_PICKUPS || ownerDraw == CG_2ND_PLYR_PICKUPS ) {
+			CG_DrawPlacementPickupSummaryOwnerDraw( rect, scale, color, textStyle, ownerDraw );
+			return qtrue;
+		}
 		CG_DrawPlacementPickupCountOwnerDraw( rect, scale, color, textStyle, ownerDraw );
 		return qtrue;
 	}

@@ -1033,6 +1033,11 @@ def test_disabled_online_services_no_longer_force_console_fallback() -> None:
 
     draw_block = _extract_function_block(cl_scrn, "void SCR_DrawScreenField( stereoFrame_t stereoFrame ) {")
     assert "uiFullscreen = VM_Call( uivm, UI_IS_FULLSCREEN ) ? qtrue : qfalse;" in draw_block
+    assert "if ( browserOverlayRequested && cls.state == CA_DISCONNECTED ) {" in draw_block
+    assert "if ( browserDrawableSurface ) {" in draw_block
+    assert "uiFullscreen = qtrue;" in draw_block
+    assert "&& !browserOverlayRequested" in draw_block
+    assert "if ( cls.keyCatchers & KEYCATCH_UI && uivm && !browserOverlayRequested ) {" in draw_block
     assert 'VM_Call( uivm, UI_SET_ACTIVE_MENU, UIMENU_MAIN );' in draw_block
     assert "consoleFallback" not in draw_block
 
@@ -2798,6 +2803,8 @@ def test_client_browser_event_publication_hooks_reconstruct_runtime_owner() -> N
     assert 'Com_DPrintf( "microtxn.authorization callback: ignored null callback payload (%s [%s])\\n",' in micro_callback_log_block
     assert "CL_GetSocialOverlayServiceProviderLabel()," in micro_callback_log_block
     assert "CL_GetSocialOverlayServicePolicyLabel()" in micro_callback_log_block
+    assert 'if ( !Cvar_VariableIntegerValue( "web_eventDebug" ) ) {' in browser_event_log_block
+    assert "return;" in browser_event_log_block
     assert 'Com_DPrintf( "%s browser event: %s (%s [%s])\\n",' in browser_event_log_block
     assert "CL_GetSocialOverlayServiceProviderLabel()," in browser_event_log_block
     assert "CL_GetSocialOverlayServicePolicyLabel()" in browser_event_log_block

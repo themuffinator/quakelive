@@ -480,11 +480,13 @@ def test_awesomium_win32_backend_documents_retail_slot_to_export_substitution() 
 		'CL_AWE_IMPORT( newWebPreferences, "_Awe_new_WebPreferences@0" );',
 		'CL_AWE_IMPORT( webPrefsEnablePluginsSet, "_Awe_WebPreferences_enable_plugins_set@8" );',
 		'CL_AWE_IMPORT( webPrefsEnableWebSecuritySet, "_Awe_WebPreferences_enable_web_security_set@8" );',
+		'cl_awe.webPrefsEnableGpuAccelerationSet = reinterpret_cast<awe_webprefs_set_bool_fn>( CL_Awesomium_ResolveOptionalImport( "_Awe_WebPreferences_enable_gpu_acceleration_set@8" ) );',
 		'CL_AWE_IMPORT( webCoreInitialize, "_Awe_WebCore_Initialize@4" );',
 		'CL_AWE_IMPORT( webCoreShutdown, "_Awe_WebCore_Shutdown@0" );',
 		'CL_AWE_IMPORT( webCoreCreateWebSession, "_Awe_WebCore_CreateWebSession@12" );',
 		'CL_AWE_IMPORT( webCoreCreateWebView, "_Awe_WebCore_CreateWebView_0@20" );',
 		'CL_AWE_IMPORT( webConfigChildProcessPathSet, "_Awe_WebConfig_child_process_path_set@8" );',
+		'cl_awe.webConfigAdditionalOptionsSet = reinterpret_cast<awe_webcore_set_object_fn>( CL_Awesomium_ResolveOptionalImport( "_Awe_WebConfig_additional_options_set@8" ) );',
 		'CL_AWE_IMPORT( webConfigPackagePathSet, "_Awe_WebConfig_package_path_set@8" );',
 		'CL_AWE_IMPORT( newDataPakSource, "_Awe_new_DataPakSource@4" );',
 		'CL_AWE_IMPORT( webSessionAddDataSource, "_Awe_WebSession_AddDataSource@12" );',
@@ -506,6 +508,9 @@ def test_awesomium_win32_backend_documents_retail_slot_to_export_substitution() 
 		'CL_AWE_IMPORT( newWebKeyboardEvent, "_Awe_new_WebKeyboardEvent_1@12" );',
 		'CL_AWE_IMPORT( deleteWebKeyboardEvent, "_Awe_delete_WebKeyboardEvent@4" );',
 		'CL_AWE_IMPORT( webViewInjectKeyboardEvent, "_Awe_WebView_InjectKeyboardEvent@8" );',
+		'cl_awe.newWebStringArray = reinterpret_cast<awe_new_void_fn>( CL_Awesomium_ResolveOptionalImport( "_Awe_new_WebStringArray_0@0" ) );',
+		'cl_awe.webStringArrayPush = reinterpret_cast<awe_webstring_array_push_fn>( CL_Awesomium_ResolveOptionalImport( "_Awe_WebStringArray_Push@8" ) );',
+		'cl_awe.deleteWebStringArray = reinterpret_cast<awe_delete_object_fn>( CL_Awesomium_ResolveOptionalImport( "_Awe_delete_WebStringArray@4" ) );',
 	):
 		assert expected in load_block
 
@@ -513,6 +518,7 @@ def test_awesomium_win32_backend_documents_retail_slot_to_export_substitution() 
 	assert "cl_aweBootstrapRetailMappings[i].retailOwnerAddress != 0u" in count_bootstrap_block
 	assert "cl_awe.webPrefsEnablePluginsSet( cl_awesomium.webPreferences, true );" in prepare_prefs_block
 	assert "cl_awe.webPrefsEnableWebSecuritySet( cl_awesomium.webPreferences, false );" in prepare_prefs_block
+	assert "cl_awe.webPrefsEnableGpuAccelerationSet( cl_awesomium.webPreferences, false );" in prepare_prefs_block
 	for retail_default in (
 		"webPrefsEnableJavascriptSet",
 		"webPrefsEnableLocalStorageSet",
@@ -528,21 +534,26 @@ def test_awesomium_win32_backend_documents_retail_slot_to_export_substitution() 
 
 	for expected in (
 		"char childProcessPath[MAX_PATH];",
+		"char childProcessConfigPath[MAX_PATH];",
 		"char logPath[MAX_PATH];",
 		"char packagePath[MAX_PATH];",
 		"char packageRoot[MAX_PATH];",
 		"const char *sessionPath;",
 		"const char *assetsPath;",
 		"sessionPath = runtimePath;",
-		"assetsPath = basePath && basePath[0] ? basePath : runtimePath;",
+		"assetsPath = runtimePath && runtimePath[0] ? runtimePath : basePath;",
 		'CL_Awesomium_AppendPath( childProcessPath, sizeof( childProcessPath ), assetsPath, "awesomium_process.exe" );',
+		'strncpy( childProcessConfigPath, "awesomium_process.exe", sizeof( childProcessConfigPath ) - 1 );',
 		'CL_Awesomium_AppendPath( logPath, sizeof( logPath ), sessionPath, "awesomium.log" );',
 		'CL_Awesomium_AppendPath( packagePath, sizeof( packagePath ), assetsPath, "web.pak" );',
-		'CL_Awesomium_AppendPath( packagePath, sizeof( packagePath ), sessionPath, "web.pak" );',
-		'CL_Awesomium_AppendPath( childProcessPath, sizeof( childProcessPath ), sessionPath, "awesomium_process.exe" );',
+		'CL_Awesomium_AppendPath( packagePath, sizeof( packagePath ), basePath, "web.pak" );',
+		'CL_Awesomium_AppendPath( childProcessPath, sizeof( childProcessPath ), basePath, "awesomium_process.exe" );',
 		"CL_Awesomium_BuildUserScript( cl_awesomium.startupScript, sizeof( cl_awesomium.startupScript ), playerName, appId, steamIdLow, steamIdHigh, initialConfigJson );",
+		'"--no-sandbox",',
+		'"--single-process"',
 		'!CL_Awesomium_SetConfigString( cl_awe.webConfigAssetProtocolSet, cl_awesomium.webConfig, "asset" )',
-		"!CL_Awesomium_SetConfigString( cl_awe.webConfigChildProcessPathSet, cl_awesomium.webConfig, childProcessPath )",
+		'!CL_Awesomium_SetConfigStringArrayOptions( cl_awe.webConfigAdditionalOptionsSet, cl_awesomium.webConfig, awesomiumOptions, sizeof( awesomiumOptions ) / sizeof( awesomiumOptions[0] ) )',
+		"!CL_Awesomium_SetConfigString( cl_awe.webConfigChildProcessPathSet, cl_awesomium.webConfig, childProcessConfigPath )",
 		"!CL_Awesomium_SetConfigString( cl_awe.webConfigLogPathSet, cl_awesomium.webConfig, logPath )",
 		"!CL_Awesomium_SetConfigString( cl_awe.webConfigPackagePathSet, cl_awesomium.webConfig, packageRoot )",
 		"!CL_Awesomium_SetConfigString( cl_awe.webConfigUserScriptSet, cl_awesomium.webConfig, cl_awesomium.startupScript )",
@@ -554,10 +565,11 @@ def test_awesomium_win32_backend_documents_retail_slot_to_export_substitution() 
 
 	assert 'cl_awesomium.webSession = cl_awe.webCoreCreateWebSession( cl_awesomium.webCore, dataPath, cl_awesomium.webPreferences );' in create_session_block
 	assert "cl_awe.webSessionInitialize( cl_awesomium.webSession );" in create_session_block
-	assert "assetsPath = basePath && basePath[0] ? basePath : runtimePath;" in create_session_block
+	assert "assetsPath = runtimePath && runtimePath[0] ? runtimePath : basePath;" in create_session_block
 	assert 'CL_Awesomium_AppendPath( pakPath, sizeof( pakPath ), assetsPath, "web.pak" );' in create_session_block
-	assert 'CL_Awesomium_AppendPath( pakPath, sizeof( pakPath ), sessionPath, "web.pak" );' in create_session_block
-	assert 'pakName = CL_Awesomium_AllocWideString( "web.pak" );' in create_session_block
+	assert 'CL_Awesomium_AppendPath( pakPath, sizeof( pakPath ), basePath, "web.pak" );' in create_session_block
+	assert "pakName = CL_Awesomium_AllocWideString( pakPath );" in create_session_block
+	assert 'Com_Printf( "Awesomium startup phase: creating DataPakSource from %s\\n", pakPath );' in create_session_block
 	assert "cl_awesomium.dataPakSource = cl_awe.newDataPakSource( pakName );" in create_session_block
 	assert 'sourceName = CL_Awesomium_AllocWideString( "QL" );' in create_session_block
 	assert "cl_awe.webSessionAddDataSource( cl_awesomium.webSession, sourceName, cl_awesomium.dataPakSource );" in create_session_block
@@ -1373,8 +1385,14 @@ def test_awesomium_runtime_bootstrap_and_surface_pump_reconstruct_retail_host_co
 	surface_ready_block = _extract_function_block(
 		cl_cgame, "static qboolean CL_WebHost_SurfaceReadyForOverlay( qboolean requireShader ) {"
 	)
+	live_failure_block = _extract_function_block(
+		cl_cgame, "static void CL_WebHost_CheckLiveAwesomiumSurfaceFailure( void ) {"
+	)
 	live_view_block = _extract_function_block(
 		cl_cgame, "qboolean CL_WebHost_HasLiveView( void ) {"
+	)
+	frame_block = _extract_function_block(
+		cl_cgame, "void CL_WebHost_Frame( void ) {"
 	)
 
 	assert '#define CL_WEB_RETAIL_SURFACE_IMAGE "browser"' in cl_cgame
@@ -1382,6 +1400,7 @@ def test_awesomium_runtime_bootstrap_and_surface_pump_reconstruct_retail_host_co
 	assert '#define CL_WEB_SURFACE_SHADER "browserShader"' in cl_cgame
 	assert "#define CL_WEB_BOOTSTRAP_MAX_ATTEMPTS 10" in cl_cgame
 	assert "#define CL_WEB_BOOTSTRAP_SLEEP_MSEC 100" in cl_cgame
+	assert "#define CL_WEB_LIVE_SURFACE_FAILURE_FRAMES 180" in cl_cgame
 	assert 'Cvar_VariableStringBuffer( "fs_homepath", buffer, bufferSize );' in resolve_session_block
 	assert 'Q_strncpyz( buffer, ".", bufferSize );' in resolve_session_block
 	assert "cl_webHost.dataPakSourceInstalled = qtrue;" in register_sources_block
@@ -1400,6 +1419,7 @@ def test_awesomium_runtime_bootstrap_and_surface_pump_reconstruct_retail_host_co
 	assert "QLWebHost_InstallRuntimeListeners();" in runtime_block
 	assert "char\t\tsurfaceImageName[MAX_QPATH];" in cl_cgame
 	assert "qboolean\tsurfaceHasUiContent;" in cl_cgame
+	assert "int\t\t\tliveSurfaceMissingFrames;" in cl_cgame
 	assert 'Q_strncpyz( cl_webHost.surfaceImageName, CL_WEB_SURFACE_IMAGE, sizeof( cl_webHost.surfaceImageName ) );' in upload_surface_block
 	assert 'Q_strncpyz( cl_webHost.surfaceShaderName, CL_WEB_SURFACE_SHADER, sizeof( cl_webHost.surfaceShaderName ) );' in upload_surface_block
 	assert "cl_webHost.surfaceShader = CL_RegisterShaderFromRGBAWithImageName(" in upload_surface_block
@@ -1411,6 +1431,8 @@ def test_awesomium_runtime_bootstrap_and_surface_pump_reconstruct_retail_host_co
 	assert "if ( copied ) {" in write_surface_block
 	assert "cl_webHost.surfaceHasVisiblePixels = visible;" in write_surface_block
 	assert "cl_webHost.surfaceHasUiContent = contentful;" in write_surface_block
+	assert "cl_webHost.liveSurfaceMissingFrames = 0;" in write_surface_block
+	assert "cl_webHost.liveSurfaceMissingFrames++;" in write_surface_block
 	assert "QLWebView_SurfaceHasUiContent(" in write_surface_block
 	assert "contentPixels >= 32 && contentPixels * 500 >= sampled" in content_surface_block
 	assert "return qtrue;" in write_surface_block
@@ -1422,7 +1444,8 @@ def test_awesomium_runtime_bootstrap_and_surface_pump_reconstruct_retail_host_co
 	assert "awesomiumHeight != cl_webHost.surfaceContentHeight" in pump_block
 	assert "if ( cl_webHost.surfaceUploadWidth != cl_webHost.surfaceWidth || cl_webHost.surfaceUploadHeight != cl_webHost.surfaceHeight ) {" in pump_block
 	assert "if ( cl_webHost.surfaceDirty ) {" in pump_block
-	assert "if ( !cl_webHost.surfaceShader || cl_webHost.surfaceDirty ) {" in draw_block
+	assert "QLWebView_UploadSurfaceImage();" in pump_block
+	assert "QLWebView_UploadSurfaceImage();" not in draw_block
 	assert "if ( !CL_WebHost_SurfaceReadyForOverlay( qtrue ) ) {" in draw_block
 	assert "contentWidth = cl_webHost.surfaceContentWidth > 0 ? cl_webHost.surfaceContentWidth : cl_webHost.viewWidth;" in draw_block
 	assert "contentHeight = cl_webHost.surfaceContentHeight > 0 ? cl_webHost.surfaceContentHeight : cl_webHost.viewHeight;" in draw_block
@@ -1430,7 +1453,18 @@ def test_awesomium_runtime_bootstrap_and_surface_pump_reconstruct_retail_host_co
 	assert "return CL_WebHost_SurfaceReadyForOverlay( qtrue );" in drawable_block
 	assert "if ( requireShader && !cl_webHost.surfaceShader ) {" in surface_ready_block
 	assert "if ( !cl_webHost.surfaceHasVisiblePixels || !cl_webHost.surfaceHasUiContent ) {" in surface_ready_block
+	assert "!cl_webHost.liveAwesomium || !cl_webHost.viewInitialised || !cl_webHost.browserVisible" in live_failure_block
+	assert "cl_webHost.surfaceHasUiContent" in live_failure_block
+	assert "cl_webHost.liveSurfaceMissingFrames < CL_WEB_LIVE_SURFACE_FAILURE_FRAMES" in live_failure_block
+	assert 'Com_Printf( "Awesomium WebCore surface failed after %d frames' in live_failure_block
+	assert "CL_WebHost_ResetRuntime( qtrue );" in live_failure_block
+	assert "cl_webHost.loadFailed = qtrue;" in live_failure_block
+	assert "CL_ResetBrowserOverlayState();" in live_failure_block
+	assert "CL_RefreshOnlineServicesBridgeState();" in live_failure_block
 	assert "return cl_webHost.viewInitialised && cl_webHost.bootstrapReady;" in live_view_block
+	assert "CL_WebHost_CheckLiveAwesomiumSurfaceFailure();" in frame_block
+	assert frame_block.find("QLWebHost_PumpFrame();") < frame_block.find("CL_WebHost_CheckLiveAwesomiumSurfaceFailure();")
+	assert frame_block.find("CL_WebHost_CheckLiveAwesomiumSurfaceFailure();") < frame_block.find("CL_WebHost_UpdateOverlayOwnership();")
 
 
 def test_awesomium_map_list_reconstructs_retail_arena_catalog() -> None:

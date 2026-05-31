@@ -247,11 +247,12 @@ jobs:
               --target "${RELEASE_TARGET}" \
               --title "${RELEASE_TITLE}" \
               --notes-file artifacts/nightly/release-notes.md \
-              --latest=false
+              --latest
           fi
 
           release_id="$(gh release view "${RELEASE_TAG}" --json databaseId --jq .databaseId)"
-          gh api --method PATCH "/repos/${GITHUB_REPOSITORY}/releases/${release_id}" -f prerelease=false
+          gh api --method PATCH "/repos/${GITHUB_REPOSITORY}/releases/${release_id}" -F prerelease=false
+          gh release edit "${RELEASE_TAG}" --latest
 
       - name: Publish nightly release manifest
         uses: actions/upload-artifact@v4

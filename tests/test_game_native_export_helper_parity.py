@@ -103,15 +103,26 @@ def test_native_ui_and_cgame_receive_retail_packed_glconfig() -> None:
 	client_h = _read("src/code/client/client.h")
 	cl_cgame = _read("src/code/client/cl_cgame.c")
 	cl_ui = _read("src/code/client/cl_ui.c")
+	tr_types = _read("src/code/cgame/tr_types.h")
+	win_glimp = _read("src/code/win32/win_glimp.c")
 	helper_block = _extract_block(cl_cgame, "void CL_GetRetailGlconfig")
 	cgame_import_block = _extract_block(cl_cgame, "static int QDECL CG_Import_Syscall")
 	ui_import_block = _extract_block(cl_ui, "static int QDECL UI_Import_Syscall")
 
 	assert "void CL_GetRetailGlconfig( void *glconfig );" in client_h
+	assert "qboolean\t\t\t\ttextureEnvAddAvailable;" in tr_types
+	assert "qboolean\t\t\t\tmultitextureAvailable;" in tr_types
+	assert "int\t\t\t\t\t\tvidWidth, vidHeight;" in tr_types
+	assert "#if !defined(CGAME) && !defined(UI_EXPORTS)" in tr_types
+	assert tr_types.index("qboolean\t\t\t\ttextureEnvAddAvailable;") < tr_types.index("qboolean\t\t\t\tmultitextureAvailable;")
+	assert tr_types.index("qboolean\t\t\t\tmultitextureAvailable;") < tr_types.index("int\t\t\t\t\t\tvidWidth, vidHeight;")
+	assert tr_types.index("qboolean\t\t\t\tstereoEnabled;") < tr_types.index("#if !defined(CGAME) && !defined(UI_EXPORTS)")
+	assert "glConfig.multitextureAvailable = qfalse;" in win_glimp
+	assert "glConfig.multitextureAvailable = qtrue;" in win_glimp
 	assert "qboolean\t\t\t\tmultitextureAvailable;" in cl_cgame
 	assert "typedef char qlRetailGlconfigSizeCheck[( sizeof( qlRetailGlconfig_t ) == 0x2c44 ) ? 1 : -1 ];" in cl_cgame
 	assert "retailConfig.textureEnvAddAvailable = cls.glconfig.textureEnvAddAvailable;" in helper_block
-	assert "retailConfig.multitextureAvailable = cls.glconfig.maxActiveTextures > 1 ? qtrue : qfalse;" in helper_block
+	assert "retailConfig.multitextureAvailable = cls.glconfig.multitextureAvailable;" in helper_block
 	assert "retailConfig.vidWidth = cls.glconfig.vidWidth;" in helper_block
 	assert "retailConfig.vidHeight = cls.glconfig.vidHeight;" in helper_block
 	assert "retailConfig.windowAspect = cls.glconfig.windowAspect;" in helper_block

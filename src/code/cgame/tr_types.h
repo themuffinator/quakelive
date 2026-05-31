@@ -185,6 +185,7 @@ typedef struct {
 	qboolean				deviceSupportsGamma;
 	textureCompression_t	textureCompression;
 	qboolean				textureEnvAddAvailable;
+	qboolean				multitextureAvailable;	// retail QL native ABI slot before vidWidth
 
 	int						vidWidth, vidHeight;
 	// aspect is the screen's physical width / height, which may be different
@@ -199,7 +200,9 @@ typedef struct {
 	// used CDS.
 	qboolean				isFullscreen;
 	qboolean				stereoEnabled;
-	qboolean				smpActive;		// dual processor
+#if !defined(CGAME) && !defined(UI_EXPORTS)
+	qboolean				smpActive;		// engine-local GPL tail, not exposed by retail native imports
+#endif
 } glconfig_t;
 
 // FIXME: VM should be OS agnostic .. in theory

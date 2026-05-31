@@ -2771,8 +2771,9 @@ def test_engine_cvar_fortysecond_renderer_postprocess_state_tranche_matches_reta
 	retail_hlil_part02 = _read_text(QL_STEAM_HLIL_PART02)
 
 	assert 'DAT_01740ed4 = (*DAT_01740d40)("r_enablePostProcess",&DAT_00551624,0x80021);' in retail_ghidra
-	assert 'r_enablePostProcess = ri.Cvar_Get( "r_enablePostProcess", "1", CVAR_ARCHIVE | CVAR_LATCH | CVAR_CLOUD );' in tr_init
-	assert 'ri.Cvar_Set( "r_enablePostProcess", "0" );' not in tr_init
+	assert 'r_enablePostProcess = ri.Cvar_Get( "r_enablePostProcess", "0", CVAR_ROM );' in tr_init
+	assert 'r_enablePostProcess = ri.Cvar_Get( "r_enablePostProcess", "1", CVAR_ARCHIVE | CVAR_LATCH | CVAR_CLOUD );' not in tr_init
+	assert 'ri.Cvar_Set( "r_enablePostProcess", "0" );' in tr_init
 	assert 'AssertCvarRange( r_enablePostProcess, 0, 1, qtrue );' in tr_init
 	assert 'triggerReset = (qboolean)(r_enablePostProcess && r_enablePostProcess->modified);' in tr_init
 	assert 'wantPostProcess = (qboolean)(r_enablePostProcess && r_enablePostProcess->integer);' in tr_backend
@@ -3292,8 +3293,9 @@ def test_engine_cvar_twentyninth_renderer_postprocess_extension_tranche_matches_
 	assert 'cvar_t\t*(*Cvar_GetBounded)( const char *name, const char *value, const char *minValue, const char *maxValue, int flags );' in tr_public
 	assert "ri.Cvar_GetBounded = Cvar_GetBounded;" in cl_main
 
-	assert 'r_enablePostProcess = ri.Cvar_Get( "r_enablePostProcess", "1", CVAR_ARCHIVE | CVAR_LATCH | CVAR_CLOUD );' in tr_init
-	assert 'ri.Cvar_Set( "r_enablePostProcess", "0" );' not in tr_init
+	assert 'r_enablePostProcess = ri.Cvar_Get( "r_enablePostProcess", "0", CVAR_ROM );' in tr_init
+	assert 'r_enablePostProcess = ri.Cvar_Get( "r_enablePostProcess", "1", CVAR_ARCHIVE | CVAR_LATCH | CVAR_CLOUD );' not in tr_init
+	assert 'ri.Cvar_Set( "r_enablePostProcess", "0" );' in tr_init
 	assert 'AssertCvarRange( r_enablePostProcess, 0, 1, qtrue );' in tr_init
 	assert 'triggerReset = (qboolean)(r_enablePostProcess && r_enablePostProcess->modified);' in tr_init
 	assert 'wantPostProcess = (qboolean)(r_enablePostProcess && r_enablePostProcess->integer);' in tr_backend
