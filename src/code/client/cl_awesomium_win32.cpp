@@ -1098,14 +1098,14 @@ static qboolean CL_Awesomium_PrepareConfig( const char *runtimePath, const char 
 
 	CL_Awesomium_CopyPath( childProcessConfigPath, sizeof( childProcessConfigPath ), "awesomium_process.exe" );
 	Com_Printf( "Awesomium startup phase: child process path %s (validated %s)\n", childProcessConfigPath, childProcessPath );
+	Com_Printf( "Awesomium startup phase: deferring bridge script to WebView ExecuteJavascript\n" );
 	Com_Printf( "Awesomium startup phase: applying WebConfig\n" );
 	if ( !CL_Awesomium_SetConfigString( cl_awe.webConfigAssetProtocolSet, cl_awesomium.webConfig, "asset" )
 		|| !CL_Awesomium_SetConfigStringArrayOptions( cl_awe.webConfigAdditionalOptionsSet, cl_awesomium.webConfig, awesomiumOptions, sizeof( awesomiumOptions ) / sizeof( awesomiumOptions[0] ) )
 		|| !CL_Awesomium_SetConfigString( cl_awe.webConfigChildProcessPathSet, cl_awesomium.webConfig, childProcessConfigPath )
 		|| !CL_Awesomium_SetConfigString( cl_awe.webConfigLogPathSet, cl_awesomium.webConfig, logPath )
 		|| !CL_Awesomium_SetConfigString( cl_awe.webConfigPackagePathSet, cl_awesomium.webConfig, packageRoot )
-		|| !CL_Awesomium_SetConfigString( cl_awe.webConfigUserAgentSet, cl_awesomium.webConfig, "Mozilla/5.0 (Windows NT 10.0; Win32; x86) QuakeLiveReverse/1.0" )
-		|| !CL_Awesomium_SetConfigString( cl_awe.webConfigUserScriptSet, cl_awesomium.webConfig, cl_awesomium.startupScript ) ) {
+		|| !CL_Awesomium_SetConfigString( cl_awe.webConfigUserAgentSet, cl_awesomium.webConfig, "Mozilla/5.0 (Windows NT 10.0; Win32; x86) QuakeLiveReverse/1.0" ) ) {
 		return qfalse;
 	}
 

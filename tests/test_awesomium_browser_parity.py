@@ -554,9 +554,10 @@ def test_awesomium_win32_backend_documents_retail_slot_to_export_substitution() 
 		"!CL_Awesomium_SetConfigString( cl_awe.webConfigChildProcessPathSet, cl_awesomium.webConfig, childProcessConfigPath )",
 		"!CL_Awesomium_SetConfigString( cl_awe.webConfigLogPathSet, cl_awesomium.webConfig, logPath )",
 		"!CL_Awesomium_SetConfigString( cl_awe.webConfigPackagePathSet, cl_awesomium.webConfig, packageRoot )",
-		"!CL_Awesomium_SetConfigString( cl_awe.webConfigUserScriptSet, cl_awesomium.webConfig, cl_awesomium.startupScript )",
+		'Com_Printf( "Awesomium startup phase: deferring bridge script to WebView ExecuteJavascript\\n" );',
 	):
 		assert expected in prepare_config_block
+	assert "!CL_Awesomium_SetConfigString( cl_awe.webConfigUserScriptSet" not in prepare_config_block
 	assert "(void)runtimePath;" not in prepare_config_block
 	assert "(void)basePath;" not in prepare_config_block
 	assert "(void)playerName;" not in prepare_config_block

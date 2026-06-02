@@ -563,7 +563,12 @@ $adapterAnchors = @(
 	@{
 		Path = 'src/code/client/cl_awesomium_win32.cpp'
 		Literal = 'CL_Awesomium_BuildUserScript( cl_awesomium.startupScript, sizeof( cl_awesomium.startupScript ), playerName, appId, steamIdLow, steamIdHigh, initialConfigJson );'
-		Description = 'WebConfig user-script bootstrap projection'
+		Description = 'startup bridge script constructed for WebView ExecuteJavascript retries'
+	},
+	@{
+		Path = 'src/code/client/cl_awesomium_win32.cpp'
+		Literal = 'Com_Printf( "Awesomium startup phase: deferring bridge script to WebView ExecuteJavascript\n" );'
+		Description = 'startup bridge kept out of WebConfig child-process command line'
 	},
 	@{
 		Path = 'src/code/client/cl_awesomium_win32.cpp'
@@ -617,8 +622,8 @@ $adapterAnchors = @(
 	},
 	@{
 		Path = 'src/code/client/cl_cgame.c'
-		Literal = 'if ( !cl_webHost.surfaceShader || cl_webHost.surfaceDirty ) {'
-		Description = 'browser draw uploads on shader absence or dirty surface'
+		Literal = 'QLWebView_UploadSurfaceImage();'
+		Description = 'browser surface update uploads dirty frames'
 	},
 	@{
 		Path = 'src/code/client/cl_cgame.c'
@@ -753,6 +758,11 @@ $disallowedSdkReplicationAnchors = @(
 		Path = 'src/code/win32/awesomium_process.cpp'
 		Literal = 'int __cdecl ChildProcessMain'
 		Description = 'local Awesomium ChildProcessMain declaration'
+	},
+	@{
+		Path = 'src/code/client/cl_awesomium_win32.cpp'
+		Literal = 'CL_Awesomium_SetConfigString( cl_awe.webConfigUserScriptSet'
+		Description = 'WebConfig user-script bridge injection'
 	},
 	@{
 		Path = 'src/code/win32/awesomium_process.rc'

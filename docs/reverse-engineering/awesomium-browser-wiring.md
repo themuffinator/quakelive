@@ -260,6 +260,31 @@ Startup performance correction:
 - Live `EnginePublish` dispatch is gated on a drawable browser surface, avoiding
   a startup event storm before the WebUI has a document ready to receive it.
 
+## 2026-06-02 Awesomium child-process command-line correction
+
+Runtime evidence:
+
+- A `cdb` breakpoint on `KernelBase!CreateProcessW` during the failing WebUI
+  launch showed Awesomium trying to spawn `awesomium_process.exe` with
+  `--awesomium-user-script=<startup bridge...>` appended to the child command
+  line.
+- `CreateProcessW` returned `0` and `LastErrorValue` was Win32 `0xce` (`206`),
+  "The filename or extension is too long." The failed launch was therefore not
+  caused by aspect ratio; the child renderer process command line was over the
+  Windows limit.
+
+Source reconstruction:
+
+- The startup bridge is still constructed from native player, Steam/app, cvar,
+  and bind state, but it is no longer assigned to `WebConfig.user_script`.
+- The bridge is injected through the existing WebView `ExecuteJavascript` retry
+  path after WebView creation and URL load. This keeps the large script out of
+  Awesomium's renderer child-process command line while preserving the recovered
+  source-visible `qz_instance` bridge behavior.
+- The child-process WebConfig path remains the retail filename
+  `awesomium_process.exe` after validating that the staged helper imports
+  `ChildProcessMain@Awesomium`.
+
 ## 2026-05-25 update/pump parity audit
 
 Retail evidence:
