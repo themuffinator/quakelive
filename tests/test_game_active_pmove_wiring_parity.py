@@ -809,7 +809,7 @@ def test_first_18_g_cvars_match_retail_defaults_flags_and_wiring() -> None:
 		'{ &g_splashdamageOffset, "g_splashdamageOffset", "0.05", CVAR_GAMERULE',
 	):
 		assert row in g_main
-	assert 'trap_Cvar_Register( NULL, "g_version", "1069 win-x86 Jun  3 2016 16:09:50", CVAR_ROM );' in g_main
+	assert 'trap_Cvar_Register( NULL, "g_version", QL_GAME_VERSION, CVAR_ROM );' in g_main
 	assert "G_RegisterCvarHelp" not in g_main
 
 	for row in (

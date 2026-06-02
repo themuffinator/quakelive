@@ -2026,7 +2026,7 @@ def test_client_browser_host_core_reconstructs_retained_runtime_owner() -> None:
     assert "QLLoadHandler_OnDocumentReady();" in open_block
     assert "QLLoadHandler_OnFailLoadingFrame( cl_webHost.currentUrl );" in open_block
     assert 'count = CL_WebPak_GetFileList( "js", ".js", fileList, sizeof( fileList ) );' in load_scripts_block
-    assert "CL_LauncherRequestData( scriptPath, &scriptBuffer, &scriptLength )" in load_scripts_block
+    assert "CL_LauncherRequestData( scriptPath, (void **)&scriptBuffer, &scriptLength )" in load_scripts_block
     assert "QLLoadHandler_LoadDocumentScripts();" in document_ready_block
     assert "QLJSHandler_BindQzInstance();" in document_ready_block
     assert 'CL_WebView_PublishEvent( "web.object.ready", NULL );' in document_ready_block
@@ -2158,7 +2158,7 @@ def test_client_browser_js_bridge_reconstructs_qz_instance_contract() -> None:
     assert "cl_webHost.qzInstanceBound = qtrue;" in bind_block
     assert "cl_webHost.windowObjectBound = qtrue;" in bind_block
     assert 'count = CL_WebPak_GetFileList( "js", ".js", fileList, sizeof( fileList ) );' in load_scripts_block
-    assert "CL_LauncherRequestData( scriptPath, &scriptBuffer, &scriptLength )" in load_scripts_block
+    assert "CL_LauncherRequestData( scriptPath, (void **)&scriptBuffer, &scriptLength )" in load_scripts_block
     assert "QLLoadHandler_LoadDocumentScripts();" in document_ready_block
     assert "for ( result = 1; result < value; result <<= 1 ) {" in next_power_block
     assert "if ( targetDimension <= 0 ) {" in map_cursor_block
@@ -3584,7 +3584,7 @@ def test_server_game_server_wrappers_reconstruct_mapped_server_slots() -> None:
     assert "#define QL_STEAM_CALLBACK_STEAM_SERVERS_DISCONNECTED 0x67" in steamworks
     assert "#define QL_STEAM_CALLBACK_VALIDATE_AUTH_TICKET_RESPONSE 0x8f" in steamworks
     assert "#define QL_STEAM_CALLBACK_P2P_SESSION_REQUEST 0x4b2" in steamworks
-    assert '#define QL_STEAM_GAMESERVER_DEFAULT_VERSION "1069"' in steamworks_h
+    assert "#define QL_STEAM_GAMESERVER_DEFAULT_VERSION QL_RETAIL_VERSION" in steamworks_h
     assert "qboolean QL_Steamworks_ServerInitWithVersion( uint32_t ip, uint16_t gamePort, qboolean secure, qboolean dedicated, const char *version );" in steamworks_h
     assert "const char *QL_Steamworks_GetP2PTransportLabel( void );" in steamworks_h
     assert "const char *QL_Steamworks_GetP2PModernGapLabel( void );" in steamworks_h
@@ -3861,8 +3861,8 @@ def test_server_init_reconstructs_retail_hostname_and_bootstrap_metadata() -> No
 	assert 'Cvar_VariableStringBuffer( "sv_setSteamAccount", steamAccount, sizeof( steamAccount ) );' in bootstrap_block
 	assert "QL_Steamworks_ServerLogOn( steamAccount );" in bootstrap_block
 	assert "QL_Steamworks_ServerEnableHeartbeats( qfalse );" in bootstrap_block
-	assert 'QL_Steamworks_ServerSetProduct( "Quake Live" );' in bootstrap_block
-	assert 'QL_Steamworks_ServerSetGameDir( "baseq3" );' in bootstrap_block
+	assert "QL_Steamworks_ServerSetProduct( QL_PRODUCT_NAME );" in bootstrap_block
+	assert "QL_Steamworks_ServerSetGameDir( QL_BASEGAME );" in bootstrap_block
 	assert "void\t\tCom_InitSteamGameServer( void );" in qcommon
 	assert "const char *SV_GetPlatformAuthProviderLabel( void );" in server_h
 	assert "const char *SV_GetPlatformAuthPolicyLabel( void );" in server_h

@@ -3996,7 +3996,7 @@ static void CL_WebHost_BuildConfigJson( char *buffer, size_t bufferSize ) {
 		buffer,
 		bufferSize,
 		"{\"version\":\"%s\",\"steamId\":\"%s\",\"playerName\":\"",
-		Q3_VERSION,
+		QL_ENGINE_VERSION,
 		steamId
 	);
 	CL_WebHost_AppendJsonEscaped( buffer, bufferSize, cl_webHost.playerName );

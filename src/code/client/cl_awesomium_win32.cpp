@@ -1176,12 +1176,12 @@ static qboolean CL_Awesomium_CreateSession( const char *runtimePath, const char 
 		return qfalse;
 	}
 
-	pakName = CL_Awesomium_AllocWideString( pakPath );
+	pakName = CL_Awesomium_AllocWideString( "web.pak" );
 	if ( !pakName ) {
 		CL_Awesomium_SetError( "could not convert web.pak path for Awesomium" );
 		return qfalse;
 	}
-	Com_Printf( "Awesomium startup phase: creating DataPakSource from %s\n", pakPath );
+	Com_Printf( "Awesomium startup phase: creating DataPakSource from web.pak (validated %s)\n", pakPath );
 	cl_awesomium.dataPakSource = cl_awe.newDataPakSource( pakName );
 	delete[] (wchar_t *)pakName;
 	if ( !cl_awesomium.dataPakSource ) {

@@ -2725,7 +2725,7 @@ static void QL_Steamworks_PrepareServerBrowserGamedirFilter( ql_steam_matchmakin
 
 	memset( filter, 0, sizeof( *filter ) );
 	Q_strncpyz( filter->key, "gamedir", sizeof( filter->key ) );
-	Q_strncpyz( filter->value, "baseq3", sizeof( filter->value ) );
+	Q_strncpyz( filter->value, QL_BASEGAME, sizeof( filter->value ) );
 	*filterPtr = filter;
 }
 

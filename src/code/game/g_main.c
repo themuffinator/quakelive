@@ -1789,7 +1789,7 @@ void G_RegisterCvars( void ) {
 		trap_Cvar_Set( "g_gametype", "0" );
 	}
 
-	trap_Cvar_Register( NULL, "g_version", "1069 win-x86 Jun  3 2016 16:09:50", CVAR_ROM );
+	trap_Cvar_Register( NULL, "g_version", QL_GAME_VERSION, CVAR_ROM );
 
 	s_factoryModCount = g_factory.modificationCount;
 	s_inactivityModCount = g_inactivity.modificationCount;

@@ -1429,7 +1429,7 @@ void CG_RegisterCvars( void ) {
 	trap_Cvar_Register(NULL, "headmodel", DEFAULT_HEAD, CVAR_USERINFO | CVAR_ARCHIVE );
 	trap_Cvar_Register(NULL, "team_model", DEFAULT_TEAM_MODEL, CVAR_USERINFO | CVAR_ARCHIVE );
 	trap_Cvar_Register(NULL, "team_headmodel", DEFAULT_TEAM_HEAD, CVAR_USERINFO | CVAR_ARCHIVE );
-	trap_Cvar_Register(NULL, "cg_version", Q3_VERSION, CVAR_ROM );
+	trap_Cvar_Register(NULL, "cg_version", QL_CGAME_VERSION, CVAR_ROM );
 	trap_Cvar_Set( "ui_voteactive", "0" );
 	trap_Cvar_Set( "ui_votestring", "" );
 

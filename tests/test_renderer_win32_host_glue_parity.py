@@ -33,7 +33,8 @@ def test_shared_loading_window_wrappers_and_startup_order_are_present() -> None:
 
 	assert "void Sys_CreateLoadingWindow( void )" in win_syscon
 	assert "void Sys_DestroyLoadingWindow( void )" in win_syscon
-	assert '#define LOADING_WINDOW_TITLE\t"Loading Quake Live"' in win_syscon
+	assert '#define LOADING_WINDOW_TITLE\t"Loading " QL_PRODUCT_NAME' in win_syscon
+	assert 'QL_PRODUCT_NAME " Console",' in win_syscon
 	assert 'LoadImage( NULL, "splash.bmp", IMAGE_BITMAP, 0, 0, LR_LOADFROMFILE )' in win_syscon
 	assert 'CONSOLE_WINDOW_CLASS,' in win_syscon
 	assert 'LOADING_WINDOW_TITLE,' in win_syscon

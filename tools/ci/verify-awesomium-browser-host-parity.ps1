@@ -587,8 +587,13 @@ $adapterAnchors = @(
 	},
 	@{
 		Path = 'src/code/client/cl_awesomium_win32.cpp'
-		Literal = 'pakName = CL_Awesomium_AllocWideString( pakPath );'
-		Description = 'resolved web.pak DataPakSource path'
+		Literal = 'pakName = CL_Awesomium_AllocWideString( "web.pak" );'
+		Description = 'retail web.pak DataPakSource member name'
+	},
+	@{
+		Path = 'src/code/client/cl_awesomium_win32.cpp'
+		Literal = 'Com_Printf( "Awesomium startup phase: creating DataPakSource from web.pak (validated %s)\n", pakPath );'
+		Description = 'resolved web.pak path retained as validation-only evidence'
 	},
 	@{
 		Path = 'src/code/client/cl_cgame.c'

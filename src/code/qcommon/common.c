@@ -4177,8 +4177,8 @@ void Com_InitSteamGameServer( void ) {
 	Cvar_VariableStringBuffer( "sv_setSteamAccount", steamAccount, sizeof( steamAccount ) );
 	QL_Steamworks_ServerLogOn( steamAccount );
 	QL_Steamworks_ServerEnableHeartbeats( qfalse );
-	QL_Steamworks_ServerSetProduct( "Quake Live" );
-	QL_Steamworks_ServerSetGameDir( "baseq3" );
+	QL_Steamworks_ServerSetProduct( QL_PRODUCT_NAME );
+	QL_Steamworks_ServerSetGameDir( QL_BASEGAME );
 #elif QL_PLATFORM_HAS_STEAM_SERVICES
 	Com_Printf( "Steam GameServer bootstrap unavailable for %s [%s]; keeping compatibility-only dedicated-server publication fallback.\n",
 		Com_GetSteamGameServerProviderLabel(), Com_GetSteamGameServerPolicyLabel() );
@@ -4191,13 +4191,12 @@ Com_Init
 =================
 */
 void Com_Init( char *commandLine ) {
-	char	*s;
 	char	pidString[32];
 	const char	*pidValue;
 	const char	*ecosystemDisabled;
 	qboolean	startupCinematicsDisabled;
 
-	Com_Printf( "%s %s %s\n", Q3_VERSION, CPUSTRING, __DATE__ );
+	Com_Printf( "%s\n", QL_ENGINE_VERSION );
 
 	if ( setjmp (abortframe) ) {
 		Sys_Error ("Error during initialization");
@@ -4351,8 +4350,7 @@ void Com_Init( char *commandLine ) {
 	Cmd_AddCommand ("writeconfig", Com_WriteConfig_f );
 	Cmd_AddCommand ("writeClientConfig", Com_WriteClientConfig_f );
 
-	s = va("%s %s %s", Q3_VERSION, CPUSTRING, __DATE__ );
-	com_version = Cvar_Get ("version", s, CVAR_ROM | CVAR_SERVERINFO );
+	com_version = Cvar_Get ("version", QL_ENGINE_VERSION, CVAR_ROM | CVAR_SERVERINFO );
 
 	Sys_Init();
 	Netchan_Init( Com_Milliseconds() & 0xffff );	// pick a port value that should be nice and random
@@ -4482,7 +4480,7 @@ void Com_WriteConfiguration( void ) {
 	if (UI_usesUniqueCDKey() && fs && fs->string[0] != 0) {
 		Com_WriteCDKey( fs->string, cl_cdkey_mod );
 	} else {
-		Com_WriteCDKey( "baseq3", cl_cdkey );
+		Com_WriteCDKey( BASEGAME, cl_cdkey );
 	}
 #endif
 }

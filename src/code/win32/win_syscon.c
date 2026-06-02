@@ -42,7 +42,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #define INPUT_ID		101
 
 #define CONSOLE_WINDOW_CLASS	"Q3 WinConsole"
-#define LOADING_WINDOW_TITLE	"Loading Quake Live"
+#define LOADING_WINDOW_TITLE	"Loading " QL_PRODUCT_NAME
 #define LOADING_WINDOW_WIDTH	0x200
 #define LOADING_WINDOW_HEIGHT	0x100
 #define LOADING_WINDOW_TAG		( ( LONG_PTR )1 )
@@ -442,7 +442,7 @@ void Sys_CreateConsole( void )
 
 	s_wcd.hWnd = CreateWindowEx( 0,
 							   CONSOLE_WINDOW_CLASS,
-							   "Quake Live Console",
+							   QL_PRODUCT_NAME " Console",
 							   DEDSTYLE,
 							   ( swidth - 600 ) / 2, ( sheight - 450 ) / 2 , rect.right - rect.left + 1, rect.bottom - rect.top + 1,
 							   NULL,

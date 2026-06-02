@@ -15,6 +15,13 @@ WORKFLOW_PATH = REPO_ROOT / ".github" / "workflows" / "qcommon-validation.yml"
 BUILD_PIPELINE_PATH = REPO_ROOT / "docs" / "build-pipeline.md"
 WINDOWS_NATIVE_PIPELINE_PATH = REPO_ROOT / "docs" / "windows-native-pipeline.md"
 QSHARED_H_PATH = REPO_ROOT / "src" / "code" / "game" / "q_shared.h"
+QCOMMON_H_PATH = REPO_ROOT / "src" / "code" / "qcommon" / "qcommon.h"
+COMMON_C_PATH = REPO_ROOT / "src" / "code" / "qcommon" / "common.c"
+CG_MAIN_C_PATH = REPO_ROOT / "src" / "code" / "cgame" / "cg_main.c"
+G_MAIN_C_PATH = REPO_ROOT / "src" / "code" / "game" / "g_main.c"
+UI_MAIN_C_PATH = REPO_ROOT / "src" / "code" / "ui" / "ui_main.c"
+PLATFORM_STEAMWORKS_H_PATH = REPO_ROOT / "src" / "common" / "platform" / "platform_steamworks.h"
+PLATFORM_STEAMWORKS_C_PATH = REPO_ROOT / "src" / "common" / "platform" / "platform_steamworks.c"
 QSHARED_C_PATH = REPO_ROOT / "src" / "code" / "game" / "q_shared.c"
 QMATH_C_PATH = REPO_ROOT / "src" / "code" / "game" / "q_math.c"
 
@@ -63,6 +70,41 @@ def test_qshared_header_matches_recovered_helper_names_and_swap_contracts() -> N
 	assert "static ID_INLINE float BigFloat(const float *l) { return FloatSwap(l); }" in q_shared_h
 	assert "static int BigLong(int l) { return LongSwap(l); }" in q_shared_h
 	assert "static float BigFloat(const float *l) { return FloatSwap(l); }" in q_shared_h
+
+
+def test_qshared_header_publishes_retail_product_and_version_defines() -> None:
+	q_shared_h = _read_text(QSHARED_H_PATH)
+	qcommon_h = _read_text(QCOMMON_H_PATH)
+	common_c = _read_text(COMMON_C_PATH)
+	cg_main = _read_text(CG_MAIN_C_PATH)
+	g_main = _read_text(G_MAIN_C_PATH)
+	ui_main = _read_text(UI_MAIN_C_PATH)
+	steamworks_h = _read_text(PLATFORM_STEAMWORKS_H_PATH)
+	steamworks_c = _read_text(PLATFORM_STEAMWORKS_C_PATH)
+
+	for expected in (
+		'#define\tQL_PRODUCT_NAME\t\t\t"Quake Live"',
+		'#define\tQL_PRODUCT_NAME_W\t\tL"Quake Live"',
+		'#define\tQL_BASEGAME\t\t\t"baseq3"',
+		'#define\tQL_RETAIL_VERSION\t\t"1069"',
+		'#define\tQL_ENGINE_VERSION\t\t"1069 win-x86 Jun  3 2016 16:09:18"',
+		'#define\tQL_CGAME_VERSION\t\t"1069 win-x86 Jun  3 2016 16:09:44"',
+		'#define\tQL_GAME_VERSION\t\t\t"1069 win-x86 Jun  3 2016 16:09:50"',
+		'#define\tQL_UI_VERSION\t\t\t"1069 win-x86 Jun  3 2016 16:09:57"',
+		"#define\tQ3_VERSION\t\t\t\tQL_ENGINE_VERSION",
+	):
+		assert expected in q_shared_h
+
+	assert "#define BASEGAME QL_BASEGAME" in qcommon_h
+	assert "#define QL_STEAM_GAMESERVER_DEFAULT_VERSION QL_RETAIL_VERSION" in steamworks_h
+	assert 'Com_Printf( "%s\\n", QL_ENGINE_VERSION );' in common_c
+	assert 'com_version = Cvar_Get ("version", QL_ENGINE_VERSION, CVAR_ROM | CVAR_SERVERINFO );' in common_c
+	assert 'trap_Cvar_Register(NULL, "cg_version", QL_CGAME_VERSION, CVAR_ROM );' in cg_main
+	assert 'trap_Cvar_Register( NULL, "g_version", QL_GAME_VERSION, CVAR_ROM );' in g_main
+	assert 'trap_Cvar_Register(&ui_version, "ui_version", QL_UI_VERSION, CVAR_ROM );' in ui_main
+	assert "QL_Steamworks_ServerSetProduct( QL_PRODUCT_NAME );" in common_c
+	assert "QL_Steamworks_ServerSetGameDir( QL_BASEGAME );" in common_c
+	assert 'Q_strncpyz( filter->value, QL_BASEGAME, sizeof( filter->value ) );' in steamworks_c
 
 
 def test_qshared_source_retains_recovered_math_and_info_helper_bodies() -> None:

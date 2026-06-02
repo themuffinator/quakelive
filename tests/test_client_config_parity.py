@@ -58,7 +58,7 @@ def test_common_config_bootstrap_and_writers_match_retail_client_split() -> None
 	assert 'if ( !com_dedicated->integer ) {' in write_config_block
 	assert 'Com_WriteConfigToFile( QL_CONFIG_HARDWARE_FILE, QL_CONFIG_REPLICATE_FILE, qfalse );' in write_config_block
 	assert 'Com_WriteCDKey( fs->string, cl_cdkey_mod );' in write_config_block
-	assert 'Com_WriteCDKey( "baseq3", cl_cdkey );' in write_config_block
+	assert 'Com_WriteCDKey( BASEGAME, cl_cdkey );' in write_config_block
 
 	write_config_cmd_block = _extract_function_block(common, "void Com_WriteConfig_f( void ) {")
 	assert 'Com_Printf( "Usage: writeconfig <filename> [<rep filename>]\\n" );' in write_config_cmd_block

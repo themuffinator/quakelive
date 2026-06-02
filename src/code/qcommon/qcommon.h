@@ -745,7 +745,10 @@ issues.
 
 #define	MAX_FILE_HANDLES	64
 
-#define BASEGAME "baseq3"
+#ifndef QL_BASEGAME
+#define QL_BASEGAME "baseq3"
+#endif
+#define BASEGAME QL_BASEGAME
 
 typedef struct {
 	int		hits;

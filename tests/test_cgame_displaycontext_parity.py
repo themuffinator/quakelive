@@ -7881,7 +7881,7 @@ def test_register_cvars_publishes_retail_version_and_vote_reset() -> None:
 	assert 'trap_Cvar_Register( cv->vmCvar, cv->cvarName,' in block
 	assert 'trap_Cvar_VariableStringBuffer( "sv_running", var, sizeof( var ) );' in block
 	assert 'cgs.localServer = atoi( var );' in block
-	assert 'trap_Cvar_Register(NULL, "cg_version", Q3_VERSION, CVAR_ROM );' in block
+	assert 'trap_Cvar_Register(NULL, "cg_version", QL_CGAME_VERSION, CVAR_ROM );' in block
 	assert 'trap_Cvar_Set( "ui_voteactive", "0" );' in block
 	assert 'trap_Cvar_Set( "ui_votestring", "" );' in block
 	assert "trap_Cvar_Update( cv->vmCvar );" in update_block

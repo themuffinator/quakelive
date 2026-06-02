@@ -1396,10 +1396,10 @@ void Con_DrawSolidConsole( float frac ) {
 
 
 	// draw the version number
-	i = strlen( Q3_VERSION );
+	i = strlen( QL_ENGINE_VERSION );
 	Con_DrawHostText( cls.glconfig.vidWidth - i * charWidth,
 		lines - ( charHeight + charHeight / 2 ),
-		charWidth, charHeight, Q3_VERSION, g_color_table[ColorIndex( COLOR_RED )], qtrue );
+		charWidth, charHeight, QL_ENGINE_VERSION, g_color_table[ColorIndex( COLOR_RED )], qtrue );
 
 
 	// draw the text

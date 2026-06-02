@@ -341,6 +341,7 @@ def test_ui_ownerdraw_force_model_previews_match_retail_ql() -> None:
 
 def test_ui_cvar_table_reconstructs_retail_callback_lane() -> None:
     ui_main = (REPO_ROOT / "src/code/ui/ui_main.c").read_text(encoding="utf-8")
+    ui_local = (REPO_ROOT / "src/code/ui/ui_local.h").read_text(encoding="utf-8")
     ui_hlil = UI_HLIL_PART01.read_text(encoding="utf-8", errors="ignore")
 
     struct_start = ui_main.index("typedef struct {\n\tvmCvar_t\t*vmCvar;")
@@ -353,6 +354,14 @@ def test_ui_cvar_table_reconstructs_retail_callback_lane() -> None:
     assert "{ (vmCvar), (cvarName), (defaultString), NULL, (cvarFlags) }" in ui_main
     assert "#define UI_CVAR_TABLE_CALLBACK( vmCvar, cvarName, defaultString, cvarFlags, update ) \\" in ui_main
     assert "{ (vmCvar), (cvarName), (defaultString), (update), (cvarFlags) }" in ui_main
+    assert "vmCvar_t\tui_version;" in ui_main
+    assert "extern vmCvar_t\tui_version;" in ui_local
+
+    init_block = _extract_function_block(ui_main, "void _UI_Init( qboolean inGameLoad ) {")
+    assert 'trap_Cvar_Register(NULL, "debug_protocol", "", 0 );' in init_block
+    assert 'trap_Cvar_Set("ui_actualNetGameType", va("%d", ui_netGameType.integer));' in init_block
+    assert 'trap_Cvar_Register(&ui_version, "ui_version", QL_UI_VERSION, CVAR_ROM );' in init_block
+    assert init_block.index('trap_Cvar_Set("ui_actualNetGameType", va("%d", ui_netGameType.integer));') < init_block.index('trap_Cvar_Register(&ui_version, "ui_version", QL_UI_VERSION, CVAR_ROM );')
 
     update_block = _extract_function_block(ui_main, "void UI_UpdateCvars( void ) {")
     assert "oldModificationCount = cv->vmCvar->modificationCount;" in update_block
@@ -366,6 +375,8 @@ def test_ui_cvar_table_reconstructs_retail_callback_lane() -> None:
     assert "10011747  void** esi_1 = &data_1002afe0" in ui_hlil
     assert "1001174c  int32_t i_3 = 0x82" in ui_hlil
     assert "(*(data_106b40a8 + 0x10))(esi_1[-2], esi_1[-1], *esi_1, esi_1[2])" in ui_hlil
+    assert 'char const data_1002665c[0x22] = "1069 win-x86 Jun  3 2016 16:09:57", 0' in ui_hlil
+    assert 'char const data_10027e54[0xb] = "ui_version", 0' in ui_hlil
     assert "100118a3  void** esi = &data_1002afd8" in ui_hlil
     assert "100118a8  int32_t i_1 = 0x82" in ui_hlil
     assert "result = esi[3]" in ui_hlil

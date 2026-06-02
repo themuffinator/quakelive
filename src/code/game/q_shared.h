@@ -42,8 +42,15 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 // q_shared.h -- included first by ALL program modules.
 // A user mod should never modify this file
 
-#define	Q3_VERSION		"Q3 1.32b"
-// 1.32 released 7-10-2002
+#define	QL_PRODUCT_NAME			"Quake Live"
+#define	QL_PRODUCT_NAME_W		L"Quake Live"
+#define	QL_BASEGAME			"baseq3"
+#define	QL_RETAIL_VERSION		"1069"
+#define	QL_ENGINE_VERSION		"1069 win-x86 Jun  3 2016 16:09:18"
+#define	QL_CGAME_VERSION		"1069 win-x86 Jun  3 2016 16:09:44"
+#define	QL_GAME_VERSION			"1069 win-x86 Jun  3 2016 16:09:50"
+#define	QL_UI_VERSION			"1069 win-x86 Jun  3 2016 16:09:57"
+#define	Q3_VERSION				QL_ENGINE_VERSION
 
 #define MAX_TEAMNAME 32
 

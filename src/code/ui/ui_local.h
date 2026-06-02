@@ -113,6 +113,7 @@ locally so the native UI DLL can build against the retail menu tree.
 
 // global display context
 
+extern vmCvar_t	ui_version;
 extern vmCvar_t	ui_ffa_fraglimit;
 extern vmCvar_t	ui_ffa_timelimit;
 

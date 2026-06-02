@@ -3096,7 +3096,7 @@ int	FS_GetModList( char *listbuf, int bufsize ) {
       continue;
     }
     // we drop "baseq3" "." and ".."
-    if (Q_stricmp(name, "baseq3") && Q_stricmpn(name, ".", 1)) {
+    if (Q_stricmp(name, BASEGAME) && Q_stricmpn(name, ".", 1)) {
       // now we need to find some .pk3 files to validate the mod
       // NOTE TTimo: (actually I'm not sure why .. what if it's a mod under developement with no .pk3?)
       // we didn't keep the information when we merged the directory names, as to what OS Path it was found under
@@ -3704,7 +3704,7 @@ qboolean FS_ComparePaks( char *neededpaks, int len, qboolean dlstring ) {
 		havepak = qfalse;
 
 		// never autodownload any of the id paks
-		if ( FS_idPak(fs_serverReferencedPakNames[i], "baseq3") || FS_idPak(fs_serverReferencedPakNames[i], "missionpack") ) {
+		if ( FS_idPak(fs_serverReferencedPakNames[i], BASEGAME) || FS_idPak(fs_serverReferencedPakNames[i], "missionpack") ) {
 			continue;
 		}
 
@@ -3990,7 +3990,7 @@ static void FS_Startup( const char *gameName ) {
 
 	FS_SteamWorkshopInit( gameName );
 
-	Com_ReadCDKey( "baseq3" );
+	Com_ReadCDKey( BASEGAME );
 	fs = Cvar_Get ("fs_game", "", CVAR_INIT|CVAR_SYSTEMINFO );
 	if (fs && fs->string[0] != 0) {
 		Com_AppendCDKey( fs->string );

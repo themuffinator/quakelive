@@ -572,8 +572,8 @@ def test_awesomium_win32_backend_documents_retail_slot_to_export_substitution() 
 	assert "assetsPath = runtimePath && runtimePath[0] ? runtimePath : basePath;" in create_session_block
 	assert 'CL_Awesomium_AppendPath( pakPath, sizeof( pakPath ), assetsPath, "web.pak" );' in create_session_block
 	assert 'CL_Awesomium_AppendPath( pakPath, sizeof( pakPath ), basePath, "web.pak" );' in create_session_block
-	assert "pakName = CL_Awesomium_AllocWideString( pakPath );" in create_session_block
-	assert 'Com_Printf( "Awesomium startup phase: creating DataPakSource from %s\\n", pakPath );' in create_session_block
+	assert 'pakName = CL_Awesomium_AllocWideString( "web.pak" );' in create_session_block
+	assert 'Com_Printf( "Awesomium startup phase: creating DataPakSource from web.pak (validated %s)\\n", pakPath );' in create_session_block
 	assert "cl_awesomium.dataPakSource = cl_awe.newDataPakSource( pakName );" in create_session_block
 	assert 'sourceName = CL_Awesomium_AllocWideString( "QL" );' in create_session_block
 	assert "cl_awe.webSessionAddDataSource( cl_awesomium.webSession, sourceName, cl_awesomium.dataPakSource );" in create_session_block

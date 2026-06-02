@@ -8627,6 +8627,7 @@ void _UI_Init( qboolean inGameLoad ) {
 	trap_Cvar_Register(NULL, "debug_protocol", "", 0 );
 
 	trap_Cvar_Set("ui_actualNetGameType", va("%d", ui_netGameType.integer));
+	trap_Cvar_Register(&ui_version, "ui_version", QL_UI_VERSION, CVAR_ROM );
 		}
 
 
@@ -9134,6 +9135,7 @@ typedef struct {
 #define UI_CVAR_TABLE_CALLBACK( vmCvar, cvarName, defaultString, cvarFlags, update ) \
 	{ (vmCvar), (cvarName), (defaultString), (update), (cvarFlags) }
 
+vmCvar_t	ui_version;
 vmCvar_t	ui_ffa_fraglimit;
 vmCvar_t	ui_ffa_timelimit;
 
