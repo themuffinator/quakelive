@@ -218,11 +218,11 @@ Summary:
 | 194 | `CG_2ND_PLYR_READY` | Pre-switch placement helper: `0x10037D60` draws secondary status/ready text from the second duel score and ready bit, including `LEADS`/`TIED`/`TRAILS` and `READY`/`NOT READY` labels. | Checked | Source secondary status wrapper and placement dispatch match. |
 | 195 | `CG_2ND_PLYR_SCORE` | Direct switch: `0x10035F30` draws `cgs.scores2` with retail `%d`, `"-"` fallback, and alignment. | Checked | Source direct slot-1 score route matches. |
 | 196 | `CG_2ND_PLYR_FRAGS` | Pre-switch placement helper: `0x100361F0` selects slot 1, reads the cached placement frag tally, and formats it through the retail `%d` HUD text path. | Checked | Source placement frags helper now uses the retail `%d` formatter. |
-| 197 | `CG_2ND_PLYR_DEATHS` | Pre-switch placement helper: deaths slot 1. | Checked | No action unless source changes. |
-| 198 | `CG_2ND_PLYR_DMG` | Pre-switch placement helper: damage slot 1. | Checked | No action unless source changes. |
-| 199 | `CG_2ND_PLYR_TIME` | Implicit default no-op; absent from retail placement helper and switch route. | Checked no-op | Keep inert; no width/value/key route. |
-| 200 | `CG_2ND_PLYR_PING` | Pre-switch placement helper: ping slot 1, sharing the retail `>40`/`>80` RGB warning tint and `0.8` alpha. | Checked | No action unless source changes. |
-| 201 | `CG_2ND_PLYR_WINS` | Pre-switch placement helper: wins/losses slot 1, sharing the retail `%d/%d` string path. | Checked | No action unless source changes. |
+| 197 | `CG_2ND_PLYR_DEATHS` | Pre-switch placement helper: `0x10036320` selects slot 1 and paints cached deaths through the retail `%d` HUD text path. | Checked | Source placement deaths helper now uses the retail `%d` formatter. |
+| 198 | `CG_2ND_PLYR_DMG` | Pre-switch placement helper: `0x10036770` selects slot 1 and paints cached damage through the retail `%d` HUD text path. | Checked | Source placement damage helper now uses the retail `%d` formatter. |
+| 199 | `CG_2ND_PLYR_TIME` | Implicit default no-op; retail lacks raw case `0xc7` and does not include it in the placement helper guard. | Checked no-op | Keep inert; no ownerdraw, placement guard, value, width, or key route. |
+| 200 | `CG_2ND_PLYR_PING` | Pre-switch placement helper: `0x10036070` selects slot 1, formats ping through retail `%d`, and applies the `>40`/`>80` RGB warning tint with `0.8` alpha. | Checked | Source metric builder and ping tint path match. |
+| 201 | `CG_2ND_PLYR_WINS` | Pre-switch placement helper: `0x10036450` selects slot 1 and draws the cached wins/losses string fed by the retail `%d/%d` scorestats path. | Checked | Source wins/losses helper and parser-backed text path match. |
 | 202 | `CG_2ND_PLYR_ACC` | Pre-switch placement helper: total accuracy slot 1, sharing the retail `%d%%` text path. | Checked | No action unless source changes. |
 | 203 | `CG_2ND_PLYR_FLAG` | Pre-switch placement helper: flag icon slot 1 from cached country-flag shader / `CG_RegisterCountryFlag` fallback. | Checked | No action unless source changes. |
 | 204 | `CG_2ND_PLYR_AVATAR` | Direct switch: CG_DrawPlacementAvatarOwnerDraw slot 1, sharing the avatar-handle then model-icon fallback path. | Checked | No action unless source changes. |

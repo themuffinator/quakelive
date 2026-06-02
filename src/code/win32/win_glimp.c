@@ -1599,29 +1599,27 @@ static qboolean GLW_LoadOpenGL( const char *drivername )
 	if ( QGL_Init( buffer ) ) 
 	{
 		int mode;
+		qboolean started;
 
 		cdsFullscreen = r_fullscreen->integer;
 		mode = R_GetMode();
 
 		// create the window and set up the context
-		if ( !GLW_StartDriverAndSetMode( drivername, mode, r_colorbits->integer, cdsFullscreen ) )
+		started = GLW_StartDriverAndSetMode( drivername, mode, r_colorbits->integer, cdsFullscreen );
+
+		if ( !started && glConfig.driverType == GLDRV_ICD )
 		{
-			// if we're on a 24/32-bit desktop and we're going fullscreen on an ICD,
-			// try it again but with a 16-bit desktop
-			if ( ( glConfig.driverType == GLDRV_ICD ) && cdsFullscreen )
+			started = GLW_StartDriverAndSetMode( drivername, 5, 16, qtrue );
+
+			if ( !started )
 			{
-				if ( r_colorbits->integer != 16 || mode != 3 )
-				{
-					if ( !GLW_StartDriverAndSetMode( drivername, 3, 16, qtrue ) )
-					{
-						goto fail;
-					}
-				}
+				started = GLW_StartDriverAndSetMode( drivername, 12, 16, qtrue );
 			}
-			else
-			{
-				goto fail;
-			}
+		}
+
+		if ( !started )
+		{
+			goto fail;
 		}
 
 		if ( glConfig.driverType == GLDRV_VOODOO )

@@ -45,6 +45,39 @@ disabled, until a documented open replacement path exists.
 
 ## Active work
 
+### Task A181: Close selected 197-201 cgame ownerdraw parity [COMPLETED]
+Priority: High
+Primary areas: `src/code/cgame/cg_newdraw.c`,
+`tests/test_cgame_displaycontext_parity.py`,
+`docs/reverse-engineering/cg-ownerdrawtype-parity-index.md`,
+`docs/reverse-engineering/cgame-mapping.md`
+Parity estimate: **before 99% -> after 100%** for the selected
+`CG_2ND_PLYR_DEATHS`, `CG_2ND_PLYR_DMG`, `CG_2ND_PLYR_TIME`,
+`CG_2ND_PLYR_PING`, and `CG_2ND_PLYR_WINS` ownerdraw set. Repo-wide
+parity remains **98%** because unrelated compatibility, source-legacy,
+online-service, and packaging surfaces are unchanged.
+
+Completed work:
+
+1. Rechecked the retail `cgamex86.dll` dispatcher and HLIL leaves for raw
+   ownerdraw cases `0xc5` through `0xc9`.
+2. Confirmed `CG_2ND_PLYR_DEATHS` and `CG_2ND_PLYR_DMG` stay on the
+   second-slot placement deaths/damage leaves and now use the retail `%d`
+   formatter literal.
+3. Confirmed `CG_2ND_PLYR_TIME` remains an inert ownerdraw boundary: retail
+   exposes no raw `0xc7` switch case, placement guard, value, width, or key
+   callback route.
+4. Confirmed `CG_2ND_PLYR_PING` stays on the retail ping leaf, including
+   `%d` text formatting, `>40`/`>80` color thresholds, zero blue component,
+   and `0.8` alpha.
+5. Confirmed `CG_2ND_PLYR_WINS` stays on the slot-1 wins/losses string path
+   fed by the retail `%d/%d` scorestats payload.
+6. Added focused structural coverage for constants, retail target-group
+   membership, HLIL cache/format/color signals, local dispatcher routes,
+   competitive score refresh wiring, callback absence, and the inert time
+   boundary.
+7. Refreshed the cgame ownerdraw and mapping ledgers for the selected five.
+
 ### Task A180: Close selected 192-196 cgame ownerdraw parity [COMPLETED]
 Priority: High
 Primary areas: `src/code/cgame/cg_newdraw.c`,

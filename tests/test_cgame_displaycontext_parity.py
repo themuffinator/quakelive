@@ -6029,6 +6029,175 @@ def test_cgame_selected_192_to_196_ownerdraws_match_retail_second_player_head_an
 	assert "CG_1ST_PLYR_TIER" not in build_metric_block
 
 
+def test_cgame_selected_197_to_201_ownerdraws_match_retail_second_player_metric_and_time_boundary() -> None:
+	source = CG_NEWDRAW.read_text(encoding="utf-8")
+	main_source = CG_MAIN.read_text(encoding="utf-8")
+	hlil_source = CGAME_HLIL.read_text(encoding="utf-8")
+	constants = _menudef_ownerdraw_constants()
+	resolve_block = _block_from_marker(source, "static qboolean CG_ResolvePlacementMetricOwnerDraw")
+	guard_block = _block_from_marker(source, "static qboolean CG_IsRetailPlacementMetricOwnerDraw")
+	build_metric_block = _block_from_marker(source, "static qboolean CG_BuildPlacementMetricText")
+	dispatch_block = _block_from_marker(source, "static qboolean CG_DrawPlacementMetricOwnerDraw")
+	deaths_block = _block_from_marker(source, "static qboolean CG_DrawPlacementDeathsOwnerDraw")
+	damage_block = _block_from_marker(source, "static qboolean CG_DrawPlacementDamageOwnerDraw")
+	ping_block = _block_from_marker(source, "static void CG_DrawPlacementPingOwnerDraw")
+	wins_block = _block_from_marker(source, "static qboolean CG_DrawPlacementWinsOwnerDraw")
+	competitive_block = _block_from_marker(source, "static qboolean CG_IsCompetitiveScoreOwnerDraw")
+	ownerdraw_block = _block_from_marker(source, "void CG_OwnerDraw(")
+	value_block = _block_from_marker(source, "float CG_GetValue")
+	width_block = _block_from_marker(main_source, "static int CG_OwnerDrawWidth")
+	key_block = _block_from_marker(main_source, "static qboolean CG_OwnerDrawHandleKey")
+	retail_ping_block = _text_between(
+		hlil_source,
+		"10036070    void __convention(\"regparm\") sub_10036070",
+		"100361f0    void __convention(\"regparm\") sub_100361f0",
+	)
+	retail_deaths_block = _text_between(
+		hlil_source,
+		"10036320    void __convention(\"regparm\") sub_10036320",
+		"10036450    void __convention(\"regparm\") sub_10036450",
+	)
+	retail_wins_block = _text_between(
+		hlil_source,
+		"10036450    void __convention(\"regparm\") sub_10036450",
+		"10036570    void __convention(\"regparm\") sub_10036570",
+	)
+	retail_damage_block = _text_between(
+		hlil_source,
+		"10036770    void __convention(\"regparm\") sub_10036770",
+		"100368a0    void sub_100368a0",
+	)
+	selected = {
+		"CG_2ND_PLYR_DEATHS",
+		"CG_2ND_PLYR_DMG",
+		"CG_2ND_PLYR_TIME",
+		"CG_2ND_PLYR_PING",
+		"CG_2ND_PLYR_WINS",
+	}
+
+	assert constants["CG_2ND_PLYR_DEATHS"] == 0xc5
+	assert constants["CG_2ND_PLYR_DMG"] == 0xc6
+	assert constants["CG_2ND_PLYR_TIME"] == 0xc7
+	assert constants["CG_2ND_PLYR_PING"] == 0xc8
+	assert constants["CG_2ND_PLYR_WINS"] == 0xc9
+	assert {constants["CG_2ND_PLYR_DEATHS"]} <= _retail_cg_ownerdraw_cases_for_target("FUN_10036320")
+	assert {constants["CG_2ND_PLYR_DMG"]} <= _retail_cg_ownerdraw_cases_for_target("FUN_10036770")
+	assert {constants["CG_2ND_PLYR_PING"]} <= _retail_cg_ownerdraw_cases_for_target("FUN_10036070")
+	assert {constants["CG_2ND_PLYR_WINS"]} <= _retail_cg_ownerdraw_cases_for_target("FUN_10036450")
+	assert constants["CG_2ND_PLYR_TIME"] not in _retail_cg_ownerdraw_case_values()
+
+	for expected in (
+		"if (arg1 s< 0xc1 || arg1 s> 0x11a)",
+		"0x10a602b0",
+		"&data_10068e44",
+		"sub_10008440(",
+	):
+		assert expected in retail_deaths_block
+
+	for expected in (
+		"if (arg1 s< 0xc1 || arg1 s> 0x11a)",
+		"0x10a602d0",
+		"&data_10068e44",
+		"sub_10008440(",
+	):
+		assert expected in retail_damage_block
+
+	for expected in (
+		"if (arg1 s< 0xc1 || arg1 s> 0x11a)",
+		"0x10a60288",
+		"if (eax_3 s> 0x28)",
+		"if (eax_3 s> 0x50)",
+		"eax_4[3] = 0x3f4ccccd",
+		"&data_10068e44",
+	):
+		assert expected in retail_ping_block
+
+	for expected in (
+		"if (arg1 s< 0xc1 || arg1 s> 0x11a)",
+		"ecx_1 + 0x10a60270",
+		"&data_10068de8",
+		"sub_10008440(",
+	):
+		assert expected in retail_wins_block
+	assert 'int32_t eax_62 = sub_100575e0("%d/%d")' in hlil_source
+	assert "strncpy(var_424_1, eax_62, 0xf)" in hlil_source
+
+	for expected in (
+		"} else if ( ownerDraw >= CG_2ND_PLYR_READY && ownerDraw <= CG_2ND_PLYR_TIER ) {",
+		"resolvedSlot = 1;",
+		"resolvedOwnerDraw = ownerDraw - ( CG_2ND_PLYR - CG_1ST_PLYR );",
+	):
+		assert expected in resolve_block
+
+	for name in selected - {"CG_2ND_PLYR_TIME"}:
+		assert f"case {name}:" in guard_block
+	assert "CG_2ND_PLYR_TIME" not in guard_block
+	assert "CG_2ND_PLYR_TIME" not in build_metric_block
+	assert "CG_2ND_PLYR_TIME" not in dispatch_block
+
+	for expected in (
+		"case CG_1ST_PLYR_DEATHS:",
+		'Com_sprintf( buffer, bufferSize, "%d", score->deaths );',
+		"case CG_1ST_PLYR_DMG:",
+		'Com_sprintf( buffer, bufferSize, "%d", score->damage );',
+		"case CG_1ST_PLYR_PING:",
+		'Com_sprintf( buffer, bufferSize, "%d", score->ping );',
+		"case CG_1ST_PLYR_WINS:",
+		'Com_sprintf( buffer, bufferSize, "%d/%d", ci->wins, ci->losses );',
+	):
+		assert expected in build_metric_block
+
+	for expected in (
+		'Com_sprintf( buffer, sizeof( buffer ), "%d", score->deaths );',
+		"CG_Text_Paint( rect->x, rect->y + rect->h, scale, color, buffer, 0, 0, textStyle );",
+	):
+		assert expected in deaths_block
+
+	for expected in (
+		'Com_sprintf( buffer, sizeof( buffer ), "%d", score->damage );',
+		"CG_Text_Paint( rect->x, rect->y + rect->h, scale, color, buffer, 0, 0, textStyle );",
+	):
+		assert expected in damage_block
+
+	for expected in (
+		'Com_sprintf( buffer, sizeof( buffer ), "%d/%d", ci->wins, ci->losses );',
+		"CG_Text_Paint( rect->x, rect->y + rect->h, scale, color, buffer, 0, 0, textStyle );",
+	):
+		assert expected in wins_block
+
+	for expected in (
+		"if ( score->ping > 40 ) {",
+		"if ( score->ping > 80 ) {",
+		"drawColor[0] = 1.0f;",
+		"drawColor[1] = 0.0f;",
+		"drawColor[2] = 0.0f;",
+		"drawColor[3] = 0.8f;",
+		"(void)CG_DrawPlacementMetricTextOwnerDraw( rect, scale, drawColor, textStyle, ownerDraw );",
+	):
+		assert expected in ping_block
+	assert "score->ping >= 80" not in ping_block
+	assert "score->ping >= 40" not in ping_block
+
+	for expected in (
+		"case CG_1ST_PLYR_DEATHS:",
+		"return CG_DrawPlacementDeathsOwnerDraw( rect, scale, color, textStyle, slot );",
+		"case CG_1ST_PLYR_DMG:",
+		"return CG_DrawPlacementDamageOwnerDraw( rect, scale, color, textStyle, slot );",
+		"if ( ownerDraw == CG_1ST_PLYR_PING || ownerDraw == CG_2ND_PLYR_PING ) {",
+		"CG_DrawPlacementPingOwnerDraw( rect, scale, color, textStyle, ownerDraw );",
+		"case CG_1ST_PLYR_WINS:",
+		"return CG_DrawPlacementWinsOwnerDraw( rect, scale, color, textStyle, slot );",
+	):
+		assert expected in dispatch_block
+
+	assert "if ( CG_IsPlacementMetricOwnerDraw( ownerDraw ) ) {" in competitive_block
+	for name in selected:
+		assert f"case {name}:" not in ownerdraw_block
+		assert name not in value_block
+		assert name not in width_block
+		assert name not in key_block
+
+
 def test_cgame_intro_panel_and_player_count_widgets_restore_retail_detail_and_cap_rules() -> None:
 	newdraw_source = CG_NEWDRAW.read_text(encoding="utf-8")
 	servercmds_source = CG_SERVERCMDS.read_text(encoding="utf-8")
