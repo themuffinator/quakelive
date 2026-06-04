@@ -4949,8 +4949,13 @@ def test_windows_build_and_launch_pipeline_keeps_runtime_ui_assets_retail_only_a
 	launch_json = json.loads((REPO_ROOT / ".vscode/launch.json").read_text(encoding="utf-8"))
 	qagame_vcxproj = (REPO_ROOT / "src/code/game/qagamex86.vcxproj").read_text(encoding="utf-8")
 	cgame_vcxproj = (REPO_ROOT / "src/code/cgame/cgamex86.vcxproj").read_text(encoding="utf-8")
+	win_main = (REPO_ROOT / "src/code/win32/win_main.c").read_text(encoding="utf-8")
 	module_out_dir = "<OutDir>$(ProjectDir)..\\..\\..\\build\\win32\\$(Configuration)\\modules\\$(ProjectName)\\</OutDir>"
 	module_int_dir = "<IntDir>$(ProjectDir)..\\..\\..\\build\\win32\\$(Configuration)\\obj\\$(ProjectName)\\</IntDir>"
+	load_dll_block = _extract_function_block(
+		win_main,
+		"void * QDECL Sys_LoadDll( const char *name, char *fqpath, int (QDECL **entryPoint)(int, ...)",
+	)
 
 	assert "Retail UI assets are loaded from the Quake Live installation; no local UI PK3 is generated." in build_script
 	assert "pak_uiql.pk3" in build_script
@@ -4962,6 +4967,11 @@ def test_windows_build_and_launch_pipeline_keeps_runtime_ui_assets_retail_only_a
 	assert module_int_dir in qagame_vcxproj
 	assert module_out_dir in cgame_vcxproj
 	assert module_int_dir in cgame_vcxproj
+	assert "homepath = Cvar_VariableString( \"fs_homepath\" );" in load_dll_block
+	assert "basepath = Cvar_VariableString( \"fs_basepath\" );" in load_dll_block
+	assert load_dll_block.index("if ( homepath && homepath[0] )") < load_dll_block.index("if ( basepath && basepath[0] )")
+	assert load_dll_block.index("if ( basepath && basepath[0] )") < load_dll_block.index("if ( cdpath && cdpath[0] )")
+	assert load_dll_block.index("if ( cdpath && cdpath[0] )") < load_dll_block.index("if ( cwdpath && cwdpath[0] )")
 
 	assert "$retailUiBundleRoot = $steamBasePath" in launch_script
 	assert "Remove-Item -LiteralPath $staleUiPackage -Force" in launch_script

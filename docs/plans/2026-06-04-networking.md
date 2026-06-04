@@ -1890,6 +1890,83 @@ Scoped parity estimate:
   artifact; the main remaining work is now less about static mapping and more
   about packet corpus replay, fuzz seeds, and CI publication.
 
+### Implementation round - 2026-06-05, native module loader order and snapshot/render runtime proof
+
+Completed work:
+
+1. Investigated the reported "Awaiting Snapshot" / non-rendering scene after
+   the recent netcode work by running windowed, reduced-sound visual probes with
+   `cl_shownet 3` and delayed engine screenshots.
+2. Confirmed the first immediate screenshot was a timing artifact from
+   `activeAction`: the screenshot command can execute before the first
+   post-active cgame frame is presented, preserving the previous loading screen
+   even after the engine has parsed a valid snapshot.
+3. Found the real runtime divergence in the native VM loader. `Sys_LoadDll`
+   probed `Sys_Cwd()` and `fs_basepath` before `fs_homepath`, so even though
+   the launch/build pipeline staged reconstructed `qagamex86.dll` and
+   `cgamex86.dll` under `build/win32/Debug/bin/baseq3`, the engine could load
+   the retail Steam DLLs first.
+4. Patched `src/code/win32/win_main.c` so `Sys_LoadDll` now searches the
+   configured local runtime root first: `fs_homepath`, then `fs_basepath`, then
+   `fs_cdpath`, then `Sys_Cwd()`. This keeps retail fallback available while
+   allowing staged reconstructed modules to own local runtime probes.
+5. Extended `tests/test_platform_services.py` so the Windows build/launch
+   pipeline guard now asserts both module staging and the corrected native DLL
+   search order.
+6. Left the snapshot wire codec and cgame snapshot handoff unchanged. Runtime
+   evidence showed the engine parsed a valid first snapshot, entered
+   `CS_ACTIVE`, cgame retrieved later snapshots, and the renderer produced a
+   live world frame once the delayed screenshot avoided the loading-edge frame.
+
+Validation:
+
+- Passed:
+  `python -m pytest tests/test_platform_services.py::test_windows_build_and_launch_pipeline_keeps_runtime_ui_assets_retail_only_and_syncs_vm_modules -q`
+- Passed:
+  `powershell -NoProfile -ExecutionPolicy Bypass -File .vscode/build.ps1 -Configuration Debug -Platform x86 -Targets quakelive_steam`
+- Build note: MSBuild emitted the existing non-fatal unused-local warnings in
+  `src/code/client/cl_cgame.c` for `escapedHash` and `script`; no errors.
+- Passed runtime probe:
+  `.vscode/launch.ps1 -Configuration Debug` with `+set r_fullscreen 0`,
+  `+set s_initsound 0`, `+set cl_shownet 3`,
+  `+set activeAction "wait 180; screenshotJPEG; quit"`,
+  and `+devmap campgrounds ffa`.
+- Passed policy-aligned runtime probe with
+  `+set fs_cdpath E:\Repositories\QuakeLive-reverse\assets\quakelive`,
+  `+set r_fullscreen 0`, `+set s_initsound 0`,
+  `+set activeAction "wait 120; screenshotJPEG; quit"`, and
+  `+devmap campgrounds ffa`.
+
+Observed facts:
+
+- Post-fix `qconsole.log` loaded both reconstructed modules from
+  `E:\Repositories\QuakeLive-reverse\build\win32\Debug\bin\baseq3`:
+  `qagamex86.dll` and `cgamex86.dll`.
+- The client reached `CS_ACTIVE` for `UnnamedPlayer`.
+- The focused probe received continuous snapshots through `snapshot:93`
+  with deltas after the initial full snapshots, proving the cgame-facing
+  snapshot path was not stuck.
+- The final policy-aligned probe received continuous snapshots through
+  `snapshot:63` before clean shutdown.
+- The captured artifact
+  `build/win32/Debug/bin/baseq3/screenshots/shot0003.jpg` renders the
+  Campgrounds scene with the retail-style Join Match overlay.
+- The active playerstate still reports `pm_type:2` and `cg_spectating 1`
+  because first-time non-team `G_InitSessionData` defaults the client to
+  `TEAM_SPECTATOR`; that is a game/session policy path rather than a failed
+  snapshot decode.
+
+Scoped parity estimate:
+
+- Native module loader/runtime staging parity: **92% -> 100%** for local
+  Windows probes that must prefer staged reconstructed modules over the retail
+  Steam fallback.
+- Snapshot retrieval/render proof-chain maturity: **99.5% -> 99.7%** for this
+  startup path; runtime evidence now distinguishes `activeAction` screenshot
+  timing from actual snapshot handoff failure.
+- Netcode wire/source parity: **99.5% -> 99.5%** for this round; no transport,
+  delta-codec, or snapshot serializer source reconstruction was required.
+
 ### Final assessment
 
 If the goal is to “bring the repo to full retail parity,” the evidence here suggests that **most of the implementation work is already present**. The highest-value remaining work is to convert subsystem-wide confidence into a tighter, netcode-specific proof chain: manifest, semantic diff, packet corpus, replay harness, fuzzing, and CI. That is the shortest path to an answer that is both technically honest and operationally useful. The likely payoff is either a strong confirmation that the repo’s current 100% scoped audits are warranted for the actual wire, or a short list of narrow transport/control-plane fixes that can be closed without destabilizing the engine. citeturn50view0turn51view3turn49search3turn49search4

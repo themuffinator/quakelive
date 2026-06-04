@@ -827,17 +827,17 @@ void * QDECL Sys_LoadDll( const char *name, char *fqpath, int (QDECL **entryPoin
 	cwdpath = Sys_Cwd();
 
 	searchCount = 0;
-	if ( cwdpath && cwdpath[0] ) {
-		searchRoots[searchCount++] = cwdpath;
+	if ( homepath && homepath[0] ) {
+		searchRoots[searchCount++] = homepath;
 	}
 	if ( basepath && basepath[0] ) {
 		searchRoots[searchCount++] = basepath;
 	}
-	if ( homepath && homepath[0] ) {
-		searchRoots[searchCount++] = homepath;
-	}
 	if ( cdpath && cdpath[0] ) {
 		searchRoots[searchCount++] = cdpath;
+	}
+	if ( cwdpath && cwdpath[0] ) {
+		searchRoots[searchCount++] = cwdpath;
 	}
 
 	for ( i = 0; i < searchCount; i++ ) {
