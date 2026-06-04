@@ -73,42 +73,7 @@ $workingDirectory = $runtimeBinDir
 $steamBasePathArg = Get-LaunchSafeArgument -Path $steamBasePath
 $runtimeBaseq3 = Join-Path $runtimeBinDir 'baseq3'
 $runtimeModulesDir = Join-Path $repoRoot "build\win32\$Configuration\modules"
-$stagedUiBundleRoot = [System.IO.Path]::GetFullPath((Join-Path $repoRoot 'build\ui_bundle\staging'))
-$stagedUiBundleBaseq3 = Join-Path $stagedUiBundleRoot 'baseq3'
-$runtimeUiPackage = Join-Path $runtimeBaseq3 'pak_uiql.pk3'
-
-function Test-LaunchUiStagingRoot {
-	param(
-		[string]$Baseq3Root
-	)
-
-	foreach ($requiredRetailUiPath in @(
-		$Baseq3Root,
-		(Join-Path $Baseq3Root 'default.cfg'),
-		(Join-Path $Baseq3Root 'ui\menudef.h'),
-		(Join-Path $Baseq3Root 'ui\hud3.txt'),
-		(Join-Path $Baseq3Root 'ui\ingame_scoreboard_ffa.menu'),
-		(Join-Path $Baseq3Root 'ui\assets\button_back.png'),
-		(Join-Path $Baseq3Root 'ui\assets\hud\ffa.png'),
-		(Join-Path $Baseq3Root 'ui\assets\score\scoretl.png'),
-		(Join-Path $Baseq3Root 'fonts\font.dat'),
-		(Join-Path $Baseq3Root 'fonts\font.tga')
-	)) {
-		if (-not (Test-Path -LiteralPath $requiredRetailUiPath)) {
-			return $false
-		}
-	}
-
-	return $true
-}
-
-if (Test-LaunchUiStagingRoot -Baseq3Root $stagedUiBundleBaseq3) {
-	$retailUiBundleRoot = $stagedUiBundleRoot
-} elseif (Test-Path -LiteralPath $runtimeUiPackage) {
-	$retailUiBundleRoot = $runtimeBinDir
-} else {
-	throw "Quake Live UI content was not found in either $stagedUiBundleBaseq3 or $runtimeUiPackage. Run the Build Debug task or tools/build_ui_bundle.py before launching."
-}
+$retailUiBundleRoot = $steamBasePath
 
 $retailUiBundleRootArg = Get-LaunchSafeArgument -Path $retailUiBundleRoot
 $runtimeBinDirArg = Get-LaunchSafeArgument -Path $runtimeBinDir
@@ -141,37 +106,6 @@ function Sync-LaunchModuleArtifact {
 		if ($shouldCopy) {
 			Copy-Item -LiteralPath $sourcePath -Destination $destinationPath -Force
 		}
-	}
-}
-
-function Sync-RuntimeUiPackages {
-	param(
-		[string]$RuntimeBaseq3Dir
-	)
-
-	$uiBundleBuilder = Join-Path $repoRoot 'tools\build_ui_bundle.py'
-	$pythonCmd = Get-Command python -ErrorAction SilentlyContinue
-	if (-not $pythonCmd) {
-		$pythonCmd = Get-Command py -ErrorAction SilentlyContinue
-	}
-
-	if (-not $pythonCmd) {
-		Write-Warning "Python was not found; skipping runtime UI PK3 refresh. Existing pak_uiql.pk3 artifacts will be reused if present."
-		return
-	}
-
-	$pythonArgs = @(
-		$uiBundleBuilder,
-		'--runtime-root',
-		$RuntimeBaseq3Dir
-	)
-	if ($pythonCmd.Name -ieq 'py.exe' -or $pythonCmd.Name -ieq 'py') {
-		$pythonArgs = @('-3') + $pythonArgs
-	}
-
-	& $pythonCmd.Source @pythonArgs
-	if ($LASTEXITCODE -ne 0) {
-		throw "tools/build_ui_bundle.py failed while refreshing runtime UI packages."
 	}
 }
 
@@ -256,7 +190,14 @@ if (-not (Test-Path -LiteralPath $runtimeBaseq3)) {
 	New-Item -ItemType Directory -Path $runtimeBaseq3 | Out-Null
 }
 
-Sync-RuntimeUiPackages -RuntimeBaseq3Dir $runtimeBaseq3
+foreach ($staleUiPackage in @(
+		(Join-Path $runtimeBaseq3 'pak_uiql.pk3'),
+		(Join-Path $runtimeBaseq3 'pak_ui_src_retail_overlay.pk3')
+	)) {
+	if (Test-Path -LiteralPath $staleUiPackage) {
+		Remove-Item -LiteralPath $staleUiPackage -Force
+	}
+}
 
 Sync-LaunchModuleArtifact -ModuleName 'cgamex86'
 Sync-LaunchModuleArtifact -ModuleName 'qagamex86'

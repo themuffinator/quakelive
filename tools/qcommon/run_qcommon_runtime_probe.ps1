@@ -86,27 +86,9 @@ function Resolve-RetailUiBundleRoot {
 		[string]$Root
 	)
 
-	$candidate = if ( [string]::IsNullOrWhiteSpace( $ExplicitPath ) ) {
-		[System.IO.Path]::GetFullPath((Join-Path $Root 'build\ui_bundle\staging'))
-	} else {
-		Resolve-ExistingPath -Path $ExplicitPath
-	}
-	$baseq3Root = Join-Path $candidate 'baseq3'
-
-	foreach ( $requiredPath in @(
-			$baseq3Root,
-			( Join-Path $baseq3Root 'default.cfg' ),
-			( Join-Path $baseq3Root 'ui\hud3.txt' ),
-			( Join-Path $baseq3Root 'ui\ingame_scoreboard_ffa.menu' ),
-			( Join-Path $baseq3Root 'ui\assets\button_back.png' ),
-			( Join-Path $baseq3Root 'ui\assets\hud\ffa.png' ),
-			( Join-Path $baseq3Root 'ui\assets\score\scoretl.png' ),
-			( Join-Path $baseq3Root 'fonts\font.dat' ),
-			( Join-Path $baseq3Root 'fonts\font.tga' )
-		) ) {
-		if ( -not ( Test-Path -LiteralPath $requiredPath ) ) {
-			throw "Quake Live UI staging content was not found: $requiredPath. Run tools/build_ui_bundle.py before running the qcommon probe so staging\\baseq3 contains the retail UI runtime tree."
-		}
+	$candidate = if ( [string]::IsNullOrWhiteSpace( $ExplicitPath ) ) { $script:RetailBasePath } else { Resolve-ExistingPath -Path $ExplicitPath }
+	if ( -not ( Test-Path -LiteralPath ( Join-Path $candidate 'baseq3\pak00.pk3' ) ) ) {
+		throw "Quake Live retail content was not found under $candidate. fs_cdpath must point at the installed Quake Live root."
 	}
 
 	return $candidate
@@ -761,6 +743,12 @@ $artifact = [ordered]@{
 	runtime_root = To-RepoPath -Path $script:RuntimeRoot
 	retail_basepath = To-RepoPath -Path $script:RetailBasePath
 	asset_cdpath = To-RepoPath -Path $script:RetailUiBundleRoot
+	ui_asset_policy = [ordered]@{
+		mode = 'retail-install-only-no-repo-copy'
+		fs_basepath = To-RepoPath -Path $script:RetailBasePath
+		fs_cdpath = To-RepoPath -Path $script:RetailUiBundleRoot
+		local_ui_packages_allowed = $false
+	}
 	main_menu = [ordered]@{
 		engine_screenshot = To-RepoPath -Path $mainEngineScreenshotPath
 		engine_sha256 = Get-ArtifactSha256 -Path $mainEngineScreenshotPath

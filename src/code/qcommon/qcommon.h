@@ -41,9 +41,8 @@ void	SyscallContract_LogEvent( const char *origin, const char *module, const int
 // msg.c
 //
 typedef struct {
-	qboolean	allowoverflow;	// if false, do a Com_Error
-	qboolean	overflowed;		// set to true if the buffer size failed (with allowoverflow set)
-	qboolean	oob;			// set to true if the buffer size failed (with allowoverflow set)
+	qboolean	overflowed;		// set to true if the buffer size failed
+	qboolean	oob;
 	byte	*data;
 	int		maxsize;
 	int		cursize;

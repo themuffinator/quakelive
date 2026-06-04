@@ -359,7 +359,7 @@ def test_awesomium_win32_backend_documents_retail_slot_to_export_substitution() 
 	)
 	prepare_config_block = _extract_function_block(
 		cl_awesomium,
-		"static qboolean CL_Awesomium_PrepareConfig( const char *runtimePath, const char *basePath, const char *playerName, unsigned int appId, unsigned int steamIdLow, unsigned int steamIdHigh, const char *initialConfigJson ) {",
+		"static qboolean CL_Awesomium_PrepareConfig( const char *runtimePath, const char *basePath, const char *playerName, unsigned int appId, unsigned int steamIdLow, unsigned int steamIdHigh, const char *initialConfigJson, const char *initialMapJson, const char *initialFactoryJson ) {",
 	)
 	prepare_prefs_block = _extract_function_block(
 		cl_awesomium, "static qboolean CL_Awesomium_PreparePreferences( void ) {"
@@ -369,7 +369,7 @@ def test_awesomium_win32_backend_documents_retail_slot_to_export_substitution() 
 	)
 	startup_block = _extract_function_block(
 		cl_awesomium,
-		'extern "C" qboolean CL_Awesomium_Startup( const char *runtimePath, const char *basePath, const char *playerName, unsigned int appId, unsigned int steamIdLow, unsigned int steamIdHigh, int width, int height, const char *initialConfigJson ) {',
+		'extern "C" qboolean CL_Awesomium_Startup( const char *runtimePath, const char *basePath, const char *playerName, unsigned int appId, unsigned int steamIdLow, unsigned int steamIdHigh, int width, int height, const char *initialConfigJson, const char *initialMapJson, const char *initialFactoryJson ) {',
 	)
 	open_url_block = _extract_function_block(
 		cl_awesomium, 'extern "C" qboolean CL_Awesomium_OpenURL( const char *url ) {'
@@ -545,7 +545,7 @@ def test_awesomium_win32_backend_documents_retail_slot_to_export_substitution() 
 		'CL_Awesomium_AppendPath( logPath, sizeof( logPath ), sessionPath, "awesomium.log" );',
 		'CL_Awesomium_AppendPath( packagePath, sizeof( packagePath ), assetsPath, "web.pak" );',
 		'CL_Awesomium_AppendPath( packagePath, sizeof( packagePath ), basePath, "web.pak" );',
-		"CL_Awesomium_BuildUserScript( cl_awesomium.startupScript, sizeof( cl_awesomium.startupScript ), playerName, appId, steamIdLow, steamIdHigh, initialConfigJson );",
+		"CL_Awesomium_BuildUserScript( cl_awesomium.startupScript, sizeof( cl_awesomium.startupScript ), playerName, appId, steamIdLow, steamIdHigh, initialConfigJson, initialMapJson, initialFactoryJson );",
 		"CL_Awesomium_SelectChildProcessPath( childProcessPath, sizeof( childProcessPath ), runtimePath, basePath )",
 		'CL_Awesomium_CopyPath( childProcessConfigPath, sizeof( childProcessConfigPath ), "awesomium_process.exe" );',
 		'"--no-sandbox"',
@@ -992,7 +992,7 @@ def test_awesomium_qz_method_table_preserves_retail_return_flags() -> None:
 	)
 	startup_script_block = _extract_function_block(
 		cl_awesomium,
-		"static void CL_Awesomium_BuildUserScript( char *buffer, size_t bufferSize, const char *playerName, unsigned int appId, unsigned int steamIdLow, unsigned int steamIdHigh, const char *initialConfigJson ) {",
+		"static void CL_Awesomium_BuildUserScript( char *buffer, size_t bufferSize, const char *playerName, unsigned int appId, unsigned int steamIdLow, unsigned int steamIdHigh, const char *initialConfigJson, const char *initialMapJson, const char *initialFactoryJson ) {",
 	)
 	dispatch_event_block = _extract_function_block(
 		cl_main,
@@ -1026,9 +1026,29 @@ def test_awesomium_qz_method_table_preserves_retail_return_flags() -> None:
 
 	for expected in (
 		"const char *configJson;",
+		"const char *mapJson;",
+		"const char *factoryJson;",
 		"configJson = ( initialConfigJson && initialConfigJson[0] ) ? initialConfigJson : \"null\";",
+		"mapJson = ( initialMapJson && initialMapJson[0] ) ? initialMapJson : \"null\";",
+		"factoryJson = ( initialFactoryJson && initialFactoryJson[0] ) ? initialFactoryJson : \"null\";",
 		"window.__qlr_initial_config_applied=applyNativeConfig(%s);",
 		"var nativeQueue=window.__qlr_native_requests=window.__qlr_native_requests||[];",
+		"var pendingNativeMaps={};",
+		"var basegtMap={ffa:0,duel:1,race:2,tdm:3,ca:4,ctf:5,oneflag:6,overload:7,har:8,ft:9,dom:10,ad:11,rr:12};",
+		"var basegtValue=function(v){if(typeof v==='number'){return v|0;}var s=canon(v);if(hasOwn.call(basegtMap,s)){return basegtMap[s];}var n=parseInt(v,10);return isNaN(n)?0:n;};",
+		"var copyObject=function(target,source){if(!target||!source){return false;}for(var oldKey in target){if(hasOwn.call(target,oldKey)){delete target[oldKey];}}for(var newKey in source){if(hasOwn.call(source,newKey)){target[newKey]=source[newKey];}}return true;};",
+		"var syncModuleObject=function(path,source){try{if(window.req){var moduleObject=window.req(path);if(moduleObject&&moduleObject!==source){copyObject(moduleObject,source);}}}catch(e){}};",
+		"var normalizeMapList=function(list){var out={};try{if(!list){return out;}",
+		"var normalizeFactoryList=function(list){var out={};try{if(!list){return out;}",
+		"f.basegt=basegtValue(f.basegt);",
+		"fm.basegt=basegtValue(fm.basegt);",
+		"var applyNativeMaps=function(list){var nextMaps=normalizeMapList(list);if(!objectHasEntries(nextMaps)){return false;}copyObject(maps,nextMaps);syncModuleObject('../src/mapdb',maps);return true;};",
+		"var applyNativeFactories=function(list){var nextFactories=normalizeFactoryList(list);if(!objectHasEntries(nextFactories)){return false;}copyObject(factories,nextFactories);syncModuleObject('../src/factories',factories);return true;};",
+		"var beginNativeMaps=function(){pendingNativeMaps={};return true;};",
+		"var addNativeMaps=function(list){var nextMaps=normalizeMapList(list);for(var pk in nextMaps){if(hasOwn.call(nextMaps,pk)){pendingNativeMaps[pk]=nextMaps[pk];}}return true;};",
+		"var commitNativeMaps=function(){var ok=applyNativeMaps(pendingNativeMaps);pendingNativeMaps={};return ok;};",
+		"if(cfg.maps){applyNativeMaps(cfg.maps);}if(cfg.factories){applyNativeFactories(cfg.factories);}",
+		"window.__qlr_initial_maps_applied=applyNativeMaps(%s);window.__qlr_initial_factories_applied=applyNativeFactories(%s);",
 		"return queue('cmd',cmd);",
 		"SetCvar:function(name,value){var k=canon(name);if(!k){return false;}value=String(value||'');config.cvars[k]=value;return queue('set',k+'\\\\n'+value);}",
 		"ResetCvar:function(name){var k=canon(name);if(!k){return false;}delete config.cvars[k];return queue('reset',k);}",
@@ -1036,15 +1056,19 @@ def test_awesomium_qz_method_table_preserves_retail_return_flags() -> None:
 		"bind('GetCvar',function(n){var k=canon(n);if(k&&typeof config.cvars[k]==='undefined'){queue('get',k);}return config.cvars[k]||'';});",
 		"bind('SetCvar',function(n,v){var k=canon(n);if(!k){return false;}v=String(v||'');config.cvars[k]=v;return queue('set',k+'\\\\n'+v);});",
 		"bind('ResetCvar',function(n){var k=canon(n);if(!k){return false;}delete config.cvars[k];return queue('reset',k);});",
-		"window.__qlr_apply_native_config=applyNativeConfig;window.__qlr_set_native_cvar=setNativeCvar;",
+		"window.qz_instance=qz;for(var fk0 in qz){window.FakeClient.qz_instance[fk0]=qz[fk0];}",
+		"window.__qlr_apply_native_config=applyNativeConfig;window.__qlr_apply_native_maps=applyNativeMaps;window.__qlr_apply_native_factories=applyNativeFactories;window.__qlr_begin_native_maps=beginNativeMaps;window.__qlr_add_native_maps=addNativeMaps;window.__qlr_commit_native_maps=commitNativeMaps;window.__qlr_set_native_cvar=setNativeCvar;",
+		"if(window.__qlr_pending_native_maps){applyNativeMaps(window.__qlr_pending_native_maps);window.__qlr_pending_native_maps=null;}",
 		"if(f){for(var k in qz){f[k]=qz[k];}}window.qz_instance=qz;",
 	):
 		assert expected in startup_script_block
-	assert "char\tstartupScript[196608];" in cl_awesomium
+	assert "char\tstartupScript[393216];" in cl_awesomium
 	assert "#define CL_AWE_STARTUP_SCRIPT_RETRY_FRAMES 240" in cl_awesomium
 	assert "#define CL_AWE_STARTUP_SCRIPT_RETRY_INTERVAL 10" in cl_awesomium
 	assert "char\tstartupRetryScript[256];" in cl_awesomium
 	assert "CL_Awesomium_BuildRetryScript( cl_awesomium.startupRetryScript, sizeof( cl_awesomium.startupRetryScript ) );" in cl_awesomium
+	assert "CL_Awesomium_StartupScriptReady" in cl_awesomium
+	assert "script = cl_awesomium.startupScript;" in cl_awesomium
 	assert "script = cl_awesomium.startupRetryScript;" in cl_awesomium
 
 	for expected in (
@@ -1053,9 +1077,19 @@ def test_awesomium_qz_method_table_preserves_retail_return_flags() -> None:
 		"#define CL_WEB_NATIVE_REQUEST_IDLE_POLL_FRAMES 15",
 		"#define CL_WEB_NATIVE_REQUEST_LOADING_POLL_FRAMES 30",
 		"#define CL_WEB_NATIVE_CONFIG_SYNC_FRAMES 300",
+		"#define CL_WEB_NATIVE_MAP_SYNC_FRAMES 300",
+		"#define CL_WEB_NATIVE_FACTORY_SYNC_FRAMES 300",
+		"#define CL_WEB_NATIVE_FACTORY_RETRY_FRAMES 15",
+		"#define CL_WEB_MAP_JSON_BUFFER_SIZE 65536",
+		"#define CL_WEB_FACTORY_JSON_BUFFER_SIZE 65536",
+		"#define CL_WEB_MAP_SYNC_CHUNK_CHARS 8192",
 		"initialConfigJson = (char *)Z_Malloc( CL_WEB_NATIVE_CONFIG_BUFFER_SIZE );",
 		"CL_WebHost_BuildConfigJson( initialConfigJson, CL_WEB_NATIVE_CONFIG_BUFFER_SIZE );",
-		"CL_Awesomium_Startup( homePath, basePath, cl_webHost.playerName, cl_webHost.appId, cl_webHost.steamIdLow, cl_webHost.steamIdHigh, cls.glconfig.vidWidth, cls.glconfig.vidHeight, initialConfigJson )",
+		"initialMapJson = (char *)Z_Malloc( CL_WEB_MAP_JSON_BUFFER_SIZE );",
+		"CL_WebHost_BuildMapListJson( initialMapJson, CL_WEB_MAP_JSON_BUFFER_SIZE );",
+		"initialFactoryJson = (char *)Z_Malloc( CL_WEB_FACTORY_JSON_BUFFER_SIZE );",
+		"CL_WebHost_BuildFactoryListJson( initialFactoryJson, CL_WEB_FACTORY_JSON_BUFFER_SIZE );",
+		"CL_Awesomium_Startup( homePath, basePath, cl_webHost.playerName, cl_webHost.appId, cl_webHost.steamIdLow, cl_webHost.steamIdHigh, cls.glconfig.vidWidth, cls.glconfig.vidHeight, initialConfigJson, initialMapJson, initialFactoryJson )",
 		"cl_webHost.configSynced = qtrue;",
 		"cl_webHost.nextNativeRequestPollFrame = cl_webHost.frameSequence + CL_WEB_NATIVE_REQUEST_STARTUP_DELAY_FRAMES;",
 		'Q_strcat( context->buffer, context->bufferSize, "\\\"" );',
@@ -1065,6 +1099,15 @@ def test_awesomium_qz_method_table_preserves_retail_return_flags() -> None:
 		'Q_strcat( buffer, bufferSize, "},\\"binds\\":[" );',
 		"static void CL_WebHost_PumpNativeJavascriptRequests( void );",
 		"static void CL_WebHost_SyncConfigSnapshot( void );",
+		"static void CL_WebHost_SyncMapCatalogSnapshot( void );",
+		"static void CL_WebHost_SyncFactoryCatalogSnapshot( void );",
+		"CL_WebHost_MapCatalogBridgeReady",
+		"typeof window.qz_instance.GetFactoryList==='function'",
+		"typeof window.__qlr_apply_native_factories==='function'",
+		"CL_WebHost_ExecuteMapCatalogBatches",
+		"CL_WebHost_ExecuteMapCatalogBatch",
+		"CL_WebHost_ExecuteFactoryCatalogSnapshot",
+		"CL_Awesomium_ExecuteJavascriptInteger",
 		"cl_webHost.frameSequence < cl_webHost.nextNativeRequestPollFrame",
 		"CL_Awesomium_IsLoading()",
 		"CL_Awesomium_PopJavascriptRequest( request, sizeof( request ) )",
@@ -1075,6 +1118,8 @@ def test_awesomium_qz_method_table_preserves_retail_return_flags() -> None:
 		"Cvar_Reset( name );",
 		"CL_WebHost_UpdateBrowserCvarCache( name, value );",
 		"CL_WebHost_PumpNativeJavascriptRequests();",
+		"CL_WebHost_SyncMapCatalogSnapshot();",
+		"CL_WebHost_SyncFactoryCatalogSnapshot();",
 		"CL_WebHost_SyncConfigSnapshot();",
 	):
 		assert expected in cl_cgame
@@ -1084,6 +1129,7 @@ def test_awesomium_qz_method_table_preserves_retail_return_flags() -> None:
 		"_Awe_WebView_ExecuteJavascriptWithResult@12",
 		"_Awe_JSValue_ToInteger@4",
 		"_Awe_delete_JSValue@4",
+		'extern "C" qboolean CL_Awesomium_ExecuteJavascriptInteger( const char *script, const char *frame, int *outValue )',
 		"CL_Awesomium_PopJavascriptRequest",
 		"window.__qlr_native_requests||[]",
 		"window.__qlr_native_read=String(q.shift())",
@@ -1481,13 +1527,38 @@ def test_awesomium_map_list_reconstructs_retail_arena_catalog() -> None:
 	type_bits_block = _extract_function_block(
 		cl_cgame, "static unsigned int CL_WebHost_ResolveMapTypeBits( const char *typeList ) {"
 	)
+	load_descriptors_block = _extract_function_block(
+		cl_cgame, "static void CL_WebHost_LoadArenaDescriptors( clWebMapDescriptor_t *descriptors, int *descriptorCount ) {"
+	)
+	mappool_block = _extract_function_block(
+		cl_cgame, "static qboolean CL_WebHost_BuildMapListJsonFromMapPool( char *buffer, size_t bufferSize, const clWebMapDescriptor_t *arenaDescriptors, int arenaDescriptorCount ) {"
+	)
 	fallback_block = _extract_function_block(
 		cl_cgame, "static void CL_WebHost_BuildMapListJsonFromBSPScan( char *buffer, size_t bufferSize ) {"
 	)
 
-	assert 'CL_WebHost_AppendArenasFromFile( "scripts/arenas.txt", buffer, bufferSize, seenMaps, &entryCount );' in build_block
-	assert 'numdirs = FS_GetFileList( "scripts", ".arena", dirlist, sizeof( dirlist ) );' in build_block
-	assert 'Com_sprintf( filename, sizeof( filename ), "scripts/%s", dirptr );' in build_block
+	assert "CL_WebHost_LoadArenaDescriptors( arenaDescriptors, &arenaDescriptorCount );" in build_block
+	assert "CL_WebHost_BuildMapListJsonFromMapPool( buffer, bufferSize, arenaDescriptors, arenaDescriptorCount )" in build_block
+	assert "CL_WebHost_BuildMapDescriptorJson( arenaDescriptors, arenaDescriptorCount, buffer, bufferSize );" in build_block
+	assert 'CL_WebHost_AppendArenaDescriptorsFromFile( "scripts/arenas.txt", descriptors, descriptorCount );' in load_descriptors_block
+	assert 'numdirs = FS_GetFileList( "scripts", ".arena", dirlist, sizeof( dirlist ) );' in load_descriptors_block
+	assert 'Com_sprintf( filename, sizeof( filename ), "scripts/%s", dirptr );' in load_descriptors_block
+	assert 'length = FS_ReadFile( "mappool.txt", &fileBuffer );' in mappool_block
+	assert "CL_WebHost_LoadFactoryBasegtList( factoryBasegts, &factoryBasegtCount, CL_WEB_MAX_FACTORY_DEFINITIONS );" in mappool_block
+	assert "CL_WebHost_ResolveMapPoolFactoryBits( factoryToken, factoryBasegts, factoryBasegtCount );" in mappool_block
+	assert "CL_WebHost_RecordMapDescriptor( poolDescriptors, &poolDescriptorCount, mapToken, displayName, typeBits );" in mappool_block
+	assert "CL_WEB_MAP_POOL_FILE_BYTES" in cl_cgame
+	assert "CL_WebHost_SyncMapCatalogSnapshot" in cl_cgame
+	assert "mapJson = (char *)Z_Malloc( CL_WEB_MAP_JSON_BUFFER_SIZE );" in cl_cgame
+	assert "CL_WebHost_BuildMapListJson( mapJson, CL_WEB_MAP_JSON_BUFFER_SIZE );" in cl_cgame
+	assert "CL_WebHost_ExecuteMapCatalogBatches( mapJson, mapJsonLength )" in cl_cgame
+	assert "CL_WebHost_MapCatalogBridgeReady()" in cl_cgame
+	assert "CL_Awesomium_ExecuteJavascriptInteger( script, \"\", &result ) && result != 0" in cl_cgame
+	assert "window.__qlr_begin_native_maps" in cl_cgame
+	assert "window.__qlr_add_native_maps" in cl_cgame
+	assert "window.__qlr_commit_native_maps" in cl_cgame
+	assert "CL_WEB_MAP_SYNC_CHUNK_CHARS" in cl_cgame
+	assert 'Q_strcat( buffer, bufferSize, "\\",\\"maps\\":" );' not in cl_cgame
 	assert "mapName = Info_ValueForKey( info, ARENA_INFO_KEY_MAP );" in parse_block
 	assert "longName = Info_ValueForKey( info, ARENA_INFO_KEY_LONGNAME );" in parse_block
 	assert "typeList = Info_ValueForKey( info, ARENA_INFO_KEY_TYPE );" in parse_block

@@ -1647,7 +1647,11 @@ def test_awesomium_launch_task_builds_with_in_process_overlay_provider() -> None
     assert "QLBuildOnlineServices=$onlineServicesSetting" in build_script
     assert "QLRequireAwesomiumSdk=$requireAwesomiumSdkSetting" in build_script
     assert '"/p:QLRequireAwesomiumSdk=$RequireAwesomiumSdk"' in build_script
-    assert '"/t:$Targets"' in build_script
+    assert "$projectPlatformNormalized = 'Win32'" in build_script
+    assert "$explicitProjectTargetMap = @{" in build_script
+    assert "'cgamex86' = 'cgame\\cgamex86.vcxproj'" in build_script
+    assert "Resolved MSBuild project targets:" in build_script
+    assert "& $msbuildPath $target.Path @projectMsbuildArgs" in build_script
     assert "function Sync-AwesomiumRuntime" in build_script
     assert "$steamBasePath = $env:QLR_STEAM_BASEPATH" in build_script
     assert "if ($onlineServicesSetting -eq '1')" in build_script
@@ -4939,18 +4943,20 @@ def test_server_dedicated_build_lane_emits_qzeroded_and_defaults_dedicated_runti
 	assert "`qzeroded.exe`" in windows_pipeline
 
 
-def test_windows_build_and_launch_pipeline_refresh_runtime_ui_bundle_and_vm_modules() -> None:
+def test_windows_build_and_launch_pipeline_keeps_runtime_ui_assets_retail_only_and_syncs_vm_modules() -> None:
 	build_script = (REPO_ROOT / ".vscode/build.ps1").read_text(encoding="utf-8")
 	launch_script = (REPO_ROOT / ".vscode/launch.ps1").read_text(encoding="utf-8")
 	launch_json = json.loads((REPO_ROOT / ".vscode/launch.json").read_text(encoding="utf-8"))
 
-	assert '$uiBundleBuilder = Join-Path $repoRoot \'tools\\build_ui_bundle.py\'' in build_script
-	assert 'Write-Host "Refreshing staged retail UI bundle..."' in build_script
+	assert "Retail UI assets are loaded from the Quake Live installation; no local UI PK3 is generated." in build_script
+	assert "pak_uiql.pk3" in build_script
+	assert "Remove-Item -LiteralPath $staleUiPackage -Force" in build_script
 	assert "Sync-ModuleRuntimeArtifacts -ModuleName 'cgamex86'" in build_script
 	assert "Sync-ModuleRuntimeArtifacts -ModuleName 'qagamex86'" in build_script
 	assert "Copy-Item -Path $sourcePath -Destination $destinationPath -Force" in build_script
 
-	assert "(Join-Path $Baseq3Root 'ui\\menudef.h')" in launch_script
+	assert "$retailUiBundleRoot = $steamBasePath" in launch_script
+	assert "Remove-Item -LiteralPath $staleUiPackage -Force" in launch_script
 	assert "$runtimeModulesDir = Join-Path $repoRoot \"build\\win32\\$Configuration\\modules\"" in launch_script
 	assert "function Sync-LaunchModuleArtifact" in launch_script
 	assert "Sync-LaunchModuleArtifact -ModuleName 'cgamex86'" in launch_script
@@ -4962,7 +4968,9 @@ def test_windows_build_and_launch_pipeline_refresh_runtime_ui_bundle_and_vm_modu
 	for configuration in launch_json["configurations"]:
 		assert configuration["cwd"] == "${workspaceFolder}\\build\\win32\\Debug\\bin"
 		basepath_index = configuration["args"].index("fs_basepath") + 1
+		cdpath_index = configuration["args"].index("fs_cdpath") + 1
 		assert configuration["args"][basepath_index] == "C:\\PROGRA~2\\Steam\\STEAMA~1\\common\\QUAKEL~1"
+		assert configuration["args"][cdpath_index] == "C:\\PROGRA~2\\Steam\\STEAMA~1\\common\\QUAKEL~1"
 
 
 def test_filesystem_referenced_steamworks_helper_reconstructs_retail_publication_list() -> None:

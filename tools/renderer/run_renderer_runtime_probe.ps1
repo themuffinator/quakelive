@@ -12,22 +12,9 @@ $RetailBasePath = [System.IO.Path]::GetFullPath((Resolve-Path -LiteralPath $Reta
 function Resolve-RetailUiBundleRoot {
 	param([string]$Root)
 
-	$candidate = [System.IO.Path]::GetFullPath((Join-Path $Root 'build\ui_bundle\staging'))
-	$baseq3Root = Join-Path $candidate 'baseq3'
-	foreach ($requiredPath in @(
-			$baseq3Root,
-			(Join-Path $baseq3Root 'default.cfg'),
-			(Join-Path $baseq3Root 'ui\hud3.txt'),
-			(Join-Path $baseq3Root 'ui\ingame_scoreboard_ffa.menu'),
-			(Join-Path $baseq3Root 'ui\assets\button_back.png'),
-			(Join-Path $baseq3Root 'ui\assets\hud\ffa.png'),
-			(Join-Path $baseq3Root 'ui\assets\score\scoretl.png'),
-			(Join-Path $baseq3Root 'fonts\font.dat'),
-			(Join-Path $baseq3Root 'fonts\font.tga')
-		)) {
-		if (-not (Test-Path -LiteralPath $requiredPath)) {
-			throw "Quake Live UI staging content was not found: $requiredPath. Run tools/build_ui_bundle.py before running the renderer probe so staging\\baseq3 contains the retail UI runtime tree."
-		}
+	$candidate = $script:RetailBasePath
+	if (-not (Test-Path -LiteralPath (Join-Path $candidate 'baseq3\pak00.pk3'))) {
+		throw "Quake Live retail content was not found under $candidate. fs_cdpath must point at the installed Quake Live root."
 	}
 
 	return $candidate
@@ -663,6 +650,12 @@ $artifact = [ordered]@{
 	probe_script = To-RepoPath (Join-Path $RepoRoot 'tools\renderer\run_renderer_runtime_probe.ps1')
 	runtime_root = To-RepoPath $RuntimeRoot
 	retail_baseq3_root = $retailBaseq3Root.Replace('\', '/')
+	ui_asset_policy = [ordered]@{
+		mode = 'retail-install-only-no-repo-copy'
+		fs_basepath = $script:RetailBasePath.Replace('\', '/')
+		fs_cdpath = $script:RetailUiBundleRoot.Replace('\', '/')
+		local_ui_packages_allowed = $false
+	}
 	main_menu = [ordered]@{
 		engine_screenshot = if ($mainProbe.engine_screenshot) { To-RepoPath $mainProbe.engine_screenshot.FullName } else { '' }
 		engine_sha256 = $mainEngineSha256

@@ -255,6 +255,9 @@ void CL_ParseSnapshot( msg_t *msg ) {
 
 	// read areamask
 	len = MSG_ReadByte( msg );
+	if ( len > sizeof( newSnap.areamask ) ) {
+		Com_Error( ERR_DROP, "CL_ParseSnapshot: Invalid size %d for areamask.", len );
+	}
 	MSG_ReadData( msg, &newSnap.areamask, len);
 
 	// read playerinfo
@@ -632,7 +635,7 @@ void CL_ParseServerMessage( msg_t *msg ) {
 	// other commands
 		switch ( cmd ) {
 		default:
-			Com_Error (ERR_DROP,"CL_ParseServerMessage: Illegible server message\n");
+			Com_Error (ERR_DROP,"CL_ParseServerMessage: Illegible server message %d\n", cmd);
 			break;			
 		case svc_nop:
 			break;

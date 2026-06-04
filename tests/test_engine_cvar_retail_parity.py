@@ -3503,7 +3503,8 @@ def test_engine_cvar_thirtyfirst_platform_vm_steam_tranche_matches_retail_contra
 	assert 'steamVac = Cvar_Get( "sv_vac", "1", CVAR_SERVERINFO | CVAR_ARCHIVE );' in common
 	assert 'sv_vac = Cvar_Get ("sv_vac", "1", CVAR_SERVERINFO | CVAR_ARCHIVE );' in sv_init
 	assert 'if ( !QL_Steamworks_ServerInit( steamIp, (uint16_t)netPort->integer, steamVac && steamVac->integer ? qtrue : qfalse, dedicated ) ) {' in common
-	assert 'if ( !sv_vac || !sv_vac->integer ) {' in sv_client
+	assert '"VAC is disabled on this server"' not in sv_client
+	assert 'SV_LogVACStatus( &from, "accepted", ( sv_vac && sv_vac->integer ) ? "enabled" : "disabled",' in sv_client
 	assert 'Info_SetValueForKey( infostring, NET_GetVACInfoKey(), va("%i", sv_vac->integer) );' in sv_main
 
 	assert 'Cvar_Set( "arch", "winnt" );' in win_main

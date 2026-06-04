@@ -1581,6 +1581,10 @@ int vmMain( int command, int arg0, int arg1, int arg2, int arg3, int arg4, int a
 	return -1;
 }
 
+#ifdef _MSC_VER
+#pragma warning(push)
+#pragma warning(disable:4090)
+#endif
 static void *g_nativeExports[GAME_NATIVE_EXPORT_COUNT] = {
 	[GAME_NATIVE_EXPORT_SHUTDOWN] = G_NativeShutdown,
 	[GAME_NATIVE_EXPORT_RUN_FRAME] = G_RunFrame,
@@ -1602,6 +1606,9 @@ static void *g_nativeExports[GAME_NATIVE_EXPORT_COUNT] = {
 	[GAME_NATIVE_EXPORT_ARE_ENEMY_CLIENTS] = G_AreEnemyClients,
 	[GAME_NATIVE_EXPORT_GET_CLIENT_SCORE] = G_GetClientScore
 };
+#ifdef _MSC_VER
+#pragma warning(pop)
+#endif
 
 /*
 ================

@@ -167,7 +167,7 @@ def _build_ui_full_parity_gate_report(
 	validation_details: dict[str, Any] = {
 		"retail_ui_bundle_artifact_present": UI_BUNDLE_PATH.exists(),
 		"retail_ui_overlay_artifact_present": UI_OVERLAY_BUNDLE_PATH.exists(),
-		"font_metrics_present": UI_METRICS_PATH.exists(),
+		"font_metrics_artifact_present": UI_METRICS_PATH.exists(),
 		"ui_validation_summary_present": UI_VALIDATION_SUMMARY_PATH.exists(),
 		"overlay_manifest_present": UI_OVERLAY_MANIFEST_PATH.exists(),
 	}
@@ -194,7 +194,7 @@ def _build_ui_full_parity_gate_report(
 		(
 			not validation_details["retail_ui_bundle_artifact_present"],
 			not validation_details["retail_ui_overlay_artifact_present"],
-			validation_details["font_metrics_present"],
+			not validation_details["font_metrics_artifact_present"],
 			validation_details["ui_validation_summary_present"],
 			validation_details["overlay_manifest_present"],
 		)
@@ -202,7 +202,7 @@ def _build_ui_full_parity_gate_report(
 	if retail_ui_corpus_inventory["retail_ui_corpus_available"]:
 		status = "pass" if (artifacts_ok and summary_ok) else "fail"
 		summary = (
-			"Validation artifacts are present, no retail UI packages were emitted, and the tracked validation summary is clean."
+			"Validation artifacts are present, no retail UI packages or font-bake assets were emitted, and the tracked validation summary is clean."
 			if status == "pass"
 			else "Validation artifacts are missing or the tracked validation summary records drift."
 		)

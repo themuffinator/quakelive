@@ -156,13 +156,27 @@ static int QLWebHost_CountRecoveredWebCvarMappings( void ) {
 #define CL_WEB_NATIVE_REQUEST_LOADING_POLL_FRAMES 30
 #define CL_WEB_NATIVE_REQUEST_BUSY_POLL_FRAMES 1
 #define CL_WEB_NATIVE_CONFIG_SYNC_FRAMES 300
+#define CL_WEB_NATIVE_MAP_SYNC_FRAMES 300
+#define CL_WEB_NATIVE_MAP_RETRY_FRAMES 15
+#define CL_WEB_NATIVE_FACTORY_SYNC_FRAMES 300
+#define CL_WEB_NATIVE_FACTORY_RETRY_FRAMES 15
 #define CL_WEB_NATIVE_CONFIG_BUFFER_SIZE 131072
+#define CL_WEB_MAP_JSON_BUFFER_SIZE 65536
+#define CL_WEB_FACTORY_JSON_BUFFER_SIZE 65536
+#define CL_WEB_MAP_SYNC_CHUNK_CHARS 8192
 #define CL_WEB_LIVE_SURFACE_FAILURE_FRAMES 180
+
+typedef struct clWebFactoryBasegt_s clWebFactoryBasegt_t;
 
 static qboolean CL_OverlayServiceAvailable( void );
 static void CL_WebHost_BuildConfigJson( char *buffer, size_t bufferSize );
+static void CL_WebHost_BuildMapListJson( char *buffer, size_t bufferSize );
+static void CL_WebHost_BuildFactoryListJson( char *buffer, size_t bufferSize );
+static void CL_WebHost_LoadFactoryBasegtList( clWebFactoryBasegt_t *definitions, int *definitionCount, int maxDefinitions );
 static void CL_WebHost_PumpNativeJavascriptRequests( void );
 static void CL_WebHost_SyncConfigSnapshot( void );
+static void CL_WebHost_SyncMapCatalogSnapshot( void );
+static void CL_WebHost_SyncFactoryCatalogSnapshot( void );
 static void CL_WebHost_CheckLiveAwesomiumSurfaceFailure( void );
 static void CL_ResetBrowserOverlayState( void );
 
@@ -259,6 +273,8 @@ typedef struct {
 	int			cursorY;
 	int			frameSequence;
 	int			nextConfigSyncFrame;
+	int			nextMapCatalogSyncFrame;
+	int			nextFactoryCatalogSyncFrame;
 	int			nextNativeRequestPollFrame;
 	int			zoomPercent;
 	int			bootstrapAttemptCount;
@@ -291,6 +307,8 @@ typedef struct {
 	qboolean	cursorOverrideActive;
 #endif
 	qboolean	configSynced;
+	qboolean	mapCatalogSynced;
+	qboolean	factoryCatalogSynced;
 } clWebHostState_t;
 
 typedef struct {
@@ -301,6 +319,7 @@ typedef struct {
 
 #define CL_WEB_ARENA_FILE_LIST_BUFFER 4096
 #define CL_WEB_MAX_MAPS 256
+#define CL_WEB_MAP_POOL_FILE_BYTES 0x8000
 #define CL_WEB_MAX_FACTORY_DEFINITIONS 256
 #define CL_WEB_FACTORY_JSON_STRING 8192
 
@@ -319,6 +338,17 @@ typedef struct {
 	char		basegt[64];
 	char		settingsJson[CL_WEB_FACTORY_JSON_STRING];
 } clWebFactoryDefinition_t;
+
+struct clWebFactoryBasegt_s {
+	char		id[MAX_QPATH];
+	char		basegt[64];
+};
+
+typedef struct {
+	char		sysname[MAX_QPATH];
+	char		name[MAX_INFO_VALUE];
+	unsigned int	typeBits;
+} clWebMapDescriptor_t;
 
 static clWebHostState_t cl_webHost;
 
@@ -989,9 +1019,13 @@ static void CL_WebHost_ResetRuntime( qboolean clearVisibility ) {
 	cl_webHost.cursorY = 0;
 	cl_webHost.frameSequence = 0;
 	cl_webHost.nextConfigSyncFrame = 0;
+	cl_webHost.nextMapCatalogSyncFrame = 0;
+	cl_webHost.nextFactoryCatalogSyncFrame = 0;
 	cl_webHost.nextNativeRequestPollFrame = 0;
 	cl_webHost.bootstrapAttemptCount = 0;
 	cl_webHost.configSynced = qfalse;
+	cl_webHost.mapCatalogSynced = qfalse;
+	cl_webHost.factoryCatalogSynced = qfalse;
 	cl_webHost.cvarMappingCount = QLWebHost_CountRecoveredWebCvarMappings();
 	cl_webHost.loadedDocumentScriptCount = 0;
 	cl_webHost.executedDocumentScriptCount = 0;
@@ -2280,6 +2314,8 @@ static qboolean QLWebHost_EnsureRuntime( void ) {
 			char homePath[MAX_OSPATH];
 			char basePath[MAX_OSPATH];
 			char *initialConfigJson;
+			char *initialMapJson;
+			char *initialFactoryJson;
 
 			Cvar_VariableStringBuffer( "fs_homepath", homePath, sizeof( homePath ) );
 			Cvar_VariableStringBuffer( "fs_basepath", basePath, sizeof( basePath ) );
@@ -2289,10 +2325,26 @@ static qboolean QLWebHost_EnsureRuntime( void ) {
 				initialConfigJson[0] = '\0';
 				CL_WebHost_BuildConfigJson( initialConfigJson, CL_WEB_NATIVE_CONFIG_BUFFER_SIZE );
 			}
+			initialMapJson = (char *)Z_Malloc( CL_WEB_MAP_JSON_BUFFER_SIZE );
+			if ( initialMapJson ) {
+				initialMapJson[0] = '\0';
+				CL_WebHost_BuildMapListJson( initialMapJson, CL_WEB_MAP_JSON_BUFFER_SIZE );
+			}
+			initialFactoryJson = (char *)Z_Malloc( CL_WEB_FACTORY_JSON_BUFFER_SIZE );
+			if ( initialFactoryJson ) {
+				initialFactoryJson[0] = '\0';
+				CL_WebHost_BuildFactoryListJson( initialFactoryJson, CL_WEB_FACTORY_JSON_BUFFER_SIZE );
+			}
 			cl_webHost.bootstrapAttemptCount++;
-			if ( CL_Awesomium_Startup( homePath, basePath, cl_webHost.playerName, cl_webHost.appId, cl_webHost.steamIdLow, cl_webHost.steamIdHigh, cls.glconfig.vidWidth, cls.glconfig.vidHeight, initialConfigJson ) ) {
+			if ( CL_Awesomium_Startup( homePath, basePath, cl_webHost.playerName, cl_webHost.appId, cl_webHost.steamIdLow, cl_webHost.steamIdHigh, cls.glconfig.vidWidth, cls.glconfig.vidHeight, initialConfigJson, initialMapJson, initialFactoryJson ) ) {
 				if ( initialConfigJson ) {
 					Z_Free( initialConfigJson );
+				}
+				if ( initialMapJson ) {
+					Z_Free( initialMapJson );
+				}
+				if ( initialFactoryJson ) {
+					Z_Free( initialFactoryJson );
 				}
 				cl_webHost.liveAwesomium = qtrue;
 				cl_webHost.coreInitialised = qtrue;
@@ -2310,6 +2362,10 @@ static qboolean QLWebHost_EnsureRuntime( void ) {
 				cl_webHost.qzInstanceBound = qtrue;
 				cl_webHost.configSynced = qtrue;
 				cl_webHost.nextConfigSyncFrame = cl_webHost.frameSequence + CL_WEB_NATIVE_CONFIG_SYNC_FRAMES;
+				cl_webHost.mapCatalogSynced = qfalse;
+				cl_webHost.nextMapCatalogSyncFrame = 0;
+				cl_webHost.factoryCatalogSynced = qfalse;
+				cl_webHost.nextFactoryCatalogSyncFrame = 0;
 				cl_webHost.nextNativeRequestPollFrame = cl_webHost.frameSequence + CL_WEB_NATIVE_REQUEST_STARTUP_DELAY_FRAMES;
 				QLWebView_Resize( cls.glconfig.vidWidth, cls.glconfig.vidHeight );
 				QLWebView_RebuildSurfaceImage();
@@ -2319,6 +2375,12 @@ static qboolean QLWebHost_EnsureRuntime( void ) {
 			}
 			if ( initialConfigJson ) {
 				Z_Free( initialConfigJson );
+			}
+			if ( initialMapJson ) {
+				Z_Free( initialMapJson );
+			}
+			if ( initialFactoryJson ) {
+				Z_Free( initialFactoryJson );
 			}
 			Com_Printf( "Awesomium WebCore initialisation failed: %s\n", CL_Awesomium_LastError() );
 			cl_webHost.loadFailed = qtrue;
@@ -2364,6 +2426,10 @@ static qboolean QLWebHost_OpenURL( const char *url ) {
 	cl_webHost.focused = qtrue;
 	cl_webHost.configSynced = qfalse;
 	cl_webHost.nextConfigSyncFrame = 0;
+	cl_webHost.mapCatalogSynced = qfalse;
+	cl_webHost.nextMapCatalogSyncFrame = 0;
+	cl_webHost.factoryCatalogSynced = qfalse;
+	cl_webHost.nextFactoryCatalogSyncFrame = 0;
 	Cvar_Set( "web_browserActive", "1" );
 
 #if defined( _WIN32 ) && QL_PLATFORM_HAS_ONLINE_SERVICES
@@ -2469,6 +2535,10 @@ static void QLWebHost_ReloadView( qboolean ignoreCache ) {
 		CL_WebZoomClearModified();
 		cl_webHost.configSynced = qfalse;
 		cl_webHost.nextConfigSyncFrame = 0;
+		cl_webHost.mapCatalogSynced = qfalse;
+		cl_webHost.nextMapCatalogSyncFrame = 0;
+		cl_webHost.factoryCatalogSynced = qfalse;
+		cl_webHost.nextFactoryCatalogSyncFrame = 0;
 		cl_webHost.surfaceDirty = qtrue;
 		return;
 	}
@@ -2645,6 +2715,8 @@ static void QLWebCore_Update( void ) {
 		CL_Awesomium_Update();
 		QLLoadHandler_PollLiveDocumentReady();
 		CL_WebHost_PumpNativeJavascriptRequests();
+		CL_WebHost_SyncMapCatalogSnapshot();
+		CL_WebHost_SyncFactoryCatalogSnapshot();
 		CL_WebHost_SyncConfigSnapshot();
 		if ( CL_Awesomium_SurfaceDirty() ) {
 			cl_webHost.surfaceDirty = qtrue;
@@ -2881,6 +2953,78 @@ static void CL_WebHost_AppendMapDescriptorJson( const char *sysname, const char 
 
 /*
 =============
+CL_WebHost_FindMapDescriptorIndex
+=============
+*/
+static int CL_WebHost_FindMapDescriptorIndex( const clWebMapDescriptor_t *descriptors, int descriptorCount, const char *sysname ) {
+	int index;
+
+	if ( !descriptors || !sysname || !sysname[0] ) {
+		return -1;
+	}
+
+	for ( index = 0; index < descriptorCount; index++ ) {
+		if ( !Q_stricmp( descriptors[index].sysname, sysname ) ) {
+			return index;
+		}
+	}
+
+	return -1;
+}
+
+/*
+=============
+CL_WebHost_RecordMapDescriptor
+=============
+*/
+static void CL_WebHost_RecordMapDescriptor( clWebMapDescriptor_t *descriptors, int *descriptorCount, const char *sysname, const char *name, unsigned int typeBits ) {
+	int index;
+
+	if ( !descriptors || !descriptorCount || !sysname || !sysname[0] ) {
+		return;
+	}
+
+	index = CL_WebHost_FindMapDescriptorIndex( descriptors, *descriptorCount, sysname );
+	if ( index < 0 ) {
+		if ( *descriptorCount >= CL_WEB_MAX_MAPS ) {
+			return;
+		}
+		index = *descriptorCount;
+		( *descriptorCount )++;
+		Com_Memset( &descriptors[index], 0, sizeof( descriptors[index] ) );
+		Q_strncpyz( descriptors[index].sysname, sysname, sizeof( descriptors[index].sysname ) );
+		Q_strncpyz( descriptors[index].name, ( name && name[0] ) ? name : sysname, sizeof( descriptors[index].name ) );
+	} else if ( name && name[0] && ( !descriptors[index].name[0] || !Q_stricmp( descriptors[index].name, descriptors[index].sysname ) ) ) {
+		Q_strncpyz( descriptors[index].name, name, sizeof( descriptors[index].name ) );
+	}
+
+	descriptors[index].typeBits |= typeBits;
+}
+
+/*
+=============
+CL_WebHost_BuildMapDescriptorJson
+=============
+*/
+static void CL_WebHost_BuildMapDescriptorJson( const clWebMapDescriptor_t *descriptors, int descriptorCount, char *buffer, size_t bufferSize ) {
+	int index;
+	int entryCount;
+
+	if ( !buffer || bufferSize == 0 ) {
+		return;
+	}
+
+	buffer[0] = '\0';
+	Q_strcat( buffer, bufferSize, "[" );
+	entryCount = 0;
+	for ( index = 0; index < descriptorCount; index++ ) {
+		CL_WebHost_AppendMapDescriptorJson( descriptors[index].sysname, descriptors[index].name, descriptors[index].typeBits, buffer, bufferSize, &entryCount );
+	}
+	Q_strcat( buffer, bufferSize, "]" );
+}
+
+/*
+=============
 CL_WebHost_ParseArenaInfosToJson
 =============
 */
@@ -2942,6 +3086,64 @@ static void CL_WebHost_ParseArenaInfosToJson( char *data, char *buffer, size_t b
 
 /*
 =============
+CL_WebHost_ParseArenaInfosToDescriptors
+=============
+*/
+static void CL_WebHost_ParseArenaInfosToDescriptors( char *data, clWebMapDescriptor_t *descriptors, int *descriptorCount ) {
+	char		*token;
+	char		key[MAX_TOKEN_CHARS];
+	char		info[MAX_INFO_STRING];
+	char		*cursor;
+
+	if ( !data || !descriptors || !descriptorCount ) {
+		return;
+	}
+
+	cursor = data;
+	while ( 1 ) {
+		token = COM_Parse( &cursor );
+		if ( !token[0] ) {
+			break;
+		}
+		if ( strcmp( token, "{" ) ) {
+			Com_DPrintf( "launcher browser map parser: missing '{' in arena data\n" );
+			break;
+		}
+
+		info[0] = '\0';
+		while ( 1 ) {
+			token = COM_ParseExt( &cursor, qtrue );
+			if ( !token[0] ) {
+				break;
+			}
+			if ( !strcmp( token, "}" ) ) {
+				break;
+			}
+
+			Q_strncpyz( key, token, sizeof( key ) );
+			token = COM_ParseExt( &cursor, qfalse );
+			Info_SetValueForKey( info, key, token[0] ? token : "<NULL>" );
+		}
+
+		{
+			const char	*mapName;
+			const char	*longName;
+			const char	*typeList;
+
+			mapName = Info_ValueForKey( info, ARENA_INFO_KEY_MAP );
+			if ( !mapName[0] || *descriptorCount >= CL_WEB_MAX_MAPS ) {
+				continue;
+			}
+
+			longName = Info_ValueForKey( info, ARENA_INFO_KEY_LONGNAME );
+			typeList = Info_ValueForKey( info, ARENA_INFO_KEY_TYPE );
+			CL_WebHost_RecordMapDescriptor( descriptors, descriptorCount, mapName, longName, CL_WebHost_ResolveMapTypeBits( typeList ) );
+		}
+	}
+}
+
+/*
+=============
 CL_WebHost_AppendArenasFromFile
 =============
 */
@@ -2961,6 +3163,68 @@ static void CL_WebHost_AppendArenasFromFile( const char *filename, char *buffer,
 
 	CL_WebHost_ParseArenaInfosToJson( (char *)fileBuffer, buffer, bufferSize, seenMaps, entryCount );
 	FS_FreeFile( fileBuffer );
+}
+
+/*
+=============
+CL_WebHost_AppendArenaDescriptorsFromFile
+=============
+*/
+static void CL_WebHost_AppendArenaDescriptorsFromFile( const char *filename, clWebMapDescriptor_t *descriptors, int *descriptorCount ) {
+	void	*fileBuffer;
+	int		length;
+
+	fileBuffer = NULL;
+	length = FS_ReadFile( filename, &fileBuffer );
+	if ( length <= 0 || !fileBuffer ) {
+		return;
+	}
+	if ( length >= MAX_ARENAS_TEXT ) {
+		FS_FreeFile( fileBuffer );
+		return;
+	}
+
+	CL_WebHost_ParseArenaInfosToDescriptors( (char *)fileBuffer, descriptors, descriptorCount );
+	FS_FreeFile( fileBuffer );
+}
+
+/*
+=============
+CL_WebHost_LoadArenaDescriptors
+=============
+*/
+static void CL_WebHost_LoadArenaDescriptors( clWebMapDescriptor_t *descriptors, int *descriptorCount ) {
+	char	arenasFile[MAX_QPATH];
+	char	dirlist[CL_WEB_ARENA_FILE_LIST_BUFFER];
+	char	*dirptr;
+	char	filename[MAX_QPATH];
+	int		numdirs;
+	int		dirlen;
+	int		i;
+
+	if ( !descriptors || !descriptorCount ) {
+		return;
+	}
+
+	*descriptorCount = 0;
+	Cvar_VariableStringBuffer( "g_arenasFile", arenasFile, sizeof( arenasFile ) );
+	if ( arenasFile[0] ) {
+		CL_WebHost_AppendArenaDescriptorsFromFile( arenasFile, descriptors, descriptorCount );
+	} else {
+		CL_WebHost_AppendArenaDescriptorsFromFile( "scripts/arenas.txt", descriptors, descriptorCount );
+	}
+
+	numdirs = FS_GetFileList( "scripts", ".arena", dirlist, sizeof( dirlist ) );
+	dirptr = dirlist;
+	for ( i = 0; i < numdirs && *descriptorCount < CL_WEB_MAX_MAPS; i++, dirptr += dirlen + 1 ) {
+		dirlen = strlen( dirptr );
+		if ( dirlen <= 0 ) {
+			continue;
+		}
+
+		Com_sprintf( filename, sizeof( filename ), "scripts/%s", dirptr );
+		CL_WebHost_AppendArenaDescriptorsFromFile( filename, descriptors, descriptorCount );
+	}
 }
 
 /*
@@ -3006,52 +3270,273 @@ static void CL_WebHost_BuildMapListJsonFromBSPScan( char *buffer, size_t bufferS
 
 /*
 =============
+CL_WebHost_TrimMapPoolToken
+=============
+*/
+static void CL_WebHost_TrimMapPoolToken( char *token ) {
+	char *start;
+	char *end;
+
+	if ( !token ) {
+		return;
+	}
+
+	start = token;
+	while ( *start == ' ' || *start == '\t' ) {
+		start++;
+	}
+
+	end = start + strlen( start );
+	while ( end > start && ( end[-1] == ' ' || end[-1] == '\t' ) ) {
+		end--;
+	}
+	*end = '\0';
+
+	if ( start != token ) {
+		memmove( token, start, ( end - start ) + 1 );
+	}
+}
+
+/*
+=============
+CL_WebHost_ResolveGametypeTokenBit
+=============
+*/
+static unsigned int CL_WebHost_ResolveGametypeTokenBit( const char *token ) {
+	if ( !token || !token[0] ) {
+		return 0u;
+	}
+
+	if ( !Q_stricmp( token, "ffa" ) ) {
+		return 1u << GT_FFA;
+	}
+	if ( !Q_stricmp( token, "duel" ) || !Q_stricmp( token, "tourney" ) ) {
+		return 1u << GT_TOURNAMENT;
+	}
+	if ( !Q_stricmp( token, "race" ) ) {
+		return 1u << GT_RACE;
+	}
+	if ( !Q_stricmp( token, "tdm" ) ) {
+		return 1u << GT_TEAM;
+	}
+	if ( !Q_stricmp( token, "ca" ) ) {
+		return 1u << GT_CLAN_ARENA;
+	}
+	if ( !Q_stricmp( token, "ctf" ) ) {
+		return 1u << GT_CTF;
+	}
+	if ( !Q_stricmp( token, "oneflag" ) ) {
+		return 1u << GT_1FCTF;
+	}
+	if ( !Q_stricmp( token, "overload" ) ) {
+		return 1u << GT_OBELISK;
+	}
+	if ( !Q_stricmp( token, "hh" ) || !Q_stricmp( token, "har" ) ) {
+		return 1u << GT_HARVESTER;
+	}
+	if ( !Q_stricmp( token, "ft" ) ) {
+		return 1u << GT_FREEZE;
+	}
+	if ( !Q_stricmp( token, "dom" ) ) {
+		return 1u << GT_DOMINATION;
+	}
+	if ( !Q_stricmp( token, "ad" ) ) {
+		return 1u << GT_ATTACK_DEFEND;
+	}
+	if ( !Q_stricmp( token, "rr" ) ) {
+		return 1u << GT_RED_ROVER;
+	}
+
+	return 0u;
+}
+
+/*
+=============
+CL_WebHost_ResolveMapPoolFactoryBits
+=============
+*/
+static unsigned int CL_WebHost_ResolveMapPoolFactoryBits( const char *factoryId, const clWebFactoryBasegt_t *factoryBasegts, int factoryBasegtCount ) {
+	int index;
+
+	if ( !factoryId || !factoryId[0] ) {
+		return 0u;
+	}
+
+	if ( factoryBasegts ) {
+		for ( index = 0; index < factoryBasegtCount; index++ ) {
+			if ( !Q_stricmp( factoryBasegts[index].id, factoryId ) ) {
+				return CL_WebHost_ResolveGametypeTokenBit( factoryBasegts[index].basegt );
+			}
+		}
+	}
+
+	return CL_WebHost_ResolveGametypeTokenBit( factoryId );
+}
+
+/*
+=============
+CL_WebHost_BuildMapListJsonFromMapPool
+
+Builds the WebUI arena list from Quake Live's retail `mappool.txt` rotation
+source, merging duplicate map entries into gametype availability bits.
+=============
+*/
+static qboolean CL_WebHost_BuildMapListJsonFromMapPool( char *buffer, size_t bufferSize, const clWebMapDescriptor_t *arenaDescriptors, int arenaDescriptorCount ) {
+	void *fileBuffer;
+	int length;
+	char *poolText;
+	char *cursor;
+	clWebMapDescriptor_t *poolDescriptors;
+	int poolDescriptorCount;
+	clWebFactoryBasegt_t factoryBasegts[CL_WEB_MAX_FACTORY_DEFINITIONS];
+	int factoryBasegtCount;
+
+	if ( !buffer || bufferSize == 0 ) {
+		return qfalse;
+	}
+
+	fileBuffer = NULL;
+	length = FS_ReadFile( "mappool.txt", &fileBuffer );
+	if ( length <= 0 || !fileBuffer ) {
+		return qfalse;
+	}
+	if ( length >= CL_WEB_MAP_POOL_FILE_BYTES ) {
+		FS_FreeFile( fileBuffer );
+		return qfalse;
+	}
+
+	poolText = (char *)Z_Malloc( length + 1 );
+	poolDescriptors = (clWebMapDescriptor_t *)Z_Malloc( sizeof( *poolDescriptors ) * CL_WEB_MAX_MAPS );
+	if ( !poolText || !poolDescriptors ) {
+		if ( poolText ) {
+			Z_Free( poolText );
+		}
+		if ( poolDescriptors ) {
+			Z_Free( poolDescriptors );
+		}
+		FS_FreeFile( fileBuffer );
+		return qfalse;
+	}
+
+	Com_Memcpy( poolText, fileBuffer, length );
+	poolText[length] = '\0';
+	Com_Memset( poolDescriptors, 0, sizeof( *poolDescriptors ) * CL_WEB_MAX_MAPS );
+	FS_FreeFile( fileBuffer );
+
+	factoryBasegtCount = 0;
+	Com_Memset( factoryBasegts, 0, sizeof( factoryBasegts ) );
+	CL_WebHost_LoadFactoryBasegtList( factoryBasegts, &factoryBasegtCount, CL_WEB_MAX_FACTORY_DEFINITIONS );
+
+	poolDescriptorCount = 0;
+	cursor = poolText;
+	while ( *cursor && poolDescriptorCount < CL_WEB_MAX_MAPS ) {
+		char lineBuffer[MAX_STRING_CHARS * 2];
+		char mapPath[MAX_QPATH];
+		char *comment;
+		char *separator;
+		char *mapToken;
+		char *factoryToken;
+		const char *displayName;
+		unsigned int typeBits;
+		int lineLength;
+		int arenaIndex;
+
+		lineLength = 0;
+		while ( cursor[lineLength] && cursor[lineLength] != '\n' && cursor[lineLength] != '\r' && lineLength < (int)sizeof( lineBuffer ) - 1 ) {
+			lineBuffer[lineLength] = cursor[lineLength];
+			lineLength++;
+		}
+		lineBuffer[lineLength] = '\0';
+
+		cursor += lineLength;
+		while ( *cursor == '\n' || *cursor == '\r' ) {
+			cursor++;
+		}
+
+		mapToken = lineBuffer;
+		while ( *mapToken == ' ' || *mapToken == '\t' ) {
+			mapToken++;
+		}
+		if ( !mapToken[0] || mapToken[0] == '#' ) {
+			continue;
+		}
+
+		comment = strchr( mapToken, '#' );
+		if ( comment ) {
+			*comment = '\0';
+		}
+
+		separator = strchr( mapToken, '|' );
+		if ( !separator ) {
+			continue;
+		}
+		*separator = '\0';
+		factoryToken = separator + 1;
+		CL_WebHost_TrimMapPoolToken( mapToken );
+		CL_WebHost_TrimMapPoolToken( factoryToken );
+		if ( !mapToken[0] || !factoryToken[0] || factoryToken[0] == '_' ) {
+			continue;
+		}
+
+		Com_sprintf( mapPath, sizeof( mapPath ), "maps/%s.bsp", mapToken );
+		if ( FS_ReadFile( mapPath, NULL ) == -1 ) {
+			continue;
+		}
+
+		typeBits = CL_WebHost_ResolveMapPoolFactoryBits( factoryToken, factoryBasegts, factoryBasegtCount );
+		if ( !typeBits ) {
+			continue;
+		}
+
+		displayName = mapToken;
+		arenaIndex = CL_WebHost_FindMapDescriptorIndex( arenaDescriptors, arenaDescriptorCount, mapToken );
+		if ( arenaIndex >= 0 && arenaDescriptors[arenaIndex].name[0] ) {
+			displayName = arenaDescriptors[arenaIndex].name;
+		}
+
+		CL_WebHost_RecordMapDescriptor( poolDescriptors, &poolDescriptorCount, mapToken, displayName, typeBits );
+	}
+
+	if ( poolDescriptorCount > 0 ) {
+		CL_WebHost_BuildMapDescriptorJson( poolDescriptors, poolDescriptorCount, buffer, bufferSize );
+	}
+
+	Z_Free( poolDescriptors );
+	Z_Free( poolText );
+	return poolDescriptorCount > 0;
+}
+
+/*
+=============
 CL_WebHost_BuildMapListJson
 =============
 */
 static void CL_WebHost_BuildMapListJson( char *buffer, size_t bufferSize ) {
-	char	arenasFile[MAX_QPATH];
-	char	dirlist[CL_WEB_ARENA_FILE_LIST_BUFFER];
-	char	*dirptr;
-	char	filename[MAX_QPATH];
-	char	seenMaps[CL_WEB_MAX_MAPS][MAX_QPATH];
-	int		numdirs;
-	int		dirlen;
-	int		i;
-	int		entryCount;
+	clWebMapDescriptor_t *arenaDescriptors;
+	int arenaDescriptorCount;
 
 	if ( !buffer || bufferSize == 0 ) {
 		return;
 	}
 
-	Com_Memset( seenMaps, 0, sizeof( seenMaps ) );
-	entryCount = 0;
-	buffer[0] = '\0';
-	Q_strcat( buffer, bufferSize, "[" );
-
-	Cvar_VariableStringBuffer( "g_arenasFile", arenasFile, sizeof( arenasFile ) );
-	if ( arenasFile[0] ) {
-		CL_WebHost_AppendArenasFromFile( arenasFile, buffer, bufferSize, seenMaps, &entryCount );
-	} else {
-		CL_WebHost_AppendArenasFromFile( "scripts/arenas.txt", buffer, bufferSize, seenMaps, &entryCount );
-	}
-
-	numdirs = FS_GetFileList( "scripts", ".arena", dirlist, sizeof( dirlist ) );
-	dirptr = dirlist;
-	for ( i = 0; i < numdirs && entryCount < CL_WEB_MAX_MAPS; i++, dirptr += dirlen + 1 ) {
-		dirlen = strlen( dirptr );
-		if ( dirlen <= 0 ) {
-			continue;
-		}
-
-		Com_sprintf( filename, sizeof( filename ), "scripts/%s", dirptr );
-		CL_WebHost_AppendArenasFromFile( filename, buffer, bufferSize, seenMaps, &entryCount );
-	}
-
-	Q_strcat( buffer, bufferSize, "]" );
-	if ( entryCount == 0 ) {
+	arenaDescriptors = (clWebMapDescriptor_t *)Z_Malloc( sizeof( *arenaDescriptors ) * CL_WEB_MAX_MAPS );
+	if ( !arenaDescriptors ) {
 		CL_WebHost_BuildMapListJsonFromBSPScan( buffer, bufferSize );
+		return;
 	}
+
+	Com_Memset( arenaDescriptors, 0, sizeof( *arenaDescriptors ) * CL_WEB_MAX_MAPS );
+	arenaDescriptorCount = 0;
+	CL_WebHost_LoadArenaDescriptors( arenaDescriptors, &arenaDescriptorCount );
+	if ( !CL_WebHost_BuildMapListJsonFromMapPool( buffer, bufferSize, arenaDescriptors, arenaDescriptorCount ) ) {
+		if ( arenaDescriptorCount > 0 ) {
+			CL_WebHost_BuildMapDescriptorJson( arenaDescriptors, arenaDescriptorCount, buffer, bufferSize );
+		} else {
+			CL_WebHost_BuildMapListJsonFromBSPScan( buffer, bufferSize );
+		}
+	}
+
+	Z_Free( arenaDescriptors );
 }
 
 /*
@@ -3603,6 +4088,158 @@ static qboolean CL_WebFactory_ParseDefinition( clWebFactoryParseState_t *state, 
 	}
 
 	return qtrue;
+}
+
+/*
+=============
+CL_WebHost_RecordFactoryBasegt
+=============
+*/
+static void CL_WebHost_RecordFactoryBasegt( clWebFactoryBasegt_t *definitions, int *definitionCount, int maxDefinitions, const clWebFactoryDefinition_t *definition ) {
+	int index;
+
+	if ( !definitions || !definitionCount || !definition || !definition->id[0] || !definition->basegt[0] ) {
+		return;
+	}
+	if ( *definitionCount >= maxDefinitions ) {
+		return;
+	}
+	for ( index = 0; index < *definitionCount; index++ ) {
+		if ( !Q_stricmp( definitions[index].id, definition->id ) ) {
+			return;
+		}
+	}
+
+	Q_strncpyz( definitions[*definitionCount].id, definition->id, sizeof( definitions[*definitionCount].id ) );
+	Q_strncpyz( definitions[*definitionCount].basegt, definition->basegt, sizeof( definitions[*definitionCount].basegt ) );
+	( *definitionCount )++;
+}
+
+/*
+=============
+CL_WebHost_AppendFactoryBasegtsFromBuffer
+=============
+*/
+static void CL_WebHost_AppendFactoryBasegtsFromBuffer( const char *filename, char *data, int dataLength, clWebFactoryBasegt_t *definitions, int *definitionCount, int maxDefinitions ) {
+	clWebFactoryParseState_t state;
+
+	if ( !data || dataLength <= 0 || !definitions || !definitionCount ) {
+		return;
+	}
+
+	state.cursor = data;
+	state.end = data + dataLength;
+	state.filename = filename;
+	state.line = 1;
+
+	CL_WebFactory_SkipWhitespace( &state );
+	if ( state.cursor >= state.end ) {
+		return;
+	}
+
+	if ( *state.cursor == '{' ) {
+		clWebFactoryDefinition_t definition;
+
+		if ( CL_WebFactory_ParseDefinition( &state, &definition ) ) {
+			CL_WebHost_RecordFactoryBasegt( definitions, definitionCount, maxDefinitions, &definition );
+		}
+		return;
+	}
+
+	if ( !CL_WebFactory_ParseExpectedChar( &state, '[' ) ) {
+		return;
+	}
+
+	CL_WebFactory_SkipWhitespace( &state );
+	if ( state.cursor < state.end && *state.cursor == ']' ) {
+		state.cursor++;
+		return;
+	}
+
+	while ( state.cursor < state.end && *definitionCount < maxDefinitions ) {
+		clWebFactoryDefinition_t definition;
+
+		if ( !CL_WebFactory_ParseDefinition( &state, &definition ) ) {
+			return;
+		}
+		CL_WebHost_RecordFactoryBasegt( definitions, definitionCount, maxDefinitions, &definition );
+
+		CL_WebFactory_SkipWhitespace( &state );
+		if ( state.cursor >= state.end ) {
+			return;
+		}
+		if ( *state.cursor == ',' ) {
+			state.cursor++;
+			CL_WebFactory_SkipWhitespace( &state );
+			if ( state.cursor < state.end && *state.cursor == ']' ) {
+				state.cursor++;
+				return;
+			}
+			continue;
+		}
+		if ( *state.cursor == ']' ) {
+			state.cursor++;
+			return;
+		}
+		CL_WebFactory_ReportParseError( &state, "expected ',' or ']'" );
+		return;
+	}
+}
+
+/*
+=============
+CL_WebHost_AppendFactoryBasegtsFromFile
+=============
+*/
+static void CL_WebHost_AppendFactoryBasegtsFromFile( const char *filename, clWebFactoryBasegt_t *definitions, int *definitionCount, int maxDefinitions ) {
+	void	*fileBuffer;
+	int		length;
+
+	fileBuffer = NULL;
+	length = FS_ReadFile( filename, &fileBuffer );
+	if ( length <= 0 || !fileBuffer ) {
+		return;
+	}
+
+	CL_WebHost_AppendFactoryBasegtsFromBuffer( filename, (char *)fileBuffer, length, definitions, definitionCount, maxDefinitions );
+	FS_FreeFile( fileBuffer );
+}
+
+/*
+=============
+CL_WebHost_LoadFactoryBasegtList
+=============
+*/
+static void CL_WebHost_LoadFactoryBasegtList( clWebFactoryBasegt_t *definitions, int *definitionCount, int maxDefinitions ) {
+	char fileList[32768];
+	char *cursor;
+	int count;
+
+	if ( !definitions || !definitionCount || maxDefinitions <= 0 ) {
+		return;
+	}
+
+	*definitionCount = 0;
+	CL_WebHost_AppendFactoryBasegtsFromFile( "scripts/factories.txt", definitions, definitionCount, maxDefinitions );
+	count = FS_GetFileList( "scripts", ".factories", fileList, sizeof( fileList ) );
+	cursor = fileList;
+	for ( ; count > 0 && *cursor && *definitionCount < maxDefinitions; count-- ) {
+		char path[MAX_QPATH];
+
+		Com_sprintf( path, sizeof( path ), "scripts/%s", cursor );
+		CL_WebHost_AppendFactoryBasegtsFromFile( path, definitions, definitionCount, maxDefinitions );
+		cursor += strlen( cursor ) + 1;
+	}
+
+	count = FS_GetFileList( "scripts", ".factory", fileList, sizeof( fileList ) );
+	cursor = fileList;
+	for ( ; count > 0 && *cursor && *definitionCount < maxDefinitions; count-- ) {
+		char path[MAX_QPATH];
+
+		Com_sprintf( path, sizeof( path ), "scripts/%s", cursor );
+		CL_WebHost_AppendFactoryBasegtsFromFile( path, definitions, definitionCount, maxDefinitions );
+		cursor += strlen( cursor ) + 1;
+	}
 }
 
 /*
@@ -4253,6 +4890,408 @@ static void CL_WebHost_SyncConfigSnapshot( void ) {
 
 	Z_Free( script );
 	Z_Free( configJson );
+#endif
+}
+
+/*
+=============
+CL_WebHost_ExecuteMapCatalogBatch
+
+Adds one bounded top-level arena batch to the pending browser-side map cache.
+=============
+*/
+static qboolean CL_WebHost_ExecuteMapCatalogBatch( const char *entries, size_t entryLength ) {
+#if defined( _WIN32 ) && QL_PLATFORM_HAS_ONLINE_SERVICES
+	char *script;
+	size_t scriptSize;
+	qboolean executed;
+	int result;
+
+	if ( !entries || entryLength == 0 ) {
+		return qtrue;
+	}
+
+	scriptSize = entryLength + 128;
+	script = (char *)Z_Malloc( (int)scriptSize );
+	if ( !script ) {
+		return qfalse;
+	}
+
+	Com_sprintf(
+		script,
+		scriptSize,
+		"(function(){return(window.__qlr_add_native_maps&&window.__qlr_add_native_maps([%.*s]))?1:0;})()",
+		(int)entryLength,
+		entries
+	);
+	executed = CL_Awesomium_ExecuteJavascriptInteger( script, "", &result ) && result != 0;
+	Z_Free( script );
+	return executed;
+#else
+	(void)entries;
+	(void)entryLength;
+	return qfalse;
+#endif
+}
+
+/*
+=============
+CL_WebHost_QueueMapCatalogEntry
+
+Extends the current arena transfer batch, flushing when the next entry would
+make the JavaScript payload too large for a conservative Awesomium hand-off.
+=============
+*/
+static qboolean CL_WebHost_QueueMapCatalogEntry( const char **batchStart, const char **batchEnd, size_t *batchLength, const char *entryStart, size_t entryLength ) {
+	if ( !batchStart || !batchEnd || !batchLength || !entryStart || entryLength == 0 ) {
+		return qtrue;
+	}
+
+	if ( *batchStart && *batchLength + 1 + entryLength > CL_WEB_MAP_SYNC_CHUNK_CHARS ) {
+		if ( !CL_WebHost_ExecuteMapCatalogBatch( *batchStart, *batchLength ) ) {
+			return qfalse;
+		}
+		*batchStart = NULL;
+		*batchEnd = NULL;
+		*batchLength = 0;
+	}
+
+	if ( !*batchStart ) {
+		*batchStart = entryStart;
+	}
+
+	*batchEnd = entryStart + entryLength;
+	*batchLength = (size_t)( *batchEnd - *batchStart );
+	return qtrue;
+}
+
+/*
+=============
+CL_WebHost_QueryBrowserCatalogCount
+
+Counts entries from the live WebUI module export when available, falling back to
+the qz_instance getter so runtime logs can verify the data the bundle observes.
+=============
+*/
+static qboolean CL_WebHost_QueryBrowserCatalogCount( const char *modulePath, const char *getterName, int *outCount ) {
+#if defined( _WIN32 ) && QL_PLATFORM_HAS_ONLINE_SERVICES
+	char script[1024];
+
+	if ( outCount ) {
+		*outCount = -1;
+	}
+	if ( !getterName || !getterName[0] ) {
+		return qfalse;
+	}
+
+	Com_sprintf(
+		script,
+		sizeof( script ),
+		"(function(){try{var has=Object.prototype.hasOwnProperty;var o=null;var p='%s';if(p&&window.req){try{o=window.req(p);}catch(e){}}if(!o&&window.qz_instance&&typeof window.qz_instance.%s==='function'){o=window.qz_instance.%s();}var c=0;for(var k in o){if(has.call(o,k)){c++;}}return c;}catch(e){return -1;}})()",
+		modulePath ? modulePath : "",
+		getterName,
+		getterName
+	);
+	return CL_Awesomium_ExecuteJavascriptInteger( script, "", outCount );
+#else
+	(void)modulePath;
+	(void)getterName;
+	if ( outCount ) {
+		*outCount = -1;
+	}
+	return qfalse;
+#endif
+}
+
+/*
+=============
+CL_WebHost_MapCatalogBridgeReady
+
+Verifies that the injected browser bridge has installed the native map-transfer
+hooks before the client starts streaming arena data.
+=============
+*/
+static qboolean CL_WebHost_MapCatalogBridgeReady( void ) {
+#if defined( _WIN32 ) && QL_PLATFORM_HAS_ONLINE_SERVICES
+	int ready;
+
+	if ( !CL_Awesomium_ExecuteJavascriptInteger(
+		"(function(){return(window.__qlr_browser_helpers_ready&&window.qz_instance&&typeof window.qz_instance.GetMapList==='function'&&typeof window.qz_instance.GetFactoryList==='function'&&typeof window.__qlr_begin_native_maps==='function'&&typeof window.__qlr_add_native_maps==='function'&&typeof window.__qlr_commit_native_maps==='function'&&typeof window.__qlr_apply_native_factories==='function')?1:0;})()",
+		"",
+		&ready ) ) {
+		return qfalse;
+	}
+
+	return ready != 0;
+#else
+	return qfalse;
+#endif
+}
+
+/*
+=============
+CL_WebHost_ExecuteMapCatalogBatches
+
+Streams the generated JSON array into the browser in top-level object batches,
+then commits the pending map cache in one synchronous browser-side swap.
+=============
+*/
+static qboolean CL_WebHost_ExecuteMapCatalogBatches( const char *mapJson, size_t mapJsonLength ) {
+#if defined( _WIN32 ) && QL_PLATFORM_HAS_ONLINE_SERVICES
+	const char *arrayEnd;
+	const char *cursor;
+	const char *entryStart;
+	const char *batchStart;
+	const char *batchEnd;
+	size_t batchLength;
+	int depth;
+	int result;
+	qboolean inString;
+	qboolean escaped;
+
+	if ( !mapJson || mapJsonLength < 2 || mapJson[0] != '[' || mapJson[mapJsonLength - 1] != ']' ) {
+		return qfalse;
+	}
+
+	if ( !CL_WebHost_MapCatalogBridgeReady() ) {
+		return qfalse;
+	}
+	if ( !CL_Awesomium_ExecuteJavascriptInteger( "(function(){return(window.__qlr_begin_native_maps&&window.__qlr_begin_native_maps())?1:0;})()", "", &result ) || result == 0 ) {
+		return qfalse;
+	}
+
+	arrayEnd = mapJson + mapJsonLength - 1;
+	entryStart = mapJson + 1;
+	batchStart = NULL;
+	batchEnd = NULL;
+	batchLength = 0;
+	depth = 0;
+	inString = qfalse;
+	escaped = qfalse;
+
+	for ( cursor = mapJson + 1; cursor < arrayEnd; cursor++ ) {
+		char ch;
+
+		ch = *cursor;
+		if ( inString ) {
+			if ( escaped ) {
+				escaped = qfalse;
+			} else if ( ch == '\\' ) {
+				escaped = qtrue;
+			} else if ( ch == '"' ) {
+				inString = qfalse;
+			}
+			continue;
+		}
+
+		if ( ch == '"' ) {
+			inString = qtrue;
+			continue;
+		}
+		if ( ch == '{' || ch == '[' ) {
+			depth++;
+			continue;
+		}
+		if ( ch == '}' || ch == ']' ) {
+			if ( depth > 0 ) {
+				depth--;
+			}
+			continue;
+		}
+		if ( ch == ',' && depth == 0 ) {
+			if ( !CL_WebHost_QueueMapCatalogEntry( &batchStart, &batchEnd, &batchLength, entryStart, (size_t)( cursor - entryStart ) ) ) {
+				return qfalse;
+			}
+			entryStart = cursor + 1;
+		}
+	}
+
+	if ( !CL_WebHost_QueueMapCatalogEntry( &batchStart, &batchEnd, &batchLength, entryStart, (size_t)( arrayEnd - entryStart ) ) ) {
+		return qfalse;
+	}
+	if ( !CL_WebHost_ExecuteMapCatalogBatch( batchStart, batchLength ) ) {
+		return qfalse;
+	}
+
+	return CL_Awesomium_ExecuteJavascriptInteger( "(function(){return(window.__qlr_commit_native_maps&&window.__qlr_commit_native_maps())?1:0;})()", "", &result ) && result != 0;
+#else
+	(void)mapJson;
+	(void)mapJsonLength;
+	return qfalse;
+#endif
+}
+
+/*
+=============
+CL_WebHost_SyncMapCatalogSnapshot
+
+Pushes the retail arena catalog into the live Awesomium qz map cache after the
+launcher document is ready. Keeping this out of the startup config avoids large
+bootstrap script literals while preserving synchronous GetMapList callers.
+=============
+*/
+static void CL_WebHost_SyncMapCatalogSnapshot( void ) {
+#if defined( _WIN32 ) && QL_PLATFORM_HAS_ONLINE_SERVICES
+	char *mapJson;
+	size_t mapJsonLength;
+
+	if ( !cl_webHost.liveAwesomium || !cl_webHost.documentReady || !cl_webHost.qzInstanceBound ) {
+		return;
+	}
+	if ( cl_webHost.mapCatalogSynced && cl_webHost.frameSequence < cl_webHost.nextMapCatalogSyncFrame ) {
+		return;
+	}
+	if ( cl_webHost.frameSequence < cl_webHost.nextMapCatalogSyncFrame ) {
+		return;
+	}
+	if ( CL_Awesomium_IsLoading() ) {
+		cl_webHost.nextMapCatalogSyncFrame = cl_webHost.frameSequence + CL_WEB_NATIVE_REQUEST_LOADING_POLL_FRAMES;
+		return;
+	}
+	if ( !CL_WebHost_MapCatalogBridgeReady() ) {
+		cl_webHost.nextMapCatalogSyncFrame = cl_webHost.frameSequence + CL_WEB_NATIVE_MAP_RETRY_FRAMES;
+		return;
+	}
+
+	mapJson = (char *)Z_Malloc( CL_WEB_MAP_JSON_BUFFER_SIZE );
+	if ( !mapJson ) {
+		return;
+	}
+	mapJson[0] = '\0';
+	CL_WebHost_BuildMapListJson( mapJson, CL_WEB_MAP_JSON_BUFFER_SIZE );
+	mapJsonLength = strlen( mapJson );
+	if ( mapJsonLength < 2 || mapJson[0] != '[' || mapJson[mapJsonLength - 1] != ']' ) {
+		Com_DPrintf( "Awesomium map catalog sync skipped malformed map JSON (%u bytes)\n", (unsigned int)mapJsonLength );
+		cl_webHost.nextMapCatalogSyncFrame = cl_webHost.frameSequence + CL_WEB_NATIVE_MAP_RETRY_FRAMES;
+		Z_Free( mapJson );
+		return;
+	}
+
+	if ( CL_WebHost_ExecuteMapCatalogBatches( mapJson, mapJsonLength ) ) {
+		int qzMapCount;
+		int moduleMapCount;
+
+		qzMapCount = -1;
+		moduleMapCount = -1;
+		CL_WebHost_QueryBrowserCatalogCount( "", "GetMapList", &qzMapCount );
+		CL_WebHost_QueryBrowserCatalogCount( "../src/mapdb", "GetMapList", &moduleMapCount );
+		cl_webHost.mapCatalogSynced = qtrue;
+		cl_webHost.nextMapCatalogSyncFrame = cl_webHost.frameSequence + CL_WEB_NATIVE_MAP_SYNC_FRAMES;
+		Com_DPrintf( "Awesomium map catalog synced (%u bytes, %d qz maps, %d module maps)\n", (unsigned int)mapJsonLength, qzMapCount, moduleMapCount );
+	} else {
+		cl_webHost.nextMapCatalogSyncFrame = cl_webHost.frameSequence + CL_WEB_NATIVE_MAP_RETRY_FRAMES;
+	}
+
+	Z_Free( mapJson );
+#endif
+}
+
+/*
+=============
+CL_WebHost_ExecuteFactoryCatalogSnapshot
+
+Pushes the recovered retail factory catalog into the live browser bridge so the
+Start Match factory and arena filters observe the same base gametype wiring.
+=============
+*/
+static qboolean CL_WebHost_ExecuteFactoryCatalogSnapshot( const char *factoryJson, size_t factoryJsonLength ) {
+#if defined( _WIN32 ) && QL_PLATFORM_HAS_ONLINE_SERVICES
+	char *script;
+	size_t scriptSize;
+	int result;
+	qboolean executed;
+
+	if ( !factoryJson || factoryJsonLength < 2 || factoryJson[0] != '[' || factoryJson[factoryJsonLength - 1] != ']' ) {
+		return qfalse;
+	}
+	if ( !CL_WebHost_MapCatalogBridgeReady() ) {
+		return qfalse;
+	}
+
+	scriptSize = factoryJsonLength + 160;
+	script = (char *)Z_Malloc( scriptSize );
+	if ( !script ) {
+		return qfalse;
+	}
+
+	Com_sprintf(
+		script,
+		scriptSize,
+		"(function(){return(window.__qlr_apply_native_factories&&window.__qlr_apply_native_factories(%s))?1:0;})()",
+		factoryJson
+	);
+	executed = CL_Awesomium_ExecuteJavascriptInteger( script, "", &result ) && result != 0;
+	Z_Free( script );
+	return executed;
+#else
+	(void)factoryJson;
+	(void)factoryJsonLength;
+	return qfalse;
+#endif
+}
+
+/*
+=============
+CL_WebHost_SyncFactoryCatalogSnapshot
+
+Keeps the browser-side factory list synchronized with the native factory files.
+This complements map catalog sync because retail Start Match derives the active
+gametype from the selected factory before filtering arenas.
+=============
+*/
+static void CL_WebHost_SyncFactoryCatalogSnapshot( void ) {
+#if defined( _WIN32 ) && QL_PLATFORM_HAS_ONLINE_SERVICES
+	char *factoryJson;
+	size_t factoryJsonLength;
+
+	if ( !cl_webHost.liveAwesomium || !cl_webHost.documentReady || !cl_webHost.qzInstanceBound ) {
+		return;
+	}
+	if ( cl_webHost.factoryCatalogSynced && cl_webHost.frameSequence < cl_webHost.nextFactoryCatalogSyncFrame ) {
+		return;
+	}
+	if ( cl_webHost.frameSequence < cl_webHost.nextFactoryCatalogSyncFrame ) {
+		return;
+	}
+	if ( CL_Awesomium_IsLoading() ) {
+		cl_webHost.nextFactoryCatalogSyncFrame = cl_webHost.frameSequence + CL_WEB_NATIVE_REQUEST_LOADING_POLL_FRAMES;
+		return;
+	}
+	if ( !CL_WebHost_MapCatalogBridgeReady() ) {
+		cl_webHost.nextFactoryCatalogSyncFrame = cl_webHost.frameSequence + CL_WEB_NATIVE_FACTORY_RETRY_FRAMES;
+		return;
+	}
+
+	factoryJson = (char *)Z_Malloc( CL_WEB_FACTORY_JSON_BUFFER_SIZE );
+	if ( !factoryJson ) {
+		return;
+	}
+	factoryJson[0] = '\0';
+	CL_WebHost_BuildFactoryListJson( factoryJson, CL_WEB_FACTORY_JSON_BUFFER_SIZE );
+	factoryJsonLength = strlen( factoryJson );
+	if ( factoryJsonLength < 2 || factoryJson[0] != '[' || factoryJson[factoryJsonLength - 1] != ']' ) {
+		Com_DPrintf( "Awesomium factory catalog sync skipped malformed factory JSON (%u bytes)\n", (unsigned int)factoryJsonLength );
+		cl_webHost.nextFactoryCatalogSyncFrame = cl_webHost.frameSequence + CL_WEB_NATIVE_FACTORY_RETRY_FRAMES;
+		Z_Free( factoryJson );
+		return;
+	}
+
+	if ( CL_WebHost_ExecuteFactoryCatalogSnapshot( factoryJson, factoryJsonLength ) ) {
+		int qzFactoryCount;
+		int moduleFactoryCount;
+
+		qzFactoryCount = -1;
+		moduleFactoryCount = -1;
+		CL_WebHost_QueryBrowserCatalogCount( "", "GetFactoryList", &qzFactoryCount );
+		CL_WebHost_QueryBrowserCatalogCount( "../src/factories", "GetFactoryList", &moduleFactoryCount );
+		cl_webHost.factoryCatalogSynced = qtrue;
+		cl_webHost.nextFactoryCatalogSyncFrame = cl_webHost.frameSequence + CL_WEB_NATIVE_FACTORY_SYNC_FRAMES;
+		Com_DPrintf( "Awesomium factory catalog synced (%u bytes, %d qz factories, %d module factories)\n", (unsigned int)factoryJsonLength, qzFactoryCount, moduleFactoryCount );
+	} else {
+		cl_webHost.nextFactoryCatalogSyncFrame = cl_webHost.frameSequence + CL_WEB_NATIVE_FACTORY_RETRY_FRAMES;
+	}
+
+	Z_Free( factoryJson );
 #endif
 }
 

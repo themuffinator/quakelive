@@ -2,91 +2,91 @@
   "description": "Retail Quake Live startup assets and UI dependencies sourced from baseq3 for validation and inventory without repackaging retail distributables.",
   "files": [
     {
-      "source": "assets/quakelive/baseq3/default.cfg",
+      "source": "baseq3/default.cfg",
       "destination": "default.cfg",
       "description": "Baseline Quake Live bindings expected by FS_InitFilesystem"
     },
     {
-      "source": "assets/quakelive/baseq3/fonts/handelgothic.ttf",
+      "source": "baseq3/fonts/handelgothic.ttf",
       "destination": "fonts/handelgothic.ttf",
       "roles": ["font", "bigFont"],
-      "license": "Handel Gothic remains proprietary; limit redistribution to Quake Live compatibility testing."
+      "license": "Handel Gothic remains proprietary; verify presence only and do not redistribute."
     },
     {
-      "source": "assets/quakelive/baseq3/fonts/notosans-regular.ttf",
+      "source": "baseq3/fonts/notosans-regular.ttf",
       "destination": "fonts/notosans-regular.ttf",
       "roles": ["smallFont"],
       "license": "Apache License 2.0 (Google Noto Sans)."
     },
     {
-      "source": "assets/quakelive/baseq3/fonts/droidsansmono.ttf",
+      "source": "baseq3/fonts/droidsansmono.ttf",
       "destination": "fonts/droidsansmono.ttf",
       "roles": ["mono"],
       "license": "Apache License 2.0 (Google Droid Sans Mono)."
     },
     {
-      "source": "assets/quakelive/baseq3/fonts/droidsansfallbackfull.ttf",
+      "source": "baseq3/fonts/droidsansfallbackfull.ttf",
       "destination": "fonts/droidsansfallbackfull.ttf",
       "roles": ["smallFont", "fallback"],
       "license": "Apache License 2.0 (Google Droid Sans Fallback)."
     },
     {
-      "source": "assets/quakelive/baseq3/tim.cfg",
+      "source": "baseq3/tim.cfg",
       "destination": "tim.cfg",
-      "license": "Quake Live profile snapshot packaged for tutorial flows."
+      "license": "Quake Live profile snapshot verified from the retail install for tutorial flows."
     },
     {
-      "source": "assets/quakelive/baseq3/sponge.cfg",
+      "source": "baseq3/sponge.cfg",
       "destination": "sponge.cfg",
-      "license": "Quake Live profile snapshot packaged for tutorial flows."
+      "license": "Quake Live profile snapshot verified from the retail install for tutorial flows."
     },
     {
-      "source": "assets/quakelive/baseq3/ttimo.cfg",
+      "source": "baseq3/ttimo.cfg",
       "destination": "ttimo.cfg",
-      "license": "Quake Live profile snapshot packaged for tutorial flows."
+      "license": "Quake Live profile snapshot verified from the retail install for tutorial flows."
     },
     {
-      "source": "assets/quakelive/baseq3/syncerror.cfg",
+      "source": "baseq3/syncerror.cfg",
       "destination": "syncerror.cfg",
-      "license": "Quake Live profile snapshot packaged for tutorial flows."
+      "license": "Quake Live profile snapshot verified from the retail install for tutorial flows."
     },
     {
-      "source_dir": "assets/quakelive/baseq3/scripts",
+      "source_dir": "baseq3/scripts",
       "destination": "scripts",
       "include": ["ui*.shader"],
       "description": "Shader scripts referenced by Quake Live HUD menus"
     },
     {
-      "source_dir": "assets/quakelive/baseq3/ui",
+      "source_dir": "baseq3/ui",
       "destination": "ui",
       "include": ["**/*.menu", "**/*.txt"],
       "description": "Menu scripts and HUD definitions consumed by the native UI module"
     },
     {
-      "source": "src/ui/menudef.h",
+      "source": "baseq3/ui/menudef.h",
       "destination": "ui/menudef.h",
       "description": "Runtime menu header required by retail Quake Live menu includes"
     },
     {
-      "source_dir": "assets/quakelive/baseq3/ui/assets",
+      "source_dir": "baseq3/ui/assets",
       "destination": "ui/assets",
       "include": ["**/*"],
       "description": "Retail UI art payload referenced by Quake Live menus"
     },
     {
-      "source_dir": "assets/quakelive/baseq3/icons",
+      "source_dir": "baseq3/icons",
       "destination": "icons",
       "include": ["**/*"],
       "description": "Gameplay icons consumed by browser, scoreboard, and HUD overlays"
     },
     {
-      "source_dir": "assets/quakelive/baseq3/menu/icons",
+      "source_dir": "baseq3/menu/icons",
       "destination": "menu/icons",
       "include": ["**/*"],
       "description": "Retail menu icon payload referenced directly by scoreboard and HUD menus"
     },
     {
-      "source_dir": "assets/quakelive/baseq3/levelshots",
+      "source_dir": "baseq3/levelshots",
       "destination": "levelshots",
       "include": ["**/*"],
       "description": "Retail levelshots consumed by map preview and browser UI"

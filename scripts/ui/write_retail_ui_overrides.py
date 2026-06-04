@@ -17,6 +17,7 @@ from scripts.ui.retail_ui_corpus import (  # noqa: E402
 	DEFAULT_BUNDLE_MANIFEST,
 	build_retail_ui_inventory,
 	compute_ui_panel_drift,
+	read_retail_root_file,
 )
 
 
@@ -49,8 +50,7 @@ def parse_args() -> argparse.Namespace:
 		"--emit-files",
 		action="store_true",
 		help=(
-			"Materialize retail-derived override files under the homepath overlay root. "
-			"Disabled by default so the validation workflow does not duplicate retail distributables."
+			"Deprecated. Retail-derived override files may not be materialized into the repo or build tree."
 		),
 	)
 	return parser.parse_args()
@@ -138,13 +138,18 @@ def build_overlay_entries(
 	for relative_overlay_path in overlay_files:
 		relative_ui_path = relative_overlay_path.removeprefix(f"{overlay_prefix}/")
 		source_path = retail_root / relative_ui_path
-		file_bytes = source_path.read_bytes()
+		file_bytes = read_retail_root_file(retail_root, relative_ui_path)
+		source_label = (
+			_repo_relative(source_path)
+			if source_path.is_file()
+			else f"{_repo_relative(retail_root.parent)}/pak00.pk3!ui/{relative_ui_path}"
+		)
 
 		entries.append(
 			{
 				"overlay_path": relative_overlay_path,
 				"ui_path": relative_ui_path,
-				"retail_source_path": _repo_relative(source_path),
+				"retail_source_path": source_label,
 				"size": len(file_bytes),
 				"sha256": _sha256_bytes(file_bytes),
 			}
@@ -183,15 +188,18 @@ def write_overlay_files(
 	homepath_root: Path,
 	overlay_entries: list[dict[str, object]],
 ) -> None:
-	for entry in overlay_entries:
-		source_path = retail_root / entry["ui_path"]
-		target_path = homepath_root / entry["overlay_path"]
-		target_path.parent.mkdir(parents=True, exist_ok=True)
-		target_path.write_bytes(source_path.read_bytes())
+	raise RuntimeError("Retail UI override materialization is disabled by policy.")
 
 
 def main() -> int:
 	args = parse_args()
+	if args.emit_files:
+		print(
+			"--emit-files is disabled: retail assets must be loaded from the Quake Live installation only.",
+			file=sys.stderr,
+		)
+		return 2
+
 	manifest_path = args.manifest or (args.homepath_root / "ui_retail_overrides.json")
 	overlay_prefix = normalize_overlay_prefix(args.overlay_prefix)
 

@@ -67,28 +67,9 @@ function Resolve-RetailUiBundleRoot {
 		[string]$Root
 	)
 
-	$candidate = if ( [string]::IsNullOrWhiteSpace( $ExplicitPath ) ) {
-		[System.IO.Path]::GetFullPath((Join-Path $Root 'build\ui_bundle\staging'))
-	} else {
-		Resolve-ExistingPath -Path $ExplicitPath
-	}
-	$baseq3Root = Join-Path $candidate 'baseq3'
-
-	foreach ( $requiredPath in @(
-			$baseq3Root,
-			( Join-Path $baseq3Root 'default.cfg' ),
-			( Join-Path $baseq3Root 'ui\\menudef.h' ),
-			( Join-Path $baseq3Root 'ui\hud3.txt' ),
-			( Join-Path $baseq3Root 'ui\ingame_scoreboard_ffa.menu' ),
-			( Join-Path $baseq3Root 'ui\assets\button_back.png' ),
-			( Join-Path $baseq3Root 'ui\assets\hud\ffa.png' ),
-			( Join-Path $baseq3Root 'ui\assets\score\scoretl.png' ),
-			( Join-Path $baseq3Root 'fonts\font.dat' ),
-			( Join-Path $baseq3Root 'fonts\font.tga' )
-		) ) {
-		if ( -not ( Test-Path -LiteralPath $requiredPath ) ) {
-			throw "Quake Live UI staging content was not found: $requiredPath. Run tools/build_ui_bundle.py before running the client probe so staging\\baseq3 contains the retail UI runtime tree."
-		}
+	$candidate = if ( [string]::IsNullOrWhiteSpace( $ExplicitPath ) ) { $script:RetailBasePath } else { Resolve-ExistingPath -Path $ExplicitPath }
+	if ( -not ( Test-Path -LiteralPath ( Join-Path $candidate 'baseq3\pak00.pk3' ) ) ) {
+		throw "Quake Live retail content was not found under $candidate. fs_cdpath must point at the installed Quake Live root."
 	}
 
 	return $candidate
@@ -108,53 +89,6 @@ function Get-LaunchSafePath {
 	}
 
 	return $Path
-}
-
-function Sync-RuntimeUiPackages {
-	param([string]$RuntimeBaseq3Dir)
-
-	$uiBundleBuilder = Join-Path $script:RepoRoot 'tools\build_ui_bundle.py'
-	$runtimePackageManifest = Join-Path $script:RepoRoot 'artifacts\ui_bundle\runtime_ui_package_manifest.json'
-	$mainPackagePath = Join-Path $RuntimeBaseq3Dir 'pak_uiql.pk3'
-	$overlayPackagePath = Join-Path $RuntimeBaseq3Dir 'pak_ui_src_retail_overlay.pk3'
-	$pythonCmd = Get-Command python -ErrorAction SilentlyContinue
-	if (-not $pythonCmd) {
-		$pythonCmd = Get-Command py -ErrorAction SilentlyContinue
-	}
-
-	if (-not $pythonCmd) {
-		Write-Warning "Python was not found; skipping runtime UI PK3 refresh. Existing pak_uiql.pk3 artifacts will be reused if present."
-		return
-	}
-
-	$pythonArgs = @(
-		$uiBundleBuilder,
-		'--runtime-root',
-		$RuntimeBaseq3Dir
-	)
-	if ($pythonCmd.Name -ieq 'py.exe' -or $pythonCmd.Name -ieq 'py') {
-		$pythonArgs = @('-3') + $pythonArgs
-	}
-
-	& $pythonCmd.Source @pythonArgs
-	if ($LASTEXITCODE -ne 0) {
-		throw "tools/build_ui_bundle.py failed while refreshing runtime UI packages."
-	}
-
-	if (-not (Test-Path -LiteralPath $runtimePackageManifest)) {
-		throw "tools/build_ui_bundle.py did not emit the runtime UI package manifest."
-	}
-	if (-not (Test-Path -LiteralPath $mainPackagePath)) {
-		throw "tools/build_ui_bundle.py did not emit pak_uiql.pk3 into the requested runtime root."
-	}
-
-	$packageReport = Get-Content -LiteralPath $runtimePackageManifest -Raw | ConvertFrom-Json
-	if (-not $packageReport.main_package.required_entries_present) {
-		throw "The refreshed pak_uiql.pk3 package is missing required runtime UI entries."
-	}
-	if ($packageReport.overlay_package.exists -and -not (Test-Path -LiteralPath $overlayPackagePath)) {
-		throw "The runtime UI package manifest reports an overlay package, but pak_ui_src_retail_overlay.pk3 was not emitted."
-	}
 }
 
 function To-RepoPath {
@@ -189,16 +123,12 @@ function Reset-LiveLog {
 	if ( Test-Path -LiteralPath $script:RuntimeLog ) {
 		Remove-Item -LiteralPath $script:RuntimeLog -Force
 	}
-	$syncSucceeded = $false
-	for ( $attempt = 1; $attempt -le 5 -and -not $syncSucceeded; $attempt++ ) {
-		try {
-			$null = Sync-RuntimeUiPackages -RuntimeBaseq3Dir $script:RuntimeRoot
-			$syncSucceeded = $true
-		} catch {
-			if ( $attempt -eq 5 ) {
-				throw
-			}
-			Start-Sleep -Seconds 2
+	foreach ( $stalePak in @(
+			( Join-Path $script:RuntimeRoot 'pak_uiql.pk3' ),
+			( Join-Path $script:RuntimeRoot 'pak_ui_src_retail_overlay.pk3' )
+		) ) {
+		if ( Test-Path -LiteralPath $stalePak ) {
+			Remove-Item -LiteralPath $stalePak -Force
 		}
 	}
 }
@@ -578,9 +508,6 @@ $script:RetailBasePath = Get-LaunchSafePath -Path ( Resolve-RetailBasePath -Expl
 $script:RetailUiBundleRoot = Resolve-RetailUiBundleRoot -ExplicitPath $AssetCdPath -Root $RepoRoot
 $script:QlHome = Join-Path $RepoRoot 'build\win32\Debug\bin'
 $script:RuntimeRoot = Join-Path $script:QlHome 'baseq3'
-$script:RuntimeUiPackageManifest = Join-Path $RepoRoot 'artifacts\ui_bundle\runtime_ui_package_manifest.json'
-$script:RuntimeUiPackage = Join-Path $script:RuntimeRoot 'pak_uiql.pk3'
-$script:RuntimeUiOverlayPackage = Join-Path $script:RuntimeRoot 'pak_ui_src_retail_overlay.pk3'
 $script:DumpsRoot = Join-Path $RepoRoot 'build\win32\Debug\dumps'
 $script:LogRoot = Join-Path $script:DumpsRoot 'logs'
 $script:RuntimeLog = Join-Path $script:RuntimeRoot 'qconsole.log'
@@ -701,22 +628,11 @@ $artifact = [ordered]@{
 	runtime_root = To-RepoPath -Path $script:RuntimeRoot
 	retail_basepath = To-RepoPath -Path $script:RetailBasePath
 	asset_cdpath = To-RepoPath -Path $script:RetailUiBundleRoot
-	ui_runtime_packages = [ordered]@{
-		manifest = [ordered]@{
-			path = To-RepoPath -Path $script:RuntimeUiPackageManifest
-			exists = Test-Path -LiteralPath $script:RuntimeUiPackageManifest
-			sha256 = Get-ArtifactSha256 -Path $script:RuntimeUiPackageManifest
-		}
-		main_package = [ordered]@{
-			path = To-RepoPath -Path $script:RuntimeUiPackage
-			exists = Test-Path -LiteralPath $script:RuntimeUiPackage
-			sha256 = Get-ArtifactSha256 -Path $script:RuntimeUiPackage
-		}
-		overlay_package = [ordered]@{
-			path = To-RepoPath -Path $script:RuntimeUiOverlayPackage
-			exists = Test-Path -LiteralPath $script:RuntimeUiOverlayPackage
-			sha256 = Get-ArtifactSha256 -Path $script:RuntimeUiOverlayPackage
-		}
+	ui_asset_policy = [ordered]@{
+		mode = 'retail-install-only-no-repo-copy'
+		fs_basepath = To-RepoPath -Path $script:RetailBasePath
+		fs_cdpath = To-RepoPath -Path $script:RetailUiBundleRoot
+		local_ui_packages_allowed = $false
 	}
 	main_menu = [ordered]@{
 		engine_screenshot = To-RepoPath -Path $mainEngineScreenshotPath

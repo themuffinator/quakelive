@@ -2011,15 +2011,6 @@ void SV_GetChallenge( netadr_t from, msg_t *msg ) {
 		return;
 	}
 
-	if ( !sv_vac || !sv_vac->integer ) {
-		const char *message;
-
-		message = "VAC is disabled on this server";
-		SV_LogVACStatus( &from, "rejected", "disabled", message );
-		NET_OutOfBandPrint( NS_SERVER, from, "%s\n%s\n", NET_GetPrintCommand(), message );
-		return;
-	}
-
 	oldest = 0;
 	oldestTime = 0x7fffffff;
 
@@ -2267,15 +2258,6 @@ void SV_DirectConnect( netadr_t from ) {
 		qport = 0;
 	}
 
-	if ( !sv_vac || !sv_vac->integer ) {
-		const char *message;
-
-		message = "VAC is disabled on this server";
-		SV_LogVACStatus( &from, "rejected", "disabled", message );
-		NET_OutOfBandPrint( NS_SERVER, from, "%s\n%s\n", NET_GetPrintCommand(), message );
-		return;
-	}
-
 	serverTypeError[0] = '\0';
 
 	if ( !SV_ServerTypeAllowsConnection( from, serverTypeError, sizeof( serverTypeError ) ) ) {
@@ -2349,7 +2331,8 @@ void SV_DirectConnect( netadr_t from ) {
 		Info_SetValueForKey( userinfo, NET_GetClientIpInfoKey(), "localhost" );
 	}
 
-	SV_LogVACStatus( &from, "accepted", "enabled", "VAC is enabled on this server" );
+	SV_LogVACStatus( &from, "accepted", ( sv_vac && sv_vac->integer ) ? "enabled" : "disabled",
+		( sv_vac && sv_vac->integer ) ? "VAC is enabled on this server" : NULL );
 
 	newcl = &temp;
 	Com_Memset (newcl, 0, sizeof(client_t));
@@ -2786,7 +2769,9 @@ Downloads are finished
 void SV_DoneDownload_f( client_t *cl ) {
 	Com_DPrintf( "clientDownload: %s Done\n", cl->name);
 	// resend the game state to update any clients that entered during the download
-	SV_SendClientGameState(cl);
+	if ( cl->state != CS_ACTIVE ) {
+		SV_SendClientGameState( cl );
+	}
 }
 
 /*

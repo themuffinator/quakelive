@@ -7359,7 +7359,7 @@ static void G_AdminPromoteTarget( gentity_t *ent, int privilege, const char *bro
 	}
 
 	G_CleanClientNameFromClientNum( clientNum, targetName );
-	trap_SendServerCommand( -1, va( broadcastCommand, targetName ) );
+	trap_SendServerCommand( -1, va( (char *)broadcastCommand, targetName ) );
 	trap_SendServerCommand( clientNum, va( "priv %i", target->client->sess.privilege ) );
 }
 

@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from scripts.ui.retail_ui_corpus import inventory_missing_reason
+from scripts.ui.retail_ui_corpus import inventory_missing_reason, read_retail_root_file
 from scripts.ui.retail_ui_corpus import DEFAULT_BASEQ3_ROOT
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -134,7 +134,7 @@ def test_ui_does_not_generate_bridge_menu_assets() -> None:
         assert removed not in combined
 
 
-def test_ui_bundle_manifest_stages_runtime_icon_roots_without_baseq3_prefixes() -> None:
+def test_ui_bundle_manifest_validates_retail_icon_roots_without_repo_asset_sources() -> None:
     manifest = json.loads((REPO_ROOT / "tools/packaging/ui_bundle_manifest.json").read_text(encoding="utf-8"))
     files = manifest["files"]
     by_source_dir = {
@@ -143,9 +143,13 @@ def test_ui_bundle_manifest_stages_runtime_icon_roots_without_baseq3_prefixes() 
         if "source_dir" in entry
     }
 
-    assert by_source_dir["assets/quakelive/baseq3/icons"]["destination"] == "icons"
-    assert by_source_dir["assets/quakelive/baseq3/menu/icons"]["destination"] == "menu/icons"
-    assert by_source_dir["assets/quakelive/baseq3/levelshots"]["destination"] == "levelshots"
+    assert by_source_dir["baseq3/icons"]["destination"] == "icons"
+    assert by_source_dir["baseq3/menu/icons"]["destination"] == "menu/icons"
+    assert by_source_dir["baseq3/levelshots"]["destination"] == "levelshots"
+    assert not any(
+        str(entry.get("source", entry.get("source_dir", ""))).startswith("assets/quakelive/")
+        for entry in files
+    )
 
     audit = manifest["audit"]
     assert "icons" in audit["required_paths"]
@@ -160,14 +164,14 @@ def test_ui_bundle_manifest_stages_runtime_icon_roots_without_baseq3_prefixes() 
     assert "baseq3/levelshots/**/*" not in audit["required_globs"]
 
 
-def test_ui_bundle_manifest_stages_runtime_menudef_header() -> None:
+def test_ui_bundle_manifest_validates_retail_menudef_header() -> None:
     manifest = json.loads((REPO_ROOT / "tools/packaging/ui_bundle_manifest.json").read_text(encoding="utf-8"))
     files = manifest["files"]
 
     header_entries = [
         entry
         for entry in files
-        if entry.get("source") == "src/ui/menudef.h"
+        if entry.get("source") == "baseq3/ui/menudef.h"
     ]
     assert len(header_entries) == 1
     assert header_entries[0]["destination"] == "ui/menudef.h"
@@ -176,7 +180,7 @@ def test_ui_bundle_manifest_stages_runtime_menudef_header() -> None:
     assert "ui/menudef.h" in audit["required_paths"]
 
     runtime_probe = (REPO_ROOT / "tools/client/run_client_runtime_probe.ps1").read_text(encoding="utf-8")
-    assert "( Join-Path $baseq3Root 'ui\\\\menudef.h' )" in runtime_probe
+    assert "fs_cdpath must point at the installed Quake Live root" in runtime_probe
 
 
 def test_ui_extended_native_exports_match_retail_bridge_surface() -> None:
@@ -811,7 +815,10 @@ def test_ui_runtime_ingame_join_matches_retail_and_fixup_stays_defensive(
 
     ui_main = (REPO_ROOT / "src/code/ui/ui_main.c").read_text(encoding="utf-8")
     src_join = (REPO_ROOT / "src/ui/ingame_join.menu").read_text(encoding="utf-8")
-    retail_join = (DEFAULT_BASEQ3_ROOT / "ui" / "ingame_join.menu").read_text(encoding="utf-8")
+    retail_join = read_retail_root_file(
+        DEFAULT_BASEQ3_ROOT / "ui",
+        "ingame_join.menu",
+    ).decode("utf-8")
 
     assert src_join == retail_join
     for expected in (

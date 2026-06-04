@@ -79,8 +79,7 @@ def test_src_ui_inventory_matches_retail_tree(
 	drift = compute_ui_panel_drift(SOURCE_ROOT, RETAIL_ROOT)
 	_assert_repo_overlay_drift_contract(drift)
 
-	retail_assets = RETAIL_ROOT / "assets"
-	assert retail_assets.is_dir()
+	assert retail_ui_corpus_inventory["inventory_counts"]["ui_asset_files"] > 0
 
 
 def test_src_ui_content_drift_is_clean_against_retail_panels(
@@ -222,7 +221,7 @@ def test_retail_ui_override_script_reports_drifted_files_without_materializing_b
 		assert not override_path.exists()
 
 
-def test_retail_ui_override_script_can_materialize_explicit_emit_files(
+def test_retail_ui_override_script_rejects_explicit_emit_files(
 	tmp_path: Path,
 	retail_ui_corpus_inventory: dict[str, object],
 ) -> None:
@@ -230,9 +229,9 @@ def test_retail_ui_override_script_can_materialize_explicit_emit_files(
 	homepath_root = tmp_path / "ui_homepath"
 	manifest_path = tmp_path / "ui_retail_overrides.json"
 	drift = compute_ui_panel_drift(SOURCE_ROOT, RETAIL_ROOT)
-	drift_files = _assert_repo_overlay_drift_contract(drift)
+	_assert_repo_overlay_drift_contract(drift)
 
-	subprocess.run(
+	result = subprocess.run(
 		[
 			sys.executable,
 			str(SCRIPT_PATH),
@@ -242,22 +241,19 @@ def test_retail_ui_override_script_can_materialize_explicit_emit_files(
 			str(manifest_path),
 			"--emit-files",
 		],
-		check=True,
+		check=False,
 		cwd=REPO_ROOT,
+		text=True,
+		capture_output=True,
 	)
 
-	report = json.loads(manifest_path.read_text(encoding="utf-8"))
-	assert report["materialization_mode"] == "emit-files"
-	assert set(report["materialized_overlay_files"]) == {f"baseq3/ui/{relative_path}" for relative_path in drift_files}
-
-	for relative_path in drift_files:
-		override_path = homepath_root / "baseq3" / "ui" / relative_path
-		retail_path = RETAIL_ROOT / relative_path
-		assert override_path.exists()
-		assert override_path.read_bytes() == retail_path.read_bytes()
+	assert result.returncode == 2
+	assert "--emit-files is disabled" in result.stderr
+	assert not manifest_path.exists()
+	assert not homepath_root.exists()
 
 
-def test_materialized_retail_corpus_refreshes_when_manifest_scope_expands(tmp_path: Path) -> None:
+def test_materialize_manifest_corpus_does_not_extract_retail_assets(tmp_path: Path) -> None:
 	baseq3_root = tmp_path / "steam_baseq3"
 	output_root = tmp_path / "materialized_baseq3"
 	manifest_path = tmp_path / "ui_bundle_manifest.json"
@@ -286,9 +282,8 @@ def test_materialized_retail_corpus_refreshes_when_manifest_scope_expands(tmp_pa
 	)
 
 	result = materialize_manifest_corpus(baseq3_root, output_root, manifest_path)
-	assert result == output_root
-	assert (output_root / "ui" / "main.menu").is_file()
-	assert not (output_root / "icons" / "icon_time.png").exists()
+	assert result == baseq3_root
+	assert not output_root.exists()
 
 	manifest_path.write_text(
 		json.dumps(
@@ -317,9 +312,8 @@ def test_materialized_retail_corpus_refreshes_when_manifest_scope_expands(tmp_pa
 	)
 
 	refreshed = materialize_manifest_corpus(baseq3_root, output_root, manifest_path)
-	assert refreshed == output_root
-	assert (output_root / "icons" / "icon_time.png").is_file()
-	assert (output_root / "menu" / "icons" / "quad.png").is_file()
+	assert refreshed == baseq3_root
+	assert not output_root.exists()
 
 
 def test_retail_ui_override_script_supports_pk3_overlay_prefix(
@@ -353,12 +347,12 @@ def test_retail_ui_override_script_supports_pk3_overlay_prefix(
 	assert report["drift_files"] == drift_files
 	assert set(report["overlay_files"]) == {f"ui/{relative_path}" for relative_path in drift_files}
 	assert set(report["overlay_file_hashes"]) == set(report["overlay_files"])
+	assert report["materialization_mode"] == "report-only"
+	assert report["materialized_overlay_files"] == []
 
 	for relative_path in drift_files:
 		override_path = overlay_root / "ui" / relative_path
-		retail_path = RETAIL_ROOT / relative_path
-		assert override_path.exists()
-		assert override_path.read_bytes() == retail_path.read_bytes()
+		assert not override_path.exists()
 
 
 def test_ui_bundle_build_keeps_retail_packages_unmaterialized(
@@ -370,7 +364,8 @@ def test_ui_bundle_build_keeps_retail_packages_unmaterialized(
 	runtime_package_manifest = REPO_ROOT / "artifacts" / "ui_bundle" / "runtime_ui_package_manifest.json"
 	metrics_path = REPO_ROOT / "artifacts" / "ui_bundle" / "metrics" / "font_metrics.json"
 	inventory_manifest = REPO_ROOT / "artifacts" / "ui_bundle" / "ui_retail_inventory.json"
-	staging_root = REPO_ROOT / "build" / "ui_bundle" / "staging" / "baseq3"
+	staging_root = REPO_ROOT / "build" / "ui_bundle" / "staging"
+	font_validation_root = REPO_ROOT / "build" / "ui_bundle" / "font_validation"
 	preserved_files = {}
 	for path in (
 		overlay_package,
@@ -409,27 +404,12 @@ def test_ui_bundle_build_keeps_retail_packages_unmaterialized(
 		if retail_ui_corpus_inventory["retail_ui_corpus_available"]:
 			assert result.returncode == 0, result.stderr
 			assert overlay_manifest.exists()
-			assert metrics_path.exists()
 			assert not overlay_package.exists()
 			assert not main_package.exists()
-			assert not runtime_package_manifest.exists()
-			assert (staging_root / "default.cfg").exists()
-			assert (staging_root / "ui" / "main.menu").exists()
-			assert (staging_root / "ui" / "assets" / "button_back.png").exists()
-			assert (staging_root / "ui" / "assets" / "hud" / "ffa.png").exists()
-			assert (staging_root / "ui" / "assets" / "hud" / "dm.png").exists()
-			assert (staging_root / "ui" / "assets" / "hud" / "tourn.png").exists()
-			assert (staging_root / "ui" / "assets" / "bluechip.png").exists()
-			assert (staging_root / "ui" / "assets" / "redchip.png").exists()
-			assert (staging_root / "ui" / "assets" / "score" / "scoretl.png").exists()
-			assert (staging_root / "ui" / "assets" / "score" / "navbarl.png").exists()
-			assert (staging_root / "ui" / "assets" / "score" / "navbarm.png").exists()
-			assert (staging_root / "ui" / "assets" / "score" / "navbarr.png").exists()
-			assert (staging_root / "ui" / "assets" / "score" / "navleft.png").exists()
-			assert (staging_root / "ui" / "assets" / "score" / "navright.png").exists()
-			assert (staging_root / "ui" / "assets" / "score" / "navfriends.png").exists()
-			assert (staging_root / "fonts" / "font.dat").exists()
-			assert (staging_root / "fonts" / "font.tga").exists()
+			assert not metrics_path.exists()
+			assert runtime_package_manifest.exists()
+			assert not staging_root.exists()
+			assert not font_validation_root.exists()
 
 			report = json.loads(overlay_manifest.read_text(encoding="utf-8"))
 			drift = compute_ui_panel_drift(SOURCE_ROOT, RETAIL_ROOT)
@@ -440,6 +420,11 @@ def test_ui_bundle_build_keeps_retail_packages_unmaterialized(
 			assert report["materialized_overlay_files"] == []
 			assert set(report["overlay_files"]) == {f"baseq3/ui/{relative_path}" for relative_path in drift_files}
 			assert len(report["overlay_entries"]) == len(drift_files)
+			runtime_report = json.loads(runtime_package_manifest.read_text(encoding="utf-8"))
+			assert runtime_report["manifest_version"] == 2
+			assert runtime_report["asset_policy"] == "retail-install-only-no-repo-copy"
+			assert runtime_report["main_package"]["emitted"] is False
+			assert runtime_report["overlay_package"]["emitted"] is False
 			return
 
 		assert result.returncode != 0
@@ -458,7 +443,7 @@ def test_ui_bundle_build_keeps_retail_packages_unmaterialized(
 			path.write_bytes(content)
 
 
-def test_ui_bundle_build_emits_runtime_package_manifest_for_explicit_runtime_root(
+def test_ui_bundle_build_cleans_runtime_root_without_emitting_packages(
 	tmp_path: Path,
 	retail_ui_corpus_inventory: dict[str, object],
 ) -> None:
@@ -472,6 +457,9 @@ def test_ui_bundle_build_emits_runtime_package_manifest_for_explicit_runtime_roo
 	overlay_package = runtime_root / "pak_ui_src_retail_overlay.pk3"
 	drift = compute_ui_panel_drift(SOURCE_ROOT, RETAIL_ROOT)
 	drift_files = _assert_repo_overlay_drift_contract(drift)
+	runtime_root.mkdir(parents=True)
+	main_package.write_text("stale-main\n", encoding="utf-8")
+	overlay_package.write_text("stale-overlay\n", encoding="utf-8")
 
 	result = subprocess.run(
 		[
@@ -493,49 +481,22 @@ def test_ui_bundle_build_emits_runtime_package_manifest_for_explicit_runtime_roo
 	assert result.returncode == 0, result.stderr
 	assert overlay_manifest.exists()
 	assert runtime_package_manifest.exists()
-	assert main_package.exists()
-	assert overlay_package.exists() is bool(drift_files)
+	assert not main_package.exists()
+	assert not overlay_package.exists()
+	assert not (build_root / "staging").exists()
+	assert not (build_root / "font_validation").exists()
 
 	report = json.loads(runtime_package_manifest.read_text(encoding="utf-8"))
-	assert report["manifest_version"] == 1
+	assert report["manifest_version"] == 2
+	assert report["asset_policy"] == "retail-install-only-no-repo-copy"
 	assert report["runtime_root"] == runtime_root.resolve().as_posix()
 	assert report["overlay_manifest_path"] == overlay_manifest.resolve().as_posix()
 	assert report["drift_files"] == drift_files
 	assert report["main_package"]["path"] == main_package.resolve().as_posix()
-	assert report["main_package"]["sha256"] == _sha256_bytes(main_package.read_bytes())
-	assert report["main_package"]["required_entries_present"] is True
-	assert report["main_package"]["missing_required_entries"] == []
+	assert report["main_package"]["exists"] is False
+	assert report["main_package"]["emitted"] is False
 	assert report["overlay_package"]["path"] == overlay_package.resolve().as_posix()
-	assert report["overlay_package"]["exists"] is bool(drift_files)
-	assert report["overlay_package"]["entry_count"] == len(drift_files)
-	assert report["overlay_package"]["entry_paths"] == [f"ui/{relative_path}" for relative_path in drift_files]
-	assert report["overlay_package"]["matches_overlay_manifest"] is True
-	if drift_files:
-		assert report["overlay_package"]["sha256"] == _sha256_bytes(overlay_package.read_bytes())
-
-	with zipfile.ZipFile(main_package, "r") as archive:
-		entry_names = set(archive.namelist())
-
-	assert {
-		"default.cfg",
-		"fonts/font.dat",
-		"fonts/font.tga",
-		"ui/main.menu",
-		"ui/hud3.txt",
-		"ui/ingame_scoreboard_ffa.menu",
-		"ui/assets/button_back.png",
-		"ui/assets/hud/ffa.png",
-		"ui/assets/hud/dm.png",
-		"ui/assets/hud/tourn.png",
-		"ui/assets/score/navbarl.png",
-		"ui/assets/score/navbarm.png",
-		"ui/assets/score/navbarr.png",
-		"ui/assets/score/navleft.png",
-		"ui/assets/score/navright.png",
-		"ui/assets/score/navfriends.png",
-		"ui/assets/score/scoretl.png",
-	}.issubset(entry_names)
-
-	if drift_files:
-		with zipfile.ZipFile(overlay_package, "r") as archive:
-			assert sorted(archive.namelist()) == [f"ui/{relative_path}" for relative_path in drift_files]
+	assert report["overlay_package"]["exists"] is False
+	assert report["overlay_package"]["emitted"] is False
+	assert main_package.resolve().as_posix() in report["removed_generated_asset_outputs"]
+	assert overlay_package.resolve().as_posix() in report["removed_generated_asset_outputs"]

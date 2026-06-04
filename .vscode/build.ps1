@@ -29,6 +29,10 @@ $platformNormalized = $Platform
 if ($platformNormalized -ieq 'Win32') {
 	$platformNormalized = 'x86'
 }
+$projectPlatformNormalized = $Platform
+if ($projectPlatformNormalized -ieq 'x86') {
+	$projectPlatformNormalized = 'Win32'
+}
 
 $msbuildPath = $null
 $msbuildCmd = Get-Command msbuild.exe -ErrorAction SilentlyContinue
@@ -142,6 +146,18 @@ $solutionDir = Split-Path -Parent $solutionPath
 $repoRoot = [System.IO.Path]::GetFullPath((Join-Path $scriptRoot '..'))
 $repoLibsDir = Join-Path $repoRoot 'src\libs'
 $internalDepsScript = Join-Path $scriptRoot '..\tools\build_internal_deps.ps1'
+$explicitProjectTargetMap = @{
+	'splines' = 'splines\Splines.vcxproj'
+	'botlib' = 'botlib\botlib.vcxproj'
+	'cgame' = 'cgame\cgame.vcxproj'
+	'game' = 'game\game.vcxproj'
+	'quakelive_steam' = 'quakelive_steam.vcxproj'
+	'awesomium_process' = 'awesomium_process.vcxproj'
+	'renderer' = 'renderer\renderer.vcxproj'
+	'ui' = 'ui\ui.vcxproj'
+	'qagamex86' = 'game\qagamex86.vcxproj'
+	'cgamex86' = 'cgame\cgamex86.vcxproj'
+}
 
 function Invoke-InternalDependencyBootstrap {
 	param(
@@ -264,41 +280,79 @@ if ($enableFreeType -eq 0 -and $freeTypeAvailable) {
 	$enableFreeType = 1
 }
 
+$requestedBuildTargets = @()
+$explicitProjectTargets = @()
+$unmappedBuildTargets = @()
+if ($Targets) {
+	$requestedBuildTargets = @(
+		$Targets -split ';' |
+			ForEach-Object { $_.Trim() } |
+			Where-Object { $_ }
+	)
+
+	foreach ($targetName in $requestedBuildTargets) {
+		$targetKey = $targetName.ToLowerInvariant()
+		if ($explicitProjectTargetMap.ContainsKey($targetKey)) {
+			$explicitProjectTargets += [PSCustomObject]@{
+				Name = $targetName
+				Path = Join-Path $solutionDir $explicitProjectTargetMap[$targetKey]
+			}
+		} else {
+			$unmappedBuildTargets += $targetName
+		}
+	}
+}
+$buildExplicitProjectTargets = $requestedBuildTargets.Count -gt 0 -and $unmappedBuildTargets.Count -eq 0
+
 $msbuildArgs = @(
 	$solutionPath,
 	'/m',
 	"/p:Configuration=$Configuration",
 	"/p:Platform=$platformNormalized"
 )
-if ($Targets) {
+$projectMsbuildArgs = @(
+	'/m',
+	"/p:Configuration=$Configuration",
+	"/p:Platform=$projectPlatformNormalized"
+)
+if ($Targets -and -not $buildExplicitProjectTargets) {
 	$msbuildArgs += "/t:$Targets"
 }
 if ($toolset) {
 	$msbuildArgs += "/p:PlatformToolset=$toolset"
+	$projectMsbuildArgs += "/p:PlatformToolset=$toolset"
 }
 if ($windowsTargetPlatformVersion) {
 	$msbuildArgs += "/p:WindowsTargetPlatformVersion=$windowsTargetPlatformVersion"
+	$projectMsbuildArgs += "/p:WindowsTargetPlatformVersion=$windowsTargetPlatformVersion"
 }
 if ($OnlineServices -ne '') {
 	$msbuildArgs += "/p:QLBuildOnlineServices=$OnlineServices"
+	$projectMsbuildArgs += "/p:QLBuildOnlineServices=$OnlineServices"
 }
 if ($Steamworks -ne '') {
 	$msbuildArgs += "/p:QLBuildSteamworks=$Steamworks"
+	$projectMsbuildArgs += "/p:QLBuildSteamworks=$Steamworks"
 }
 if ($OpenSteam -ne '') {
 	$msbuildArgs += "/p:QLBuildOpenSteam=$OpenSteam"
+	$projectMsbuildArgs += "/p:QLBuildOpenSteam=$OpenSteam"
 }
 if ($RequireAwesomiumSdk -ne '') {
 	$msbuildArgs += "/p:QLRequireAwesomiumSdk=$RequireAwesomiumSdk"
+	$projectMsbuildArgs += "/p:QLRequireAwesomiumSdk=$RequireAwesomiumSdk"
 }
 if ($enableOgg -ne $null) {
 	$msbuildArgs += "/p:QLEnableOgg=$enableOgg"
+	$projectMsbuildArgs += "/p:QLEnableOgg=$enableOgg"
 }
 if ($enablePng -ne $null) {
 	$msbuildArgs += "/p:QLEnablePng=$enablePng"
+	$projectMsbuildArgs += "/p:QLEnablePng=$enablePng"
 }
 if ($enableFreeType -ne $null) {
 	$msbuildArgs += "/p:QLEnableFreeType=$enableFreeType"
+	$projectMsbuildArgs += "/p:QLEnableFreeType=$enableFreeType"
 }
 
 Write-Host "Using MSBuild: $msbuildPath"
@@ -322,6 +376,11 @@ if ($RequireAwesomiumSdk -ne '') {
 }
 if ($Targets) {
 	Write-Host "MSBuild targets: $Targets"
+	if ($buildExplicitProjectTargets) {
+		Write-Host "Resolved MSBuild project targets: $($explicitProjectTargets.Name -join ';')"
+	} elseif ($unmappedBuildTargets.Count -gt 0) {
+		Write-Host "Using solution target fallback for unmapped targets: $($unmappedBuildTargets -join ';')"
+	}
 }
 Write-Host "QLEnableOgg: $enableOgg (available: $oggAvailable)"
 Write-Host "Vorbis include: $vorbisIncludeDir"
@@ -339,8 +398,20 @@ if ($freeTypeAvailable) {
 	Write-Host "FreeType library: $(Join-Path $FreeTypeLibDir $FreeTypeLibrary)"
 }
 
-& $msbuildPath @msbuildArgs
-$buildExitCode = $LASTEXITCODE
+if ($buildExplicitProjectTargets) {
+	foreach ($target in $explicitProjectTargets) {
+		Write-Host "Building project target $($target.Name): $($target.Path)"
+		& $msbuildPath $target.Path @projectMsbuildArgs
+		$buildExitCode = $LASTEXITCODE
+		if ($buildExitCode -ne 0) {
+			exit $buildExitCode
+		}
+	}
+	$buildExitCode = 0
+} else {
+	& $msbuildPath @msbuildArgs
+	$buildExitCode = $LASTEXITCODE
+}
 
 if ($buildExitCode -ne 0) {
 	exit $buildExitCode
@@ -386,11 +457,6 @@ if ($enableFreeType -ne 0 -and $freeTypeAvailable) {
 $runtimeBinDir = Join-Path $repoRoot "build\win32\$Configuration\bin"
 $runtimeBaseq3Dir = Join-Path $runtimeBinDir 'baseq3'
 $runtimeModulesDir = Join-Path $repoRoot "build\win32\$Configuration\modules"
-$uiBundleBuilder = Join-Path $repoRoot 'tools\build_ui_bundle.py'
-$pythonCmd = Get-Command python -ErrorAction SilentlyContinue
-if (-not $pythonCmd) {
-	$pythonCmd = Get-Command py -ErrorAction SilentlyContinue
-}
 
 if (-not (Test-Path $runtimeBinDir)) {
 	New-Item -ItemType Directory -Path $runtimeBinDir | Out-Null
@@ -502,24 +568,15 @@ if (-not (Test-Path $runtimeBaseq3Dir)) {
 	New-Item -ItemType Directory -Path $runtimeBaseq3Dir | Out-Null
 }
 
-if ($pythonCmd) {
-	Write-Host "Refreshing staged retail UI bundle..."
-	$pythonArgs = @(
-		$uiBundleBuilder,
-		'--runtime-root',
-		$runtimeBaseq3Dir
-	)
-	if ($pythonCmd.Name -ieq 'py.exe' -or $pythonCmd.Name -ieq 'py') {
-		$pythonArgs = @('-3') + $pythonArgs
+foreach ($staleUiPackage in @(
+		(Join-Path $runtimeBaseq3Dir 'pak_uiql.pk3'),
+		(Join-Path $runtimeBaseq3Dir 'pak_ui_src_retail_overlay.pk3')
+	)) {
+	if (Test-Path -LiteralPath $staleUiPackage) {
+		Remove-Item -LiteralPath $staleUiPackage -Force
 	}
-	& $pythonCmd.Source @pythonArgs
-	$uiBundleExitCode = $LASTEXITCODE
-	if ($uiBundleExitCode -ne 0) {
-		exit $uiBundleExitCode
-	}
-} else {
-	Write-Warning "Python was not found; skipping tools/build_ui_bundle.py refresh. Launches may use stale staged UI content."
 }
+Write-Host "Retail UI assets are loaded from the Quake Live installation; no local UI PK3 is generated."
 
 Sync-ModuleRuntimeArtifacts -ModuleName 'cgamex86' -RuntimeBaseq3Dir $runtimeBaseq3Dir -ModulesDir $runtimeModulesDir
 Sync-ModuleRuntimeArtifacts -ModuleName 'qagamex86' -RuntimeBaseq3Dir $runtimeBaseq3Dir -ModulesDir $runtimeModulesDir

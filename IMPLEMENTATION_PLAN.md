@@ -1,6 +1,6 @@
 # Implementation Plan
 
-Last updated: 2026-05-31
+Last updated: 2026-06-04
 
 This file now tracks only active repo-level work. Detailed closure narratives
 live in the dedicated subsystem audits under `docs/reverse-engineering/`.
@@ -44,6 +44,40 @@ disabled, until a documented open replacement path exists.
   pick and close remaining `src/ui/menudef.h` ownerdraw IDs.
 
 ## Active work
+
+### Task A182: Feed retail arena catalog into live Awesomium start-server map list [COMPLETED]
+Priority: High
+Primary areas: `src/code/client/cl_cgame.c`,
+`src/code/client/cl_awesomium_win32.cpp`,
+`tests/test_awesomium_browser_parity.py`
+Parity estimate: **before 99.1% -> after 99.2%** for the focused Awesomium
+WebUI arena-listing lane. Repo-wide parity remains **98%** because unrelated
+compatibility, source-legacy, online-service, and packaging surfaces are
+unchanged.
+
+Completed work:
+
+1. Rechecked the retail `GetMapList` HLIL, the map-pool loader notes, and the
+   shipped WebUI bundle: Start Match synchronously imports `GetMapList()` and
+   `GetFactoryList()`, then filters maps by the selected factory's numeric
+   `basegt`.
+2. Switched the native WebUI map builder to prefer Quake Live's retail
+   `mappool.txt` rotation source, merging duplicate `map|factory` rows into
+   one descriptor per unique map and deriving the 13-slot `gametypes` table
+   from parsed factory `basegt` definitions; arena files now provide display
+   metadata and fallback descriptors.
+3. Added startup-time map/factory JSON payloads plus post-document-ready map
+   and factory catalog sync. The map catalog still streams in bounded batches,
+   and the factory catalog sync keeps the WebUI factory filter from staying on
+   the one-entry fallback.
+4. Hardened the injected bridge so factory `basegt` tokens map to retail
+   `gametype_t` ids, the full bridge reinstalls after Awesomium document
+   context resets, and Browserify/CommonJS `mapdb`/`factories` module exports
+   are refreshed in place when the native catalog changes.
+5. Added runtime diagnostics for qz/module map and factory counts, updated
+   focused Awesomium parity coverage, and revalidated the windowed live client:
+   the retail map pool loaded 173 rotation entries and the WebUI exposed 93
+   unique maps plus 22 factories.
 
 ### Task A181: Close selected 197-201 cgame ownerdraw parity [COMPLETED]
 Priority: High

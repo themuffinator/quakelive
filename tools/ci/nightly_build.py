@@ -271,12 +271,7 @@ def copy_required_outputs(repo_root: Path, stage_root: Path, configuration: str)
 
 
 def copy_optional_globs(repo_root: Path, stage_root: Path) -> list[dict]:
-    copied: list[dict] = []
-    ui_bundle = repo_root / "artifacts/ui_bundle/pak_uiql.pk3"
-    if ui_bundle.exists():
-        copied.append(copy_artifact(ui_bundle, stage_root / "baseq3/pak_uiql.pk3", stage_root))
-
-    return copied
+    return []
 
 
 def copy_artifact(source: Path, destination: Path, stage_root: Path) -> dict:

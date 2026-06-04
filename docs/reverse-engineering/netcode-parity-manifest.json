@@ -1,0 +1,3468 @@
+{
+  "schema_version": 1,
+  "last_updated": "2026-06-04",
+  "scope": "Quake Live retail netcode and adjacent message wrapper parity",
+  "owning_retail_binary": "assets/quakelive/quakelive_steam.exe",
+  "reference_profile": {
+    "name": "NETPROFILE_QL_RETAIL",
+    "protocol": 91
+  },
+  "rounds": [
+    {
+      "date": "2026-06-04",
+      "focus": "message wrapper layout plus netchan/XOR semantic checkpoints",
+      "outcome": "verified with compact msg_t source reconstruction"
+    },
+    {
+      "date": "2026-06-04",
+      "focus": "client usercmd packet writer and server parser checkpoints",
+      "outcome": "verified without source behavior changes"
+    },
+    {
+      "date": "2026-06-04",
+      "focus": "server snapshot authoring, reliable resend, and send scheduling checkpoints",
+      "outcome": "verified with documented classic-download compatibility divergence"
+    },
+    {
+      "date": "2026-06-04",
+      "focus": "server connectionless OOB dispatch and VAC secure-mode policy checkpoints",
+      "outcome": "verified with sv_vac hard rejection source reconstruction"
+    },
+    {
+      "date": "2026-06-04",
+      "focus": "client connectionless challenge request and response checkpoints",
+      "outcome": "verified with documented Steam-service unknown-OOB fallback divergence"
+    },
+    {
+      "date": "2026-06-04",
+      "focus": "download bootstrap, workshop completion, and classic UDP autodownload compatibility checkpoints",
+      "outcome": "verified with SV_DoneDownload active-client guard reconstruction and classic autodownload compatibility classification"
+    },
+    {
+      "date": "2026-06-04",
+      "focus": "client server-message parsing, snapshot intake, and gamestate/systeminfo checkpoints",
+      "outcome": "verified with CL_ParseSnapshot areamask guard and CL_ParseServerMessage bad-command diagnostic reconstruction"
+    },
+    {
+      "date": "2026-06-04",
+      "focus": "netchan setup, OOB packet framing, and Win32 socket boundary checkpoints",
+      "outcome": "verified with Sys_GetPacket receive-error diagnostic reconstruction"
+    },
+    {
+      "date": "2026-06-04",
+      "focus": "address comparison, loopback queue, and NET_StringToAdr checkpoints",
+      "outcome": "verified without source behavior changes; NET_SendLoopPacket remains a source helper matched through the retail NET_SendPacket loopback branch"
+    },
+    {
+      "date": "2026-06-04",
+      "focus": "qcommon MSG bitstream primitives, OOB scalar paths, and string wrapper checkpoints",
+      "outcome": "verified with MSG_WriteString, MSG_WriteBigString, and MSG_ReadString high-byte scrub removal reconstruction"
+    },
+    {
+      "date": "2026-06-04",
+      "focus": "MSG_ReadData, packet-entity delta, and playerstate delta codec checkpoints",
+      "outcome": "verified without source behavior changes; retained Quake Live entity and playerstate delta codecs are now directly manifest-backed"
+    },
+    {
+      "date": "2026-06-04",
+      "focus": "Huffman bit helpers, adaptive compression/decompression core, and MSG_initHuffman bootstrap checkpoints",
+      "outcome": "verified without source behavior changes; compressed message transport is now directly manifest-backed"
+    },
+    {
+      "date": "2026-06-04",
+      "focus": "MSG_WriteData, short/long scalar write wrappers, and short/long scalar read wrappers",
+      "outcome": "verified without source behavior changes; retained scalar data wrapper lane is now directly manifest-backed"
+    },
+    {
+      "date": "2026-06-04",
+      "focus": "MSG_ReportChangeVectors_f debug reporter and changeVectors command registration",
+      "outcome": "verified without source behavior changes; retained delta-codec debug reporter is now directly manifest-backed"
+    },
+    {
+      "date": "2026-06-04",
+      "focus": "Quake Live retail protocol profile, command-token helpers, connect-packet guard, and feature gates",
+      "outcome": "verified without source behavior changes; source-reconstructed protocol profile lane is now manifest-backed"
+    },
+    {
+      "date": "2026-06-04",
+      "focus": "shared transport constants, netchan structure layout, and server fragment queue checkpoints",
+      "outcome": "verified without source behavior changes; packet sizing, ring sizing, fragmentation buffers, and queued fragment sends are now manifest-backed"
+    },
+    {
+      "date": "2026-06-04",
+      "focus": "client/server netchan endpoint wrappers and server #462 queued-fragment dispatch",
+      "outcome": "verified without source behavior changes; endpoint encode/decode gates, EOF appends, process gates, and queued-fragment drain behavior are now manifest-backed"
+    },
+    {
+      "date": "2026-06-04",
+      "focus": "client usercmd generation and send-cadence checkpoints",
+      "outcome": "verified without source behavior changes; command creation, frame-msec clamping, send throttling, and CL_SendCmd orchestration are now manifest-backed"
+    },
+    {
+      "date": "2026-06-04",
+      "focus": "server rate scheduler helper and fragment-drain cadence checkpoints",
+      "outcome": "verified without source behavior changes; SV_RateMsec arithmetic and send-loop rate scheduling are now manifest-backed"
+    }
+  ],
+  "entries": [
+    {
+      "symbol": "msg_t",
+      "kind": "structure",
+      "source_path": "src/code/qcommon/qcommon.h",
+      "status": "verified",
+      "retail_address": null,
+      "reference": {
+        "binary_ninja_hlil": [
+          "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part04.txt:39616",
+          "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part04.txt:39825"
+        ],
+        "ghidra": [
+          "references/reverse-engineering/ghidra/quakelive_steam/functions.csv",
+          "references/reverse-engineering/ghidra/quakelive_steam/analysis_symbols.txt"
+        ],
+        "notes": [
+          "docs/reverse-engineering/quakelive_steam_mapping_round_56.md"
+        ]
+      },
+      "behavior_checkpoints": [
+        "compact 0x1c-byte retail x86 message header copied by MSG_Copy",
+        "overflowed is the first stored qboolean",
+        "oob is the second stored qboolean",
+        "no distinct allowoverflow field survives in the retail wrapper layer",
+        "data, maxsize, cursize, readcount, and bit follow the two qboolean fields"
+      ],
+      "tests": [
+        "tests/test_netcode_parity_manifest.py::test_compact_msg_t_layout_matches_hlil_wrapper_layer"
+      ]
+    },
+    {
+      "symbol": "netprofile_desc_t",
+      "kind": "structure",
+      "source_path": "src/code/qcommon/qcommon.h",
+      "status": "reconstructed",
+      "retail_address": null,
+      "reference": {
+        "binary_ninja_hlil": [
+          "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part04.txt"
+        ],
+        "ghidra": [
+          "references/reverse-engineering/ghidra/quakelive_steam/decompile_top_functions.c"
+        ],
+        "notes": [
+          "docs/reverse-engineering/engine-netcode-parity-audit-2026-04-16.md",
+          "docs/reverse-engineering/quakelive_steam_mapping_round_290.md"
+        ]
+      },
+      "behavior_checkpoints": [
+        "describes the active Quake Live retail network profile",
+        "stores OOB command tokens, reliable command tokens, userinfo keys, protocol numbers, and feature booleans",
+        "keeps connect and demo protocol numbers in the profile instead of hard-coding PROTOCOL_VERSION at each call site",
+        "source-level reconstruction helper rather than a retained standalone retail function"
+      ],
+      "compatibility_notes": [
+        "this profile abstraction is a source reconstruction layer around retail-observed constants and call-site behavior; it intentionally has no single retail function address"
+      ],
+      "tests": [
+        "tests/test_netcode_parity_manifest.py::test_manifest_covers_protocol_profile_and_token_lane",
+        "tests/test_engine_netcode_parity.py::test_retail_steam_protocol_version_matches_hlil_constants",
+        "tests/test_engine_netcode_parity.py::test_retail_protocol_profile_is_used_by_handshake_and_demo_paths"
+      ]
+    },
+    {
+      "symbol": "s_netProtocolProfile",
+      "kind": "constant",
+      "source_path": "src/code/qcommon/common.c",
+      "status": "reconstructed",
+      "retail_address": null,
+      "reference": {
+        "binary_ninja_hlil": [
+          "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part04.txt"
+        ],
+        "ghidra": [
+          "references/reverse-engineering/ghidra/quakelive_steam/decompile_top_functions.c"
+        ],
+        "notes": [
+          "docs/reverse-engineering/engine-netcode-parity-audit-2026-04-16.md",
+          "docs/reverse-engineering/quakelive_steam_mapping_round_290.md"
+        ]
+      },
+      "behavior_checkpoints": [
+        "selects NETPROFILE_QL_RETAIL and name ql-retail-steam",
+        "uses retail protocol 91 for connect and demo protocol numbers",
+        "stores retail command tokens such as getchallenge, challengeResponse, connect, connectResponse, getserversResponse, download, nextdl, stopdl, and donedl",
+        "stores retail userinfo keys such as protocol, qport, challenge, sv_serverid, fs_game, and sv_pure",
+        "enables challenge handshake, client qport, netchan qport, reliable XOR, and compressed connect for the retail profile",
+        "keeps platform auth and workshop support behind build-time service gates"
+      ],
+      "compatibility_notes": [
+        "online-service support bits are build-gated so default offline builds preserve the repository's QL_BUILD_ONLINE_SERVICES policy"
+      ],
+      "tests": [
+        "tests/test_netcode_parity_manifest.py::test_manifest_covers_protocol_profile_and_token_lane",
+        "tests/test_engine_netcode_parity.py::test_retail_steam_protocol_version_matches_hlil_constants",
+        "tests/test_engine_netcode_parity.py::test_retail_protocol_profile_is_used_by_handshake_and_demo_paths"
+      ]
+    },
+    {
+      "symbol": "NET_ProtocolCoreAccessors",
+      "kind": "function_group",
+      "source_path": "src/code/qcommon/common.c",
+      "status": "reconstructed",
+      "retail_address": null,
+      "reference": {
+        "binary_ninja_hlil": [
+          "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part04.txt"
+        ],
+        "ghidra": [
+          "references/reverse-engineering/ghidra/quakelive_steam/decompile_top_functions.c"
+        ],
+        "notes": [
+          "docs/reverse-engineering/engine-netcode-parity-audit-2026-04-16.md"
+        ]
+      },
+      "behavior_checkpoints": [
+        "NET_GetProtocolProfile returns the singleton retail descriptor",
+        "NET_ProtocolName returns the descriptor name",
+        "NET_ProtocolVersion returns connectProtocol",
+        "NET_DemoProtocol returns demoProtocol",
+        "NET_ProtocolSupports accepts only the descriptor connectProtocol"
+      ],
+      "compatibility_notes": [
+        "grouped manifest entry for small source-reconstruction accessors rather than separate direct retail symbols"
+      ],
+      "tests": [
+        "tests/test_netcode_parity_manifest.py::test_manifest_covers_protocol_profile_and_token_lane",
+        "tests/test_engine_netcode_parity.py::test_retail_steam_protocol_version_matches_hlil_constants",
+        "tests/test_engine_netcode_parity.py::test_retail_protocol_profile_is_used_by_handshake_and_demo_paths"
+      ]
+    },
+    {
+      "symbol": "NET_ProfileCommandAccessors",
+      "kind": "function_group",
+      "source_path": "src/code/qcommon/common.c",
+      "status": "reconstructed",
+      "retail_address": null,
+      "reference": {
+        "binary_ninja_hlil": [
+          "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part04.txt"
+        ],
+        "ghidra": [
+          "references/reverse-engineering/ghidra/quakelive_steam/decompile_top_functions.c"
+        ],
+        "notes": [
+          "docs/reverse-engineering/engine-netcode-parity-audit-2026-04-16.md"
+        ]
+      },
+      "behavior_checkpoints": [
+        "OOB command getters return tokens from the active profile descriptor",
+        "reliable command getters return download, pure, userinfo, and reliable-disconnect tokens from the active profile descriptor",
+        "userinfo key getters return server-browser, connect, client, and systeminfo keys from the active profile descriptor",
+        "call sites use these getters instead of hard-coded classic Quake III command strings"
+      ],
+      "compatibility_notes": [
+        "grouped manifest entry covers the source-reconstructed getter family because each helper is a direct descriptor-field accessor"
+      ],
+      "tests": [
+        "tests/test_netcode_parity_manifest.py::test_manifest_covers_protocol_profile_and_token_lane",
+        "tests/test_engine_netcode_parity.py::test_retail_protocol_profile_is_used_by_handshake_and_demo_paths"
+      ]
+    },
+    {
+      "symbol": "NET_ProfileCommandPredicates",
+      "kind": "function_group",
+      "source_path": "src/code/qcommon/common.c",
+      "status": "reconstructed",
+      "retail_address": null,
+      "reference": {
+        "binary_ninja_hlil": [
+          "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part04.txt"
+        ],
+        "ghidra": [
+          "references/reverse-engineering/ghidra/quakelive_steam/decompile_top_functions.c"
+        ],
+        "notes": [
+          "docs/reverse-engineering/engine-netcode-parity-audit-2026-04-16.md"
+        ]
+      },
+      "behavior_checkpoints": [
+        "exact-match predicates reject null command or profile-token pointers",
+        "exact-match predicates use case-insensitive token comparison",
+        "server-list response matching uses prefix comparison through NET_CommandStartsWithProfileToken",
+        "download, pure, userinfo, and reliable-disconnect command predicates dispatch through the active profile tokens"
+      ],
+      "compatibility_notes": [
+        "grouped manifest entry covers small source-reconstructed predicate wrappers tied to retail-observed command tokens"
+      ],
+      "tests": [
+        "tests/test_netcode_parity_manifest.py::test_manifest_covers_protocol_profile_and_token_lane",
+        "tests/test_engine_netcode_parity.py::test_retail_protocol_profile_is_used_by_handshake_and_demo_paths"
+      ]
+    },
+    {
+      "symbol": "NET_IsConnectRequestPacket",
+      "kind": "function",
+      "source_path": "src/code/qcommon/common.c",
+      "status": "reconstructed",
+      "retail_address": null,
+      "reference": {
+        "binary_ninja_hlil": [
+          "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part05.txt:2905"
+        ],
+        "ghidra": [
+          "references/reverse-engineering/ghidra/quakelive_steam/decompile_top_functions.c"
+        ],
+        "notes": [
+          "docs/reverse-engineering/engine-netcode-parity-audit-2026-04-16.md",
+          "docs/reverse-engineering/quakelive_steam_mapping_round_65.md"
+        ]
+      },
+      "behavior_checkpoints": [
+        "rejects null messages, null data, and messages shorter than the OOB marker",
+        "checks the active profile connect token at payload offset four",
+        "requires the message to contain the full connect token",
+        "accepts exact-token packets or packets delimited by null, space, quote, newline, or carriage return",
+        "guards server compressed-connect decompression before SV_ConnectionlessPacket tokenization"
+      ],
+      "compatibility_notes": [
+        "source reconstruction helper introduced to identify retail compressed connect OOB payloads before Huff_Decompress"
+      ],
+      "tests": [
+        "tests/test_netcode_parity_manifest.py::test_manifest_covers_protocol_profile_and_token_lane",
+        "tests/test_engine_netcode_parity.py::test_retail_protocol_profile_is_used_by_handshake_and_demo_paths",
+        "tests/test_netcode_parity_manifest.py::test_manifest_covers_huffman_compression_lane",
+        "tests/test_netcode_parity_manifest.py::test_manifest_covers_server_connectionless_control_plane_lane"
+      ]
+    },
+    {
+      "symbol": "NET_ProtocolFeatureGates",
+      "kind": "function_group",
+      "source_path": "src/code/qcommon/common.c",
+      "status": "reconstructed",
+      "retail_address": null,
+      "reference": {
+        "binary_ninja_hlil": [
+          "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part04.txt",
+          "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part05.txt"
+        ],
+        "ghidra": [
+          "references/reverse-engineering/ghidra/quakelive_steam/decompile_top_functions.c"
+        ],
+        "notes": [
+          "docs/reverse-engineering/engine-netcode-parity-audit-2026-04-16.md",
+          "docs/reverse-engineering/quakelive_steam_mapping_round_290.md"
+        ]
+      },
+      "behavior_checkpoints": [
+        "NET_ProtocolUsesClientQport returns usesClientQport",
+        "NET_ProtocolUsesNetchanClientQport returns usesNetchanClientQport",
+        "NET_ProtocolUsesReliableXorCodec returns usesReliableXorCodec",
+        "NET_ProtocolUsesLegacyAuthorize returns usesLegacyQ3Authorize",
+        "NET_ProtocolUsesCompressedConnect returns usesCompressedConnect",
+        "NET_ProtocolSupportsPlatformAuth returns supportsPlatformAuth",
+        "qport, XOR, compressed connect, legacy authorize, and platform-auth call sites are gated through these helpers"
+      ],
+      "compatibility_notes": [
+        "platform-auth and workshop capability bits remain build-gated to keep online services disabled by default"
+      ],
+      "tests": [
+        "tests/test_netcode_parity_manifest.py::test_manifest_covers_protocol_profile_and_token_lane",
+        "tests/test_engine_netcode_parity.py::test_retail_protocol_profile_is_used_by_handshake_and_demo_paths"
+      ]
+    },
+    {
+      "symbol": "SharedTransportConstants",
+      "kind": "constant_group",
+      "source_path": "src/code/qcommon/qcommon.h",
+      "status": "verified",
+      "retail_address": null,
+      "reference": {
+        "binary_ninja_hlil": [
+          "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part04.txt",
+          "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part05.txt"
+        ],
+        "ghidra": [
+          "references/reverse-engineering/ghidra/quakelive_steam/functions.csv",
+          "references/reverse-engineering/ghidra/quakelive_steam/analysis_symbols.txt"
+        ],
+        "notes": [
+          "docs/reverse-engineering/networking-parity-audit-2026-05-24.md",
+          "docs/reverse-engineering/network-handshake.md"
+        ]
+      },
+      "behavior_checkpoints": [
+        "PACKET_BACKUP is 32 and PACKET_MASK is PACKET_BACKUP minus one for client/server packet history rings",
+        "MAX_RELIABLE_COMMANDS is 64 for retained reliable command retransmit buffers",
+        "MAX_MSGLEN is 16384 for whole reliable messages and fragment assembly buffers",
+        "MAX_DOWNLOAD_WINDOW is 8 for the classic UDP download block window",
+        "client and server structures consume these constants for outPackets, snapshots, reliableCommands, downloadBlocks, frames, netchan_t, and netchan_buffer_t storage"
+      ],
+      "compatibility_notes": [
+        "constant group has no standalone retail address; it is verified through shared structure layout, netchan function behavior, and retained client/server ring users"
+      ],
+      "tests": [
+        "tests/test_netcode_parity_manifest.py::test_manifest_covers_transport_constants_and_netchan_layout_lane"
+      ]
+    },
+    {
+      "symbol": "NetchanFragmentConstants",
+      "kind": "constant_group",
+      "source_path": "src/code/qcommon/net_chan.c",
+      "status": "verified",
+      "retail_address": null,
+      "reference": {
+        "binary_ninja_hlil": [
+          "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part04.txt",
+          "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part05.txt"
+        ],
+        "ghidra": [
+          "references/reverse-engineering/ghidra/quakelive_steam/functions.csv",
+          "references/reverse-engineering/ghidra/quakelive_steam/analysis_symbols.txt"
+        ],
+        "notes": [
+          "docs/reverse-engineering/networking-parity-audit-2026-05-24.md",
+          "docs/reverse-engineering/network-handshake.md"
+        ]
+      },
+      "behavior_checkpoints": [
+        "MAX_PACKETLEN is 1400 for outgoing UDP packet scratch buffers",
+        "FRAGMENT_SIZE is MAX_PACKETLEN minus 100, matching the documented retail 0x514 fragment payload size",
+        "PACKET_HEADER remains 10 bytes for two ints and a short in the classic header accounting",
+        "FRAGMENT_BIT is the high bit of the outgoing sequence number",
+        "Netchan_Transmit fragments messages at length greater than or equal to FRAGMENT_SIZE and rejects messages larger than MAX_MSGLEN",
+        "Netchan_Process strips FRAGMENT_BIT, reads fragment start and length, assembles in-order fragments, and only releases a complete message when fragmentLength is less than FRAGMENT_SIZE"
+      ],
+      "compatibility_notes": [
+        "constant group has no standalone retail address; it is verified through retained Netchan_Transmit, Netchan_TransmitNextFragment, and Netchan_Process behavior"
+      ],
+      "tests": [
+        "tests/test_netcode_parity_manifest.py::test_manifest_covers_transport_constants_and_netchan_layout_lane"
+      ]
+    },
+    {
+      "symbol": "netchan_t",
+      "kind": "structure",
+      "source_path": "src/code/qcommon/qcommon.h",
+      "status": "verified",
+      "retail_address": null,
+      "reference": {
+        "binary_ninja_hlil": [
+          "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part04.txt",
+          "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part05.txt"
+        ],
+        "ghidra": [
+          "references/reverse-engineering/ghidra/quakelive_steam/functions.csv",
+          "references/reverse-engineering/ghidra/quakelive_steam/analysis_symbols.txt"
+        ],
+        "notes": [
+          "docs/reverse-engineering/networking-parity-audit-2026-05-24.md",
+          "docs/reverse-engineering/network-handshake.md"
+        ]
+      },
+      "behavior_checkpoints": [
+        "stores socket identity, dropped packet count, remote address, qport, incoming sequence, and outgoing sequence",
+        "stores incoming fragment sequence and length with a MAX_MSGLEN fragmentBuffer",
+        "stores outgoing unsentFragments state, unsentFragmentStart, unsentLength, and a MAX_MSGLEN unsentBuffer",
+        "Netchan_Setup zeroes the structure, assigns the socket, remote address, qport, incoming sequence 0, and outgoing sequence 1",
+        "clientConnection_t and server client_t each embed one netchan_t"
+      ],
+      "compatibility_notes": [
+        "structure row has no standalone retail address; field layout is verified through retained netchan setup, transmit, process, and client/server embedding evidence"
+      ],
+      "tests": [
+        "tests/test_netcode_parity_manifest.py::test_manifest_covers_transport_constants_and_netchan_layout_lane"
+      ]
+    },
+    {
+      "symbol": "netchan_buffer_t",
+      "kind": "structure",
+      "source_path": "src/code/server/server.h",
+      "status": "verified",
+      "retail_address": null,
+      "reference": {
+        "binary_ninja_hlil": [
+          "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part05.txt"
+        ],
+        "ghidra": [
+          "references/reverse-engineering/ghidra/quakelive_steam/functions.csv",
+          "references/reverse-engineering/ghidra/quakelive_steam/analysis_symbols.txt"
+        ],
+        "notes": [
+          "docs/reverse-engineering/networking-parity-audit-2026-05-24.md"
+        ]
+      },
+      "behavior_checkpoints": [
+        "server-side queued fragmented sends store a msg_t and MAX_MSGLEN backing buffer",
+        "queue nodes link through next",
+        "server client_t stores netchan_start_queue and netchan_end_queue for paced fragmented sends",
+        "server client_t retains one netchan_t alongside the queued-fragment send list"
+      ],
+      "compatibility_notes": [
+        "server queue structure has no standalone retail address; it is verified as the retained slow-link companion to the netchan fragment path"
+      ],
+      "tests": [
+        "tests/test_netcode_parity_manifest.py::test_manifest_covers_transport_constants_and_netchan_layout_lane"
+      ]
+    },
+    {
+      "symbol": "MSG_Copy",
+      "kind": "function",
+      "source_path": "src/code/qcommon/msg.c",
+      "status": "verified",
+      "retail_address": "0x004D4AA0",
+      "reference": {
+        "binary_ninja_hlil": [
+          "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part04.txt:39616"
+        ],
+        "ghidra": [
+          "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+        ],
+        "notes": [
+          "docs/reverse-engineering/quakelive_steam_mapping_round_56.md"
+        ]
+      },
+      "behavior_checkpoints": [
+        "rejects destination buffers smaller than src->cursize",
+        "copies the compact msg_t header before replacing data",
+        "copies exactly src->cursize bytes of payload"
+      ],
+      "tests": [
+        "tests/test_netcode_parity_manifest.py::test_compact_msg_t_layout_matches_hlil_wrapper_layer"
+      ]
+    },
+    {
+      "symbol": "Huff_putBit",
+      "kind": "function",
+      "source_path": "src/code/qcommon/huffman.c",
+      "status": "verified",
+      "retail_address": "0x004D3790",
+      "reference": {
+        "binary_ninja_hlil": [
+          "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part04.txt:38733"
+        ],
+        "ghidra": [
+          "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+        ],
+        "notes": [
+          "docs/reverse-engineering/quakelive_steam_mapping_round_56.md"
+        ]
+      },
+      "behavior_checkpoints": [
+        "loads the shared bit cursor from the caller offset",
+        "zeroes the output byte when starting a new byte lane",
+        "writes the requested bit at the low-bit-first cursor position",
+        "increments the cursor and stores it back through the caller offset"
+      ],
+      "tests": [
+        "tests/test_netcode_parity_manifest.py::test_manifest_covers_huffman_compression_lane"
+      ]
+    },
+    {
+      "symbol": "Huff_getBit",
+      "kind": "function",
+      "source_path": "src/code/qcommon/huffman.c",
+      "status": "verified",
+      "retail_address": "0x004D37D0",
+      "reference": {
+        "binary_ninja_hlil": [
+          "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part04.txt:38752"
+        ],
+        "ghidra": [
+          "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+        ],
+        "notes": [
+          "docs/reverse-engineering/quakelive_steam_mapping_round_56.md"
+        ]
+      },
+      "behavior_checkpoints": [
+        "loads the shared bit cursor from the caller offset",
+        "reads a low-bit-first bit from the current byte lane",
+        "increments the cursor and stores it back through the caller offset",
+        "returns the recovered bit as a zero-or-one integer"
+      ],
+      "tests": [
+        "tests/test_netcode_parity_manifest.py::test_manifest_covers_huffman_compression_lane"
+      ]
+    },
+    {
+      "symbol": "Huff_addRef",
+      "kind": "function",
+      "source_path": "src/code/qcommon/huffman.c",
+      "status": "verified",
+      "retail_address": "0x004D3980",
+      "reference": {
+        "binary_ninja_hlil": [
+          "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part04.txt:38890"
+        ],
+        "ghidra": [
+          "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+        ],
+        "notes": [
+          "docs/reverse-engineering/quakelive_steam_mapping_round_56.md"
+        ]
+      },
+      "behavior_checkpoints": [
+        "creates NYT/internal and symbol nodes for first-seen bytes",
+        "updates the symbol location table",
+        "links the new nodes into the tree and rank list",
+        "increments weights through the adaptive Huffman update path for both new and existing symbols"
+      ],
+      "tests": [
+        "tests/test_netcode_parity_manifest.py::test_manifest_covers_huffman_compression_lane"
+      ]
+    },
+    {
+      "symbol": "Huff_Receive",
+      "kind": "function",
+      "source_path": "src/code/qcommon/huffman.c",
+      "status": "verified",
+      "retail_address": "0x004D3B20",
+      "reference": {
+        "binary_ninja_hlil": [
+          "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part04.txt:38986"
+        ],
+        "ghidra": [
+          "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+        ],
+        "notes": [
+          "docs/reverse-engineering/quakelive_steam_mapping_round_56.md"
+        ]
+      },
+      "behavior_checkpoints": [
+        "walks internal Huffman tree nodes by consuming buffered bits",
+        "chooses left or right child from the recovered bit",
+        "returns zero for an illegal null tree path",
+        "stores the recovered symbol through the caller output pointer"
+      ],
+      "tests": [
+        "tests/test_netcode_parity_manifest.py::test_manifest_covers_huffman_compression_lane"
+      ]
+    },
+    {
+      "symbol": "Huff_offsetReceive",
+      "kind": "function",
+      "source_path": "src/code/qcommon/huffman.c",
+      "status": "verified",
+      "retail_address": "0x004D3B80",
+      "reference": {
+        "binary_ninja_hlil": [
+          "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part04.txt:39015"
+        ],
+        "ghidra": [
+          "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+        ],
+        "notes": [
+          "docs/reverse-engineering/quakelive_steam_mapping_round_56.md"
+        ]
+      },
+      "behavior_checkpoints": [
+        "loads the shared bit cursor from the caller offset",
+        "walks internal Huffman tree nodes by consuming buffered bits",
+        "stores zero for an illegal null tree path",
+        "stores the recovered symbol and updated bit cursor"
+      ],
+      "tests": [
+        "tests/test_netcode_parity_manifest.py::test_manifest_covers_huffman_compression_lane"
+      ]
+    },
+    {
+      "symbol": "Huff_transmit",
+      "kind": "function",
+      "source_path": "src/code/qcommon/huffman.c",
+      "status": "verified",
+      "retail_address": "0x004D3C90",
+      "reference": {
+        "binary_ninja_hlil": [
+          "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part04.txt:39082"
+        ],
+        "ghidra": [
+          "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+        ],
+        "notes": [
+          "docs/reverse-engineering/quakelive_steam_mapping_round_56.md"
+        ]
+      },
+      "behavior_checkpoints": [
+        "sends the NYT prefix before first-seen symbols",
+        "writes first-seen symbols as eight high-to-low raw bits",
+        "sends existing symbols by walking the retained prefix path",
+        "uses the shared buffered bit cursor for emitted bits"
+      ],
+      "tests": [
+        "tests/test_netcode_parity_manifest.py::test_manifest_covers_huffman_compression_lane"
+      ]
+    },
+    {
+      "symbol": "Huff_offsetTransmit",
+      "kind": "function",
+      "source_path": "src/code/qcommon/huffman.c",
+      "status": "verified",
+      "retail_address": "0x004D3E20",
+      "reference": {
+        "binary_ninja_hlil": [
+          "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part04.txt:39160"
+        ],
+        "ghidra": [
+          "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+        ],
+        "notes": [
+          "docs/reverse-engineering/quakelive_steam_mapping_round_56.md"
+        ]
+      },
+      "behavior_checkpoints": [
+        "loads the shared bit cursor from the caller offset",
+        "sends the existing symbol prefix path",
+        "stores the updated cursor back through the caller offset"
+      ],
+      "tests": [
+        "tests/test_netcode_parity_manifest.py::test_manifest_covers_huffman_compression_lane"
+      ]
+    },
+    {
+      "symbol": "Huff_Decompress",
+      "kind": "function",
+      "source_path": "src/code/qcommon/huffman.c",
+      "status": "verified",
+      "retail_address": "0x004D3E60",
+      "reference": {
+        "binary_ninja_hlil": [
+          "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part04.txt:39178"
+        ],
+        "ghidra": [
+          "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+        ],
+        "notes": [
+          "docs/reverse-engineering/quakelive_steam_mapping_round_56.md",
+          "docs/reverse-engineering/quakelive_steam_mapping_round_65.md"
+        ]
+      },
+      "behavior_checkpoints": [
+        "treats the caller offset as the compressed payload start",
+        "reads a two-byte uncompressed size header",
+        "clamps the recovered size to the message maximum minus offset",
+        "starts the compressed bit cursor at bit 16",
+        "expands NYT symbols by reading eight raw bits",
+        "updates the adaptive tree after every decoded byte",
+        "rewrites mbuf->cursize to offset plus recovered byte count"
+      ],
+      "tests": [
+        "tests/test_netcode_parity_manifest.py::test_manifest_covers_huffman_compression_lane",
+        "tests/test_netcode_parity_manifest.py::test_manifest_covers_server_connectionless_control_plane_lane"
+      ]
+    },
+    {
+      "symbol": "Huff_Compress",
+      "kind": "function",
+      "source_path": "src/code/qcommon/huffman.c",
+      "status": "verified",
+      "retail_address": "0x004D40F0",
+      "reference": {
+        "binary_ninja_hlil": [
+          "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part04.txt:39258"
+        ],
+        "ghidra": [
+          "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+        ],
+        "notes": [
+          "docs/reverse-engineering/quakelive_steam_mapping_round_56.md"
+        ]
+      },
+      "behavior_checkpoints": [
+        "treats the caller offset as the uncompressed payload start",
+        "stores the uncompressed size as a two-byte big-endian header",
+        "starts the compressed bit cursor at bit 16",
+        "transmits every source byte through the adaptive Huffman tree",
+        "updates the adaptive tree after every encoded byte",
+        "rounds the bit cursor forward by eight before computing compressed byte count",
+        "rewrites mbuf->cursize to offset plus compressed byte count"
+      ],
+      "tests": [
+        "tests/test_netcode_parity_manifest.py::test_manifest_covers_huffman_compression_lane",
+        "tests/test_netcode_parity_manifest.py::test_manifest_covers_oob_socket_framing_lane"
+      ]
+    },
+    {
+      "symbol": "Huff_Init",
+      "kind": "function",
+      "source_path": "src/code/qcommon/huffman.c",
+      "status": "verified",
+      "retail_address": "0x004D4260",
+      "reference": {
+        "binary_ninja_hlil": [
+          "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part04.txt:39306"
+        ],
+        "ghidra": [
+          "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+        ],
+        "notes": [
+          "docs/reverse-engineering/quakelive_steam_mapping_round_56.md"
+        ]
+      },
+      "behavior_checkpoints": [
+        "clears both compressor and decompressor Huffman state",
+        "initializes the decompressor tree and list with the NYT node",
+        "initializes the compressor tree and list with the NYT node",
+        "sets both NYT location-table entries to their tree roots"
+      ],
+      "tests": [
+        "tests/test_netcode_parity_manifest.py::test_manifest_covers_huffman_compression_lane"
+      ]
+    },
+    {
+      "symbol": "MSG_initHuffman",
+      "kind": "function",
+      "source_path": "src/code/qcommon/msg.c",
+      "status": "verified",
+      "retail_address": "0x004D6BB0",
+      "reference": {
+        "binary_ninja_hlil": [
+          "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part04.txt:41332"
+        ],
+        "ghidra": [
+          "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+        ],
+        "notes": [
+          "docs/reverse-engineering/quakelive_steam_mapping_round_57.md"
+        ]
+      },
+      "behavior_checkpoints": [
+        "sets the retained msgInit guard",
+        "initializes the global message Huffman tables",
+        "walks the 256-entry msg_hData frequency table",
+        "feeds each weighted symbol into both compressor and decompressor trees"
+      ],
+      "tests": [
+        "tests/test_netcode_parity_manifest.py::test_manifest_covers_huffman_compression_lane",
+        "tests/test_netcode_parity_manifest.py::test_manifest_covers_msg_bitstream_primitive_lane"
+      ]
+    },
+    {
+      "symbol": "MSG_Init",
+      "kind": "function",
+      "source_path": "src/code/qcommon/msg.c",
+      "status": "verified",
+      "retail_address": "0x004D6C10",
+      "reference": {
+        "binary_ninja_hlil": [
+          "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part04.txt:41356"
+        ],
+        "ghidra": [
+          "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+        ],
+        "notes": [
+          "docs/reverse-engineering/quakelive_steam_mapping_round_57.md"
+        ]
+      },
+      "behavior_checkpoints": [
+        "lazily initializes Huffman tables when msgInit is false",
+        "clears the compact msg_t wrapper",
+        "stores the caller data buffer",
+        "stores the caller maximum size",
+        "leaves oob false for normal bitstream initialization"
+      ],
+      "tests": [
+        "tests/test_netcode_parity_manifest.py::test_manifest_covers_msg_bitstream_primitive_lane"
+      ]
+    },
+    {
+      "symbol": "MSG_InitOOB",
+      "kind": "function",
+      "source_path": "src/code/qcommon/msg.c",
+      "status": "verified",
+      "retail_address": "0x004D6C50",
+      "reference": {
+        "binary_ninja_hlil": [
+          "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part04.txt:41368"
+        ],
+        "ghidra": [
+          "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+        ],
+        "notes": [
+          "docs/reverse-engineering/quakelive_steam_mapping_round_57.md"
+        ]
+      },
+      "behavior_checkpoints": [
+        "lazily initializes Huffman tables when msgInit is false",
+        "clears the compact msg_t wrapper",
+        "stores the caller data buffer",
+        "stores the caller maximum size",
+        "sets oob true for direct scalar reads and writes"
+      ],
+      "tests": [
+        "tests/test_netcode_parity_manifest.py::test_manifest_covers_msg_bitstream_primitive_lane"
+      ]
+    },
+    {
+      "symbol": "MSG_Clear",
+      "kind": "function",
+      "source_path": "src/code/qcommon/msg.c",
+      "status": "verified",
+      "retail_address": "0x004D4A50",
+      "reference": {
+        "binary_ninja_hlil": [
+          "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part04.txt:39591"
+        ],
+        "ghidra": [
+          "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+        ],
+        "notes": [
+          "docs/reverse-engineering/quakelive_steam_mapping_round_56.md"
+        ]
+      },
+      "behavior_checkpoints": [
+        "clears cursize",
+        "clears overflowed",
+        "resets bit cursor to zero"
+      ],
+      "tests": [
+        "tests/test_netcode_parity_manifest.py::test_manifest_covers_msg_bitstream_primitive_lane"
+      ]
+    },
+    {
+      "symbol": "MSG_Bitstream",
+      "kind": "function",
+      "source_path": "src/code/qcommon/msg.c",
+      "status": "verified",
+      "retail_address": "0x004D4A70",
+      "reference": {
+        "binary_ninja_hlil": [
+          "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part04.txt:39600"
+        ],
+        "ghidra": [
+          "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+        ],
+        "notes": [
+          "docs/reverse-engineering/quakelive_steam_mapping_round_56.md"
+        ]
+      },
+      "behavior_checkpoints": [
+        "switches an existing message wrapper out of OOB mode"
+      ],
+      "tests": [
+        "tests/test_netcode_parity_manifest.py::test_manifest_covers_msg_bitstream_primitive_lane"
+      ]
+    },
+    {
+      "symbol": "MSG_BeginReadingOOB",
+      "kind": "function",
+      "source_path": "src/code/qcommon/msg.c",
+      "status": "verified",
+      "retail_address": "0x004D4A80",
+      "reference": {
+        "binary_ninja_hlil": [
+          "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part04.txt:39607"
+        ],
+        "ghidra": [
+          "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+        ],
+        "notes": [
+          "docs/reverse-engineering/quakelive_steam_mapping_round_56.md"
+        ]
+      },
+      "behavior_checkpoints": [
+        "resets readcount",
+        "resets bit cursor",
+        "sets oob true for direct scalar reads"
+      ],
+      "tests": [
+        "tests/test_netcode_parity_manifest.py::test_manifest_covers_msg_bitstream_primitive_lane"
+      ]
+    },
+    {
+      "symbol": "MSG_WriteBits",
+      "kind": "function",
+      "source_path": "src/code/qcommon/msg.c",
+      "status": "verified",
+      "retail_address": "0x004D4AF0",
+      "reference": {
+        "binary_ninja_hlil": [
+          "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part04.txt:39629"
+        ],
+        "ghidra": [
+          "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+        ],
+        "notes": [
+          "docs/reverse-engineering/quakelive_steam_mapping_round_56.md"
+        ]
+      },
+      "behavior_checkpoints": [
+        "tracks oldsize by the requested bit count",
+        "marks overflowed and returns when fewer than four bytes remain",
+        "rejects zero and out-of-range bit widths with the retail diagnostic",
+        "counts unsigned and signed range overflows without stopping the write",
+        "turns negative bit counts into signed absolute widths",
+        "uses direct little-endian scalar writes for OOB 8, 16, and 32-bit values",
+        "retains the retail OOB 32-bit bit-cursor increment of 8",
+        "writes sub-byte compressed bitstreams with Huff_putBit",
+        "writes full-byte compressed bitstreams with Huff_offsetTransmit",
+        "updates cursize from the bit cursor after compressed writes"
+      ],
+      "tests": [
+        "tests/test_netcode_parity_manifest.py::test_manifest_covers_msg_bitstream_primitive_lane"
+      ]
+    },
+    {
+      "symbol": "MSG_ReadBits",
+      "kind": "function",
+      "source_path": "src/code/qcommon/msg.c",
+      "status": "verified",
+      "retail_address": "0x004D4C70",
+      "reference": {
+        "binary_ninja_hlil": [
+          "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part04.txt:39719"
+        ],
+        "ghidra": [
+          "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+        ],
+        "notes": [
+          "docs/reverse-engineering/quakelive_steam_mapping_round_56.md"
+        ]
+      },
+      "behavior_checkpoints": [
+        "treats negative bit counts as signed reads",
+        "uses direct little-endian scalar reads for OOB 8, 16, and 32-bit values",
+        "rejects unsupported OOB widths with the retail diagnostic",
+        "reads sub-byte compressed bitstreams with Huff_getBit",
+        "reads full-byte compressed bitstreams with Huff_offsetReceive",
+        "updates readcount from the bit cursor after compressed reads",
+        "sign-extends signed reads from the recovered bit width"
+      ],
+      "tests": [
+        "tests/test_netcode_parity_manifest.py::test_manifest_covers_msg_bitstream_primitive_lane"
+      ]
+    },
+    {
+      "symbol": "MSG_WriteByte",
+      "kind": "function",
+      "source_path": "src/code/qcommon/msg.c",
+      "status": "verified",
+      "retail_address": "0x004D4DC0",
+      "reference": {
+        "binary_ninja_hlil": [
+          "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part04.txt:39807"
+        ],
+        "ghidra": [
+          "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+        ],
+        "notes": [
+          "docs/reverse-engineering/quakelive_steam_mapping_round_56.md"
+        ]
+      },
+      "behavior_checkpoints": [
+        "writes bytes through MSG_WriteBits with an 8-bit width"
+      ],
+      "tests": [
+        "tests/test_netcode_parity_manifest.py::test_manifest_covers_msg_bitstream_primitive_lane"
+      ]
+    },
+    {
+      "symbol": "MSG_WriteData",
+      "kind": "function",
+      "source_path": "src/code/qcommon/msg.c",
+      "status": "verified",
+      "retail_address": "0x004D4DE0",
+      "reference": {
+        "binary_ninja_hlil": [
+          "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part04.txt:39813"
+        ],
+        "ghidra": [
+          "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+        ],
+        "notes": [
+          "docs/reverse-engineering/quakelive_steam_mapping_round_56.md"
+        ]
+      },
+      "behavior_checkpoints": [
+        "iterates from zero to length minus one",
+        "reads each source byte in ascending order",
+        "writes every byte through MSG_WriteByte",
+        "does not perform a direct memcpy or alternate endian transform"
+      ],
+      "tests": [
+        "tests/test_netcode_parity_manifest.py::test_manifest_covers_msg_scalar_data_wrapper_lane"
+      ]
+    },
+    {
+      "symbol": "MSG_WriteShort",
+      "kind": "function",
+      "source_path": "src/code/qcommon/msg.c",
+      "status": "verified",
+      "retail_address": "0x004D4E10",
+      "reference": {
+        "binary_ninja_hlil": [
+          "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part04.txt:39825"
+        ],
+        "ghidra": [
+          "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+        ],
+        "notes": [
+          "docs/reverse-engineering/quakelive_steam_mapping_round_56.md"
+        ]
+      },
+      "behavior_checkpoints": [
+        "writes the caller value through MSG_WriteBits",
+        "uses a 16-bit width",
+        "inherits OOB and Huffman bitstream behavior from MSG_WriteBits"
+      ],
+      "tests": [
+        "tests/test_netcode_parity_manifest.py::test_manifest_covers_msg_scalar_data_wrapper_lane"
+      ]
+    },
+    {
+      "symbol": "MSG_WriteLong",
+      "kind": "function",
+      "source_path": "src/code/qcommon/msg.c",
+      "status": "verified",
+      "retail_address": "0x004D4E30",
+      "reference": {
+        "binary_ninja_hlil": [
+          "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part04.txt:39831"
+        ],
+        "ghidra": [
+          "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+        ],
+        "notes": [
+          "docs/reverse-engineering/quakelive_steam_mapping_round_56.md"
+        ]
+      },
+      "behavior_checkpoints": [
+        "writes the caller value through MSG_WriteBits",
+        "uses a 32-bit width",
+        "inherits OOB and Huffman bitstream behavior from MSG_WriteBits"
+      ],
+      "tests": [
+        "tests/test_netcode_parity_manifest.py::test_manifest_covers_msg_scalar_data_wrapper_lane"
+      ]
+    },
+    {
+      "symbol": "MSG_WriteString",
+      "kind": "function",
+      "source_path": "src/code/qcommon/msg.c",
+      "status": "reconstructed",
+      "retail_address": "0x004D4E50",
+      "reference": {
+        "binary_ninja_hlil": [
+          "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part04.txt:39837"
+        ],
+        "ghidra": [
+          "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+        ],
+        "notes": [
+          "docs/reverse-engineering/quakelive_steam_mapping_round_56.md"
+        ]
+      },
+      "behavior_checkpoints": [
+        "writes a single empty-string byte for null input",
+        "rejects strings at or above MAX_STRING_CHARS with the retail diagnostic",
+        "copies the source string into a bounded local buffer",
+        "writes exactly length plus trailing null through MSG_WriteData",
+        "does not rewrite high-byte characters before writing"
+      ],
+      "compatibility_notes": [
+        "the GPL-derived write-side high-byte scrub loop was removed because the committed retail HLIL copies the bounded string directly into MSG_WriteData"
+      ],
+      "tests": [
+        "tests/test_netcode_parity_manifest.py::test_manifest_covers_msg_bitstream_primitive_lane"
+      ]
+    },
+    {
+      "symbol": "MSG_WriteBigString",
+      "kind": "function",
+      "source_path": "src/code/qcommon/msg.c",
+      "status": "reconstructed",
+      "retail_address": "0x004D4F00",
+      "reference": {
+        "binary_ninja_hlil": [
+          "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part04.txt:39891"
+        ],
+        "ghidra": [
+          "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+        ],
+        "notes": [
+          "docs/reverse-engineering/quakelive_steam_mapping_round_56.md"
+        ]
+      },
+      "behavior_checkpoints": [
+        "writes a single empty-string byte for null input",
+        "rejects strings at or above BIG_INFO_STRING with the retail diagnostic",
+        "copies the source string into a bounded local buffer",
+        "writes exactly length plus trailing null through MSG_WriteData",
+        "does not rewrite high-byte characters before writing"
+      ],
+      "compatibility_notes": [
+        "the GPL-derived write-side high-byte scrub loop was removed because the committed retail HLIL copies the bounded big string directly into MSG_WriteData"
+      ],
+      "tests": [
+        "tests/test_netcode_parity_manifest.py::test_manifest_covers_msg_bitstream_primitive_lane"
+      ]
+    },
+    {
+      "symbol": "MSG_ReadByte",
+      "kind": "function",
+      "source_path": "src/code/qcommon/msg.c",
+      "status": "verified",
+      "retail_address": "0x004D4FC0",
+      "reference": {
+        "binary_ninja_hlil": [
+          "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part04.txt:39904"
+        ],
+        "ghidra": [
+          "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+        ],
+        "notes": [
+          "docs/reverse-engineering/quakelive_steam_mapping_round_56.md"
+        ]
+      },
+      "behavior_checkpoints": [
+        "reads an unsigned byte through MSG_ReadBits",
+        "returns -1 when readcount runs past cursize"
+      ],
+      "tests": [
+        "tests/test_netcode_parity_manifest.py::test_manifest_covers_msg_bitstream_primitive_lane"
+      ]
+    },
+    {
+      "symbol": "MSG_ReadShort",
+      "kind": "function",
+      "source_path": "src/code/qcommon/msg.c",
+      "status": "verified",
+      "retail_address": "0x004D4FF0",
+      "reference": {
+        "binary_ninja_hlil": [
+          "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part04.txt:39915"
+        ],
+        "ghidra": [
+          "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+        ],
+        "notes": [
+          "docs/reverse-engineering/quakelive_steam_mapping_round_56.md"
+        ]
+      },
+      "behavior_checkpoints": [
+        "reads through MSG_ReadBits with a 16-bit width",
+        "casts the recovered value to signed short",
+        "returns -1 when readcount runs past cursize"
+      ],
+      "tests": [
+        "tests/test_netcode_parity_manifest.py::test_manifest_covers_msg_scalar_data_wrapper_lane"
+      ]
+    },
+    {
+      "symbol": "MSG_ReadLong",
+      "kind": "function",
+      "source_path": "src/code/qcommon/msg.c",
+      "status": "verified",
+      "retail_address": "0x004D5020",
+      "reference": {
+        "binary_ninja_hlil": [
+          "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part04.txt:39926"
+        ],
+        "ghidra": [
+          "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+        ],
+        "notes": [
+          "docs/reverse-engineering/quakelive_steam_mapping_round_56.md"
+        ]
+      },
+      "behavior_checkpoints": [
+        "reads through MSG_ReadBits with a 32-bit width",
+        "returns the recovered value without a narrower cast",
+        "returns -1 when readcount runs past cursize"
+      ],
+      "tests": [
+        "tests/test_netcode_parity_manifest.py::test_manifest_covers_msg_scalar_data_wrapper_lane"
+      ]
+    },
+    {
+      "symbol": "MSG_ReadString",
+      "kind": "function",
+      "source_path": "src/code/qcommon/msg.c",
+      "status": "reconstructed",
+      "retail_address": "0x004D5040",
+      "reference": {
+        "binary_ninja_hlil": [
+          "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part04.txt:39936"
+        ],
+        "ghidra": [
+          "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+        ],
+        "notes": [
+          "docs/reverse-engineering/quakelive_steam_mapping_round_56.md"
+        ]
+      },
+      "behavior_checkpoints": [
+        "reads through MSG_ReadByte until -1, null, or MAX_STRING_CHARS minus one",
+        "rewrites percent characters to dot",
+        "null-terminates the static string buffer"
+      ],
+      "compatibility_notes": [
+        "the GPL-derived read-side high-byte scrub loop was removed because the committed retail HLIL only rewrites percent characters before storing the byte"
+      ],
+      "tests": [
+        "tests/test_netcode_parity_manifest.py::test_manifest_covers_msg_bitstream_primitive_lane"
+      ]
+    },
+    {
+      "symbol": "MSG_ReadBigString",
+      "kind": "function",
+      "source_path": "src/code/qcommon/msg.c",
+      "status": "verified",
+      "retail_address": "0x004D50A0",
+      "reference": {
+        "binary_ninja_hlil": [
+          "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part04.txt:39962"
+        ],
+        "ghidra": [
+          "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+        ],
+        "notes": [
+          "docs/reverse-engineering/quakelive_steam_mapping_round_56.md"
+        ]
+      },
+      "behavior_checkpoints": [
+        "reads through MSG_ReadByte until -1, null, or BIG_INFO_STRING minus one",
+        "rewrites percent characters to dot",
+        "null-terminates the static big-string buffer"
+      ],
+      "tests": [
+        "tests/test_netcode_parity_manifest.py::test_manifest_covers_msg_bitstream_primitive_lane"
+      ]
+    },
+    {
+      "symbol": "MSG_ReadStringLine",
+      "kind": "function",
+      "source_path": "src/code/qcommon/msg.c",
+      "status": "verified",
+      "retail_address": "0x004D5100",
+      "reference": {
+        "binary_ninja_hlil": [
+          "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part04.txt:39988"
+        ],
+        "ghidra": [
+          "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+        ],
+        "notes": [
+          "docs/reverse-engineering/quakelive_steam_mapping_round_56.md"
+        ]
+      },
+      "behavior_checkpoints": [
+        "reads through MSG_ReadByte until -1, null, newline, or MAX_STRING_CHARS minus one",
+        "rewrites percent characters to dot",
+        "null-terminates the static line buffer"
+      ],
+      "tests": [
+        "tests/test_netcode_parity_manifest.py::test_manifest_covers_msg_bitstream_primitive_lane"
+      ]
+    },
+    {
+      "symbol": "MSG_ReadData",
+      "kind": "function",
+      "source_path": "src/code/qcommon/msg.c",
+      "status": "verified",
+      "retail_address": "0x004D5160",
+      "reference": {
+        "binary_ninja_hlil": [
+          "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part04.txt:40016"
+        ],
+        "ghidra": [
+          "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+        ],
+        "notes": [
+          "docs/reverse-engineering/quakelive_steam_mapping_round_56.md"
+        ]
+      },
+      "behavior_checkpoints": [
+        "reads len bytes in ascending order",
+        "uses MSG_ReadByte for every byte so overread returns the same -1 sentinel as scalar byte reads",
+        "stores each byte into the caller buffer without extra transformation"
+      ],
+      "tests": [
+        "tests/test_netcode_parity_manifest.py::test_manifest_covers_msg_entity_playerstate_delta_lane"
+      ]
+    },
+    {
+      "symbol": "MSG_ReportChangeVectors_f",
+      "kind": "function",
+      "source_path": "src/code/qcommon/msg.c",
+      "status": "verified",
+      "retail_address": "0x004D5750",
+      "reference": {
+        "binary_ninja_hlil": [
+          "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part04.txt:32939",
+          "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part04.txt:40282"
+        ],
+        "ghidra": [
+          "references/reverse-engineering/ghidra/quakelive_steam/decompile_top_functions.c",
+          "references/analysis/quakelive_symbol_aliases.json"
+        ],
+        "notes": [
+          "docs/reverse-engineering/quakelive_steam_mapping_round_57.md"
+        ]
+      },
+      "behavior_checkpoints": [
+        "registered under the changeVectors console command",
+        "iterates all 256 pcount entries",
+        "prints only non-zero counters",
+        "uses the retail %d used %d diagnostic",
+        "debug/report helper only; does not alter wire-format serialization"
+      ],
+      "tests": [
+        "tests/test_netcode_parity_manifest.py::test_manifest_covers_msg_change_vector_reporter_lane"
+      ]
+    },
+    {
+      "symbol": "MSG_WriteDeltaEntity",
+      "kind": "function",
+      "source_path": "src/code/qcommon/msg.c",
+      "status": "verified",
+      "retail_address": "0x004D5780",
+      "reference": {
+        "binary_ninja_hlil": [
+          "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part04.txt:40298"
+        ],
+        "ghidra": [
+          "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+        ],
+        "notes": [
+          "docs/reverse-engineering/quakelive_steam_mapping_round_57.md",
+          "docs/reverse-engineering/cgame-bg-parity-implementation-plan.md"
+        ]
+      },
+      "behavior_checkpoints": [
+        "returns without output when both from and to are null",
+        "writes remove-entity deltas as entity number plus removed bit when to is null",
+        "rejects invalid entity numbers with the retail MSG_WriteDeltaEntity fatal",
+        "finds the last changed field in the retained entityStateFields order",
+        "suppresses unchanged entities when force is false",
+        "writes forced unchanged entities as number, not-removed, no-delta",
+        "writes changed entities as number, not-removed, delta-present, and last-change count",
+        "encodes float fields as zero, 13-bit biased integral floats, or full 32-bit floats",
+        "encodes integer fields as zero marker or field-width payload",
+        "preserves the recovered retailEventData entity payload slot in the serialized field table"
+      ],
+      "tests": [
+        "tests/test_netcode_parity_manifest.py::test_manifest_covers_msg_entity_playerstate_delta_lane",
+        "tests/test_cgame_event_transport_parity.py::test_shared_entity_state_restores_retail_event_data_slot"
+      ]
+    },
+    {
+      "symbol": "MSG_ReadDeltaEntity",
+      "kind": "function",
+      "source_path": "src/code/qcommon/msg.c",
+      "status": "verified",
+      "retail_address": "0x004D5AC0",
+      "reference": {
+        "binary_ninja_hlil": [
+          "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part04.txt:40470"
+        ],
+        "ghidra": [
+          "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+        ],
+        "notes": [
+          "docs/reverse-engineering/quakelive_steam_mapping_round_57.md"
+        ]
+      },
+      "behavior_checkpoints": [
+        "rejects invalid entity numbers with the retail bad delta entity diagnostic",
+        "tracks the start bit for shownet bit-count reporting",
+        "parses remove-entity deltas by clearing the destination and setting MAX_GENTITIES minus one",
+        "copies the baseline state and fixes the number when no delta is present",
+        "reads the last-change byte before iterating changed fields",
+        "copies unchanged fields from the baseline",
+        "reconstructs zero, biased integral, and full 32-bit float fields",
+        "reconstructs zero and field-width integer fields",
+        "copies all tail fields after the last-change count from the baseline"
+      ],
+      "tests": [
+        "tests/test_netcode_parity_manifest.py::test_manifest_covers_msg_entity_playerstate_delta_lane"
+      ]
+    },
+    {
+      "symbol": "MSG_WriteDeltaPlayerstate",
+      "kind": "function",
+      "source_path": "src/code/qcommon/msg.c",
+      "status": "verified",
+      "retail_address": "0x004D5D50",
+      "reference": {
+        "binary_ninja_hlil": [
+          "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part04.txt:40605"
+        ],
+        "ghidra": [
+          "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+        ],
+        "notes": [
+          "docs/reverse-engineering/quakelive_steam_mapping_round_57.md"
+        ]
+      },
+      "behavior_checkpoints": [
+        "uses a zeroed dummy baseline when from is null",
+        "finds the last changed scalar in the retained playerStateFields order",
+        "writes the scalar last-change byte before field payloads",
+        "compares signed movement-axis tail fields as signed bytes",
+        "serializes signed movement-axis tail fields as unsigned byte payloads",
+        "encodes float fields as 13-bit biased integral floats or full 32-bit floats",
+        "writes integer fields using their table bit widths",
+        "builds stats, persistant, ammo, and powerup 16-bit change masks",
+        "writes no-array-change as a single zero bit",
+        "writes stats, persistant, and ammo array values as shorts and powerups as longs"
+      ],
+      "tests": [
+        "tests/test_netcode_parity_manifest.py::test_manifest_covers_msg_entity_playerstate_delta_lane",
+        "tests/test_playerstate_replication.py::test_playerstate_delta_codec_preserves_retail_signed_byte_and_array_mask_wiring"
+      ]
+    },
+    {
+      "symbol": "MSG_ReadDeltaPlayerstate",
+      "kind": "function",
+      "source_path": "src/code/qcommon/msg.c",
+      "status": "verified",
+      "retail_address": "0x004D66C0",
+      "reference": {
+        "binary_ninja_hlil": [
+          "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part04.txt:41093"
+        ],
+        "ghidra": [
+          "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+        ],
+        "notes": [
+          "docs/reverse-engineering/quakelive_steam_mapping_round_57.md"
+        ]
+      },
+      "behavior_checkpoints": [
+        "uses a zeroed dummy baseline when from is null",
+        "copies the baseline into the output before applying deltas",
+        "tracks start and end bits for shownet playerstate reporting",
+        "reads the scalar last-change byte before field payloads",
+        "copies unchanged scalar fields from the baseline",
+        "reconstructs biased integral and full 32-bit float fields",
+        "restores signed movement-axis tail fields through the signed-byte helper",
+        "parses stats, persistant, ammo, and powerup array masks only when the array-changed bit is set",
+        "reads stats, persistant, and ammo array values as shorts and powerups as longs",
+        "preserves the PS_STATS, PS_PERSISTANT, PS_AMMO, and PS_POWERUPS shownet labels"
+      ],
+      "tests": [
+        "tests/test_netcode_parity_manifest.py::test_manifest_covers_msg_entity_playerstate_delta_lane",
+        "tests/test_playerstate_replication.py::test_playerstate_delta_codec_preserves_retail_signed_byte_and_array_mask_wiring"
+      ]
+    },
+    {
+      "symbol": "Netchan_TransmitNextFragment",
+      "kind": "function",
+      "source_path": "src/code/qcommon/net_chan.c",
+      "status": "verified",
+      "retail_address": "0x004D7370",
+      "reference": {
+        "binary_ninja_hlil": [
+          "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part04.txt:41687"
+        ],
+        "ghidra": [
+          "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+        ],
+        "notes": [
+          "docs/reverse-engineering/quakelive_steam_mapping_round_57.md"
+        ]
+      },
+      "behavior_checkpoints": [
+        "writes outgoing sequence with FRAGMENT_BIT",
+        "writes client qport only for client-originated packets when the profile requires it",
+        "caps each fragment at FRAGMENT_SIZE",
+        "emits a zero-length tail fragment for exact-boundary messages",
+        "advances outgoingSequence only after the final non-full fragment"
+      ],
+      "tests": [
+        "tests/test_netcode_parity_manifest.py::test_manifest_covers_xor_and_fragment_checkpoint_slice"
+      ]
+    },
+    {
+      "symbol": "Netchan_Transmit",
+      "kind": "function",
+      "source_path": "src/code/qcommon/net_chan.c",
+      "status": "verified",
+      "retail_address": "0x004D74E0",
+      "reference": {
+        "binary_ninja_hlil": [
+          "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part04.txt:41733"
+        ],
+        "ghidra": [
+          "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+        ],
+        "notes": [
+          "docs/reverse-engineering/quakelive_steam_mapping_round_57.md"
+        ]
+      },
+      "behavior_checkpoints": [
+        "drops through Com_Error when length exceeds MAX_MSGLEN",
+        "queues and sends the first fragment when length is at least FRAGMENT_SIZE",
+        "writes the unfragmented outgoing sequence then increments it",
+        "writes client qport only for client-originated packets when the profile requires it",
+        "sends through NET_SendPacket"
+      ],
+      "tests": [
+        "tests/test_netcode_parity_manifest.py::test_manifest_covers_xor_and_fragment_checkpoint_slice"
+      ]
+    },
+    {
+      "symbol": "Netchan_Process",
+      "kind": "function",
+      "source_path": "src/code/qcommon/net_chan.c",
+      "status": "verified",
+      "retail_address": "0x004D7640",
+      "reference": {
+        "binary_ninja_hlil": [
+          "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part04.txt:41781"
+        ],
+        "ghidra": [
+          "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+        ],
+        "notes": [
+          "docs/reverse-engineering/quakelive_steam_mapping_round_57.md"
+        ]
+      },
+      "behavior_checkpoints": [
+        "begins reading as OOB and consumes the sequence long",
+        "strips FRAGMENT_BIT before sequence comparison",
+        "reads client qport only on the server side when the profile requires it",
+        "rejects duplicate or out-of-order sequences",
+        "requires in-order fragmentStart equal to accumulated fragmentLength",
+        "rejects negative, truncated, and overlarge fragment payloads",
+        "copies complete reassembled payload after the sequence long and positions readcount/bit after the sequence"
+      ],
+      "tests": [
+        "tests/test_netcode_parity_manifest.py::test_manifest_covers_xor_and_fragment_checkpoint_slice"
+      ]
+    },
+    {
+      "symbol": "CL_Netchan_Encode",
+      "kind": "function",
+      "source_path": "src/code/client/cl_net_chan.c",
+      "status": "verified",
+      "retail_address": "0x004BCE30",
+      "reference": {
+        "binary_ninja_hlil": [
+          "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part04.txt:18402"
+        ],
+        "ghidra": [
+          "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+        ],
+        "notes": [
+          "docs/reverse-engineering/quakelive_steam_mapping_round_280.md"
+        ]
+      },
+      "behavior_checkpoints": [
+        "returns without work unless cursize is greater than CL_ENCODE_START",
+        "preserves readcount, bit, and oob cursor state",
+        "reads serverId, messageAcknowledge, and reliableAcknowledge from the first 12 bytes",
+        "seeds key with challenge xor serverId xor messageAcknowledge",
+        "mixes the acknowledged server command string and sanitizes high-byte or percent characters to dot",
+        "xors bytes from CL_ENCODE_START through cursize"
+      ],
+      "tests": [
+        "tests/test_netcode_parity_manifest.py::test_manifest_covers_xor_and_fragment_checkpoint_slice"
+      ]
+    },
+    {
+      "symbol": "CL_Netchan_Decode",
+      "kind": "function",
+      "source_path": "src/code/client/cl_net_chan.c",
+      "status": "verified",
+      "retail_address": "0x004BCEF0",
+      "reference": {
+        "binary_ninja_hlil": [
+          "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part04.txt:18448"
+        ],
+        "ghidra": [
+          "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+        ],
+        "notes": [
+          "docs/reverse-engineering/quakelive_steam_mapping_round_280.md"
+        ]
+      },
+      "behavior_checkpoints": [
+        "preserves readcount, bit, and oob cursor state",
+        "reads reliableAcknowledge from the message stream",
+        "seeds key with challenge xor the netchan sequence long",
+        "mixes the acknowledged reliable client command string and sanitizes high-byte or percent characters to dot",
+        "xors bytes from readcount plus CL_DECODE_START through cursize"
+      ],
+      "tests": [
+        "tests/test_netcode_parity_manifest.py::test_manifest_covers_xor_and_fragment_checkpoint_slice"
+      ]
+    },
+    {
+      "symbol": "SV_Netchan_Encode",
+      "kind": "function",
+      "source_path": "src/code/server/sv_net_chan.c",
+      "status": "verified",
+      "retail_address": "0x004E4CD0",
+      "reference": {
+        "binary_ninja_hlil": [
+          "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part05.txt:3317"
+        ],
+        "ghidra": [
+          "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+        ],
+        "notes": [
+          "docs/reverse-engineering/quakelive_steam_mapping_round_65.md"
+        ]
+      },
+      "behavior_checkpoints": [
+        "returns without work when cursize is smaller than SV_ENCODE_START",
+        "preserves readcount, bit, and oob cursor state",
+        "reads reliableAcknowledge from the first four bytes",
+        "seeds key with challenge xor netchan outgoingSequence",
+        "mixes lastClientCommandString and sanitizes high-byte or percent characters to dot",
+        "xors bytes from SV_ENCODE_START through cursize"
+      ],
+      "tests": [
+        "tests/test_netcode_parity_manifest.py::test_manifest_covers_xor_and_fragment_checkpoint_slice"
+      ]
+    },
+    {
+      "symbol": "SV_Netchan_Decode",
+      "kind": "function",
+      "source_path": "src/code/server/sv_net_chan.c",
+      "status": "verified",
+      "retail_address": "0x004E4D70",
+      "reference": {
+        "binary_ninja_hlil": [
+          "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part05.txt:3363"
+        ],
+        "ghidra": [
+          "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+        ],
+        "notes": [
+          "docs/reverse-engineering/quakelive_steam_mapping_round_65.md"
+        ]
+      },
+      "behavior_checkpoints": [
+        "preserves readcount, bit, and oob cursor state",
+        "reads serverId, messageAcknowledge, and reliableAcknowledge",
+        "seeds key with challenge xor serverId xor messageAcknowledge",
+        "mixes the acknowledged server command string and sanitizes high-byte or percent characters to dot",
+        "xors bytes from readcount plus SV_DECODE_START through cursize"
+      ],
+      "tests": [
+        "tests/test_netcode_parity_manifest.py::test_manifest_covers_xor_and_fragment_checkpoint_slice"
+      ]
+    },
+    {
+      "symbol": "CL_Netchan_TransmitNextFragment",
+      "kind": "function",
+      "source_path": "src/code/client/cl_net_chan.c",
+      "status": "verified",
+      "retail_address": "0x004BCF80",
+      "reference": {
+        "binary_ninja_hlil": [
+          "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part04.txt:18495"
+        ],
+        "ghidra": [
+          "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+        ],
+        "notes": [
+          "docs/reverse-engineering/quakelive_steam_mapping_round_280.md"
+        ]
+      },
+      "behavior_checkpoints": [
+        "tail-calls the shared Netchan_TransmitNextFragment path",
+        "client call sites drain clc.netchan unsent fragments before authoring a new packet",
+        "source keeps the generalized GPL wrapper signature while the retail HLIL collapses the wrapper to the active client netchan tailcall"
+      ],
+      "compatibility_notes": [
+        "wire behavior is equivalent because the retained client call sites pass the active clc.netchan channel into the shared fragment sender"
+      ],
+      "tests": [
+        "tests/test_netcode_parity_manifest.py::test_manifest_covers_endpoint_netchan_wrapper_and_queue_lane"
+      ]
+    },
+    {
+      "symbol": "CL_Netchan_Transmit",
+      "kind": "function",
+      "source_path": "src/code/client/cl_net_chan.c",
+      "status": "verified",
+      "retail_address": "0x004BCF90",
+      "reference": {
+        "binary_ninja_hlil": [
+          "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part04.txt:18501"
+        ],
+        "ghidra": [
+          "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+        ],
+        "notes": [
+          "docs/reverse-engineering/quakelive_steam_mapping_round_280.md"
+        ]
+      },
+      "behavior_checkpoints": [
+        "appends clc_EOF before transport send",
+        "applies CL_Netchan_Encode only when the active protocol profile enables reliable XOR",
+        "forwards the final message cursize and data pointer to Netchan_Transmit"
+      ],
+      "tests": [
+        "tests/test_netcode_parity_manifest.py::test_manifest_covers_endpoint_netchan_wrapper_and_queue_lane"
+      ]
+    },
+    {
+      "symbol": "CL_Netchan_Process",
+      "kind": "function",
+      "source_path": "src/code/client/cl_net_chan.c",
+      "status": "verified",
+      "retail_address": "0x004BCFC0",
+      "reference": {
+        "binary_ninja_hlil": [
+          "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part04.txt:18509"
+        ],
+        "ghidra": [
+          "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+        ],
+        "notes": [
+          "docs/reverse-engineering/quakelive_steam_mapping_round_280.md"
+        ]
+      },
+      "behavior_checkpoints": [
+        "returns qfalse when Netchan_Process rejects or defers the message",
+        "applies CL_Netchan_Decode only after an accepted transport message when reliable XOR is enabled",
+        "updates the retained client-side size accounting after accepted packets",
+        "returns qtrue for accepted and decoded packets"
+      ],
+      "tests": [
+        "tests/test_netcode_parity_manifest.py::test_manifest_covers_endpoint_netchan_wrapper_and_queue_lane"
+      ]
+    },
+    {
+      "symbol": "SV_Netchan_TransmitNextFragment",
+      "kind": "function",
+      "source_path": "src/code/server/sv_net_chan.c",
+      "status": "verified",
+      "retail_address": "0x004E4E20",
+      "reference": {
+        "binary_ninja_hlil": [
+          "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part05.txt:3410"
+        ],
+        "ghidra": [
+          "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+        ],
+        "notes": [
+          "docs/reverse-engineering/quakelive_steam_mapping_round_65.md",
+          "docs/reverse-engineering/networking-parity-audit-2026-05-24.md"
+        ]
+      },
+      "behavior_checkpoints": [
+        "drains the active shared netchan fragment train first",
+        "requires the server queue end pointer to be initialized once unsent fragments are cleared",
+        "pops one queued netchan_buffer_t message when available",
+        "encodes queued messages at send time when reliable XOR is enabled",
+        "forwards queued message cursize and data to Netchan_Transmit",
+        "updates the queue head and resets the queue end pointer when the queue becomes empty",
+        "frees the popped queue node"
+      ],
+      "tests": [
+        "tests/test_netcode_parity_manifest.py::test_manifest_covers_endpoint_netchan_wrapper_and_queue_lane"
+      ]
+    },
+    {
+      "symbol": "SV_Netchan_Transmit",
+      "kind": "function",
+      "source_path": "src/code/server/sv_net_chan.c",
+      "status": "verified",
+      "retail_address": "0x004E4EE0",
+      "reference": {
+        "binary_ninja_hlil": [
+          "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part05.txt:3440"
+        ],
+        "ghidra": [
+          "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+        ],
+        "notes": [
+          "docs/reverse-engineering/quakelive_steam_mapping_round_65.md",
+          "docs/reverse-engineering/networking-parity-audit-2026-05-24.md"
+        ]
+      },
+      "behavior_checkpoints": [
+        "appends svc_EOF before transport send",
+        "queues a copied msg_t plus MAX_MSGLEN backing buffer when the server channel already has unsent fragments",
+        "stores queued messages unencoded because the XOR key depends on the sequence still being drained",
+        "appends queued nodes through netchan_end_queue and advances the end pointer",
+        "sends the next active fragment immediately while the new message waits in the queue",
+        "when no fragments are active, encodes under the reliable-XOR gate and forwards directly to Netchan_Transmit"
+      ],
+      "tests": [
+        "tests/test_netcode_parity_manifest.py::test_manifest_covers_endpoint_netchan_wrapper_and_queue_lane"
+      ]
+    },
+    {
+      "symbol": "SV_Netchan_Process",
+      "kind": "function",
+      "source_path": "src/code/server/sv_net_chan.c",
+      "status": "verified",
+      "retail_address": "0x004E4F80",
+      "reference": {
+        "binary_ninja_hlil": [
+          "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part05.txt:3457"
+        ],
+        "ghidra": [
+          "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+        ],
+        "notes": [
+          "docs/reverse-engineering/quakelive_steam_mapping_round_65.md"
+        ]
+      },
+      "behavior_checkpoints": [
+        "returns qfalse when Netchan_Process rejects or defers the message",
+        "applies SV_Netchan_Decode only after an accepted transport message when reliable XOR is enabled",
+        "returns qtrue for accepted and decoded packets"
+      ],
+      "tests": [
+        "tests/test_netcode_parity_manifest.py::test_manifest_covers_endpoint_netchan_wrapper_and_queue_lane"
+      ]
+    },
+    {
+      "symbol": "Netchan_Init",
+      "kind": "function",
+      "source_path": "src/code/qcommon/net_chan.c",
+      "status": "verified",
+      "retail_address": "0x004D6C90",
+      "reference": {
+        "binary_ninja_hlil": [
+          "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part04.txt:41381"
+        ],
+        "ghidra": [
+          "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+        ],
+        "notes": [
+          "docs/reverse-engineering/quakelive_steam_mapping_round_57.md",
+          "docs/reverse-engineering/networking-parity-audit-2026-05-24.md"
+        ]
+      },
+      "behavior_checkpoints": [
+        "masks the supplied qport seed to 16 bits",
+        "registers showpackets as a temporary cvar",
+        "registers showdrop as a temporary cvar",
+        "registers net_qport as an init cvar using the masked seed"
+      ],
+      "tests": [
+        "tests/test_netcode_parity_manifest.py::test_manifest_covers_oob_socket_framing_lane"
+      ]
+    },
+    {
+      "symbol": "Netchan_Setup",
+      "kind": "function",
+      "source_path": "src/code/qcommon/net_chan.c",
+      "status": "verified",
+      "retail_address": "0x004D6D00",
+      "reference": {
+        "binary_ninja_hlil": [
+          "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part04.txt:41395"
+        ],
+        "ghidra": [
+          "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+        ],
+        "notes": [
+          "docs/reverse-engineering/quakelive_steam_mapping_round_57.md"
+        ]
+      },
+      "behavior_checkpoints": [
+        "clears the full netchan structure before initialization",
+        "stores the owning socket",
+        "copies the remote address",
+        "stores the qport",
+        "initializes incomingSequence to zero",
+        "initializes outgoingSequence to one"
+      ],
+      "tests": [
+        "tests/test_netcode_parity_manifest.py::test_manifest_covers_oob_socket_framing_lane"
+      ]
+    },
+    {
+      "symbol": "NET_CompareBaseAdr",
+      "kind": "function",
+      "source_path": "src/code/qcommon/net_chan.c",
+      "status": "verified",
+      "retail_address": "0x004D6D60",
+      "reference": {
+        "binary_ninja_hlil": [
+          "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part04.txt:41411"
+        ],
+        "ghidra": [
+          "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+        ],
+        "notes": [
+          "docs/reverse-engineering/quakelive_steam_mapping_round_57.md"
+        ]
+      },
+      "behavior_checkpoints": [
+        "returns false when address types differ",
+        "accepts loopback addresses without comparing bytes",
+        "compares only the four IP address bytes for IP addresses",
+        "ignores port values for base-address comparison",
+        "prints the retail bad-address-type diagnostic for unsupported address types"
+      ],
+      "tests": [
+        "tests/test_netcode_parity_manifest.py::test_manifest_covers_address_loopback_helper_lane"
+      ]
+    },
+    {
+      "symbol": "NET_AdrToString",
+      "kind": "function",
+      "source_path": "src/code/qcommon/net_chan.c",
+      "status": "verified",
+      "retail_address": "0x004D6DD0",
+      "reference": {
+        "binary_ninja_hlil": [
+          "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part04.txt:41432"
+        ],
+        "ghidra": [
+          "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+        ],
+        "notes": [
+          "docs/reverse-engineering/quakelive_steam_mapping_round_57.md"
+        ]
+      },
+      "behavior_checkpoints": [
+        "formats loopback addresses as loopback",
+        "formats bot addresses as bot",
+        "formats IP addresses as dotted quad plus host-order port",
+        "falls back to the retained IPX-style formatter for other address types"
+      ],
+      "tests": [
+        "tests/test_netcode_parity_manifest.py::test_manifest_covers_address_loopback_helper_lane"
+      ]
+    },
+    {
+      "symbol": "NET_CompareAdr",
+      "kind": "function",
+      "source_path": "src/code/qcommon/net_chan.c",
+      "status": "verified",
+      "retail_address": "0x004D6EB0",
+      "reference": {
+        "binary_ninja_hlil": [
+          "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part04.txt:41467"
+        ],
+        "ghidra": [
+          "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+        ],
+        "notes": [
+          "docs/reverse-engineering/quakelive_steam_mapping_round_57.md"
+        ]
+      },
+      "behavior_checkpoints": [
+        "returns false when address types differ",
+        "accepts loopback and bot addresses without byte comparison",
+        "compares four IP address bytes and port for IP addresses",
+        "prints the retail bad-address-type diagnostic for unsupported address types"
+      ],
+      "tests": [
+        "tests/test_netcode_parity_manifest.py::test_manifest_covers_address_loopback_helper_lane"
+      ]
+    },
+    {
+      "symbol": "NET_IsLocalAddress",
+      "kind": "function",
+      "source_path": "src/code/qcommon/net_chan.c",
+      "status": "verified",
+      "retail_address": "0x004D6F30",
+      "reference": {
+        "binary_ninja_hlil": [
+          "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part04.txt:41489"
+        ],
+        "ghidra": [
+          "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+        ],
+        "notes": [
+          "docs/reverse-engineering/quakelive_steam_mapping_round_57.md"
+        ]
+      },
+      "behavior_checkpoints": [
+        "classifies only NA_LOOPBACK as local"
+      ],
+      "tests": [
+        "tests/test_netcode_parity_manifest.py::test_manifest_covers_address_loopback_helper_lane"
+      ]
+    },
+    {
+      "symbol": "NET_GetLoopPacket",
+      "kind": "function",
+      "source_path": "src/code/qcommon/net_chan.c",
+      "status": "verified",
+      "retail_address": "0x004D6F40",
+      "reference": {
+        "binary_ninja_hlil": [
+          "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part04.txt:41497"
+        ],
+        "ghidra": [
+          "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+        ],
+        "notes": [
+          "docs/reverse-engineering/quakelive_steam_mapping_round_57.md"
+        ]
+      },
+      "behavior_checkpoints": [
+        "clamps the loopback get index when more than MAX_LOOPBACK messages are pending",
+        "returns false when the loopback queue is empty",
+        "uses a power-of-two ring index from the get counter",
+        "copies the stored payload into the caller message buffer",
+        "sets cursize to the stored payload length",
+        "returns the sender address as NA_LOOPBACK"
+      ],
+      "tests": [
+        "tests/test_netcode_parity_manifest.py::test_manifest_covers_address_loopback_helper_lane"
+      ]
+    },
+    {
+      "symbol": "NET_SendLoopPacket",
+      "kind": "source_helper",
+      "source_path": "src/code/qcommon/net_chan.c",
+      "status": "verified",
+      "retail_address": null,
+      "reference": {
+        "binary_ninja_hlil": [
+          "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part04.txt:41519"
+        ],
+        "ghidra": [
+          "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+        ],
+        "notes": [
+          "docs/reverse-engineering/quakelive_steam_mapping_round_57.md"
+        ]
+      },
+      "behavior_checkpoints": [
+        "writes loopback payloads into the opposite socket queue",
+        "uses the send counter masked by MAX_LOOPBACK minus one as the ring slot",
+        "increments the send counter after selecting the slot",
+        "copies the payload bytes and stores the payload length"
+      ],
+      "compatibility_notes": [
+        "the retail loopback send behavior is observed as the NA_LOOPBACK branch inside NET_SendPacket rather than as a separately promoted retail helper"
+      ],
+      "tests": [
+        "tests/test_netcode_parity_manifest.py::test_manifest_covers_address_loopback_helper_lane"
+      ]
+    },
+    {
+      "symbol": "NET_StringToAdr",
+      "kind": "function",
+      "source_path": "src/code/qcommon/net_chan.c",
+      "status": "verified",
+      "retail_address": "0x004D7250",
+      "reference": {
+        "binary_ninja_hlil": [
+          "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part04.txt:41615"
+        ],
+        "ghidra": [
+          "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+        ],
+        "notes": [
+          "docs/reverse-engineering/quakelive_steam_mapping_round_57.md"
+        ]
+      },
+      "behavior_checkpoints": [
+        "special-cases localhost as a cleared NA_LOOPBACK address",
+        "copies the input into a bounded base-address buffer before parsing",
+        "splits an optional colon port suffix in place",
+        "delegates the base address conversion to Sys_StringToAdr",
+        "marks conversion failures as NA_BAD",
+        "rejects the inet_addr out-of-range 255.255.255.255 sentinel as NA_BAD",
+        "stores an explicit port with BigShort(atoi(port))",
+        "falls back to BigShort(PORT_SERVER) when no port suffix exists"
+      ],
+      "tests": [
+        "tests/test_netcode_parity_manifest.py::test_manifest_covers_address_loopback_helper_lane"
+      ]
+    },
+    {
+      "symbol": "NET_SendPacket",
+      "kind": "function",
+      "source_path": "src/code/qcommon/net_chan.c",
+      "status": "verified",
+      "retail_address": "0x004D6FD0",
+      "reference": {
+        "binary_ninja_hlil": [
+          "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part04.txt:41519"
+        ],
+        "ghidra": [
+          "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+        ],
+        "notes": [
+          "docs/reverse-engineering/quakelive_steam_mapping_round_57.md"
+        ]
+      },
+      "behavior_checkpoints": [
+        "prints send-packet diagnostics only for out-of-band packets when showpackets is enabled",
+        "queues loopback packets instead of using the system socket",
+        "drops NA_BAD and NA_BOT packets before the system socket",
+        "delegates broadcast and IP packets to Sys_SendPacket"
+      ],
+      "tests": [
+        "tests/test_netcode_parity_manifest.py::test_manifest_covers_oob_socket_framing_lane"
+      ]
+    },
+    {
+      "symbol": "NET_OutOfBandPrint",
+      "kind": "function",
+      "source_path": "src/code/qcommon/net_chan.c",
+      "status": "verified",
+      "retail_address": "0x004D7080",
+      "reference": {
+        "binary_ninja_hlil": [
+          "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part04.txt:41548"
+        ],
+        "ghidra": [
+          "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+        ],
+        "notes": [
+          "docs/reverse-engineering/quakelive_steam_mapping_round_57.md"
+        ]
+      },
+      "behavior_checkpoints": [
+        "writes a four-byte 0xffffffff out-of-band header",
+        "formats the textual payload immediately after the header",
+        "sends the datagram length from the header start through the formatted text without the trailing null",
+        "uses NET_SendPacket for the final loopback-or-socket dispatch"
+      ],
+      "tests": [
+        "tests/test_netcode_parity_manifest.py::test_manifest_covers_oob_socket_framing_lane"
+      ]
+    },
+    {
+      "symbol": "NET_OutOfBandData",
+      "kind": "function",
+      "source_path": "src/code/qcommon/net_chan.c",
+      "status": "verified",
+      "retail_address": "0x004D7120",
+      "reference": {
+        "binary_ninja_hlil": [
+          "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part04.txt:41574"
+        ],
+        "ghidra": [
+          "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+        ],
+        "notes": [
+          "docs/reverse-engineering/quakelive_steam_mapping_round_57.md"
+        ]
+      },
+      "behavior_checkpoints": [
+        "writes a four-byte 0xffffffff out-of-band header",
+        "copies the binary connect payload after the header",
+        "compresses the message starting at bit 12 so the OOB header stays clear",
+        "uses the compressed message size for final dispatch",
+        "preserves the same loopback-or-socket send behavior as NET_SendPacket"
+      ],
+      "tests": [
+        "tests/test_netcode_parity_manifest.py::test_manifest_covers_oob_socket_framing_lane"
+      ]
+    },
+    {
+      "symbol": "NET_OutOfBandRaw",
+      "kind": "source_helper",
+      "source_path": "src/code/qcommon/net_chan.c",
+      "status": "reconstructed",
+      "retail_address": null,
+      "reference": {
+        "binary_ninja_hlil": [
+          "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part04.txt:16063",
+          "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part04.txt:41548"
+        ],
+        "ghidra": [
+          "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+        ],
+        "notes": [
+          "docs/reverse-engineering/quakelive_steam_mapping_round_290.md"
+        ]
+      },
+      "behavior_checkpoints": [
+        "keeps binary Steam-auth challenge payloads uncompressed",
+        "rejects null data, negative lengths, and payloads that do not fit after the OOB header",
+        "writes the same four-byte 0xffffffff OOB marker as retail OOB helpers",
+        "sends exactly payload length plus four header bytes"
+      ],
+      "compatibility_notes": [
+        "this source helper is reconstructed to preserve embedded zero bytes in the retail Steam-auth getchallenge payload",
+        "the retail behavior is observed at the CL_CheckForResend callsite rather than as a separately promoted public helper"
+      ],
+      "tests": [
+        "tests/test_netcode_parity_manifest.py::test_manifest_covers_oob_socket_framing_lane"
+      ]
+    },
+    {
+      "symbol": "Sys_GetPacket",
+      "kind": "function",
+      "source_path": "src/code/win32/win_net.c",
+      "status": "reconstructed",
+      "retail_address": "0x004EE260",
+      "reference": {
+        "binary_ninja_hlil": [
+          "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part05.txt:11607",
+          "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part06.txt:35288"
+        ],
+        "ghidra": [
+          "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+        ],
+        "notes": [
+          "docs/reverse-engineering/qcommon-full-parity-audit-and-implementation-plan-2026-04-10.md"
+        ]
+      },
+      "behavior_checkpoints": [
+        "returns false when the IP socket is not open",
+        "receives into the provided msg_t data buffer using msg->maxsize",
+        "silently ignores WSAEWOULDBLOCK and WSAECONNRESET",
+        "prints the retail Sys_GetPacket diagnostic for other receive errors",
+        "unwraps SOCKS UDP relay headers only from the configured relay address",
+        "rejects oversized packets whose received byte count equals maxsize",
+        "sets cursize to the received byte count on success"
+      ],
+      "tests": [
+        "tests/test_netcode_parity_manifest.py::test_manifest_covers_oob_socket_framing_lane"
+      ]
+    },
+    {
+      "symbol": "Sys_SendPacket",
+      "kind": "function",
+      "source_path": "src/code/win32/win_net.c",
+      "status": "verified",
+      "retail_address": "0x004EE460",
+      "reference": {
+        "binary_ninja_hlil": [
+          "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part05.txt:11731",
+          "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part06.txt:35292"
+        ],
+        "ghidra": [
+          "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+        ],
+        "notes": [
+          "docs/reverse-engineering/qcommon-full-parity-audit-and-implementation-plan-2026-04-10.md"
+        ]
+      },
+      "behavior_checkpoints": [
+        "fatally rejects address types other than broadcast and IP",
+        "returns without work when the IP socket is not open",
+        "wraps IP packets in a 10-byte SOCKS UDP relay header when SOCKS is enabled",
+        "sends ordinary packets directly to the socket address",
+        "silently ignores WSAEWOULDBLOCK",
+        "silently ignores WSAEADDRNOTAVAIL for broadcast packets",
+        "prints NET_SendPacket diagnostics for other socket send errors"
+      ],
+      "tests": [
+        "tests/test_netcode_parity_manifest.py::test_manifest_covers_oob_socket_framing_lane"
+      ]
+    },
+    {
+      "symbol": "CL_CreateCmd",
+      "kind": "function",
+      "source_path": "src/code/client/cl_input.c",
+      "status": "verified",
+      "retail_address": "0x004B5C70",
+      "reference": {
+        "binary_ninja_hlil": [
+          "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part04.txt:13187"
+        ],
+        "ghidra": [
+          "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+        ],
+        "notes": [
+          "docs/reverse-engineering/quakelive_steam_mapping_round_277.md",
+          "docs/reverse-engineering/client-full-parity-audit-and-implementation-plan-2026-04-09.md"
+        ]
+      },
+      "behavior_checkpoints": [
+        "preserves old view angles before input processing",
+        "applies keyboard angle adjustment before clearing the command",
+        "clears a usercmd_t and folds button, keyboard, mouse, and joystick movement into it",
+        "clamps pitch wrap deltas larger than 90 degrees against the saved pitch",
+        "finishes the move after view-angle clamping",
+        "emits debug graphs for yaw or pitch movement when cl_debugMove selects them"
+      ],
+      "compatibility_notes": [
+        "retail HLIL inlines the final move storage that source keeps in CL_FinishMove; mapping round 277 classifies this as recovery shape rather than behavior drift"
+      ],
+      "tests": [
+        "tests/test_netcode_parity_manifest.py::test_manifest_covers_client_command_generation_and_send_cadence_lane"
+      ]
+    },
+    {
+      "symbol": "CL_CreateNewCommands",
+      "kind": "function",
+      "source_path": "src/code/client/cl_input.c",
+      "status": "verified",
+      "retail_address": "0x004B5DE0",
+      "reference": {
+        "binary_ninja_hlil": [
+          "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part04.txt:13255"
+        ],
+        "ghidra": [
+          "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+        ],
+        "notes": [
+          "docs/reverse-engineering/quakelive_steam_mapping_round_277.md"
+        ]
+      },
+      "behavior_checkpoints": [
+        "does not create commands before the client reaches CA_PRIMED",
+        "computes frame_msec from com_frameTime minus old_com_frameTime",
+        "clamps hitches above 200 ms to 200 ms",
+        "updates old_com_frameTime after computing the frame delta",
+        "increments cl.cmdNumber and stores the generated command in the CMD_MASK ring slot"
+      ],
+      "tests": [
+        "tests/test_netcode_parity_manifest.py::test_manifest_covers_client_command_generation_and_send_cadence_lane"
+      ]
+    },
+    {
+      "symbol": "CL_ReadyToSendPacket",
+      "kind": "function",
+      "source_path": "src/code/client/cl_input.c",
+      "status": "verified",
+      "retail_address": "0x004B5E60",
+      "reference": {
+        "binary_ninja_hlil": [
+          "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part04.txt:13276"
+        ],
+        "ghidra": [
+          "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+        ],
+        "notes": [
+          "docs/reverse-engineering/quakelive_steam_mapping_round_277.md"
+        ]
+      },
+      "behavior_checkpoints": [
+        "rejects sends during demo playback and cinematics",
+        "throttles download packets to at least 50 ms apart",
+        "throttles non-active and non-primed non-download states to one packet per second",
+        "allows every frame for loopback and LAN addresses",
+        "clamps cl_maxpackets to the 15..125 retail range",
+        "uses the previous outgoing packet history slot to enforce the 1000 / cl_maxpackets interval"
+      ],
+      "tests": [
+        "tests/test_netcode_parity_manifest.py::test_manifest_covers_client_command_generation_and_send_cadence_lane"
+      ]
+    },
+    {
+      "symbol": "CL_SendCmd",
+      "kind": "function",
+      "source_path": "src/code/client/cl_input.c",
+      "status": "verified",
+      "retail_address": "0x004B62A0",
+      "reference": {
+        "binary_ninja_hlil": [
+          "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part04.txt:13416"
+        ],
+        "ghidra": [
+          "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+        ],
+        "notes": [
+          "docs/reverse-engineering/quakelive_steam_mapping_round_277.md",
+          "docs/reverse-engineering/client-full-parity-audit-and-implementation-plan-2026-04-09.md"
+        ]
+      },
+      "behavior_checkpoints": [
+        "does not send before CA_CONNECTED",
+        "does not send while the local paused-server condition is active",
+        "creates new commands every frame once connected, including during demo playback",
+        "uses CL_ReadyToSendPacket as the send-throttle gate",
+        "prints the cl_showSend choke marker when a packet is intentionally delayed",
+        "calls CL_WritePacket only after the ready gate accepts the frame"
+      ],
+      "tests": [
+        "tests/test_netcode_parity_manifest.py::test_manifest_covers_client_command_generation_and_send_cadence_lane"
+      ]
+    },
+    {
+      "symbol": "CL_WritePacket",
+      "kind": "function",
+      "source_path": "src/code/client/cl_input.c",
+      "status": "verified",
+      "retail_address": "0x004B5F70",
+      "reference": {
+        "binary_ninja_hlil": [
+          "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part04.txt:13315"
+        ],
+        "ghidra": [
+          "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+        ],
+        "notes": [
+          "docs/reverse-engineering/quakelive_steam_mapping_round_126.md",
+          "docs/reverse-engineering/quakelive_steam_mapping_round_277.md"
+        ]
+      },
+      "behavior_checkpoints": [
+        "skips packet authoring during demo playback and cinematics",
+        "initializes a MAX_MSGLEN bitstream message",
+        "writes serverId, serverMessageSequence, and serverCommandSequence in that order",
+        "serializes unacknowledged reliable client commands before the move opcode",
+        "clamps cl_packetdup to the retail 0..5 window",
+        "derives cmd count from cl.cmdNumber and the selected outPackets history slot",
+        "caps cmd count at MAX_PACKET_USERCMDS",
+        "selects clc_moveNoDelta when no valid delta base is available, otherwise clc_move",
+        "seeds the usercmd key from checksumFeed, serverMessageSequence, and the acknowledged server-command hash",
+        "writes usercmd deltas in ascending command order through MSG_WriteDeltaUsercmdKey",
+        "records p_realtime, p_serverTime, and p_cmdNumber before CL_Netchan_Transmit",
+        "drains unexpected client-side fragments with CL_Netchan_TransmitNextFragment"
+      ],
+      "tests": [
+        "tests/test_netcode_parity_manifest.py::test_manifest_covers_client_usercmd_packet_lane"
+      ]
+    },
+    {
+      "symbol": "MSG_WriteDeltaUsercmdKey",
+      "kind": "function",
+      "source_path": "src/code/qcommon/msg.c",
+      "status": "verified",
+      "retail_address": "0x004D51A0",
+      "reference": {
+        "binary_ninja_hlil": [
+          "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part04.txt:40033"
+        ],
+        "ghidra": [
+          "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+        ],
+        "notes": [
+          "docs/reverse-engineering/quakelive_steam_mapping_round_57.md"
+        ]
+      },
+      "behavior_checkpoints": [
+        "writes compact 8-bit serverTime delta when the delta is less than 256",
+        "falls back to full 32-bit serverTime when needed",
+        "writes a no-change bit and preserves oldsize accounting when all command fields match",
+        "xors the key with to->serverTime before field deltas",
+        "serializes angles, signed movement axes, buttons, weapon, weaponPrimary, and fov in retail order",
+        "serializes weaponPrimary and fov as the Quake Live usercmd tail"
+      ],
+      "tests": [
+        "tests/test_netcode_parity_manifest.py::test_manifest_covers_client_usercmd_packet_lane"
+      ]
+    },
+    {
+      "symbol": "MSG_ReadDeltaUsercmdKey",
+      "kind": "function",
+      "source_path": "src/code/qcommon/msg.c",
+      "status": "verified",
+      "retail_address": "0x004D54A0",
+      "reference": {
+        "binary_ninja_hlil": [
+          "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part04.txt:40161"
+        ],
+        "ghidra": [
+          "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+        ],
+        "notes": [
+          "docs/reverse-engineering/quakelive_steam_mapping_round_57.md"
+        ]
+      },
+      "behavior_checkpoints": [
+        "reads compact or full serverTime using the same leading bit as the writer",
+        "copies the full baseline command when the change bit is clear",
+        "xors the key with reconstructed serverTime before field deltas",
+        "reads angles, signed movement axes, buttons, weapon, weaponPrimary, and fov in retail order",
+        "copies weaponPrimary and fov from the baseline when no field deltas are present"
+      ],
+      "tests": [
+        "tests/test_netcode_parity_manifest.py::test_manifest_covers_client_usercmd_packet_lane"
+      ]
+    },
+    {
+      "symbol": "SV_UserMove",
+      "kind": "function",
+      "source_path": "src/code/server/sv_client.c",
+      "status": "verified",
+      "retail_address": "0x004E0320",
+      "reference": {
+        "binary_ninja_hlil": [
+          "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part04.txt:49785"
+        ],
+        "ghidra": [
+          "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+        ],
+        "notes": [
+          "docs/reverse-engineering/quakelive_steam_mapping_round_62.md"
+        ]
+      },
+      "behavior_checkpoints": [
+        "sets deltaMessage from messageAcknowledge for delta moves and -1 for no-delta moves",
+        "rejects cmdCount below 1 and above MAX_PACKET_USERCMDS",
+        "reconstructs the same checksum/hash key used by CL_WritePacket",
+        "reads each command through MSG_ReadDeltaUsercmdKey using the previous decoded command as baseline",
+        "stores messageAcked for ping calculation",
+        "handles pure-client no-cp resend and invalid-pure drop gates",
+        "enters the world from CS_PRIMED using the first decoded command",
+        "suppresses stale duplicate commands and replays only new commands through SV_ClientThink"
+      ],
+      "tests": [
+        "tests/test_netcode_parity_manifest.py::test_manifest_covers_client_usercmd_packet_lane"
+      ]
+    },
+    {
+      "symbol": "SV_ExecuteClientMessage",
+      "kind": "function",
+      "source_path": "src/code/server/sv_client.c",
+      "status": "verified",
+      "retail_address": "0x004E05C0",
+      "reference": {
+        "binary_ninja_hlil": [
+          "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part04.txt:49871"
+        ],
+        "ghidra": [
+          "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+        ],
+        "notes": [
+          "docs/reverse-engineering/quakelive_steam_mapping_round_62.md"
+        ]
+      },
+      "behavior_checkpoints": [
+        "switches the incoming message into bitstream mode",
+        "reads serverId, messageAcknowledge, and reliableAcknowledge in packet-body order",
+        "rejects negative message acknowledgements",
+        "bounds reliableAcknowledge against the reliable command ring",
+        "ignores or retransmits gamestate for stale serverId mismatches except during download-next handling",
+        "consumes zero or more clc_clientCommand records before the move opcode",
+        "dispatches clc_move to SV_UserMove with delta enabled",
+        "dispatches clc_moveNoDelta to SV_UserMove with delta disabled",
+        "prints the retail bad-command warning for unexpected non-EOF opcodes"
+      ],
+      "tests": [
+        "tests/test_netcode_parity_manifest.py::test_manifest_covers_client_usercmd_packet_lane"
+      ]
+    },
+    {
+      "symbol": "CL_CheckForResend",
+      "kind": "function",
+      "source_path": "src/code/client/cl_main.c",
+      "status": "verified",
+      "retail_address": "0x004B9150",
+      "reference": {
+        "binary_ninja_hlil": [
+          "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part04.txt:16001"
+        ],
+        "ghidra": [
+          "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+        ],
+        "notes": [
+          "docs/reverse-engineering/quakelive_steam_mapping_round_103.md",
+          "docs/reverse-engineering/quakelive_steam_mapping_round_290.md"
+        ]
+      },
+      "behavior_checkpoints": [
+        "returns without traffic during demo playback",
+        "only resends while the client is in CA_CONNECTING or CA_CHALLENGING",
+        "throttles retries through the retained RETRANSMIT_TIMEOUT window",
+        "sends a challenge request from CA_CONNECTING, including the reconstructed Steam-auth payload when platform auth is available",
+        "builds the quoted connect userinfo from protocol, optional qport, and challenge while in CA_CHALLENGING",
+        "sends compressed connect data only when the active retail protocol profile requires it",
+        "clears the userinfo modified flag after sending the connect payload",
+        "keeps the retail fatal bad-state diagnostic"
+      ],
+      "tests": [
+        "tests/test_netcode_parity_manifest.py::test_manifest_covers_client_connectionless_handshake_lane"
+      ]
+    },
+    {
+      "symbol": "CL_BuildSteamChallengeRequest",
+      "kind": "source_helper",
+      "source_path": "src/code/client/cl_main.c",
+      "status": "reconstructed",
+      "retail_address": null,
+      "reference": {
+        "binary_ninja_hlil": [
+          "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part04.txt:16063"
+        ],
+        "ghidra": [
+          "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+        ],
+        "notes": [
+          "docs/reverse-engineering/quakelive_steam_mapping_round_290.md"
+        ]
+      },
+      "behavior_checkpoints": [
+        "keeps the retail Steam-auth getchallenge payload isolated behind the platform-auth protocol predicate",
+        "requests the local Steam auth ticket and low/high SteamID words from the platform-auth wrapper",
+        "writes the challenge command, a single space, the little-endian SteamID words, and the raw ticket bytes",
+        "bounds the payload against MAX_MSGLEN and rejects empty tickets",
+        "returns the payload length excluding the out-of-band marker because NET_OutOfBandRaw writes that marker"
+      ],
+      "tests": [
+        "tests/test_netcode_parity_manifest.py::test_manifest_covers_client_connectionless_handshake_lane"
+      ]
+    },
+    {
+      "symbol": "CL_SendChallengeRequest",
+      "kind": "source_helper",
+      "source_path": "src/code/client/cl_main.c",
+      "status": "reconstructed",
+      "retail_address": null,
+      "reference": {
+        "binary_ninja_hlil": [
+          "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part04.txt:16063"
+        ],
+        "ghidra": [
+          "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+        ],
+        "notes": [
+          "docs/reverse-engineering/quakelive_steam_mapping_round_290.md"
+        ]
+      },
+      "behavior_checkpoints": [
+        "prefers the reconstructed binary Steam-auth challenge payload when available",
+        "sends Steam-auth challenge bytes through NET_OutOfBandRaw so embedded zero bytes are preserved",
+        "falls back to the bare profile challenge command when platform auth is disabled or unavailable",
+        "logs non-LAN Steam-auth fallback without denying offline or stubbed builds"
+      ],
+      "tests": [
+        "tests/test_netcode_parity_manifest.py::test_manifest_covers_client_connectionless_handshake_lane"
+      ]
+    },
+    {
+      "symbol": "CL_ConnectionlessPacket",
+      "kind": "function",
+      "source_path": "src/code/client/cl_main.c",
+      "status": "verified",
+      "retail_address": "0x004BBBE0",
+      "reference": {
+        "binary_ninja_hlil": [
+          "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part04.txt:17941"
+        ],
+        "ghidra": [
+          "references/reverse-engineering/ghidra/quakelive_steam/functions.csv",
+          "references/reverse-engineering/ghidra/quakelive_steam/decompile_top_functions.c"
+        ],
+        "notes": [
+          "docs/reverse-engineering/quakelive_steam_mapping_round_105.md",
+          "docs/reverse-engineering/quakelive_steam_mapping_round_290.md"
+        ]
+      },
+      "behavior_checkpoints": [
+        "begins reading out-of-band packets after the 0xffffffff marker",
+        "tokenizes the first connectionless command line",
+        "accepts challengeResponse only from CA_CONNECTING, stores the challenge, moves to CA_CHALLENGING, and resets resend state",
+        "accepts connectResponse only while CA_CHALLENGING and from the current base address",
+        "sets up the client netchan with net_qport and moves to CA_CONNECTED on connectResponse",
+        "dispatches infoResponse, statusResponse, disconnect, echo, keyAuthorize, motd, print, and getserversResponse through the retained handlers",
+        "keeps the unknown connectionless packet diagnostic"
+      ],
+      "compatibility_notes": [
+        "retail HLIL shows unmatched client OOB packets falling through the SteamServer_HandleIncomingPacket helper before the unknown-packet diagnostic",
+        "the writable source keeps the retained explicit client OOB handlers and diagnostic while live Steam service usage remains behind disabled-by-default online-services policy"
+      ],
+      "tests": [
+        "tests/test_netcode_parity_manifest.py::test_manifest_covers_client_connectionless_handshake_lane"
+      ]
+    },
+    {
+      "symbol": "CL_PacketEvent",
+      "kind": "function",
+      "source_path": "src/code/client/cl_main.c",
+      "status": "verified",
+      "retail_address": "0x004BC190",
+      "reference": {
+        "binary_ninja_hlil": [
+          "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part04.txt:18082"
+        ],
+        "ghidra": [
+          "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+        ],
+        "notes": [
+          "docs/reverse-engineering/quakelive_steam_mapping_round_105.md"
+        ]
+      },
+      "behavior_checkpoints": [
+        "stamps lastPacketTime before packet classification",
+        "routes 0xffffffff packets to CL_ConnectionlessPacket before sequenced processing",
+        "drops sequenced packets while the client is below CA_CONNECTED",
+        "rejects runt sequenced packets before netchan processing",
+        "rejects sequenced packets from non-current server addresses",
+        "runs CL_Netchan_Process before updating the server message sequence",
+        "parses the server message and writes demo data only after successful frame parsing"
+      ],
+      "tests": [
+        "tests/test_netcode_parity_manifest.py::test_manifest_covers_client_connectionless_handshake_lane"
+      ]
+    },
+    {
+      "symbol": "CL_DownloadsComplete",
+      "kind": "function",
+      "source_path": "src/code/client/cl_main.c",
+      "status": "verified",
+      "retail_address": "0x004BB9C0",
+      "reference": {
+        "binary_ninja_hlil": [
+          "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part04.txt:17850"
+        ],
+        "ghidra": [
+          "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+        ],
+        "notes": [
+          "docs/reverse-engineering/quakelive_steam_mapping_round_105.md"
+        ]
+      },
+      "behavior_checkpoints": [
+        "moves the client into CA_LOADING before pumping the event loop",
+        "returns without duplicate loading if the event loop changes client state",
+        "clears r_uiFullScreen before map load",
+        "flushes client memory before cgame startup",
+        "marks cgameStarted, initializes cgame, and sends pure checksums",
+        "writes three immediate packets after cgame initialization"
+      ],
+      "compatibility_notes": [
+        "the writable source intentionally retains the classic downloadRestart plus donedl branch before the retail loading path",
+        "the committed retail HLIL for 0x004BB9C0 does not show the classic donedl restart branch"
+      ],
+      "tests": [
+        "tests/test_netcode_parity_manifest.py::test_manifest_covers_download_bootstrap_and_compatibility_lane"
+      ]
+    },
+    {
+      "symbol": "CL_InitDownloads",
+      "kind": "function",
+      "source_path": "src/code/client/cl_main.c",
+      "status": "verified",
+      "retail_address": "0x004BBA30",
+      "reference": {
+        "binary_ninja_hlil": [
+          "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part04.txt:17861"
+        ],
+        "ghidra": [
+          "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+        ],
+        "notes": [
+          "docs/reverse-engineering/quakelive_steam_mapping_round_105.md"
+        ]
+      },
+      "behavior_checkpoints": [
+        "reads the required workshop items configstring before classic pak comparison fallback",
+        "prints the required workshop item list",
+        "counts tokenized workshop item ids before issuing requests",
+        "parses item ids through the retail unsigned 64-bit path",
+        "requests Steam workshop downloads with queue mode enabled",
+        "updates cl_downloadItem, cl_downloadName, and cl_downloadTime for UI progress",
+        "sets the connected/loading download state while workshop bootstrap is active",
+        "falls back to CL_DownloadsComplete when no workshop or pak download is needed"
+      ],
+      "tests": [
+        "tests/test_netcode_parity_manifest.py::test_manifest_covers_download_bootstrap_and_compatibility_lane"
+      ]
+    },
+    {
+      "symbol": "CL_Workshop_Frame",
+      "kind": "function",
+      "source_path": "src/code/client/cl_main.c",
+      "status": "verified",
+      "retail_address": "0x004BC320",
+      "reference": {
+        "binary_ninja_hlil": [
+          "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part04.txt:18128"
+        ],
+        "ghidra": [
+          "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+        ],
+        "notes": [
+          "docs/reverse-engineering/quakelive_steam_mapping_round_105.md",
+          "docs/reverse-engineering/quakelive_steam_mapping_round_280.md"
+        ]
+      },
+      "behavior_checkpoints": [
+        "returns while no workshop bootstrap is active",
+        "returns until workshop downloads are settled",
+        "restarts the filesystem once after requested downloads complete",
+        "prints the Steamworks completion line on the settled no-restart path",
+        "checks for missing paks after the restart path has settled",
+        "clears the active workshop flag before calling CL_DownloadsComplete"
+      ],
+      "tests": [
+        "tests/test_netcode_parity_manifest.py::test_manifest_covers_download_bootstrap_and_compatibility_lane"
+      ]
+    },
+    {
+      "symbol": "SV_DoneDownload_f",
+      "kind": "function",
+      "source_path": "src/code/server/sv_client.c",
+      "status": "reconstructed",
+      "retail_address": "0x004DFAC0",
+      "reference": {
+        "binary_ninja_hlil": [
+          "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part04.txt:49072"
+        ],
+        "ghidra": [
+          "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+        ],
+        "notes": [
+          "docs/reverse-engineering/quakelive_steam_mapping_round_62.md"
+        ]
+      },
+      "behavior_checkpoints": [
+        "logs the retained clientDownload done diagnostic",
+        "resends gamestate only when the client is not CS_ACTIVE",
+        "is dispatched through the active profile's donedl command token"
+      ],
+      "tests": [
+        "tests/test_netcode_parity_manifest.py::test_manifest_covers_download_bootstrap_and_compatibility_lane"
+      ]
+    },
+    {
+      "symbol": "ClassicUdpAutodownloadCompatibility",
+      "kind": "compatibility_lane",
+      "source_path": "src/code/client/cl_parse.c; src/code/client/cl_main.c; src/code/server/sv_client.c",
+      "status": "compatibility",
+      "retail_address": null,
+      "reference": {
+        "binary_ninja_hlil": [
+          "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part04.txt",
+          "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part05.txt:4024"
+        ],
+        "ghidra": [
+          "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+        ],
+        "notes": [
+          "docs/reverse-engineering/engine-netcode-parity-audit-2026-04-16.md"
+        ]
+      },
+      "behavior_checkpoints": [
+        "retains profile-routed download, nextdl, stopdl, and donedl reliable commands",
+        "client CL_BeginDownload emits the active profile download request command",
+        "client CL_ParseDownload reads svc_download block ids, block-zero file size, stop and next acknowledgements, temp-file rename, and CL_NextDownload handoff",
+        "server SV_WriteDownloadToClient retains the sliding MAX_DOWNLOAD_WINDOW block writer for svc_download",
+        "server user-command dispatch routes download, nextdl, stopdl, and donedl through profile token getters"
+      ],
+      "compatibility_notes": [
+        "committed retail HLIL search for this round did not find svc_download, nextdl, stopdl, donedl, or classic clientDownload block-transfer strings",
+        "source keeps the classic UDP pk3 autodownload lane for Quake III compatibility while Quake Live retail download bootstrap is workshop-first"
+      ],
+      "tests": [
+        "tests/test_netcode_parity_manifest.py::test_manifest_covers_download_bootstrap_and_compatibility_lane"
+      ]
+    },
+    {
+      "symbol": "CL_ParsePacketEntities",
+      "kind": "function",
+      "source_path": "src/code/client/cl_parse.c",
+      "status": "verified",
+      "retail_address": "0x004BD000",
+      "reference": {
+        "binary_ninja_hlil": [
+          "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part04.txt:18524"
+        ],
+        "ghidra": [
+          "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+        ],
+        "notes": [
+          "docs/reverse-engineering/quakelive_steam_mapping_round_125.md"
+        ]
+      },
+      "behavior_checkpoints": [
+        "initializes the new snapshot parse-entity base and entity count",
+        "uses the 99999 old-entity sentinel when no old frame or no old entities remain",
+        "reads entity numbers with GENTITYNUM_BITS until the MAX_GENTITIES - 1 sentinel",
+        "drops on readcount past cursize before applying entity deltas",
+        "copies unchanged old entities while oldnum is lower than newnum",
+        "parses matched old/new entities as deltas from the previous state",
+        "parses new lower-numbered entities from cl.entityBaselines",
+        "copies any remaining old entities after the new stream sentinel"
+      ],
+      "tests": [
+        "tests/test_netcode_parity_manifest.py::test_manifest_covers_client_server_message_parse_lane"
+      ]
+    },
+    {
+      "symbol": "CL_ParseSnapshot",
+      "kind": "function",
+      "source_path": "src/code/client/cl_parse.c",
+      "status": "reconstructed",
+      "retail_address": "0x004BD350",
+      "reference": {
+        "binary_ninja_hlil": [
+          "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part04.txt:18651",
+          "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part06.txt:30715"
+        ],
+        "ghidra": [
+          "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+        ],
+        "notes": [
+          "docs/reverse-engineering/quakelive_steam_mapping_round_127.md"
+        ]
+      },
+      "behavior_checkpoints": [
+        "parses serverTime, messageNum, delta byte, and snapFlags into a temporary snapshot",
+        "marks full snapshots valid and clears demowaiting",
+        "validates delta snapshots against valid frame, message number, and parse-entity retention checks",
+        "rejects areamask lengths larger than the retail 0x20-byte areamask buffer",
+        "reads playerstate before packet entities",
+        "returns without committing invalid snapshots after consuming the packet body",
+        "invalidates skipped snapshot ring slots before committing the new snapshot",
+        "computes ping from the outgoing packet history and saves the snapshot ring copy"
+      ],
+      "tests": [
+        "tests/test_netcode_parity_manifest.py::test_manifest_covers_client_server_message_parse_lane"
+      ]
+    },
+    {
+      "symbol": "CL_SystemInfoChanged",
+      "kind": "function",
+      "source_path": "src/code/client/cl_parse.c",
+      "status": "verified",
+      "retail_address": "0x004BD620",
+      "reference": {
+        "binary_ninja_hlil": [
+          "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part04.txt:18774"
+        ],
+        "ghidra": [
+          "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+        ],
+        "notes": [
+          "docs/reverse-engineering/quakelive_steam_mapping_round_280.md",
+          "docs/reverse-engineering/engine-netcode-parity-audit-2026-04-16.md"
+        ]
+      },
+      "behavior_checkpoints": [
+        "extracts sv_serverid through the active profile info key before demo gating",
+        "returns after serverId update when playing a demo",
+        "clears cheat cvars when sv_cheats is zero",
+        "applies loaded and referenced pure-pak string pairs",
+        "mirrors every systeminfo key/value pair into local cvars",
+        "tracks whether fs_game was supplied by systeminfo",
+        "clears local fs_game when the server omits it",
+        "updates cl_connectedToPureServer from the active profile pure key"
+      ],
+      "tests": [
+        "tests/test_netcode_parity_manifest.py::test_manifest_covers_client_server_message_parse_lane"
+      ]
+    },
+    {
+      "symbol": "CL_ParseGamestate",
+      "kind": "function",
+      "source_path": "src/code/client/cl_parse.c",
+      "status": "verified",
+      "retail_address": "0x004BD790",
+      "reference": {
+        "binary_ninja_hlil": [
+          "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part04.txt:18830"
+        ],
+        "ghidra": [
+          "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+        ],
+        "notes": [
+          "docs/reverse-engineering/quakelive_steam_mapping_round_131.md"
+        ]
+      },
+      "behavior_checkpoints": [
+        "closes the console, resets connect packet count, and clears local client state",
+        "reads the server command sequence before configstring and baseline records",
+        "stores configstrings with MAX_CONFIGSTRINGS and MAX_GAMESTATE_CHARS bounds",
+        "reads baseline entity states with GENTITYNUM_BITS and MAX_GENTITIES bounds",
+        "drops on unexpected gamestate command bytes",
+        "reads clientNum and checksumFeed after the gamestate EOF",
+        "runs CL_SystemInfoChanged before filesystem restart and download initialization",
+        "clears cl_paused after download initialization"
+      ],
+      "tests": [
+        "tests/test_netcode_parity_manifest.py::test_manifest_covers_client_server_message_parse_lane"
+      ]
+    },
+    {
+      "symbol": "CL_ParseServerMessage",
+      "kind": "function",
+      "source_path": "src/code/client/cl_parse.c",
+      "status": "reconstructed",
+      "retail_address": "0x004BDA00",
+      "reference": {
+        "binary_ninja_hlil": [
+          "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part04.txt:18915",
+          "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part06.txt:30727"
+        ],
+        "ghidra": [
+          "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+        ],
+        "notes": [
+          "docs/reverse-engineering/quakelive_steam_mapping_round_280.md"
+        ]
+      },
+      "behavior_checkpoints": [
+        "switches the incoming packet body into bitstream mode before reading fields",
+        "reads and clamps reliableAcknowledge against the reliable command window",
+        "drops if the parse cursor runs past the message size",
+        "prints shownet names or bad-command diagnostics before dispatch",
+        "stores svc_serverCommand payloads in the reliable server-command ring",
+        "dispatches svc_gamestate and svc_snapshot to their retail owners",
+        "drops illegible commands with the retail diagnostic that includes the command byte"
+      ],
+      "compatibility_notes": [
+        "retail HLIL treats svc_download as a no-op in the top-level server-message switch",
+        "the writable source intentionally retains CL_ParseDownload dispatch for the classic UDP autodownload compatibility lane"
+      ],
+      "tests": [
+        "tests/test_netcode_parity_manifest.py::test_manifest_covers_client_server_message_parse_lane"
+      ]
+    },
+    {
+      "symbol": "SV_ConnectionlessPacket",
+      "kind": "function",
+      "source_path": "src/code/server/sv_main.c",
+      "status": "verified",
+      "retail_address": "0x004E4340",
+      "reference": {
+        "binary_ninja_hlil": [
+          "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part05.txt:2896"
+        ],
+        "ghidra": [
+          "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+        ],
+        "notes": [
+          "docs/reverse-engineering/quakelive_steam_mapping_round_65.md",
+          "docs/reverse-engineering/engine-netcode-parity-audit-2026-04-16.md"
+        ]
+      },
+      "behavior_checkpoints": [
+        "begins reading out-of-band packets after the 0xffffffff marker",
+        "decompresses compressed connect requests before tokenization when the protocol profile requires it",
+        "tokenizes the first connectionless command line",
+        "dispatches getstatus, getinfo, getchallenge, connect, ipAuthorize, rcon, and disconnect through profile predicates",
+        "passes getchallenge the original message so Steam challenge payload bytes remain available",
+        "preserves the bad connectionless packet diagnostic for unrecognized commands"
+      ],
+      "compatibility_notes": [
+        "retail HLIL shows non-connect connectionless packets falling through the SteamServer_HandleIncomingPacket helper before the bad-packet diagnostic",
+        "the writable source keeps classic getstatus, getinfo, rcon, and legacy ipAuthorize handling explicit behind profile/policy helpers"
+      ],
+      "tests": [
+        "tests/test_netcode_parity_manifest.py::test_manifest_covers_server_connectionless_control_plane_lane"
+      ]
+    },
+    {
+      "symbol": "SV_PacketEvent",
+      "kind": "function",
+      "source_path": "src/code/server/sv_main.c",
+      "status": "verified",
+      "retail_address": "0x004E4500",
+      "reference": {
+        "binary_ninja_hlil": [
+          "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part05.txt:2941"
+        ],
+        "ghidra": [
+          "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+        ],
+        "notes": [
+          "docs/reverse-engineering/quakelive_steam_mapping_round_65.md",
+          "docs/reverse-engineering/quakelive_steam_mapping_round_04.md"
+        ]
+      },
+      "behavior_checkpoints": [
+        "routes 0xffffffff packets to SV_ConnectionlessPacket before sequenced processing",
+        "reads sequence and qport from sequenced packets in out-of-band cursor mode",
+        "matches clients by base address and qport",
+        "repairs translated UDP ports when the base address and qport match",
+        "runs SV_Netchan_Process before updating lastPacketTime or executing client messages",
+        "skips SV_ExecuteClientMessage for zombie clients after netchan processing",
+        "sends an out-of-band disconnect to unrecognized sequenced packet senders"
+      ],
+      "tests": [
+        "tests/test_netcode_parity_manifest.py::test_manifest_covers_server_connectionless_control_plane_lane"
+      ]
+    },
+    {
+      "symbol": "SV_GetChallenge",
+      "kind": "function",
+      "source_path": "src/code/server/sv_client.c",
+      "status": "reconstructed",
+      "retail_address": "0x004DF430",
+      "reference": {
+        "binary_ninja_hlil": [
+          "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part04.txt:48838"
+        ],
+        "ghidra": [
+          "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+        ],
+        "notes": [
+          "docs/reverse-engineering/quakelive_steam_mapping_round_62.md",
+          "docs/reverse-engineering/quakelive_steam_mapping_round_290.md",
+          "docs/reverse-engineering/networking-parity-audit-2026-05-24.md"
+        ]
+      },
+      "behavior_checkpoints": [
+        "ignores single-player challenge requests",
+        "uses the 1024-entry challenge table matching the retail 0x400 challenge count",
+        "reuses an existing unconnected challenge entry for the same address or replaces the oldest entry",
+        "initializes challenge, address, firstTime, time, connected, and platform auth state for new entries",
+        "keeps the LAN challenge-response fast path before strict Steam auth parsing",
+        "parses non-LAN Steam challenge payloads from the original OOB message when platform auth is supported",
+        "rejects missing Steam auth tickets with the retail No Steam auth token message",
+        "rejects oversized Steam auth tickets with the retail Auth token too large message",
+        "does not reject clients solely because sv_vac is zero"
+      ],
+      "tests": [
+        "tests/test_netcode_parity_manifest.py::test_manifest_covers_server_connectionless_control_plane_lane"
+      ]
+    },
+    {
+      "symbol": "SV_DirectConnect",
+      "kind": "function",
+      "source_path": "src/code/server/sv_client.c",
+      "status": "reconstructed",
+      "retail_address": "0x004E0750",
+      "reference": {
+        "binary_ninja_hlil": [
+          "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part04.txt:49944"
+        ],
+        "ghidra": [
+          "references/reverse-engineering/ghidra/quakelive_steam/functions.csv",
+          "references/reverse-engineering/ghidra/quakelive_steam/decompile_top_functions.c"
+        ],
+        "notes": [
+          "docs/reverse-engineering/quakelive_steam_mapping_round_62.md",
+          "docs/reverse-engineering/quakelive_steam_mapping_round_290.md",
+          "docs/reverse-engineering/networking-parity-audit-2026-05-24.md"
+        ]
+      },
+      "behavior_checkpoints": [
+        "rejects unsupported protocol versions with the profile print command",
+        "reads challenge and qport through the retail profile key helpers",
+        "validates server-type policy before slot allocation",
+        "validates non-local challenge entries against the retained challenge table",
+        "sets the game-visible client IP userinfo key from the network address or localhost",
+        "captures Steam auth from the matched challenge entry before qagame ClientConnect",
+        "publishes server-owned steam and steamid userinfo keys before qagame sees the client",
+        "keeps connect-userinfo auth capture only as a fallback when challenge-carried auth is absent",
+        "does not reject clients solely because sv_vac is zero",
+        "returns the profile connectResponse command after qagame and auth acceptance"
+      ],
+      "tests": [
+        "tests/test_netcode_parity_manifest.py::test_manifest_covers_server_connectionless_control_plane_lane"
+      ]
+    },
+    {
+      "symbol": "SV_EmitPacketEntities",
+      "kind": "function",
+      "source_path": "src/code/server/sv_snapshot.c",
+      "status": "verified",
+      "retail_address": "0x004E4FC0",
+      "reference": {
+        "binary_ninja_hlil": [
+          "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part05.txt:3470"
+        ],
+        "ghidra": [
+          "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+        ],
+        "notes": [
+          "docs/reverse-engineering/quakelive_steam_mapping_round_65.md"
+        ]
+      },
+      "behavior_checkpoints": [
+        "walks old and new entity lists in ascending entity-number order",
+        "writes changed entities as old-to-new deltas without force",
+        "writes newly visible entities from the entity baseline with force",
+        "writes removed entities as old-to-null deltas with force",
+        "terminates packet entities with the MAX_GENTITIES - 1 sentinel"
+      ],
+      "tests": [
+        "tests/test_netcode_parity_manifest.py::test_manifest_covers_server_snapshot_authoring_lane"
+      ]
+    },
+    {
+      "symbol": "SV_WriteSnapshotToClient",
+      "kind": "function",
+      "source_path": "src/code/server/sv_snapshot.c",
+      "status": "verified",
+      "retail_address": "0x004E50E0",
+      "reference": {
+        "binary_ninja_hlil": [
+          "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part05.txt:3523"
+        ],
+        "ghidra": [
+          "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+        ],
+        "notes": [
+          "docs/reverse-engineering/quakelive_steam_mapping_round_65.md"
+        ]
+      },
+      "behavior_checkpoints": [
+        "selects the outgoing frame by netchan outgoingSequence masked by PACKET_MASK",
+        "falls back to a full snapshot for inactive clients or missing delta messages",
+        "rejects stale delta packet bases outside the PACKET_BACKUP - 3 window",
+        "rejects delta bases whose packet entities rolled out of the snapshot entity ring",
+        "writes svc_snapshot, server time, lastframe, snapFlags, areabytes, areabits, playerstate delta, and packet entities in retail order",
+        "sets SNAPFLAG_RATE_DELAYED and SNAPFLAG_NOT_ACTIVE from client send state",
+        "emits optional svc_nop padding only after packet entities"
+      ],
+      "tests": [
+        "tests/test_netcode_parity_manifest.py::test_manifest_covers_server_snapshot_authoring_lane"
+      ]
+    },
+    {
+      "symbol": "SV_UpdateServerCommandsToClient",
+      "kind": "function",
+      "source_path": "src/code/server/sv_snapshot.c",
+      "status": "verified",
+      "retail_address": "0x004E5240",
+      "reference": {
+        "binary_ninja_hlil": [
+          "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part05.txt:3601"
+        ],
+        "ghidra": [
+          "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+        ],
+        "notes": [
+          "docs/reverse-engineering/quakelive_steam_mapping_round_65.md"
+        ]
+      },
+      "behavior_checkpoints": [
+        "iterates from reliableAcknowledge + 1 through reliableSequence",
+        "writes svc_serverCommand before each reliable command payload",
+        "writes the reliable command sequence number",
+        "writes the string from the reliable command ring masked by MAX_RELIABLE_COMMANDS - 1",
+        "records reliableSent after resending the pending command range"
+      ],
+      "tests": [
+        "tests/test_netcode_parity_manifest.py::test_manifest_covers_server_snapshot_authoring_lane"
+      ]
+    },
+    {
+      "symbol": "SV_BuildClientSnapshot",
+      "kind": "function",
+      "source_path": "src/code/server/sv_snapshot.c",
+      "status": "verified",
+      "retail_address": "0x004E5680",
+      "reference": {
+        "binary_ninja_hlil": [
+          "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part05.txt:3860"
+        ],
+        "ghidra": [
+          "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+        ],
+        "notes": [
+          "docs/reverse-engineering/quakelive_steam_mapping_round_65.md"
+        ]
+      },
+      "behavior_checkpoints": [
+        "bumps snapshotCounter and clears the target frame areabits and entity count",
+        "returns early for missing client entities and zombie clients",
+        "copies the live qagame playerState into the target client snapshot",
+        "suppresses the client entity because cgame regenerates it from playerState",
+        "builds visibility from player origin plus viewheight",
+        "sorts visible entity numbers before delta compression",
+        "inverts areabits before copying entity states into the snapshot entity ring",
+        "guards against svs.nextSnapshotEntities wraparound"
+      ],
+      "tests": [
+        "tests/test_netcode_parity_manifest.py::test_manifest_covers_server_snapshot_authoring_lane"
+      ]
+    },
+    {
+      "symbol": "SV_RateMsec",
+      "kind": "source_helper",
+      "source_path": "src/code/server/sv_snapshot.c",
+      "status": "verified",
+      "retail_address": null,
+      "reference": {
+        "binary_ninja_hlil": [
+          "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part05.txt:3967",
+          "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part05.txt:4053"
+        ],
+        "ghidra": [
+          "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+        ],
+        "notes": [
+          "docs/reverse-engineering/quakelive_steam_mapping_round_65.md"
+        ]
+      },
+      "behavior_checkpoints": [
+        "HEADER_RATE_BYTES is 48 for transport/IP/header overhead in rate accounting",
+        "clamps message sizes above 1500 bytes before rate calculation",
+        "starts from the client rate and honors sv_maxRate when configured",
+        "forces sv_MaxRate to at least 1000 when sv_maxRate is configured below the retail floor",
+        "caps the effective client rate to sv_maxRate when sv_maxRate is lower",
+        "computes milliseconds as (messageSize plus HEADER_RATE_BYTES) times 1000 divided by effective rate",
+        "SV_SendMessageToClient uses the helper for full messages and SV_SendClientMessages uses it for remaining unsent fragment length"
+      ],
+      "compatibility_notes": [
+        "static source helper has no separate promoted retail address; its behavior is verified through the retained SV_SendMessageToClient and SV_SendClientMessages rate arithmetic in HLIL"
+      ],
+      "tests": [
+        "tests/test_netcode_parity_manifest.py::test_manifest_covers_server_rate_scheduler_helper_lane"
+      ]
+    },
+    {
+      "symbol": "SV_SendMessageToClient",
+      "kind": "function",
+      "source_path": "src/code/server/sv_snapshot.c",
+      "status": "verified",
+      "retail_address": "0x004E5900",
+      "reference": {
+        "binary_ninja_hlil": [
+          "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part05.txt:3967"
+        ],
+        "ghidra": [
+          "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+        ],
+        "notes": [
+          "docs/reverse-engineering/quakelive_steam_mapping_round_65.md"
+        ]
+      },
+      "behavior_checkpoints": [
+        "records messageSize, messageSent, and messageAcked for the outgoing frame",
+        "transmits through the server netchan wrapper before scheduling the next snapshot",
+        "sends loopback and LAN-force-rate clients again on the next frame",
+        "calculates rate delay from message size and client rate limits",
+        "sets rateDelayed when rate is the constraining scheduler",
+        "keeps non-active clients from receiving empty snapshots more often than once per second unless downloading"
+      ],
+      "tests": [
+        "tests/test_netcode_parity_manifest.py::test_manifest_covers_server_snapshot_authoring_lane"
+      ]
+    },
+    {
+      "symbol": "SV_SendClientSnapshot",
+      "kind": "function",
+      "source_path": "src/code/server/sv_snapshot.c",
+      "status": "verified",
+      "retail_address": "0x004E5AC0",
+      "reference": {
+        "binary_ninja_hlil": [
+          "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part05.txt:4024"
+        ],
+        "ghidra": [
+          "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+        ],
+        "notes": [
+          "docs/reverse-engineering/quakelive_steam_mapping_round_65.md",
+          "docs/reverse-engineering/engine-netcode-parity-audit-2026-04-16.md"
+        ]
+      },
+      "behavior_checkpoints": [
+        "builds the client snapshot before the bot early-return gate",
+        "initializes a MAX_MSGLEN message buffer after the bot gate",
+        "writes lastClientCommand at the start of every server-to-client message",
+        "resends reliable server commands before the snapshot body",
+        "writes the snapshot body through SV_WriteSnapshotToClient",
+        "clears overflowed messages after printing the retail warning",
+        "sends through SV_SendMessageToClient after overflow handling"
+      ],
+      "compatibility_notes": [
+        "the writable source intentionally retains the classic SV_WriteDownloadToClient call after SV_WriteSnapshotToClient for the preserved UDP pk3 autodownload lane",
+        "the committed retail HLIL for 0x004E5AC0 does not show an intervening classic download writer between SV_WriteSnapshotToClient and overflow handling"
+      ],
+      "tests": [
+        "tests/test_netcode_parity_manifest.py::test_manifest_covers_server_snapshot_authoring_lane"
+      ]
+    },
+    {
+      "symbol": "SV_SendClientMessages",
+      "kind": "function",
+      "source_path": "src/code/server/sv_snapshot.c",
+      "status": "verified",
+      "retail_address": "0x004E5B90",
+      "reference": {
+        "binary_ninja_hlil": [
+          "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part05.txt:4053"
+        ],
+        "ghidra": [
+          "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+        ],
+        "notes": [
+          "docs/reverse-engineering/quakelive_steam_mapping_round_65.md"
+        ]
+      },
+      "behavior_checkpoints": [
+        "iterates every allocated server client slot",
+        "skips disconnected clients",
+        "skips clients whose nextSnapshotTime has not arrived",
+        "drains unsent netchan fragments before building a new snapshot",
+        "schedules the next fragment send from remaining unsent length and rate msec",
+        "builds and sends a new client snapshot only when no fragments are pending"
+      ],
+      "tests": [
+        "tests/test_netcode_parity_manifest.py::test_manifest_covers_server_snapshot_authoring_lane"
+      ]
+    }
+  ]
+}

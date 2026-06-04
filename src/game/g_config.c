@@ -731,7 +731,7 @@ uint64_t G_ComputeConfigCustomSettingsMask( void ) {
 		 g_weaponConfig.grenadeSplashDamage != 100 ||
 		 g_weaponConfig.grenadeSplashRadius != 150 ||
 		 g_weaponConfig.grenadeSpeed != 700 ||
-		 G_ConfigFloatDiffersFromDefault( g_knockbackConfig.grenadeLauncher, DEFAULT_KNOCKBACK_GL ) ) {
+		 G_ConfigFloatDiffersFromDefault( g_knockbackConfig.grenadeLauncher, (float)DEFAULT_KNOCKBACK_GL ) ) {
 		mask |= CUSTOM_SETTING_GRENADE_LAUNCHER;
 	}
 
@@ -741,8 +741,8 @@ uint64_t G_ComputeConfigCustomSettingsMask( void ) {
 		 g_weaponConfig.rocketSplashRadius != 120 ||
 		 g_weaponConfig.rocketSpeed != 1000 ||
 		 g_weaponConfig.rocketSplashOffset != -10 ||
-		 G_ConfigFloatDiffersFromDefault( g_knockbackConfig.rocketLauncher, DEFAULT_KNOCKBACK_RL ) ||
-		 G_ConfigFloatDiffersFromDefault( g_knockbackConfig.rocketLauncherSelf, DEFAULT_KNOCKBACK_RL_SELF ) ||
+		 G_ConfigFloatDiffersFromDefault( g_knockbackConfig.rocketLauncher, (float)DEFAULT_KNOCKBACK_RL ) ||
+		 G_ConfigFloatDiffersFromDefault( g_knockbackConfig.rocketLauncherSelf, (float)DEFAULT_KNOCKBACK_RL_SELF ) ||
 		 G_ConfigFloatDiffersFromDefault( g_weaponConfig.rocketAccelerationFactor, 1.0f ) ||
 		 g_weaponConfig.rocketAccelerationRate != 16 ) {
 		mask |= CUSTOM_SETTING_ROCKET_LAUNCHER;
@@ -758,7 +758,7 @@ uint64_t G_ComputeConfigCustomSettingsMask( void ) {
 
 	if ( g_weaponReloadConfig.railgun != DEFAULT_WEAPON_RELOAD_RG ||
 		 g_weaponConfig.railgunDamage != 80 ||
-		 G_ConfigFloatDiffersFromDefault( g_knockbackConfig.railgun, DEFAULT_KNOCKBACK_RG ) ) {
+		 G_ConfigFloatDiffersFromDefault( g_knockbackConfig.railgun, (float)DEFAULT_KNOCKBACK_RG ) ) {
 		mask |= CUSTOM_SETTING_RAILGUN;
 	}
 
@@ -767,8 +767,8 @@ uint64_t G_ComputeConfigCustomSettingsMask( void ) {
 		 g_weaponConfig.plasmaSplashDamage != 15 ||
 		 g_weaponConfig.plasmaSplashRadius != 20 ||
 		 g_weaponConfig.plasmaSpeed != 2000 ||
-		 G_ConfigFloatDiffersFromDefault( g_knockbackConfig.plasmagun, DEFAULT_KNOCKBACK_PG ) ||
-		 G_ConfigFloatDiffersFromDefault( g_knockbackConfig.plasmagunSelf, DEFAULT_KNOCKBACK_PG_SELF ) ||
+		 G_ConfigFloatDiffersFromDefault( g_knockbackConfig.plasmagun, (float)DEFAULT_KNOCKBACK_PG ) ||
+		 G_ConfigFloatDiffersFromDefault( g_knockbackConfig.plasmagunSelf, (float)DEFAULT_KNOCKBACK_PG_SELF ) ||
 		 G_ConfigFloatDiffersFromDefault( g_weaponConfig.plasmaAccelerationFactor, 1.0f ) ||
 		 g_weaponConfig.plasmaAccelerationRate != 16 ) {
 		mask |= CUSTOM_SETTING_PLASMAGUN;
@@ -901,13 +901,13 @@ void G_InitKnockbackConfig( void ) {
 	g_knockbackConfig.gauntlet = G_ReadKnockbackCvar( &g_knockback_g, DEFAULT_KNOCKBACK_G, "g_knockback_g" );
 	g_knockbackConfig.machinegun = G_ReadKnockbackCvar( &g_knockback_mg, DEFAULT_KNOCKBACK_MG, "g_knockback_mg" );
 	g_knockbackConfig.shotgun = G_ReadKnockbackCvar( &g_knockback_sg, DEFAULT_KNOCKBACK_SG, "g_knockback_sg" );
-	g_knockbackConfig.grenadeLauncher = G_ReadKnockbackCvar( &g_knockback_gl, DEFAULT_KNOCKBACK_GL, "g_knockback_gl" );
-	g_knockbackConfig.rocketLauncher = G_ReadKnockbackCvar( &g_knockback_rl, DEFAULT_KNOCKBACK_RL, "g_knockback_rl" );
-	g_knockbackConfig.rocketLauncherSelf = G_ReadKnockbackCvar( &g_knockback_rl_self, DEFAULT_KNOCKBACK_RL_SELF, "g_knockback_rl_self" );
+	g_knockbackConfig.grenadeLauncher = G_ReadKnockbackCvar( &g_knockback_gl, (float)DEFAULT_KNOCKBACK_GL, "g_knockback_gl" );
+	g_knockbackConfig.rocketLauncher = G_ReadKnockbackCvar( &g_knockback_rl, (float)DEFAULT_KNOCKBACK_RL, "g_knockback_rl" );
+	g_knockbackConfig.rocketLauncherSelf = G_ReadKnockbackCvar( &g_knockback_rl_self, (float)DEFAULT_KNOCKBACK_RL_SELF, "g_knockback_rl_self" );
 	g_knockbackConfig.lightningGun = G_ReadKnockbackCvar( &g_knockback_lg, DEFAULT_KNOCKBACK_LG, "g_knockback_lg" );
-	g_knockbackConfig.railgun = G_ReadKnockbackCvar( &g_knockback_rg, DEFAULT_KNOCKBACK_RG, "g_knockback_rg" );
-	g_knockbackConfig.plasmagun = G_ReadKnockbackCvar( &g_knockback_pg, DEFAULT_KNOCKBACK_PG, "g_knockback_pg" );
-	g_knockbackConfig.plasmagunSelf = G_ReadKnockbackCvar( &g_knockback_pg_self, DEFAULT_KNOCKBACK_PG_SELF, "g_knockback_pg_self" );
+	g_knockbackConfig.railgun = G_ReadKnockbackCvar( &g_knockback_rg, (float)DEFAULT_KNOCKBACK_RG, "g_knockback_rg" );
+	g_knockbackConfig.plasmagun = G_ReadKnockbackCvar( &g_knockback_pg, (float)DEFAULT_KNOCKBACK_PG, "g_knockback_pg" );
+	g_knockbackConfig.plasmagunSelf = G_ReadKnockbackCvar( &g_knockback_pg_self, (float)DEFAULT_KNOCKBACK_PG_SELF, "g_knockback_pg_self" );
 	g_knockbackConfig.bfg = G_ReadKnockbackCvar( &g_knockback_bfg, DEFAULT_KNOCKBACK_BFG, "g_knockback_bfg" );
 	g_knockbackConfig.grapplingHook = G_ReadKnockbackCvar( &g_knockback_gh, DEFAULT_KNOCKBACK_GH, "g_knockback_gh" );
 	g_knockbackConfig.nailgun = G_ReadKnockbackCvar( &g_knockback_ng, DEFAULT_KNOCKBACK_NG, "g_knockback_ng" );
