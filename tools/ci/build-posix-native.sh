@@ -62,7 +62,22 @@ if ! command -v make >/dev/null 2>&1; then
 	exit 1
 fi
 
-mkdir -p "${BUILD_ROOT}"
+mkdir -p \
+	"${BUILD_ROOT}" \
+	"${BUILD_ROOT}/client" \
+	"${BUILD_ROOT}/ded" \
+	"${BUILD_ROOT}/ref" \
+	"${BUILD_ROOT}/baseq3" \
+	"${BUILD_ROOT}/baseq3/cgame" \
+	"${BUILD_ROOT}/baseq3/game" \
+	"${BUILD_ROOT}/baseq3/ui" \
+	"${BUILD_ROOT}/baseq3/vm" \
+	"${BUILD_ROOT}/missionpack" \
+	"${BUILD_ROOT}/missionpack/cgame" \
+	"${BUILD_ROOT}/missionpack/game" \
+	"${BUILD_ROOT}/missionpack/ui" \
+	"${BUILD_ROOT}/missionpack/vm" \
+	"${BUILD_ROOT}/q3static"
 
 COMMON_MODULE_SOURCES=(
 	"${REPO_ROOT}/src/code/game/bg_lib.c"

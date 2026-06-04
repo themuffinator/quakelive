@@ -2720,7 +2720,7 @@ def test_client_web_host_exports_label_online_service_social_and_ugc_boundaries(
         cl_cgame, "static void CL_WebHost_BuildFriendListJson( char *buffer, size_t bufferSize )"
     )
     config_block = _extract_function_block(
-        cl_cgame, "static void CL_WebHost_BuildConfigJson( char *buffer, size_t bufferSize )"
+        cl_cgame, "static void CL_WebHost_BuildConfigJson( char *buffer, size_t bufferSize ) {"
     )
     method_block = _extract_function_block(
         cl_cgame,
