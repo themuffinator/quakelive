@@ -236,6 +236,19 @@ def test_awesomium_load_failure_hides_host_and_suppresses_error_publish_until_re
 	assert "CL_WebHost_UpdateOverlayOwnership();" in frame_block
 
 
+def test_awesomium_menu_runtime_is_torn_down_before_match_loading() -> None:
+	cl_cgame = _read_text(CL_CGAME_PATH)
+	cl_main = _read_text(CL_MAIN_PATH)
+
+	map_loading_block = _extract_function_block(cl_main, "void CL_MapLoading( void ) {")
+	bootstrap_allowed_block = _extract_function_block(cl_cgame, "static qboolean CL_WebHost_ShouldBootstrapMenu( void ) {")
+	bootstrap_block = _extract_function_block(cl_cgame, "void CL_WebHost_BootstrapAwesomiumMenu( void ) {")
+
+	assert "CL_WebHost_Shutdown();" in map_loading_block
+	assert "return cls.state == CA_DISCONNECTED || cls.state == CA_CINEMATIC;" in bootstrap_allowed_block
+	assert "|| !CL_WebHost_ShouldBootstrapMenu()" in bootstrap_block
+
+
 def test_awesomium_direct_input_helpers_reconstruct_browser_runtime_injection_surface() -> None:
 	cl_cgame = _read_text(CL_CGAME_PATH)
 	cl_input = _read_text(CL_INPUT_PATH)

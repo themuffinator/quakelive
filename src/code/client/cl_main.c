@@ -5883,6 +5883,7 @@ void CL_MapLoading( void ) {
 		return;
 	}
 
+	CL_WebHost_Shutdown();
 	Con_Close();
 	cls.keyCatchers = 0;
 

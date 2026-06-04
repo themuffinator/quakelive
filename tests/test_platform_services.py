@@ -4947,6 +4947,10 @@ def test_windows_build_and_launch_pipeline_keeps_runtime_ui_assets_retail_only_a
 	build_script = (REPO_ROOT / ".vscode/build.ps1").read_text(encoding="utf-8")
 	launch_script = (REPO_ROOT / ".vscode/launch.ps1").read_text(encoding="utf-8")
 	launch_json = json.loads((REPO_ROOT / ".vscode/launch.json").read_text(encoding="utf-8"))
+	qagame_vcxproj = (REPO_ROOT / "src/code/game/qagamex86.vcxproj").read_text(encoding="utf-8")
+	cgame_vcxproj = (REPO_ROOT / "src/code/cgame/cgamex86.vcxproj").read_text(encoding="utf-8")
+	module_out_dir = "<OutDir>$(ProjectDir)..\\..\\..\\build\\win32\\$(Configuration)\\modules\\$(ProjectName)\\</OutDir>"
+	module_int_dir = "<IntDir>$(ProjectDir)..\\..\\..\\build\\win32\\$(Configuration)\\obj\\$(ProjectName)\\</IntDir>"
 
 	assert "Retail UI assets are loaded from the Quake Live installation; no local UI PK3 is generated." in build_script
 	assert "pak_uiql.pk3" in build_script
@@ -4954,6 +4958,10 @@ def test_windows_build_and_launch_pipeline_keeps_runtime_ui_assets_retail_only_a
 	assert "Sync-ModuleRuntimeArtifacts -ModuleName 'cgamex86'" in build_script
 	assert "Sync-ModuleRuntimeArtifacts -ModuleName 'qagamex86'" in build_script
 	assert "Copy-Item -Path $sourcePath -Destination $destinationPath -Force" in build_script
+	assert module_out_dir in qagame_vcxproj
+	assert module_int_dir in qagame_vcxproj
+	assert module_out_dir in cgame_vcxproj
+	assert module_int_dir in cgame_vcxproj
 
 	assert "$retailUiBundleRoot = $steamBasePath" in launch_script
 	assert "Remove-Item -LiteralPath $staleUiPackage -Force" in launch_script

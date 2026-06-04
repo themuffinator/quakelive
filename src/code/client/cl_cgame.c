@@ -7047,6 +7047,19 @@ void CL_WebHost_Shutdown( void ) {
 
 /*
 =============
+CL_WebHost_ShouldBootstrapMenu
+
+Allows the retained Awesomium menu host to auto-start only while the client is
+in a menu-side state. Match startup tears the menu host down before loading
+game VMs, and this guard keeps it from immediately bootstrapping again.
+=============
+*/
+static qboolean CL_WebHost_ShouldBootstrapMenu( void ) {
+	return cls.state == CA_DISCONNECTED || cls.state == CA_CINEMATIC;
+}
+
+/*
+=============
 CL_WebHost_BootstrapAwesomiumMenu
 
 Starts the opt-in Awesomium WebCore menu once the renderer has dimensions,
@@ -7062,6 +7075,7 @@ void CL_WebHost_BootstrapAwesomiumMenu( void ) {
 	CL_RefreshOnlineServicesBridgeState();
 	awesomiumAllowed = CL_AwesomiumRuntimeActive();
 	if ( !awesomiumAllowed
+		|| !CL_WebHost_ShouldBootstrapMenu()
 		|| cl_webHost.loadFailed
 		|| cls.glconfig.vidWidth <= 0
 		|| cls.glconfig.vidHeight <= 0 ) {

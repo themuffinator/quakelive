@@ -100,8 +100,8 @@
     </ClCompile>
   </ItemDefinitionGroup>
   <PropertyGroup Condition="'$(Platform)'=='Win32'">
-    <OutDir>$(SolutionDir)..\..\build\win32\$(Configuration)\modules\$(ProjectName)\</OutDir>
-    <IntDir>$(SolutionDir)..\..\build\win32\$(Configuration)\obj\$(ProjectName)\</IntDir>
+    <OutDir>$(ProjectDir)..\..\..\build\win32\$(Configuration)\modules\$(ProjectName)\</OutDir>
+    <IntDir>$(ProjectDir)..\..\..\build\win32\$(Configuration)\obj\$(ProjectName)\</IntDir>
     <LinkIncremental>false</LinkIncremental>
     <TargetName>$(ProjectName)</TargetName>
     <TargetExt>.dll</TargetExt>
