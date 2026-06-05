@@ -1,0 +1,254 @@
+{
+  "schema_version": 1,
+  "last_updated": "2026-06-05",
+  "scope": "OOB/connect/auth compatibility matrix for docs/plans/2026-06-05-networking-2.md",
+  "depends_on": [
+    "docs/reverse-engineering/network-protocol-parity-ledger-2026-06-05.json",
+    "docs/reverse-engineering/network-protocol-header-transport-spec-2026-06-05.json"
+  ],
+  "owning_retail_binary": {
+    "path": "assets/quakelive/quakelive_steam.exe",
+    "metadata": "references/reverse-engineering/ghidra/quakelive_steam/metadata.txt",
+    "program_name": "quakelive_steam.exe",
+    "language": "x86:LE:32:default"
+  },
+  "reference_corpus": {
+    "binary_ninja_hlil": [
+      "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part04.txt",
+      "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part05.txt"
+    ],
+    "aliases": "references/analysis/quakelive_symbol_aliases.json",
+    "ghidra_functions": "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+  },
+  "source_files": [
+    "src/code/qcommon/msg.c",
+    "src/code/qcommon/huffman.c",
+    "src/code/qcommon/common.c",
+    "src/code/qcommon/net_chan.c",
+    "src/code/client/cl_main.c",
+    "src/code/server/sv_main.c"
+  ],
+  "active_profile": {
+    "profile": "NETPROFILE_QL_RETAIL",
+    "connect_protocol": 91,
+    "uses_compressed_connect": true,
+    "uses_legacy_q3_authorize": false,
+    "supports_platform_auth": "build gated by QL_BUILD_ONLINE_SERVICES / platform service support",
+    "requires_platform_auth": false
+  },
+  "oob_scalar_primitives": {
+    "source_write_mode": "MSG_WriteBits writes raw 8/16/32-bit little-endian values while msg->oob is true",
+    "source_read_mode": "MSG_ReadBits reads raw 8/16/32-bit little-endian values while msg->oob is true",
+    "retail_write_anchor": "MSG_WriteBits 0x004D4AF0 branches on msg->oob and writes byte/word/dword data directly",
+    "retail_read_anchor": "MSG_ReadBits 0x004D4C70 branches on msg->oob and reads byte/word/dword data directly",
+    "huffman_used": false
+  },
+  "compatibility_matrix": [
+    {
+      "id": "generic_oob_text_commands",
+      "commands": [
+        "getinfo",
+        "infoResponse",
+        "getstatus",
+        "statusResponse",
+        "getchallenge_fallback",
+        "challengeResponse",
+        "disconnect",
+        "print",
+        "echo",
+        "rcon",
+        "getmotd",
+        "motd",
+        "heartbeat"
+      ],
+      "sender_helpers": [
+        "NET_OutOfBandPrint"
+      ],
+      "receiver_mode": "MSG_BeginReadingOOB then MSG_ReadStringLine",
+      "compression": "none",
+      "negative_test": "NET_OutOfBandPrint must not call Huff_Compress"
+    },
+    {
+      "id": "steam_auth_getchallenge_binary",
+      "commands": [
+        "getchallenge"
+      ],
+      "sender_helpers": [
+        "CL_BuildSteamChallengeRequest",
+        "NET_OutOfBandRaw"
+      ],
+      "payload_shape": "getchallenge, space, little-endian SteamID low word, little-endian SteamID high word, auth ticket bytes",
+      "compression": "none",
+      "policy": "build gated by platform auth support; no live service required for this static compatibility matrix",
+      "negative_test": "CL_SendChallengeRequest must send the built Steam challenge buffer through NET_OutOfBandRaw, not NET_OutOfBandData"
+    },
+    {
+      "id": "compressed_connect_request",
+      "commands": [
+        "connect"
+      ],
+      "sender_helpers": [
+        "CL_CheckForResend",
+        "NET_OutOfBandData"
+      ],
+      "clear_window": {
+        "sentinel_offset": 0,
+        "command_offset": 4,
+        "clear_token": "connect",
+        "clear_delimiter_offset": 11,
+        "compressed_remainder_offset": 12
+      },
+      "compression": {
+        "client_function": "Huff_Compress",
+        "client_offset": 12,
+        "server_function": "Huff_Decompress",
+        "server_offset": 12,
+        "server_guard": "NET_ProtocolUsesCompressedConnect() && NET_IsConnectRequestPacket(msg)"
+      },
+      "negative_test": "Only the connect request path may reach NET_OutOfBandData"
+    },
+    {
+      "id": "legacy_q3_authorize",
+      "commands": [
+        "getKeyAuthorize",
+        "keyAuthorize",
+        "getIpAuthorize",
+        "ipAuthorize"
+      ],
+      "sender_helpers": [
+        "NET_OutOfBandPrint"
+      ],
+      "compression": "none",
+      "profile_state": "uses_legacy_q3_authorize is false for NETPROFILE_QL_RETAIL",
+      "negative_test": "The retail profile must keep legacy authorize disabled and raw if explicitly enabled by another profile"
+    }
+  ],
+  "negative_assertions": [
+    {
+      "id": "oob_primitives_bypass_huffman",
+      "assertion": "MSG_WriteBits and MSG_ReadBits contain raw OOB branches and only use Huffman helpers in the non-OOB branch"
+    },
+    {
+      "id": "oob_text_bypasses_huffman",
+      "assertion": "NET_OutOfBandPrint writes four 0xff bytes, formats at offset 4, and sends without Huff_Compress"
+    },
+    {
+      "id": "oob_binary_bypasses_huffman",
+      "assertion": "NET_OutOfBandRaw writes four 0xff bytes, copies raw payload at offset 4, and sends without Huff_Compress"
+    },
+    {
+      "id": "steam_challenge_bypasses_compressed_connect",
+      "assertion": "CL_SendChallengeRequest uses NET_OutOfBandRaw for the Steam getchallenge payload and NET_OutOfBandPrint for fallback"
+    },
+    {
+      "id": "compressed_connect_is_guarded",
+      "assertion": "SV_ConnectionlessPacket only calls Huff_Decompress(msg, 12) after NET_IsConnectRequestPacket identifies the clear connect token"
+    }
+  ],
+  "golden_vectors": [
+    {
+      "id": "oob_primitive_little_endian",
+      "bytes_hex": "12 56 34 ef cd ab 89",
+      "read_sequence": [
+        {"bits": 8, "value_hex": "0x12"},
+        {"bits": 16, "value_hex": "0x3456"},
+        {"bits": 32, "value_hex": "0x89abcdef"}
+      ],
+      "huffman_expected": false
+    },
+    {
+      "id": "raw_getinfo_text",
+      "datagram_prefix_hex": "ff ff ff ff 67 65 74 69 6e 66 6f 20 39 31",
+      "command": "getinfo 91",
+      "sender": "NET_OutOfBandPrint",
+      "huffman_expected": false
+    },
+    {
+      "id": "steam_getchallenge_raw_prefix",
+      "datagram_prefix_hex": "ff ff ff ff 67 65 74 63 68 61 6c 6c 65 6e 67 65 20",
+      "command": "getchallenge",
+      "clear_bytes_after_sentinel": "getchallenge ",
+      "sender": "NET_OutOfBandRaw",
+      "huffman_expected": false
+    },
+    {
+      "id": "compressed_connect_clear_window",
+      "datagram_prefix_hex": "ff ff ff ff 63 6f 6e 6e 65 63 74 20",
+      "command": "connect",
+      "clear_bytes_after_sentinel": "connect ",
+      "compressed_remainder_offset": 12,
+      "sender": "NET_OutOfBandData",
+      "huffman_expected": true
+    }
+  ],
+  "retail_anchors": [
+    {
+      "symbol": "MSG_WriteBits",
+      "address": "0x004D4AF0",
+      "observed": "OOB branch writes direct 8/16/32-bit values; Huffman helpers are in the non-OOB branch."
+    },
+    {
+      "symbol": "MSG_ReadBits",
+      "address": "0x004D4C70",
+      "observed": "OOB branch reads direct 8/16/32-bit values; Huffman helpers are in the non-OOB branch."
+    },
+    {
+      "symbol": "MSG_BeginReadingOOB",
+      "address": "0x004D4A80",
+      "observed": "Resets read counters and sets the OOB flag."
+    },
+    {
+      "symbol": "MSG_InitOOB",
+      "address": "0x004D6C50",
+      "observed": "Initializes msg_t storage and sets the OOB flag."
+    },
+    {
+      "symbol": "Huff_Decompress",
+      "address": "0x004D3E60",
+      "observed": "Retail connectionless server path calls this with offset 0x0c only for connect packets."
+    },
+    {
+      "symbol": "Huff_Compress",
+      "address": "0x004D40F0",
+      "observed": "Retail NET_OutOfBandData calls this with offset 0x0c."
+    },
+    {
+      "symbol": "CL_CheckForResend",
+      "address": "0x004B9150",
+      "observed": "Connect request path reaches NET_OutOfBandData; Steam getchallenge path sends a raw OOB buffer."
+    },
+    {
+      "symbol": "NET_OutOfBandPrint",
+      "address": "0x004D7080",
+      "observed": "Writes four 0xff bytes and sends raw formatted bytes."
+    },
+    {
+      "symbol": "NET_OutOfBandData",
+      "address": "0x004D7120",
+      "observed": "Writes four 0xff bytes, copies payload, compresses from offset 0x0c, then sends."
+    },
+    {
+      "symbol": "SV_ConnectionlessPacket",
+      "address": "0x004E4340",
+      "observed": "Checks for the clear connect token at offset 4 and calls Huff_Decompress with offset 0x0c before tokenizing."
+    }
+  ],
+  "completion_status": {
+    "implementation_plan_entry": "Audit OOB/connect/auth behavior and confirm whether any retail path applies compression beyond raw OOB primitives",
+    "status": "completed_static_matrix_and_negative_assertions",
+    "completed_on": "2026-06-05",
+    "runtime_launch_required": false,
+    "source_patch_required": false,
+    "focused_task_parity_before_percent": 62,
+    "focused_task_parity_after_percent": 90,
+    "overall_network_protocol_parity_before_percent": 84,
+    "overall_network_protocol_parity_after_percent": 85,
+    "remaining_gaps": [
+      "No committed retail packet capture is available for byte-for-byte compressed connect comparison.",
+      "Live Steam platform auth remains a documented online-service divergence unless QL_BUILD_ONLINE_SERVICES is enabled."
+    ]
+  },
+  "assertion_tests": [
+    "tests/test_netcode_parity_manifest.py::test_networking_2_oob_connect_auth_matrix_and_negative_compression_contract"
+  ]
+}

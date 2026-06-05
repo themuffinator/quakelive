@@ -33,6 +33,9 @@
 				"0",
 				"+set",
 				"ui_browserAwesomium",
+				"1",
+				"+set",
+				"qlr_requireAwesomium",
 				"1"
 			],
 			"cwd": "${workspaceFolder}\\build\\win32\\Debug\\bin",

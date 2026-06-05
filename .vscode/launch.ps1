@@ -221,7 +221,8 @@ $arguments = @(
 
 if ($EnableAwesomium) {
 	$arguments += @(
-		'+set', 'ui_browserAwesomium', '1'
+		'+set', 'ui_browserAwesomium', '1',
+		'+set', 'qlr_requireAwesomium', '1'
 	)
 } else {
 	$arguments += @(

@@ -564,7 +564,7 @@
     {
       "id": "oob_connect_auth",
       "priority": "medium",
-      "status": "mapped",
+      "status": "completed_by_network_oob_connect_auth_parity_2026_06_05",
       "source_files": [
         "src/code/qcommon/msg.c",
         "src/code/qcommon/net_chan.c",
@@ -619,14 +619,14 @@
       ],
       "observed_facts": [
         "MSG_InitOOB and MSG_BeginReadingOOB set msg->oob and raw OOB scalar reads/writes bypass the adaptive Huffman bitstream.",
-        "Compressed connect remains a profile-gated exception candidate and is already exposed through NET_ProtocolUsesCompressedConnect().",
-        "Steam-era auth challenge payloads are policy-gated online-service work and must stay behind QL_BUILD_ONLINE_SERVICES."
+        "Compressed connect is the only confirmed profile-91 OOB Huffman exception: retail and source keep the clear connect token through offset 11 and compress/decompress the remainder from offset 12.",
+        "Steam-era getchallenge auth payloads use a raw binary OOB send path; live platform auth remains policy-gated behind QL_BUILD_ONLINE_SERVICES."
       ],
       "open_questions": [
-        "Add negative tests proving ordinary OOB commands are raw and not Huffman-coded.",
+        "Capture-diff compressed connect against a committed retail packet trace when one is available.",
         "Keep live Steam service use disabled by default; only document or stub open replacements unless QL_BUILD_ONLINE_SERVICES is explicitly enabled."
       ],
-      "confidence": "high for raw OOB primitives; medium for compressed-connect/auth edge cases until vectors exist"
+      "confidence": "high for raw OOB primitives and compressed-connect boundaries; medium for byte-for-byte compressed connect until retail capture exists"
     }
   ],
   "completion_status": {

@@ -22,6 +22,8 @@ NETWORKING_2_PLAYERSTATE_FIELDS_PATH = REPO_ROOT / "docs/reverse-engineering/net
 NETWORKING_2_PLAYERSTATE_FIELDS_AUDIT_PATH = REPO_ROOT / "docs/reverse-engineering/network-playerstate-fields-parity-2026-06-05.md"
 NETWORKING_2_ENTITYSTATE_FIELDS_PATH = REPO_ROOT / "docs/reverse-engineering/network-entitystate-fields-parity-2026-06-05.json"
 NETWORKING_2_ENTITYSTATE_FIELDS_AUDIT_PATH = REPO_ROOT / "docs/reverse-engineering/network-entitystate-fields-parity-2026-06-05.md"
+NETWORKING_2_OOB_CONNECT_AUTH_PATH = REPO_ROOT / "docs/reverse-engineering/network-oob-connect-auth-parity-2026-06-05.json"
+NETWORKING_2_OOB_CONNECT_AUTH_AUDIT_PATH = REPO_ROOT / "docs/reverse-engineering/network-oob-connect-auth-parity-2026-06-05.md"
 NETWORKING_2_PLAN_PATH = REPO_ROOT / "docs/plans/2026-06-05-networking-2.md"
 QCOMMON_H_PATH = REPO_ROOT / "src/code/qcommon/qcommon.h"
 Q_SHARED_PATH = REPO_ROOT / "src/code/game/q_shared.h"
@@ -94,6 +96,10 @@ def _networking_2_playerstate_fields_spec() -> dict:
 
 def _networking_2_entitystate_fields_spec() -> dict:
 	return json.loads(_read(NETWORKING_2_ENTITYSTATE_FIELDS_PATH))
+
+
+def _networking_2_oob_connect_auth_spec() -> dict:
+	return json.loads(_read(NETWORKING_2_OOB_CONNECT_AUTH_PATH))
 
 
 def _ql_reliable_xor(data: bytes, start: int, initial_key: int, command_bytes: bytes) -> bytes:
@@ -4293,6 +4299,290 @@ def test_networking_2_header_transport_spec_freezes_protocol_gates_and_headers()
 	assert "Freeze **protocol gates and packet headers**" in plan
 	assert "network-protocol-header-transport-spec-2026-06-05.json" in plan
 	assert "completed_static_spec_and_assertions" in plan
+
+
+def test_networking_2_oob_connect_auth_matrix_and_negative_compression_contract() -> None:
+	spec = _networking_2_oob_connect_auth_spec()
+	ledger = _networking_2_ledger()
+	msg_c = _read(MSG_C_PATH)
+	huffman_c = _read(HUFFMAN_C_PATH)
+	common_c = _read(COMMON_C_PATH)
+	net_chan = _read(NET_CHAN_PATH)
+	cl_main = _read(CL_MAIN_PATH)
+	sv_main = _read(SV_MAIN_PATH)
+	hlil_part04 = _read(HLIL_PART04_PATH)
+	hlil_part05 = _read(HLIL_PART05_PATH)
+	audit_note = _read(NETWORKING_2_OOB_CONNECT_AUTH_AUDIT_PATH)
+	plan = _read(NETWORKING_2_PLAN_PATH)
+
+	assert spec["schema_version"] == 1
+	assert spec["last_updated"] == "2026-06-05"
+	assert spec["depends_on"] == [
+		"docs/reverse-engineering/network-protocol-parity-ledger-2026-06-05.json",
+		"docs/reverse-engineering/network-protocol-header-transport-spec-2026-06-05.json",
+	]
+	assert spec["owning_retail_binary"]["path"] == "assets/quakelive/quakelive_steam.exe"
+
+	profile = spec["active_profile"]
+	assert profile["profile"] == "NETPROFILE_QL_RETAIL"
+	assert profile["connect_protocol"] == 91
+	assert profile["uses_compressed_connect"] is True
+	assert profile["uses_legacy_q3_authorize"] is False
+	assert profile["requires_platform_auth"] is False
+	assert "QL_BUILD_ONLINE_SERVICES" in profile["supports_platform_auth"]
+
+	matrix = {item["id"]: item for item in spec["compatibility_matrix"]}
+	assert set(matrix) == {
+		"generic_oob_text_commands",
+		"steam_auth_getchallenge_binary",
+		"compressed_connect_request",
+		"legacy_q3_authorize",
+	}
+	assert matrix["generic_oob_text_commands"]["compression"] == "none"
+	assert "getinfo" in matrix["generic_oob_text_commands"]["commands"]
+	assert "statusResponse" in matrix["generic_oob_text_commands"]["commands"]
+	assert matrix["steam_auth_getchallenge_binary"]["sender_helpers"] == [
+		"CL_BuildSteamChallengeRequest",
+		"NET_OutOfBandRaw",
+	]
+	assert matrix["steam_auth_getchallenge_binary"]["compression"] == "none"
+	connect = matrix["compressed_connect_request"]
+	assert connect["clear_window"] == {
+		"sentinel_offset": 0,
+		"command_offset": 4,
+		"clear_token": "connect",
+		"clear_delimiter_offset": 11,
+		"compressed_remainder_offset": 12,
+	}
+	assert connect["compression"]["client_offset"] == 12
+	assert connect["compression"]["server_offset"] == 12
+	assert connect["compression"]["server_guard"] == "NET_ProtocolUsesCompressedConnect() && NET_IsConnectRequestPacket(msg)"
+	assert matrix["legacy_q3_authorize"]["profile_state"] == "uses_legacy_q3_authorize is false for NETPROFILE_QL_RETAIL"
+
+	assert spec["oob_scalar_primitives"]["huffman_used"] is False
+	vectors = {vector["id"]: vector for vector in spec["golden_vectors"]}
+	assert vectors["oob_primitive_little_endian"]["read_sequence"] == [
+		{"bits": 8, "value_hex": "0x12"},
+		{"bits": 16, "value_hex": "0x3456"},
+		{"bits": 32, "value_hex": "0x89abcdef"},
+	]
+	assert vectors["raw_getinfo_text"]["huffman_expected"] is False
+	assert vectors["steam_getchallenge_raw_prefix"]["clear_bytes_after_sentinel"] == "getchallenge "
+	assert vectors["compressed_connect_clear_window"]["compressed_remainder_offset"] == 12
+	assert vectors["compressed_connect_clear_window"]["huffman_expected"] is True
+
+	init_oob = _function_block(msg_c, "void MSG_InitOOB( msg_t *buf, byte *data, int length )")
+	begin_oob = _function_block(msg_c, "void MSG_BeginReadingOOB( msg_t *msg )")
+	bitstream = _function_block(msg_c, "void MSG_Bitstream( msg_t *buf )")
+	assert "buf->oob = qtrue;" in init_oob
+	assert "msg->oob = qtrue;" in begin_oob
+	assert "buf->oob = qfalse;" in bitstream
+
+	write_bits = _function_block(msg_c, "void MSG_WriteBits( msg_t *msg, int value, int bits )")
+	write_oob = write_bits.split("if (msg->oob) {", 1)[1].split("\n\t} else {", 1)[0]
+	write_bitstream = write_bits.split("\n\t} else {", 1)[1]
+	for expected in (
+		"msg->data[msg->cursize] = value;",
+		"*sp = LittleShort(value);",
+		"*ip = LittleLong(value);",
+	):
+		assert expected in write_oob
+	assert "Huff_" not in write_oob
+	assert "Huff_putBit" in write_bitstream
+	assert "Huff_offsetTransmit" in write_bitstream
+
+	read_bits = _function_block(msg_c, "int MSG_ReadBits( msg_t *msg, int bits )")
+	read_oob = read_bits.split("if (msg->oob) {", 1)[1].split("\n\t} else {", 1)[0]
+	read_bitstream = read_bits.split("\n\t} else {", 1)[1]
+	for expected in (
+		"value = msg->data[msg->readcount];",
+		"value = LittleShort(*sp);",
+		"value = LittleLong(*ip);",
+	):
+		assert expected in read_oob
+	assert "Huff_" not in read_oob
+	assert "Huff_getBit" in read_bitstream
+	assert "Huff_offsetReceive" in read_bitstream
+
+	huff_compress = _function_block(huffman_c, "void Huff_Compress(msg_t *mbuf, int offset)")
+	huff_decompress = _function_block(huffman_c, "void Huff_Decompress(msg_t *mbuf, int offset)")
+	assert "size = mbuf->cursize - offset;" in huff_compress
+	assert "mbuf->cursize = (bloc>>3) + offset;" in huff_compress
+	assert "size = mbuf->cursize - offset;" in huff_decompress
+	assert "mbuf->cursize = cch + offset;" in huff_decompress
+
+	profile_block = common_c.split("static const netprofile_desc_t s_netProtocolProfile = {", 1)[1].split("\n};", 1)[0]
+	_assert_order(
+		profile_block,
+		"NETPROFILE_QL_RETAIL,",
+		"\"getchallenge\",",
+		"\"connect\",",
+		"\"getKeyAuthorize\",",
+		"\"ipAuthorize\",",
+		"qtrue,",
+		"qfalse,",
+		"NET_PROFILE_SUPPORTS_PLATFORM_AUTH,",
+	)
+	assert "return NET_GetProtocolProfile()->usesCompressedConnect;" in _function_block(
+		common_c, "qboolean NET_ProtocolUsesCompressedConnect( void )"
+	)
+	assert "return NET_GetProtocolProfile()->usesLegacyQ3Authorize;" in _function_block(
+		common_c, "qboolean NET_ProtocolUsesLegacyAuthorize( void )"
+	)
+
+	connect_detector = common_c.split("qboolean NET_IsConnectRequestPacket( const msg_t *msg )", 1)[1].split(
+		"NET_ProtocolUsesClientQport", 1
+	)[0]
+	_assert_order(
+		connect_detector,
+		"payload = (const char *)msg->data + 4;",
+		"if ( Q_strncmp( payload, command, commandLength ) ) {",
+		"delimiter = payload[commandLength];",
+		"delimiter == '\\0' || delimiter == ' ' || delimiter == '\"' || delimiter == '\\n' || delimiter == '\\r'",
+	)
+
+	oob_print = _function_block(net_chan, "void QDECL NET_OutOfBandPrint( netsrc_t sock, netadr_t adr, const char *format, ... )")
+	oob_raw = _function_block(net_chan, "void NET_OutOfBandRaw( netsrc_t sock, netadr_t adr, const byte *data, int len )")
+	oob_data = _function_block(net_chan, "void QDECL NET_OutOfBandData( netsrc_t sock, netadr_t adr, byte *format, int len )")
+	for raw_block in (oob_print, oob_raw):
+		assert "Huff_Compress" not in raw_block
+		assert "NET_SendPacket" in raw_block
+	_assert_order(
+		oob_print,
+		"string[0] = -1;",
+		"vsprintf( string+4, format, argptr );",
+		"NET_SendPacket( sock, strlen( string ), string, adr );",
+	)
+	_assert_order(
+		oob_raw,
+		"string[0] = 0xff;",
+		"Com_Memcpy( string + 4, data, len );",
+		"NET_SendPacket( sock, len + 4, string, adr );",
+	)
+	_assert_order(
+		oob_data,
+		"string[0] = 0xff;",
+		"string[i+4] = format[i];",
+		"mbuf.cursize = len+4;",
+		"Huff_Compress( &mbuf, 12);",
+		"NET_SendPacket( sock, mbuf.cursize, mbuf.data, adr );",
+	)
+
+	build_challenge = _function_block(cl_main, "static qboolean CL_BuildSteamChallengeRequest( byte *data, int dataSize, int *dataLength )")
+	send_challenge = _function_block(cl_main, "static void CL_SendChallengeRequest( void )")
+	check_resend = _function_block(cl_main, "void CL_CheckForResend( void ) {")
+	_assert_order(
+		build_challenge,
+		"if ( !NET_ProtocolSupportsPlatformAuth() ) {",
+		"command = NET_GetChallengeRequestCommand();",
+		"data[commandLength] = ' ';",
+		"CL_WriteSteamChallengeWord( data + commandLength + 1, steamIdLow );",
+		"CL_WriteSteamChallengeWord( data + commandLength + 5, steamIdHigh );",
+		"Com_Memcpy( data + commandLength + 9, ticket, ticketLength );",
+	)
+	_assert_order(
+		send_challenge,
+		"if ( CL_BuildSteamChallengeRequest( data, sizeof( data ), &dataLength ) ) {",
+		"NET_OutOfBandRaw( NS_CLIENT, clc.serverAddress, data, dataLength );",
+		"NET_OutOfBandPrint( NS_CLIENT, clc.serverAddress, \"%s\", NET_GetChallengeRequestCommand() );",
+	)
+	assert "NET_OutOfBandData" not in send_challenge
+	_assert_order(
+		check_resend,
+		"CL_SendChallengeRequest();",
+		"Com_sprintf( data, sizeof( data ), \"%s \\\"%s\\\"\", NET_GetConnectRequestCommand(), info );",
+		"if ( NET_ProtocolUsesCompressedConnect() ) {",
+		"NET_OutOfBandData( NS_CLIENT, clc.serverAddress, (byte *)data, dataLength );",
+		"NET_OutOfBandPrint( NS_CLIENT, clc.serverAddress, \"%s\", data );",
+	)
+
+	connectionless = _function_block(sv_main, "void SV_ConnectionlessPacket( netadr_t from, msg_t *msg )")
+	_assert_order(
+		connectionless,
+		"MSG_BeginReadingOOB( msg );",
+		"MSG_ReadLong( msg );",
+		"if ( NET_ProtocolUsesCompressedConnect() && NET_IsConnectRequestPacket( msg ) ) {",
+		"Huff_Decompress(msg, 12);",
+		"s = MSG_ReadStringLine( msg );",
+		"if ( NET_IsGetStatusRequest( c ) ) {",
+		"} else if ( NET_IsGetChallengeRequest( c ) ) {",
+		"} else if ( NET_IsConnectRequest( c ) ) {",
+	)
+
+	write_bits_hlil = hlil_part04.split("004d4af0    int32_t* sub_4d4af0", 1)[1].split("004d4c70", 1)[0]
+	read_bits_hlil = hlil_part04.split("004d4c70    uint32_t sub_4d4c70", 1)[1].split("004d4dc0", 1)[0]
+	_assert_order(
+		write_bits_hlil,
+		"if (arg1[1] != 0)",
+		"*(arg1[2] + eax_4) = arg2.w",
+		"*(arg1[2] + arg1[4]) = arg2",
+		"arg1[2][arg1[4]] = arg2.b",
+		"sub_4d3790(ebx_1.b & 1, arg1[2], &arg1[6])",
+		"sub_4d3e20(&data_123c5f8, zx.d(ebx_1.b), arg1[2], &arg1[6])",
+	)
+	_assert_order(
+		read_bits_hlil,
+		"if (*(esi + 4) == 0)",
+		"sub_4d37d0(*(esi + 8), esi + 0x18)",
+		"sub_4d3b80(data_124361c, &arg1, *(esi + 8), esi + 0x18)",
+		"else if (__saved_ebx_1 == 8)",
+		"uint32_t result_1 = zx.d(*(*(esi + 8) + ecx))",
+		"else if (__saved_ebx_1 != 0x10)",
+		"uint32_t result_3 = *(ecx_3 + *(esi + 8))",
+	)
+	oob_data_hlil = hlil_part04.split("004d7120    int32_t sub_4d7120", 1)[1].split("004d7248", 1)[0]
+	_assert_order(
+		oob_data_hlil,
+		"int32_t var_10008 = 0xffffffff",
+		"memcpy(&var_10004, arg7, arg8)",
+		"int32_t eax_3 = sub_4d40f0(&var_10024, 0xc)",
+		"eax_3 = sub_4ee460(arg8 + 4, var_1001c, arg2)",
+	)
+	check_resend_hlil = hlil_part04.split("004b9150    int32_t sub_4b9150", 1)[1].split("004b942f", 1)[0]
+	assert '__builtin_strncpy(dest: &var_408, src: "connect ", n: 9)' in check_resend_hlil
+	assert "sub_4d7120(0, edx_3" in check_resend_hlil
+	assert '__builtin_strncpy(dest: &var_9804, src: "getchallenge ", n: 0xd)' in check_resend_hlil
+	assert "eax_1 = sub_4d6fd0(0, eax_13 + 0x19, &var_9808" in check_resend_hlil
+	connectionless_hlil = hlil_part05.split("004e4340    int32_t sub_4e4340", 1)[1].split("004e4500", 1)[0]
+	_assert_order(
+		connectionless_hlil,
+		"sub_4d4a80(arg9)",
+		"sub_4d5020(arg9)",
+		"if (sub_4d9020(\"connect\", *(arg9 + 8) + 4, 7) == 0)",
+		"sub_4d3e60(arg9, 0xc)",
+		"sub_4d5100(arg9)",
+		"if (sub_4d9060(eax_5, \"getchallenge\") == 0)",
+		"if (sub_4d9060(eax_5, \"connect\") == 0)",
+	)
+
+	anchors = {item["symbol"]: item for item in spec["retail_anchors"]}
+	assert anchors["MSG_WriteBits"]["address"] == "0x004D4AF0"
+	assert anchors["MSG_ReadBits"]["address"] == "0x004D4C70"
+	assert anchors["Huff_Compress"]["address"] == "0x004D40F0"
+	assert anchors["Huff_Decompress"]["address"] == "0x004D3E60"
+	assert anchors["NET_OutOfBandData"]["address"] == "0x004D7120"
+	assert anchors["SV_ConnectionlessPacket"]["address"] == "0x004E4340"
+
+	focus = {area["id"]: area for area in ledger["focus_areas"]}
+	assert focus["oob_connect_auth"]["status"] == "completed_by_network_oob_connect_auth_parity_2026_06_05"
+	assert "Compressed connect is the only confirmed profile-91 OOB Huffman exception" in focus["oob_connect_auth"]["observed_facts"][1]
+	assert "Capture-diff compressed connect" in focus["oob_connect_auth"]["open_questions"][0]
+
+	assert spec["completion_status"]["status"] == "completed_static_matrix_and_negative_assertions"
+	assert spec["completion_status"]["source_patch_required"] is False
+	assert spec["completion_status"]["focused_task_parity_before_percent"] == 62
+	assert spec["completion_status"]["focused_task_parity_after_percent"] == 90
+	assert spec["completion_status"]["overall_network_protocol_parity_before_percent"] == 84
+	assert spec["completion_status"]["overall_network_protocol_parity_after_percent"] == 85
+	assert "tests/test_netcode_parity_manifest.py::test_networking_2_oob_connect_auth_matrix_and_negative_compression_contract" in spec["assertion_tests"]
+
+	assert "Network OOB Connect/Auth Parity" in audit_note
+	assert "profile-91 Huffman exception" in audit_note
+	assert "Steam auth `getchallenge` payload" in audit_note
+	assert "Focused OOB/connect/auth slice: `62%` before, `90%` after" in audit_note
+	assert "Audit **OOB/connect/auth** behavior" in plan
+	assert "network-oob-connect-auth-parity-2026-06-05.json" in plan
+	assert "focused OOB/connect/auth slice" in plan
 
 
 def test_networking_2_client_message_parser_grammar_and_sideband_byte() -> None:

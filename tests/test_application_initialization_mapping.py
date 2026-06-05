@@ -279,6 +279,9 @@ def test_policy_adjusted_common_client_server_wiring_matches_mapped_retail_chain
 		cl_cgame, "void CL_WebHost_BootstrapAwesomiumMenu( void )"
 	)
 	assert "#if !QL_PLATFORM_HAS_ONLINE_SERVICES" in bootstrap
+	assert "CL_AwesomiumValidateRequiredRuntime();" in bootstrap
+	assert 'Cvar_VariableIntegerValue( "qlr_requireAwesomium" )' in cl_cgame
+	assert "Com_Error( ERR_FATAL," in cl_cgame
 	assert "return;" in bootstrap
 	assert "CL_AwesomiumRuntimeActive();" in bootstrap
 	assert "QLWebHost_OpenURL( CL_WEB_DEFAULT_URL )" in bootstrap

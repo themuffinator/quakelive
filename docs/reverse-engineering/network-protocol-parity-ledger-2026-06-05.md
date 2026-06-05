@@ -57,7 +57,7 @@ The JSON ledger now covers these focus areas:
 | `playerStateFields` | Mapped | `MSG_WriteDeltaPlayerstate` `0x004D5D50`, `MSG_ReadDeltaPlayerstate` `0x004D66C0` | `q_shared.h`, `msg.c`, `sv_snapshot.c`, `cl_parse.c` |
 | `entityStateFields` | Gap found | `MSG_WriteDeltaEntity` `0x004D5780`, `MSG_ReadDeltaEntity` `0x004D5AC0` | `q_shared.h`, `msg.c`, `sv_snapshot.c`, `cl_parse.c` |
 | Client message parser | Mapped with external conflict | `CL_WritePacket` `0x004B5F70`, `SV_ExecuteClientMessage` `0x004E05C0` | `cl_input.c`, `sv_client.c`, `qcommon.h` |
-| OOB/connect/auth | Mapped | `MSG_WriteBits` `0x004D4AF0`, `MSG_ReadBits` `0x004D4C70`, `MSG_InitOOB` `0x004D6C50`, `NET_OutOfBandPrint` `0x004D7080`, `NET_OutOfBandData` `0x004D7120` | `msg.c`, `net_chan.c`, `cl_main.c`, `sv_main.c`, `sv_client.c` |
+| OOB/connect/auth | Completed by OOB matrix | `MSG_WriteBits` `0x004D4AF0`, `MSG_ReadBits` `0x004D4C70`, `MSG_InitOOB` `0x004D6C50`, `NET_OutOfBandPrint` `0x004D7080`, `NET_OutOfBandData` `0x004D7120` | `msg.c`, `net_chan.c`, `cl_main.c`, `sv_main.c`, `sv_client.c` |
 
 ## Observed Facts
 
@@ -104,9 +104,12 @@ OOB behavior:
 
 - `MSG_InitOOB` and OOB scalar read/write paths remain raw byte-oriented
   message primitives, not adaptive-Huffman bitstream primitives.
-- Compressed connect remains a profile-gated exception candidate.
-- Steam-era live auth behavior stays subject to the repository policy: keep it
-  behind `QL_BUILD_ONLINE_SERVICES`, default disabled.
+- Compressed connect is now confirmed as the narrow profile-91 OOB Huffman
+  exception: retail and source keep `connect ` clear through offset `11` and
+  compress/decompress from offset `12`.
+- Steam-era `getchallenge` auth payloads use a raw binary OOB send path. Live
+  auth behavior stays subject to the repository policy: keep it behind
+  `QL_BUILD_ONLINE_SERVICES`, default disabled.
 
 ## New Gaps And Conflicts
 
@@ -141,8 +144,8 @@ Focused networking-ledger task:
 - After: **100%** for the ledger deliverable itself, with follow-up
   implementation gaps explicitly carried forward.
 
-Strict gameplay wire behavior was not changed by this pass. Repo-wide parity
-remains **98%**. The focused semantic field-table lane is now better bounded:
-playerstate field-count confidence rises, while entity field-table parity is
-reclassified from assumed/high to known-incomplete until the missing six retail
-entries are reconstructed.
+Strict gameplay wire behavior was not changed by the original ledger pass.
+Repo-wide parity remains **98%**. Later June 5 passes have since closed the
+playerstate table, entitystate table, parser-sideband, XOR, usercmd, and
+OOB/connect-auth evidence gaps tracked by this ledger while leaving capture
+replay and live-service policy work as separate follow-ups.

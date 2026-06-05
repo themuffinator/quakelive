@@ -1641,6 +1641,7 @@ def test_awesomium_launch_task_builds_with_in_process_overlay_provider() -> None
     assert args[args.index("-Targets") + 1] == "Splines;botlib;cgame;game;renderer;ui;qagamex86;cgamex86;quakelive_steam"
     assert "preLaunchTask" not in awesomium_launch
     assert awesomium_launch["args"][awesomium_launch["args"].index("ui_browserAwesomium") + 1] == "1"
+    assert awesomium_launch["args"][awesomium_launch["args"].index("qlr_requireAwesomium") + 1] == "1"
     assert awesomium_launch["env"]["QL_DISABLE_EXTERNAL_ECOSYSTEMS"] == "0"
     assert awesomium_launch["env"]["QL_DISABLE_AWESOMIUM"] == "0"
     assert "ql_build_settings.txt" in build_script
@@ -1659,6 +1660,7 @@ def test_awesomium_launch_task_builds_with_in_process_overlay_provider() -> None
     assert "function Sync-AwesomiumRuntime" in launch_script
     assert "ql_build_settings.txt" in launch_script
     assert "Assert-AwesomiumEnabledBuild -RuntimeBinDir $runtimeBinDir" in launch_script
+    assert "'+set', 'qlr_requireAwesomium', '1'" in launch_script
     assert "'awesomium.dll'" in launch_script
     assert "'web.pak'" in launch_script
     assert "Sync-AwesomiumRuntime -SourceRoot $steamBasePath -DestinationRoot $runtimeBinDir" in launch_script

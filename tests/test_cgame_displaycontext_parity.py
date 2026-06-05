@@ -15531,6 +15531,8 @@ def test_cgame_browser_runtime_state_and_simple_script_wrappers_restore_retail_o
 	assert "return Menu_GetMatchingItemByNumber( (menuDef_t *)overlay, index, name );" in get_matching_block
 	assert "return Menu_FindItemByName( (menuDef_t *)overlay, name );" in find_widget_block
 	assert "Item_RunScript( (itemDef_t *)widget, script );" not in run_script_block
+	assert "#define CG_UI_SCRIPT_BUFFER_SIZE 2048" in newdraw_source
+	assert "buffer[CG_UI_SCRIPT_BUFFER_SIZE]" in run_script_block
 	assert "static const cgBrowserScriptCommand_t browserScriptCommands[] = {" in run_script_block
 	assert "ARRAY_LEN( browserScriptCommands )" in run_script_block
 	assert "browserScriptCommands[i].handler( widget, &p );" in run_script_block

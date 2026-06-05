@@ -6052,6 +6052,37 @@ static qboolean CL_AwesomiumRuntimeActive( void ) {
 
 /*
 =============
+CL_AwesomiumRuntimeRequired
+
+Reports whether this launch profile requires the retail Awesomium menu lane.
+This keeps stale offline Debug binaries from silently degrading into main.menu.
+=============
+*/
+static qboolean CL_AwesomiumRuntimeRequired( void ) {
+	return Cvar_VariableIntegerValue( "qlr_requireAwesomium" ) != 0;
+}
+
+/*
+=============
+CL_AwesomiumValidateRequiredRuntime
+
+Turns an explicit Awesomium launch into a clear build/runtime policy failure
+instead of the disconnected native UI fallback path.
+=============
+*/
+static void CL_AwesomiumValidateRequiredRuntime( void ) {
+	if ( !CL_AwesomiumRuntimeRequired() || CL_AwesomiumRuntimeActive() ) {
+		return;
+	}
+
+	Com_Error( ERR_FATAL,
+		"Awesomium launch requested, but this binary cannot start the Awesomium WebUI. "
+		"Rebuild with QL_BUILD_ONLINE_SERVICES=1 (default Build or Build Debug Awesomium) "
+		"and ensure QL_DISABLE_AWESOMIUM/QL_DISABLE_EXTERNAL_ECOSYSTEMS are not set." );
+}
+
+/*
+=============
 CL_BrowserHostServiceAvailable
 
 Returns qtrue when either the compatibility overlay bridge or the explicit
@@ -7067,6 +7098,8 @@ before the startup command buffer can request screenshots or browser commands.
 =============
 */
 void CL_WebHost_BootstrapAwesomiumMenu( void ) {
+	CL_AwesomiumValidateRequiredRuntime();
+
 #if !QL_PLATFORM_HAS_ONLINE_SERVICES
 	return;
 #else

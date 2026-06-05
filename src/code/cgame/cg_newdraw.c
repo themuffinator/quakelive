@@ -158,6 +158,7 @@ static void *CG_ClearBrowserFocus( void *overlay );
 #define CG_RACE_CHECKPOINT_HEIGHT 48.0f
 #define CG_SPECTATOR_TRACK_TIMEOUT 5000
 
+#define CG_UI_SCRIPT_BUFFER_SIZE 2048
 #define CG_STARTING_WEAPON_ICON_COUNT 14
 #define CG_SCORE_FORFEIT -999
 #define CG_SERVER_SETTINGS_LINE_HEIGHT 12.0f
@@ -12747,7 +12748,7 @@ Runs one retail browser widget script through the cgame-owned script-command tab
 =============
 */
 static void CG_RunBrowserScript( void *widget, const char *script ) {
-	char			buffer[UI_SCRIPT_BUFFER_SIZE];
+	char			buffer[CG_UI_SCRIPT_BUFFER_SIZE];
 	char			*p;
 	const char		*command;
 	int			i;
