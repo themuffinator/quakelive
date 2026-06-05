@@ -417,7 +417,7 @@ static qboolean SV_VerifyClientSteamAuth( int clientNum ) {
 	}
 
 	cl = &svs.clients[clientNum];
-	if ( NET_IsLocalAddress( cl->netchan.remoteAddress ) ) {
+	if ( Sys_IsLANAddress( cl->netchan.remoteAddress ) ) {
 		return qtrue;
 	}
 
@@ -432,7 +432,7 @@ static qboolean SV_VerifyClientSteamAuth( int clientNum ) {
 	cl = &svs.clients[clientNum];
 
 	if ( !cl->platformAuthToken[0] ) {
-		if ( NET_IsLocalAddress( cl->netchan.remoteAddress ) ) {
+		if ( Sys_IsLANAddress( cl->netchan.remoteAddress ) ) {
 			cl->platformAuthSucceeded = qtrue;
 			return qtrue;
 		}

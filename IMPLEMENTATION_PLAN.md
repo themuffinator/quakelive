@@ -47,6 +47,25 @@ disabled, until a documented open replacement path exists.
 
 ## Active work
 
+### Task A221: Allow retail LAN clients through server auth fallback [COMPLETED]
+Priority: High
+Primary areas: `src/code/server/sv_game.c`, `src/code/server/sv_client.c`,
+`tests/test_platform_services.py`
+Parity estimate: **before 92% -> after 100%** for the focused retail-client
+LAN dedicated-server auth slice. Repo-wide parity remains **99%** because this
+closes a narrow policy mismatch without changing the broader default-disabled
+online-service boundary.
+
+Completed work:
+
+1. Aligned the qagame-facing `trap_VerifySteamAuth` fallback with the existing
+   `Sys_IsLANAddress` challenge fast path so retail clients on a private LAN no
+   longer fail with `Failed to verify Steam auth token`.
+2. Kept LAN joins out of the live Steam GameServer auth-session bootstrap even
+   if userinfo happens to carry an auth token.
+3. Updated platform-service coverage so the LAN fallback and auth-session skip
+   remain pinned.
+
 ### Task A220: Wire WebUI server browser native Steam list owner [COMPLETED]
 Priority: High
 Primary areas: `src/code/client/cl_main.c`, `tests/test_platform_services.py`,

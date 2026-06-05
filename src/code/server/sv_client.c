@@ -1535,7 +1535,7 @@ static const char *SV_BeginPlatformAuthSession( client_t *cl, const netadr_t *ad
 	CSteamID		steamId;
 	const char		*message;
 
-	if ( !cl || !cl->platformAuthToken[0] || NET_IsLocalAddress( cl->netchan.remoteAddress ) ) {
+	if ( !cl || !cl->platformAuthToken[0] || Sys_IsLANAddress( cl->netchan.remoteAddress ) ) {
 		return NULL;
 	}
 

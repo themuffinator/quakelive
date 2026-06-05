@@ -4152,18 +4152,18 @@ def test_native_import_dispatch_normalizes_qboolean_contracts() -> None:
     assert "SV_AdjustAreaPortalState( VMA(1), args[2] ? qtrue : qfalse );" in game_block
 
 
-def test_loopback_steam_auth_verify_falls_back_for_local_clients() -> None:
+def test_lan_steam_auth_verify_falls_back_for_local_clients() -> None:
     sv_game = (REPO_ROOT / "src/code/server/sv_game.c").read_text(encoding="utf-8")
     verify_block = _extract_function_block(sv_game, "static qboolean SV_VerifyClientSteamAuth( int clientNum )")
     platform_auth_section = verify_block.split("#else", 1)[1]
 
     assert "#if !SV_HAS_PLATFORM_AUTH" in verify_block
     assert "cl = &svs.clients[clientNum];" in verify_block
-    assert "if ( NET_IsLocalAddress( cl->netchan.remoteAddress ) ) {" in verify_block
+    assert "if ( Sys_IsLANAddress( cl->netchan.remoteAddress ) ) {" in verify_block
     assert "return qtrue;" in verify_block
 
     assert "if ( !cl->platformAuthToken[0] ) {" in verify_block
-    assert "if ( NET_IsLocalAddress( cl->netchan.remoteAddress ) ) {" in verify_block
+    assert "if ( Sys_IsLANAddress( cl->netchan.remoteAddress ) ) {" in verify_block
     assert "cl->platformAuthSucceeded = qtrue;" in verify_block
     assert "return qtrue;" in verify_block
     assert "if ( cl->platformAuthPending ) {" in verify_block
@@ -4192,6 +4192,7 @@ def test_server_auth_lifecycle_trace_documents_pending_to_callback_contract() ->
     assert "cl->platformAuthSessionActive = qtrue;" in begin_auth_block
     assert "cl->platformAuthPending = qtrue;" in begin_auth_block
     assert "cl->platformAuthSucceeded = qfalse;" in begin_auth_block
+    assert "Sys_IsLANAddress( cl->netchan.remoteAddress )" in begin_auth_block
     assert 'SV_SetPlatformAuthUserinfo( cl, "pending", "retry", "" );' in begin_auth_block
     assert "SV_SteamStats_CreatePlayerSession( cl );" in begin_auth_block
     assert "SV_FinalisePlatformAuthState( cl, qtrue" not in begin_auth_block
