@@ -597,7 +597,7 @@ void SV_BotInitBotLib(void) {
 
 	//debug lines
 	botlib_import.DebugLineCreate = BotImport_DebugLineCreate;
-	botlib_import.DebugLineDelete = BotImport_DebugLineDelete;
+	botlib_import.DebugLineDelete = BotImport_DebugPolygonDelete;
 	botlib_import.DebugLineShow = BotImport_DebugLineShow;
 
 	//debug polygons

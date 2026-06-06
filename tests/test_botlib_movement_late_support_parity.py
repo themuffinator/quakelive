@@ -71,7 +71,7 @@ def _read(path: Path) -> str:
 
 
 def _aliases() -> dict[str, str]:
-	return json.loads(_read(SYMBOL_ALIASES))["quakelive_steam"]
+	return json.loads(_read(SYMBOL_ALIASES))["quakelive_steam_srp"]
 
 
 def _extract_function_block(source: str, signature: str, *, use_last: bool = False) -> str:

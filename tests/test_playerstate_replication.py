@@ -721,8 +721,8 @@ def test_playerstate_delta_codec_is_backed_by_committed_retail_mapping_evidence(
 	aliases = json.loads(ALIASES_PATH.read_text(encoding="utf-8"))
 	mapping_round = MAPPING_ROUND_57.read_text(encoding="utf-8")
 
-	assert aliases["quakelive_steam"]["sub_4D5D50"] == "MSG_WriteDeltaPlayerstate"
-	assert aliases["quakelive_steam"]["sub_4D66C0"] == "MSG_ReadDeltaPlayerstate"
+	assert aliases["quakelive_steam_srp"]["sub_4D5D50"] == "MSG_WriteDeltaPlayerstate"
+	assert aliases["quakelive_steam_srp"]["sub_4D66C0"] == "MSG_ReadDeltaPlayerstate"
 
 	for expected in (
 		"`sub_4D5D50 -> MSG_WriteDeltaPlayerstate`",
@@ -892,7 +892,7 @@ def test_cgame_snapshot_import_exposes_client_snapshot_playerstate_to_prediction
 
 
 def test_snapshot_playerstate_transport_is_backed_by_committed_retail_mapping_evidence() -> None:
-	aliases = json.loads(ALIASES_PATH.read_text(encoding="utf-8"))["quakelive_steam"]
+	aliases = json.loads(ALIASES_PATH.read_text(encoding="utf-8"))["quakelive_steam_srp"]
 	round_17 = MAPPING_ROUND_17.read_text(encoding="utf-8")
 	round_65 = MAPPING_ROUND_65.read_text(encoding="utf-8")
 	round_127 = MAPPING_ROUND_127.read_text(encoding="utf-8")

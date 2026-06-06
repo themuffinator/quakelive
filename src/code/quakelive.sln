@@ -10,7 +10,7 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "cgame", "cgame\cgame.vcxpro
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "game", "game\game.vcxproj", "{F9EE10DA-2404-4154-B904-F93C936C040A}"
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "quakelive_steam", "quakelive_steam.vcxproj", "{81CB51C4-B434-4E12-B69B-BAEE102F2852}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "quakelive_steam_srp", "quakelive_steam.vcxproj", "{81CB51C4-B434-4E12-B69B-BAEE102F2852}"
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "awesomium_process", "awesomium_process.vcxproj", "{C7006958-AB86-451D-BAAD-73F4B5DFBBD5}"
 EndProject

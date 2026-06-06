@@ -47,6 +47,1129 @@ disabled, until a documented open replacement path exists.
 
 ## Active work
 
+### Task A334: Pin qagame ai_team modal order and leader dispatcher wiring [COMPLETED]
+Priority: High
+Primary areas: `references/analysis/quakelive_symbol_aliases.json`,
+`tests/test_botlib_qagame_ai_team_modal_order_parity.py`,
+`docs/reverse-engineering/botlib-qagame-ai-team-modal-order-mapping-2026-06-06.md`
+Parity estimate: **before 0% -> after 100%** for focused qagame
+`ai_team.c` Obelisk/Harvester/leader/BotTeamAI alias coverage, **before 88%
+-> after 98%** for focused source-owned modal team-order reconstruction
+confidence, **before 94% -> after 98%** for focused
+leader/chat/EA/import-wiring confidence, and overall botlib plus qagame AI
+wiring confidence **98.3% -> 98.6%**.
+
+Completed work:
+
+1. Promoted both `FUN_...` and `sub_...` aliases for `BotObeliskOrders`,
+   `BotHarvesterOrders`, `FindHumanTeamLeader`, and `BotTeamAI` at
+   `0x10029df0..0x1002aef0`.
+2. Cross-checked the checked-in source against HLIL evidence for
+   defend/attack/harvest order splits, passive/aggressive caps, human leader
+   discovery, `whoisteamleader` / `iamteamleader` chat, `startleader` voice
+   emission, and the gametype-specific order dispatcher cadence.
+3. Added a parity regression covering aliases, Ghidra function inventory,
+   symbol-map signatures/comments, source anchors, Binary Ninja HLIL
+   entry/flow anchors, Ghidra top-function anchors, and the
+   configstring/AAS/chat/EA import bridge used by this band.
+4. Documented that the source reconstruction already matches this retail slice,
+   so no C source edits were required in this round.
+
+### Task A333: Pin ZMQ idZMQ host lifecycle and source wiring [COMPLETED]
+Priority: High
+Primary areas: `docs/reverse-engineering/quakelive_steam_mapping_round_420.md`,
+`tests/test_platform_services.py`,
+`src/code/server/sv_zmq.c`
+Parity estimate: **before 76% -> after 95%** for focused `idZMQ` host
+lifecycle/publication/RCON wiring confidence, **before 94.1% -> after 94.2%**
+for ZMQ-related source reconstruction confidence, and overall Quake Live
+source parity **55.83% -> 55.84%**.
+
+Completed work:
+
+1. Rechecked the older retail `idZMQ` host aliases from Rounds 94 through 97
+   against current HLIL, function inventory, and the source reconstruction.
+2. Re-pinned the server-facing match-report/player-event wrappers, retained
+   object methods, thin global wrappers, RCON broadcast/pump helpers, shutdown
+   split, and peer-table ownership helpers.
+3. Tied the retail wrapper and string evidence back to the current
+   `sv_zmq.c`, `sv_init.c`, `sv_main.c`, `sv_game.c`, and `common.c` call
+   sites without changing C source behavior.
+4. Documented the CZMQ/libzmq inference boundary: retail uses embedded helper
+   bands, while this repository keeps Quake Live's server integration source
+   and dynamically resolves public `zmq_*` symbols for opted-in live transport.
+
+### Task A332: Pin qagame ai_team one-flag order and team dispatcher wiring [COMPLETED]
+Priority: High
+Primary areas: `references/analysis/quakelive_symbol_aliases.json`,
+`tests/test_botlib_qagame_ai_team_oneflag_order_parity.py`,
+`docs/reverse-engineering/botlib-qagame-ai-team-oneflag-order-mapping-2026-06-06.md`
+Parity estimate: **before 0% -> after 100%** for focused qagame
+`ai_team.c` dispatcher/group/1FCTF alias coverage, **before 87% -> after
+97%** for focused source-owned one-flag and team-order reconstruction
+confidence, **before 94% -> after 98%** for focused
+Cvar/configstring/chat/EA import-wiring confidence, and overall botlib plus
+qagame AI wiring confidence **98.0% -> 98.3%**.
+
+Completed work:
+
+1. Promoted both `FUN_...` and `sub_...` aliases for `BotCTFOrders`,
+   `BotCreateGroup`, `BotTeamOrders`, the four `Bot1FCTFOrders_*` helpers, and
+   `Bot1FCTFOrders` at `0x10027750..0x10029d90`.
+2. Cross-checked the checked-in source against HLIL evidence for the CTF
+   flag-status dispatcher, group leader follow commands, cached
+   `sv_maxclients` team enumeration, 1FCTF percentage splits, return/getflag
+   voice order quirks, and `neutralflagstatus` dispatch.
+3. Added a parity regression covering aliases, Ghidra function inventory,
+   symbol-map signatures/comments, source anchors, Binary Ninja HLIL
+   entry/flow anchors, Ghidra top-function anchors, `BotTeamAI` gametype
+   dispatch, and the Cvar/configstring/chat/EA import bridge used by the band.
+4. Documented that the source reconstruction already matches this retail slice,
+   so no C source edits were required in this round.
+
+### Task A331: Pin ZMQ option switch source-constant wiring [COMPLETED]
+Priority: High
+Primary areas: `docs/reverse-engineering/quakelive_steam_mapping_round_419.md`,
+`tests/test_platform_services.py`,
+`src/code/server/sv_zmq.c`
+Parity estimate: **before 68% -> after 93%** for focused ZMQ
+option-switch/source-constant linkage confidence, **before 94.0% -> after
+94.1%** for ZMQ-related source reconstruction confidence, and overall Quake
+Live source parity **55.82% -> 55.83%**.
+
+Completed work:
+
+1. Rechecked the retail `options_t::setsockopt` / `options_t::getsockopt`
+   switch tables at `0x40E0E0` and `0x40E690` against the committed HLIL.
+2. Pinned the option range, jump/lookup-table shapes, `EINVAL` rejection path,
+   and the entries for ROUTER mandatory delivery (`0x21`), PLAIN server mode
+   (`0x2c`), and ZAP domain strings (`0x37`).
+3. Tied those retail option ids to the reconstructed `QL_ZMQ_*` constants used
+   by the server-owned RCON and stats socket setup in `src/code/server/sv_zmq.c`.
+4. Added a focused regression so future ZMQ edits cannot drift the source
+   constants away from the retail option switch evidence.
+
+### Task A330: Classify ZMQ dependency ownership boundary [COMPLETED]
+Priority: High
+Primary areas: `docs/reverse-engineering/zmq-dependency-ownership-2026-06-06.md`,
+`tests/test_platform_services.py`,
+`README.md`
+Parity estimate: **before 61% -> after 92%** for focused ZMQ dependency
+ownership confidence, **before 94.0% -> after 94.0%** for ZMQ-related source
+reconstruction confidence, and overall Quake Live source parity **55.82% ->
+55.82%**.
+
+Completed work:
+
+1. Investigated whether writable source contains actual libzmq implementation
+   code or only the Quake Live server-owned `idZMQ` integration.
+2. Confirmed the only ZMQ-named source file under `src/code/` is
+   `src/code/server/sv_zmq.c`, and that it dynamically resolves external
+   libzmq symbols for opted-in online-service builds.
+3. Documented the conclusion that no dependency should be installed under
+   `src/libs/` in this pass and no `sv_zmq.c` code should be cut from
+   `src/code/`.
+4. Added a regression guard against accidentally treating `src/code` as a
+   vendored libzmq implementation space.
+
+### Task A329: Pin qagame ai_team CTF order and botlib wiring [COMPLETED]
+Priority: High
+Primary areas: `references/analysis/quakelive_symbol_aliases.json`,
+`tests/test_botlib_qagame_ai_team_ctf_order_parity.py`,
+`docs/reverse-engineering/botlib-qagame-ai-team-ctf-order-mapping-2026-06-06.md`
+Parity estimate: **before 0% -> after 100%** for focused qagame
+`ai_team.c` CTF order-band alias coverage, **before 88% -> after 97%** for
+focused source-owned team-order reconstruction confidence, **before 94% ->
+after 98%** for focused AAS/chat/EA import-wiring confidence, and overall
+botlib plus qagame AI wiring confidence **97.6% -> 98.0%**.
+
+Completed work:
+
+1. Promoted both `FUN_...` and `sub_...` aliases for the retail teammate
+   counting, base travel-time sorting, CTF task-preference, team-order chat,
+   voice-chat, and first four CTF order helpers at `0x10025390..0x10026f20`.
+2. Cross-checked the source reconstruction against HLIL evidence for
+   `sv_maxclients` caching, player configstring walks, AAS travel-time calls,
+   task-preference name validation, defender/roamer/attacker partitioning,
+   `vsay`/`vtell` and `vosay`/`votell` EA formatting, and the `BotCTFOrders`
+   dispatcher edges.
+3. Added a parity regression covering aliases, Ghidra function sizes,
+   symbol-map signatures/comments, source anchors, Binary Ninja HLIL
+   entry/flow anchors, Ghidra decompiler anchors, and the game/server import
+   bridge for the AAS, chat, and EA calls used by the slice.
+4. Documented `FUN_100269d0` as a medium-high confidence mapping because HLIL
+   reports unresolved stack usage, while the surrounding dispatcher,
+   command-string, sort/preference, and symbol-map evidence still strongly
+   support `BotCTFOrders_EnemyFlagNotAtBase`.
+
+### Task A328: Pin ZMQ clock and thread runtime wiring [COMPLETED]
+Priority: High
+Primary areas: `references/analysis/quakelive_symbol_aliases.json`,
+`tests/test_platform_services.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_418.md`
+Parity estimate: **before 48% -> after 93%** for focused ZMQ clock/thread
+runtime wiring confidence, **before 93.8% -> after 94.0%** for ZMQ-related
+source reconstruction confidence, and overall Quake Live source parity
+**55.81% -> 55.82%**.
+
+Completed work:
+
+1. Rechecked the cached millisecond clock helper, Windows tick-count fallback,
+   thread trampoline, start wrapper, stop wrapper, and fallback lock atexit
+   cleanup against HLIL around `0x40B950..0x40BB30` and `0x52A9E0..0x52B070`.
+2. Added aliases for the address-backed clock/thread helpers that connect
+   `socket_base_t` timeout loops, `select_t`, `io_thread_t`, and `reaper_t` to
+   the retail runtime scaffolding.
+3. Documented the `GetTickCount64` resolver/fallback path while leaving
+   `sub_40B950` as supporting evidence because it is not exposed as a normal
+   Ghidra inventory row.
+4. Added a parity regression covering alias rows, clock cache anchors, thread
+   assertion anchors, select/io-thread/reaper callsites, and static initializer
+   evidence for the fallback tick-count lock.
+
+### Task A327: Pin qagame ai_main lifecycle and training helper wiring [COMPLETED]
+Priority: High
+Primary areas: `references/analysis/quakelive_symbol_aliases.json`,
+`tests/test_botlib_qagame_ai_main_lifecycle_training_parity.py`,
+`docs/reverse-engineering/botlib-qagame-ai-main-lifecycle-training-mapping-2026-06-06.md`
+Parity estimate: **before 8% -> after 100%** for focused qagame
+`ai_main.c` lifecycle and training-helper alias coverage, **before 92% ->
+after 98%** for focused source-owned lifecycle reconstruction confidence,
+**before 58% -> after 87%** for focused retail-only training/dynamic-skill
+helper mapping confidence, and overall botlib plus qagame AI execution wiring
+confidence **97.1% -> 97.6%**.
+
+Completed work:
+
+1. Promoted both `FUN_...` and `sub_...` aliases for the source-owned
+   `BotTestAAS`, interbreed, team-leader, view-angle, input translation,
+   per-bot think, scheduling, session, setup, shutdown, reset, map-load,
+   botlib setup, and botlib shutdown rows.
+2. Promoted mapped training and tutorial helper aliases for
+   `BotEntityBoundsGap`, `BotSetIdealViewAnglesToPoint`,
+   `BotSetTrainingBotState`, `BotAppendDynamicSkillSample`,
+   `BotUpdateDynamicSkill`, `BotApplyBeyondRealityTravelFlags`, local/bot
+   client selectors, training cvar helpers, and the training-state tail.
+3. Added a parity regression covering aliases, Ghidra row sizes, symbol-map
+   signatures/comments, reconstructed source anchors, Binary Ninja HLIL
+   entry/flow anchors, Ghidra decompiler anchors for the larger retail-only
+   helpers, and the botlib lifecycle, EA, chat, move, goal, weapon, entity,
+   and user-command import wiring used by the slice.
+4. Documented the source-reconstruction boundary for the retail-only
+   dynamic-skill island, where names and call sites are now pinned but exact
+   C reconstruction remains open.
+
+### Task A326: Pin ZMQ own_t owned pointer-set lifecycle wiring [COMPLETED]
+Priority: High
+Primary areas: `references/analysis/quakelive_symbol_aliases.json`,
+`tests/test_platform_services.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_417.md`
+Parity estimate: **before 42% -> after 94%** for focused ZMQ `own_t`
+owned pointer-set lifecycle confidence, **before 93.6% -> after 93.8%** for
+ZMQ-related source reconstruction confidence, and overall Quake Live source
+parity **55.80% -> 55.81%**.
+
+Completed work:
+
+1. Rechecked `own_t` construction, destruction, `process_own`,
+   `process_term_req`, and `process_term` against HLIL around
+   `0x40F050..0x40FAE0`.
+2. Added aliases for the pointer-node create/find/predecessor/rightmost,
+   subtree free, right-rotation, range-erase, and full-tree clear helpers that
+   back the `owned` child set.
+3. Preserved the Round 148 shared pointer-set insert/erase/rebalance aliases
+   while tying the remaining helper surface to the observed `own.cpp`
+   lifecycle flow.
+4. Documented the reconstructed container-level source shape and the inference
+   boundary for the inline command opcode `0xB` termination send sequence.
+
+### Task A325: Pin ZMQ object default command and poll-event assertion wiring [COMPLETED]
+Priority: High
+Primary areas: `references/analysis/quakelive_symbol_aliases.json`,
+`tests/test_platform_services.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_416.md`
+Parity estimate: **before 35% -> after 96%** for focused ZMQ object-command
+default callback surface confidence, **before 93.4% -> after 93.6%** for
+ZMQ-related source reconstruction confidence, and overall Quake Live source
+parity **55.79% -> 55.80%**.
+
+Completed work:
+
+1. Rechecked `object_t`, `io_thread_t`, and `reaper_t` default callback slots
+   against HLIL around `0x40CF60..0x40DF00`.
+2. Added aliases for io-thread/reaper `out_event` and `timer_event` assertion
+   callbacks with their source-file-specific assertion anchors.
+3. Added aliases for all 16 base `object_t::process_*` fail-fast command
+   handlers, matching the `zmq_command_t_process` opcode dispatch table and
+   existing command send helpers.
+4. Documented the reconstructed command vtable surface and the inference
+   boundary for the `process_attach` slot.
+
+### Task A324: Pin qagame DMQ3 deathmatch setup and ai_main wrapper wiring [COMPLETED]
+Priority: High
+Primary areas: `references/analysis/quakelive_symbol_aliases.json`,
+`references/symbol-maps/qagame.json`,
+`tests/test_botlib_qagame_ai_dmq3_deathmatch_setup_parity.py`,
+`docs/reverse-engineering/botlib-qagame-ai-dmq3-deathmatch-setup-mapping-2026-06-06.md`
+Parity estimate: **before 0% -> after 100%** for focused qagame
+deathmatch/setup and adjacent ai_main alias coverage, **before 91% -> after
+98%** for focused source-owned deathmatch/setup/wrapper parity confidence,
+**before 45% -> after 82%** for focused retail-only tutorial helper mapping
+confidence, and overall botlib plus qagame AI execution wiring confidence
+**96.7% -> 97.1%**.
+
+Completed work:
+
+1. Promoted both `FUN_...` and `sub_...` aliases for the source-owned
+   `BotDeathmatchAI`, `BotSetEntityNumForGoal`, `BotSetupDeathmatchAI`,
+   `BotAI_Print`, `BotAI_Trace`, `BotAI_GetClientState`,
+   `BotClientHasNoTargetFlag`, `BotAI_GetEntityState`, and
+   `BotAI_BotInitialChat` rows.
+2. Promoted mapped-only retail helper aliases for `BotSelectTormentTarget`,
+   `BotResolveTourPoint`, `BotAcceptOffscreenEnemyCandidate`, and
+   `BotCanSpawnTourPoint`, without claiming source reconstruction for those
+   retail-only bodies.
+3. Corrected the `BotSetEntityNumForGoal` symbol-map comment to document the
+   retail-preserved classname guard that skips exact classname matches and
+   falls through for absent or non-matching classnames.
+4. Added a parity regression covering aliases, Ghidra row sizes, symbol-map
+   signatures/comments, source-body anchors, Binary Ninja HLIL entry/flow
+   anchors, and the cvar, userinfo, trace, AAS/BSP, EA command, chat, stack
+   dump, and level-item botlib wiring used by the slice.
+
+### Task A323: Pin ZMQ socket-base endpoint and pending compact-map wiring [COMPLETED]
+Priority: High
+Primary areas: `references/analysis/quakelive_symbol_aliases.json`,
+`tests/test_platform_services.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_415.md`
+Parity estimate: **before 44% -> after 90%** for focused ZMQ socket-base
+endpoint and pending compact-map helper wiring, **before 93.2% -> after
+93.4%** for ZMQ-related source reconstruction confidence, and overall Quake
+Live source parity **55.78% -> 55.79%**.
+
+Completed work:
+
+1. Rechecked `socket_base_t::bind`, `socket_base_t::connect`, and
+   `socket_base_t::term_endpoint` against HLIL around `0x408D90..0x40B360`.
+2. Added aliases for the shared `socket_base_t::add_endpoint` helper and the
+   compact endpoint/pending node creation, subtree cleanup, iterator, range
+   erase, and rotation helpers.
+3. Preserved the older ctx and socket-base map aliases while distinguishing the
+   socket-base compact layouts by their `0x30/0x31` endpoint and `0x2C/0x2D`
+   pending node sentinel offsets.
+4. Documented the inferred source reconstruction shape for endpoint registration
+   and unresolved inproc pending-connection storage.
+
+### Task A322: Pin qagame DMQ3 activate-goal, obstacle, snapshot, and alternate-route wiring [COMPLETED]
+Priority: High
+Primary areas: `references/analysis/quakelive_symbol_aliases.json`,
+`tests/test_botlib_qagame_ai_dmq3_activate_obstacle_parity.py`,
+`docs/reverse-engineering/botlib-qagame-ai-dmq3-activate-obstacle-mapping-2026-06-06.md`
+Parity estimate: **before 80% -> after 100%** for focused qagame
+`ai_dmq3.c` activate/obstacle/alternate-route alias coverage, **before 92% ->
+after 98%** for focused source-owned activate/obstacle/event parity confidence,
+**before 91% -> after 98%** for focused botlib activation, route, movement,
+avoid, and chat import wiring confidence, and overall botlib plus qagame AI
+execution wiring confidence **96.0% -> 96.7%**.
+
+Completed work:
+
+1. Promoted the remaining retail qagame `FUN_...` and `sub_...` names for
+   `BotCheckConsoleMessages`, `BotAlternateRoute`,
+   `BotGetAlternateRouteGoal`, and `BotSetupAlternativeRouteGoals`.
+2. Added a parity regression covering the contiguous
+   `0x1001BCD0..0x1001EE30` qagame band from activate-goal builders through
+   alternate-route setup.
+3. Pinned the source bodies against Binary Ninja HLIL entries and flow anchors,
+   Ghidra function sizes, symbol-map signatures, and representative botlib AAS,
+   chat, movement, avoid, and alternate-route import wiring.
+4. Documented the observed facts, inferred subsystem role, import wiring, and
+   remaining confidence limits in the reverse-engineering notes.
+
+### Task A321: Pin ZMQ ctx endpoint and pending tree helper wiring [COMPLETED]
+Priority: High
+Primary areas: `references/analysis/quakelive_symbol_aliases.json`,
+`tests/test_platform_services.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_414.md`
+Parity estimate: **before 46% -> after 91%** for focused ZMQ ctx endpoint and
+pending tree helper wiring, **before 93.0% -> after 93.2%** for ZMQ-related
+source reconstruction confidence, and overall Quake Live source parity
+**55.77% -> 55.78%**.
+
+Completed work:
+
+1. Rechecked the ctx endpoint and pending inproc connection map helper band
+   against HLIL around `0x404380..0x406820`.
+2. Added aliases for endpoint-tree find, get-or-insert, lower-bound,
+   insertion, subtree cleanup, iterator, and rotation helpers.
+3. Added aliases for pending-connection tree copy, creation, insertion,
+   iterator, subtree cleanup, and rotation helpers, preserving the retail
+   `0x280/0x281` pending-node layout distinction from endpoint nodes.
+4. Re-pinned the `options_t` address-mask vector copy/destruction helpers
+   reached by the ctx endpoint payload copy path.
+
+### Task A320: Pin ZMQ ctx runtime and inproc handoff wiring [COMPLETED]
+Priority: High
+Primary areas: `references/analysis/quakelive_symbol_aliases.json`,
+`tests/test_platform_services.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_413.md`
+Parity estimate: **before 36% -> after 93%** for focused ZMQ ctx runtime and
+inproc-pending wiring, **before 92.8% -> after 93.0%** for ZMQ-related source
+reconstruction confidence, and overall Quake Live source parity
+**55.76% -> 55.77%**.
+
+Completed work:
+
+1. Rechecked the ctx runtime helper band around `0x403120..0x404010`
+   against socket destruction, I/O-thread selection, endpoint map cleanup, and
+   inproc pending-connection call sites.
+2. Added aliases for socket destruction, I/O-thread selection, endpoint-record
+   destruction, options destruction, endpoint bulk-unregistration, and
+   pending-connection delivery.
+3. Corrected two stale compiler-noise aliases: `sub_4038B0` is the
+   `options_t` copy constructor, and `sub_403BB0` is the ctx pending inproc
+   connection helper rather than an STL locale helper.
+
+### Task A319: Pin qagame DMQ3 aim, attack, and map-script bridge [COMPLETED]
+Priority: High
+Primary areas: `src/code/game/ai_dmq3.c`,
+`references/analysis/quakelive_symbol_aliases.json`,
+`tests/test_botlib_qagame_ai_dmq3_aim_attack_parity.py`,
+`docs/reverse-engineering/botlib-qagame-ai-dmq3-aim-attack-mapping-2026-06-06.md`
+Parity estimate: **before 0% -> after 96%** for focused qagame
+`ai_dmq3.c` aim/attack alias coverage, **before 88% -> after 97%** for
+focused source-owned aim/attack/map-script parity confidence, **before 92% ->
+after 97%** for fire-control and prediction import wiring confidence, and
+overall botlib plus adjacent qagame AI execution wiring **95% -> 96%**.
+
+Completed work:
+
+1. Mapped the retail `qagamex86.dll` `0x10019E00..0x1001BBE0`
+   `ai_dmq3.c` bridge from `BotAimAtEnemy` through `BotModelMinsMaxs`.
+2. Promoted both `FUN_...` and `sub_...` aliases for the aim controller,
+   attack gate, map-script helper, movedir helper, and model-bounds helper.
+3. Reconstructed the retail `BotMapScripts` fallback branch from
+   `mpq3tourney6` to `beyondreality`, matching HLIL and symbol-map evidence.
+4. Added a parity gate covering aliases, Ghidra row sizes, symbol-map
+   signatures, source-body anchors, Binary Ninja HLIL entry/flow anchors, and
+   the predictive movement, weapon-info, visible-position, characteristic, EA
+   attack, and EA view botlib wiring used by the slice.
+
+### Task A318: Pin ZMQ ctx constructor and endpoint-map wiring [COMPLETED]
+Priority: High
+Primary areas: `references/analysis/quakelive_symbol_aliases.json`,
+`tests/test_platform_services.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_412.md`
+Parity estimate: **before 41% -> after 94%** for focused ZMQ ctx constructor,
+endpoint-map, and map-cleanup wiring, **before 92.5% -> after 92.8%** for ZMQ-related
+source reconstruction confidence, and overall Quake Live source parity
+**55.75% -> 55.76%**.
+
+Completed work:
+
+1. Rechecked the `ctx_t` constructor body against the public `zmq_ctx_new`
+   wrapper, ctx magic constants, mailbox setup, map sentinels, mutex
+   initialization, and default option writes.
+2. Added aliases for the ctx constructor, endpoint registration/removal/lookup,
+   endpoint/pending-connection map constructor-unwind destructors, and the
+   endpoint/pending range-erase helpers.
+3. Added a static parity guard tying the constructor and cleanup aliases to
+   `ctx.cpp` strings, the existing ctx destructor, Ghidra rows, endpoint map
+   errno behavior, map sentinel sizes, and command-mailbox teardown evidence.
+
+### Task A317: Pin qagame DMQ3 roaming, visibility, and carrier helpers [COMPLETED]
+Priority: High
+Primary areas: `references/analysis/quakelive_symbol_aliases.json`,
+`tests/test_botlib_qagame_ai_dmq3_visibility_parity.py`,
+`docs/reverse-engineering/botlib-qagame-ai-dmq3-visibility-mapping-2026-06-06.md`
+Parity estimate: **before 0% -> after 95%** for focused qagame
+`ai_dmq3.c` visibility-band alias coverage, **before 90% -> after 97%**
+for focused source-owned visibility-band parity confidence, **before 91% ->
+after 96%** for movement/visibility import wiring confidence, and overall
+botlib plus adjacent qagame AI execution wiring **94% -> 95%**.
+
+Completed work:
+
+1. Mapped the retail `qagamex86.dll` `0x10017D20..0x10019D30`
+   `ai_dmq3.c` slice from `BotRoamGoal` through
+   `BotEnemyCubeCarrierVisible`.
+2. Promoted both `FUN_...` and `sub_...` aliases for the roam,
+   attack-movement, same-team, field-of-view, entity-visibility,
+   enemy-acquisition, flag-carrier, and cube-carrier helper rows.
+3. Added a parity gate covering aliases, Ghidra row sizes, symbol-map
+   signatures, source-body anchors, Binary Ninja HLIL entry/flow anchors, and
+   the AAS contents, characteristic, move-to-goal, and move-in-direction botlib
+   import wiring used by the slice.
+
+### Task A316: Pin ZMQ Windows err.cpp helper wiring [COMPLETED]
+Priority: High
+Primary areas: `references/analysis/quakelive_symbol_aliases.json`,
+`tests/test_platform_services.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_411.md`
+Parity estimate: **before 34% -> after 91%** for focused ZMQ Windows
+`err.cpp` helper wiring, **before 92.4% -> after 92.5%** for ZMQ-related
+source reconstruction confidence, and overall Quake Live source parity
+**55.74% -> 55.75%**.
+
+Completed work:
+
+1. Rechecked the early ZMQ Windows `err.cpp` helper band against HLIL bodies,
+   Ghidra function rows, imports, and source-file string anchors.
+2. Added aliases for the fatal abort helper, WSA last-error string dispatch,
+   Win32 `FormatMessageA` formatter, and Winsock-to-errno mapper.
+3. Added a static parity guard tying the helpers to public `zmq_poll`,
+   stream-engine send/recv handling, TCP listener setup, and retained
+   `err.cpp` assertion lines.
+
+### Task A315: Pin ZMQ select fd-vector and pollout reset wiring [COMPLETED]
+Priority: High
+Primary areas: `references/analysis/quakelive_symbol_aliases.json`,
+`tests/test_platform_services.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_410.md`
+Parity estimate: **before 38% -> after 92%** for focused ZMQ select-poller
+fd-vector and pollout reset wiring, **before 92.3% -> after 92.4%** for
+ZMQ-related source reconstruction confidence, and overall Quake Live source
+parity **55.73% -> 55.74%**.
+
+Completed work:
+
+1. Rechecked the deferred `select_t` fd-entry vector helper slab left by
+   Round 370 against `select.cpp` HLIL, Ghidra rows, and the select vtable/
+   source-file anchors.
+2. Added aliases for the stream-engine-facing pollout reset helper and the
+   fd-entry vector grow/reserve/allocate/copy helpers.
+3. Added a static parity guard tying the aliases to add/remove fd behavior,
+   select-loop fd-set copies, retired-slot compaction, and stream-engine
+   output backpressure call sites.
+
+### Task A314: Pin qagame AI DMQ3 support-band mapping [COMPLETED]
+Priority: High
+Primary areas: `references/analysis/quakelive_symbol_aliases.json`,
+`tests/test_botlib_qagame_ai_dmq3_support_parity.py`,
+`docs/reverse-engineering/botlib-qagame-ai-dmq3-support-mapping-2026-06-06.md`,
+`src/code/game/ai_dmq3.c`, `src/code/game/g_public.h`,
+`src/code/game/g_syscalls.c`, `src/code/server/sv_game.c`,
+`src/code/server/ql_game_imports.inc`
+Parity estimate: **before 0% -> after 95%** for focused qagame `ai_dmq3.c`
+support-band alias coverage, **before 90% -> after 97%** for source-owned
+support-band parity confidence, **before 90% -> after 96%** for focused
+botlib support import wiring confidence, and overall botlib plus adjacent
+qagame AI execution wiring **93% -> 94%**.
+
+Completed work:
+
+1. Promoted the retail qagame `ai_dmq3.c` support-band identities over
+   `0x10015A40..0x10017CD0`, covering AAS point-area helpers, client-name
+   helpers, weapon and movement setup, inventory and battle-inventory updates,
+   item use, observer and hazard probes, waypoints, aggression/retreat/chase,
+   rocket-jump, persistent-powerup, camping, avoid-goal, and powerup helpers.
+2. Added a parity gate that checks alias promotion against Ghidra rows,
+   symbol-map names/signatures, Binary Ninja HLIL entry and flow anchors, and
+   direct source-body anchors for every promoted helper.
+3. Pinned the related AAS, EA, characteristic, avoid-goal, camp-spot,
+   level-item, movement-state, and weapon botlib import wiring from qagame
+   syscall constants through native Quake Live import slots and generated
+   `QL_G_trap_*` wrappers.
+
+### Task A313: Pin ZMQ io_object default callback wiring [COMPLETED]
+Priority: High
+Primary areas: `references/analysis/quakelive_symbol_aliases.json`,
+`tests/test_platform_services.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_409.md`
+Parity estimate: **before 45% -> after 94%** for focused ZMQ `io_object_t`
+default callback-surface mapping, **before 92.2% -> after 92.3%** for
+ZMQ-related source reconstruction confidence, and overall Quake Live source
+parity **55.72% -> 55.73%**.
+
+Completed work:
+
+1. Rechecked the deferred Round 377 assertion-only `io_object_t` callbacks
+   against retained `io_object.cpp` HLIL bodies and the shared
+   `i_poll_events`/`io_object_t` vtable order.
+2. Added aliases for the default `in_event`, `out_event`, and `timer_event`
+   fail-fast callback handlers.
+3. Added a static parity guard tying the names to Ghidra rows, HLIL
+   `assert(false)` bodies, and reuse by REQ/session, TCP listener, and
+   stream-engine subobject vtables.
+
+### Task A312: Pin qagame AI DMQ3 team-goal mapping [COMPLETED]
+Priority: High
+Primary areas: `references/analysis/quakelive_symbol_aliases.json`,
+`tests/test_botlib_qagame_ai_dmq3_team_goal_parity.py`,
+`docs/reverse-engineering/botlib-qagame-ai-dmq3-team-goal-mapping-2026-06-06.md`,
+`src/code/game/ai_dmq3.c`, `src/code/game/g_public.h`,
+`src/code/game/g_syscalls.c`, `src/code/server/sv_game.c`,
+`src/code/server/ql_game_imports.inc`
+Parity estimate: **before 0% -> after 95%** for focused qagame `ai_dmq3.c`
+team-goal alias coverage, **before 88% -> after 96%** for source-owned
+team-goal source parity confidence, **before 90% -> after 96%** for focused
+botlib/AAS/EA wiring into team-goal selection, and overall botlib plus adjacent
+qagame AI execution wiring **92% -> 93%**.
+
+Completed work:
+
+1. Promoted the retail qagame `ai_dmq3.c` team-goal helper identities over
+   `0x10013BE0..0x10015960`, covering team predicates, ordered-task restore,
+   refusal/status helpers, CTF/1FCTF/Obelisk/Harvester seek and retreat
+   dispatchers, and `BotTeamGoals`.
+2. Added a parity gate that checks alias promotion against Ghidra rows,
+   symbol-map names/signatures, Binary Ninja HLIL entry and cross-call anchors,
+   and direct source-body anchors for every promoted helper.
+3. Pinned the related AAS travel-time and EA action botlib import wiring from
+   qagame syscall constants through native Quake Live import slots and generated
+   `QL_G_trap_*` wrappers.
+
+### Task A311: Pin ZMQ message pipe queue tail wiring [COMPLETED]
+Priority: High
+Primary areas: `references/analysis/quakelive_symbol_aliases.json`,
+`tests/test_platform_services.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_408.md`
+Parity estimate: **before 70% -> after 94%** for focused ZMQ message pipe
+queue tail wiring, **before 92.1% -> after 92.2%** for ZMQ-related source
+reconstruction confidence, and overall Quake Live source parity
+**55.71% -> 55.72%**.
+
+Completed work:
+
+1. Rechecked the deferred `ypipe_conflate_t<msg_t,256>` final vtable callback
+   that Binary Ninja renders as `operator new[]`.
+2. Added aliases for the conflating message-pipe probe callback and the
+   non-deleting `ypipe_base_t<msg_t,256>` destructor.
+3. Added a static parity guard tying the aliases to Ghidra rows, HLIL
+   lock/probe body, vtable slot order, and analysis-symbol RTTI/vtable anchors.
+
+### Task A310: Pin ZMQ endpoint container lifecycle wiring [COMPLETED]
+Priority: High
+Primary areas: `references/analysis/quakelive_symbol_aliases.json`,
+`tests/test_platform_services.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_407.md`
+Parity estimate: **before 48% -> after 93%** for focused ZMQ endpoint
+container lifecycle wiring, **before 91.9% -> after 92.1%** for ZMQ-related
+source reconstruction confidence, and overall Quake Live source parity
+**55.70% -> 55.71%**.
+
+Completed work:
+
+1. Rechecked the deferred endpoint lifecycle helpers against socket-base
+   endpoint allocation, TCP protocol detection, concrete TCP address ownership,
+   endpoint URI rendering, and session-base destructor cleanup.
+2. Added aliases for the endpoint container constructor/destructor at
+   `sub_41AAE0` and `sub_41AB60`.
+3. Added a static parity guard tying the aliases to Ghidra rows, retained HLIL
+   constructor/destructor bodies, the `tcp` literal, renderer dispatch, and
+   session cleanup evidence.
+
+### Task A309: Pin qagame AI DMNet tutorial-tail mapping [COMPLETED]
+Priority: High
+Primary areas: `references/analysis/quakelive_symbol_aliases.json`,
+`references/symbol-maps/qagame.json`,
+`tests/test_botlib_qagame_ai_dmnet_tutorial_tail_parity.py`,
+`tests/test_ctf_oneflag_retail_parity.py`,
+`docs/reverse-engineering/botlib-qagame-ai-dmnet-tutorial-tail-mapping-2026-06-06.md`,
+`src/code/game/ai_dmq3.c`, `src/code/game/ai_main.c`,
+`src/code/game/g_cmds.c`, `src/code/game/g_public.h`,
+`src/code/game/g_syscalls.c`, `src/code/server/sv_game.c`,
+`src/code/server/ql_game_imports.inc`
+Parity estimate: **before 0% -> after 94%** for focused qagame tutorial-tail
+alias coverage, **before 85% -> after 98%** for source-owned
+`BotCTFCarryingFlag` retail predicate parity, **before 87% -> after 94%** for
+focused training/botlib movement and EA wiring confidence, and overall botlib
+plus adjacent qagame AI execution wiring **91% -> 92%**.
+
+Completed work:
+
+1. Promoted the retail-only qagame `ai_dmnet.c` tutorial-tail identities over
+   `0x1000ECC0..0x10013B00`, including teammate seeking, teammate leading,
+   torment-human, fragbait lead, instagib, `BotCTFCarryingFlag`, and `BotTeam`.
+2. Reconstructed the safe source-owned `BotCTFCarryingFlag` predicate so it
+   accepts the retail second CTF-like gametype slot, represented in current
+   source as `GT_ATTACK_DEFEND`, alongside `GT_CTF`.
+3. Added a parity gate that checks alias promotion against Ghidra rows,
+   symbol-map names/signatures, Binary Ninja HLIL entry/call anchors, Ghidra
+   decompile strings, source-owned helper bodies, training cvars, and botlib
+   movement/EA import wiring.
+4. Documented the remaining source gap: the retail tutorial node bodies require
+   a future `bot_state_t` tail-layout reconstruction before they can be compiled
+   accurately into `ai_dmnet.c`.
+
+### Task A308: Pin ZMQ TCP address endpoint parser wiring [COMPLETED]
+Priority: High
+Primary areas: `references/analysis/quakelive_symbol_aliases.json`,
+`tests/test_platform_services.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_406.md`
+Parity estimate: **before 57% -> after 91%** for focused ZMQ TCP address
+endpoint parser wiring, **before 91.7% -> after 91.9%** for ZMQ-related
+source reconstruction confidence, and overall Quake Live source parity
+**55.69% -> 55.70%**.
+
+Completed work:
+
+1. Rechecked `tcp_address.cpp` endpoint parsing against HLIL source-file
+   strings, promoted `tcp_address_t`/`tcp_address_mask_t` vtable symbols,
+   Ghidra function rows, and existing listener/connecter call-site evidence.
+2. Added 5 aliases for NIC-name resolution, default and sockaddr-backed
+   address construction, the address destructor body, and listener-side address
+   mask matching.
+3. Re-pinned existing TCP address resolve/stringify and address-mask
+   resolve/stringify aliases so listener `getsockname` reporting, accept
+   filtering, and options mask parsing remain tied to retail evidence.
+
+### Task A307: Pin qagame AI DMNet seek/battle node mapping [COMPLETED]
+Priority: High
+Primary areas: `references/analysis/quakelive_symbol_aliases.json`,
+`tests/test_botlib_qagame_ai_dmnet_battle_parity.py`,
+`docs/reverse-engineering/botlib-qagame-ai-dmnet-battle-node-mapping-2026-06-06.md`,
+`src/code/game/ai_dmnet.c`, `src/code/game/g_public.h`,
+`src/code/game/g_syscalls.c`, `src/code/server/sv_game.c`,
+`src/code/server/ql_game_imports.inc`
+Parity estimate: **before 50% -> after 96%** for focused qagame `ai_dmnet.c`
+seek/battle node alias coverage, **before 88% -> after 96%** for focused
+botlib goal-stack/movement import wiring into qagame battle flow, and overall
+botlib plus adjacent qagame AI execution wiring **90% -> 91%**.
+
+Completed work:
+
+1. Completed the qagame `ai_dmnet.c` seek/battle decision-network alias set over
+   `0x1000C6E0..0x1000E700`, filling the missing `AIEnter_*` aliases around
+   the already-promoted seek and battle node functions.
+2. Added a parity gate that checks alias promotion against Ghidra rows,
+   symbol-map names/signatures, Binary Ninja HLIL entry/call anchors,
+   reconstructed source anchors, and botlib goal-stack/movement import wiring.
+3. Documented the evidence trail and the observed qagame-to-botlib movement
+   wiring in the dedicated reverse-engineering note for this slice.
+
+### Task A306: Pin ZMQ subscription trie/mtrie wiring [COMPLETED]
+Priority: High
+Primary areas: `references/analysis/quakelive_symbol_aliases.json`,
+`tests/test_platform_services.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_405.md`
+Parity estimate: **before 40% -> after 88%** for focused ZMQ subscription
+trie/mtrie wiring, **before 91.5% -> after 91.7%** for ZMQ-related source
+reconstruction confidence, and overall Quake Live source parity
+**55.68% -> 55.69%**.
+
+Completed work:
+
+1. Rechecked XPUB/XSUB subscription-prefix ownership against HLIL call sites,
+   source-file strings, Ghidra rows, and the round-404 DIST routing aliases.
+2. Added 8 aliases covering `mtrie_t` teardown, pipe-set destruction,
+   node deletion, redundancy testing, XPUB mtrie-to-DIST matching, `trie_t`
+   teardown, trie node deletion, and trie apply/walk behavior.
+3. Re-pinned existing `mtrie_t` add/remove and `trie_t` add/remove aliases so
+   prefix insertion, recursive pruning, compressed child-range maintenance, and
+   XSUB subscription replay remain tied to retail evidence.
+
+### Task A305: Pin qagame AI DMNet goal-prelude mapping [COMPLETED]
+Priority: High
+Primary areas: `references/analysis/quakelive_symbol_aliases.json`,
+`tests/test_botlib_qagame_ai_dmnet_goal_parity.py`,
+`docs/reverse-engineering/botlib-qagame-ai-dmnet-goal-prelude-mapping-2026-06-06.md`,
+`src/code/game/ai_dmnet.c`, `src/code/game/g_public.h`,
+`src/code/game/g_syscalls.c`, `src/code/server/sv_game.c`,
+`src/code/server/ql_game_imports.inc`
+Parity estimate: **before 5% -> after 96%** for focused qagame `ai_dmnet.c`
+LTG/node prelude alias coverage, **before 86% -> after 95%** for focused
+botlib goal/movement import wiring into qagame node flow, and overall botlib
+plus adjacent qagame AI execution wiring **89% -> 90%**.
+
+Completed work:
+
+1. Promoted the qagame `ai_dmnet.c` long-term-goal and node-entry prelude over
+   `0x100083C0..0x1000C640`, including air-goal selection, nearby-goal
+   selection, LTG fallback, intermission/stand/respawn entry, path clearing,
+   activate-entity seeking, and seek-NBG entry.
+2. Added a parity gate that checks alias promotion against Ghidra rows,
+   symbol-map names/signatures, Binary Ninja HLIL entry/call anchors,
+   reconstructed source anchors, and botlib goal/movement import wiring.
+3. Documented the evidence trail and the observed qagame-to-botlib wiring in
+   the dedicated reverse-engineering note for this slice.
+
+### Task A304: Pin ZMQ FQ/LB/DIST pipe routing helper wiring [COMPLETED]
+Priority: High
+Primary areas: `references/analysis/quakelive_symbol_aliases.json`,
+`tests/test_platform_services.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_404.md`
+Parity estimate: **before 42% -> after 90%** for focused ZMQ FQ/LB/DIST
+pipe routing helper wiring, **before 91.2% -> after 91.5%** for ZMQ-related
+source reconstruction confidence, and overall Quake Live source parity
+**55.67% -> 55.68%**.
+
+Completed work:
+
+1. Rechecked `fq.cpp`, `lb.cpp`, and `dist.cpp` helper bodies against HLIL
+   entry points, source-file strings, Ghidra function rows, and existing
+   `pipe_t`/queue aliases.
+2. Added 17 aliases covering fair-queue attach/activate/terminate/probe,
+   load-balancer terminate/activate/probe, distribution attach/activate/
+   terminate/send/write, and the FQ/LB vector push helpers.
+3. Re-pinned existing `zmq_fq_t_recvpipe` and `zmq_lb_t_sendpipe` names so
+   the recovered routing layer remains tied to read/write vtable dispatch,
+   multipart state handling, flush/termination behavior, and `EAGAIN`
+   fallbacks.
+
+### Task A303: Pin qagame AI command team-order mapping [COMPLETED]
+Priority: High
+Primary areas: `references/analysis/quakelive_symbol_aliases.json`,
+`tests/test_botlib_qagame_ai_cmd_parity.py`,
+`docs/reverse-engineering/botlib-qagame-ai-cmd-team-order-mapping-2026-06-06.md`,
+`src/code/game/ai_cmd.c`, `src/code/server/sv_game.c`,
+`src/code/server/ql_game_imports.inc`
+Parity estimate: **before 0% -> after 95%** for focused qagame `ai_cmd.c`
+team-order alias coverage, **before 82% -> after 94%** for focused botlib
+match-parser wiring into qagame command handling, and overall botlib plus
+adjacent qagame AI/chat command wiring **88% -> 89%**.
+
+Completed work:
+
+1. Promoted 39 qagame team-message and team-order identities, with both
+   `FUN_...` and `sub_...` aliases, across `0x10004930..0x100080A0`.
+2. Cross-checked the slice against symbol-map names/signatures, Ghidra function
+   rows, HLIL entry/call anchors, and reconstructed `ai_cmd.c` source bodies.
+3. Added a focused parity gate for team-goal lookup, time parsing, addressed
+   message filtering, patrol waypoint parsing, team-order LTG transitions,
+   subteam/checkpoint/formation/leadership handlers, CTF status handling, and
+   the central `BotMatchMessage` dispatcher.
+4. Pinned the botlib match parser import wiring used by the command layer:
+   `BOTLIB_AI_FIND_MATCH` and `BOTLIB_AI_MATCH_VARIABLE` through game syscall
+   mapping, server import initialization, and generated qagame wrappers.
+
+### Task A302: Pin ZMQ message pipe backing queue wiring [COMPLETED]
+Priority: High
+Primary areas: `references/analysis/quakelive_symbol_aliases.json`,
+`tests/test_platform_services.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_403.md`
+Parity estimate: **before 37% -> after 89%** for focused ZMQ message pipe
+backing queue wiring, **before 90.9% -> after 91.2%** for ZMQ-related source
+reconstruction confidence, and overall Quake Live source parity
+**55.66% -> 55.67%**.
+
+Completed work:
+
+1. Rechecked `pipe.cpp` queue allocation and vtable evidence for `pipepair`,
+   `pipe_t`, normal `ypipe_t<msg_t,256>`, conflating
+   `ypipe_conflate_t<msg_t,256>`, and `yqueue<msg_t,256>`.
+2. Added 28 aliases covering conflating write/read helpers, pipe scalar and
+   array-item destructor thunks, normal and conflating message ypipe
+   constructors/destructors/callbacks, shared ypipe flush publishing, and
+   message yqueue chunk allocation/destruction/push/unpush.
+3. Re-pinned 7 existing `pipe_t` owners so the recovered queue callbacks remain
+   tied to pipepair allocation, pipe construction/destruction, read/write,
+   rollback, and hiccup queue replacement.
+
+### Task A301: Pin qagame bot chat prologue mapping [COMPLETED]
+Priority: High
+Primary areas: `references/analysis/quakelive_symbol_aliases.json`,
+`tests/test_botlib_chat_parity.py`,
+`docs/reverse-engineering/botlib-qagame-chat-prologue-mapping-2026-06-06.md`,
+`src/code/game/ai_chat.c`
+Parity estimate: **before 0% -> after 96%** for focused qagame bot
+chat/ranking prologue alias coverage, **before 90% -> after 93%** for focused
+botlib plus qagame chat wiring confidence, and overall botlib plus adjacent
+qagame AI/chat wiring **87% -> 88%**.
+
+Completed work:
+
+1. Promoted 24 qagame bot chat/ranking prologue identities, with both
+   `FUN_...` and `sub_...` aliases, across `0x10001000..0x100033F0`.
+2. Cross-checked the slice against qagame owner metadata, imports, exports,
+   symbol-map names/signatures, Ghidra function rows, HLIL entry/call anchors,
+   and the reconstructed `ai_chat.c` source bodies.
+3. Added a focused parity gate for the active-player, ranking, opponent-name,
+   map-title, weapon-name, visible-enemy, valid-chat-position, chat-handler,
+   chat-time, and chat-test source/HLIL shapes.
+
+### Task A300: Pin ZMQ socket-base default virtual/interface wiring [COMPLETED]
+Priority: High
+Primary areas: `references/analysis/quakelive_symbol_aliases.json`,
+`tests/test_platform_services.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_402.md`
+Parity estimate: **before 54% -> after 91%** for focused `socket_base_t`
+default virtual/interface wiring, **before 90.7% -> after 90.9%** for
+ZMQ-related source reconstruction confidence, and overall Quake Live source
+parity **55.65% -> 55.66%**.
+
+Completed work:
+
+1. Rechecked the shared `socket_base_t` primary vtable and the
+   `array_item_t<0>`, `i_poll_events`, and `i_pipe_events` subobject vtables
+   against the retail HLIL and Ghidra function rows.
+2. Added 17 aliases covering the socket-base scalar deleting destructor,
+   process-destroy state transition, default unsupported xsetsockopt/xsend/xrecv
+   callbacks, assert-false activation/timer callbacks, poll in-event command
+   pumping, pipe-event forwarding, pipe-terminated cleanup, and subobject
+   destructor thunks.
+3. Re-pinned 4 existing socket-base and pending-connection helpers so
+   command-pump, destroyed-flag teardown, complete destruction, and pending
+   connection erase behavior remain tied to the shared callback evidence.
+
+### Task A299: Pin ZMQ PAIR/STREAM socket-family wiring [COMPLETED]
+Priority: High
+Primary areas: `references/analysis/quakelive_symbol_aliases.json`,
+`tests/test_platform_services.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_401.md`,
+`src/code/server/sv_zmq.c`
+Parity estimate: **before 35% -> after 88%** for focused PAIR/STREAM
+socket-family wiring, **before 90.4% -> after 90.7%** for ZMQ-related source
+reconstruction confidence, and overall Quake Live source parity
+**55.64% -> 55.65%**.
+
+Completed work:
+
+1. Rechecked the Quake Live Steam libzmq factory edges for PAIR (`0`) and
+   STREAM (`11`) against HLIL, Ghidra function rows, promoted vtable symbols,
+   existing stream aliases, and the reconstructed server ZMQ service context.
+2. Added 22 aliases covering PAIR constructor/destructor, singleton-pipe
+   attach/termination, send/receive/probe callbacks, PAIR interface thunks,
+   STREAM constructor/destructor, pipe attachment, termination, write
+   activation, and STREAM interface thunks.
+3. Re-pinned 5 existing shared/STREAM aliases so identity-framed STREAM
+   send/receive/prefetch behavior remains tied to factory-call evidence,
+   source-file strings, vtable slots, and function rows.
+
+### Task A298: Pin ROQ cinematic continuation beyond botlib boundary [COMPLETED]
+Priority: High
+Primary areas: `tests/test_botlib_structure_tail_cgame_boundary_parity.py`,
+`src/code/client/cl_cin.c`,
+`references/analysis/quakelive_symbol_aliases.json`,
+`docs/reverse-engineering/botlib-roq-cinematic-continuation-boundary-mapping-2026-06-06.md`
+Parity estimate: **before 68% -> after 99%** for focused ROQ cinematic
+continuation boundary classification, **before 0% -> after 98%** for direct
+`decodeCodeBook`/`RoQInterrupt` source and HLIL coverage inside botlib
+boundary gates, and overall botlib plus adjacent client/cinematic wiring
+**86% -> 87%**.
+
+Completed work:
+
+1. Extended the botlib structure-tail/cgame-boundary gate from
+   `ROQ_GenYUVTables` through the adjacent retail
+   `0x004B1010..0x004B3510` cinematic decode/control slab.
+2. Pinned the promoted adjacent owners from `yuv_to_rgb` and
+   `decodeCodeBook` through `RoQInterrupt`, `CIN_RunCinematic`,
+   `CIN_PlayCinematic`, and `SCR_RunCinematic`.
+3. Added direct source anchors for the large ROQ codebook and interrupt
+   dispatch bodies, including sample-depth branches, VQ expansion calls,
+   streamed-read loop handling, audio decode branches, quad-info dispatch, and
+   oversized-frame guard behavior.
+4. Rechecked the continuation against committed Ghidra function rows, HLIL
+   call/constant anchors, and `cl_cin.c` source ownership.
+5. Verified that promoted aliases from the botlib support tail through this
+   full cinematic continuation now all have direct `test_botlib_*.py`
+   mentions.
+
+### Task A297: Pin ZMQ publication socket-family wiring [COMPLETED]
+Priority: High
+Primary areas: `references/analysis/quakelive_symbol_aliases.json`,
+`tests/test_platform_services.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_400.md`,
+`src/code/server/sv_zmq.c`
+Parity estimate: **before 46% -> after 89%** for focused
+PUB/SUB/PULL/PUSH and XPUB/XSUB socket-family wiring, **before 90.0% -> after
+90.4%** for ZMQ-related source reconstruction confidence, and overall Quake
+Live source parity **55.63% -> 55.64%**.
+
+Completed work:
+
+1. Rechecked the Quake Live Steam libzmq factory cases for PUB (`1`),
+   SUB (`2`), PULL (`7`), PUSH (`8`), XPUB (`9`), and XSUB (`10`) against
+   HLIL, Ghidra function rows, vtable symbols, existing aliases, and the
+   retained server stats `QL_ZMQ_PUB` source usage.
+2. Added 39 aliases covering PUB/SUB wrappers, PULL fair-queue receive,
+   PUSH load-balancer send, and the XPUB/XSUB scalar/interface destructor
+   thunks that complete their vtable coverage.
+3. Re-pinned 23 existing XPUB/XSUB and shared activation/output aliases so
+   the publication pipeline remains tied to factory-call evidence, source-file
+   strings, vtable slots, function rows, and retained stats publication code.
+
+### Task A296: Pin post-structure botlib boundary into client timing and ROQ [COMPLETED]
+Priority: High
+Primary areas: `tests/test_botlib_structure_tail_cgame_boundary_parity.py`,
+`src/code/client/cl_cgame.c`, `src/code/client/cl_cin.c`,
+`references/analysis/quakelive_symbol_aliases.json`,
+`docs/reverse-engineering/botlib-post-structure-client-cinematic-boundary-mapping-2026-06-06.md`
+Parity estimate: **before 86% -> after 99%** for focused post-structure
+botlib/client ownership-boundary classification, **before 72% -> after 99%**
+for focused cgame timing and ROQ cinematic helper coverage inside botlib
+boundary gates, and overall botlib plus adjacent parser/client wiring
+**85% -> 86%**.
+
+Completed work:
+
+1. Extended the botlib structure-tail/cgame-boundary gate past
+   `CL_GetServerCommand` into the retail `0x004B0610..0x004B0F60` slab.
+2. Pinned the promoted adjacent owners: `CL_GameCommand`,
+   `CL_CGameRendering`, `CL_AdjustServerTimeDelta`, `CL_FirstSnapshot`,
+   `CL_SetCGameTime`, `RllDecodeStereoToStereo`, `move8_32`, `blit8_32`,
+   `blitVQQuad32fs`, and `ROQ_GenYUVTables`.
+3. Explicitly bounded retail `0x004B0A50` as the source-modeled cgame native
+   import integrity guard row, not as a botlib owner or promoted alias.
+4. Rechecked source anchors in `cl_cgame.c` and `cl_cin.c` against the
+   committed Quake Live HLIL and Ghidra function rows.
+5. Verified that promoted aliases from the botlib support tail through this
+   adjacent boundary range now all have direct `test_botlib_*.py` mentions.
+
+### Task A295: Pin ZMQ REP/router socket-family wiring [COMPLETED]
+Priority: High
+Primary areas: `references/analysis/quakelive_symbol_aliases.json`,
+`tests/test_platform_services.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_399.md`,
+`src/code/server/sv_zmq.c`
+Parity estimate: **before 39% -> after 88%** for focused REP/router
+socket-family wiring, **before 89.7% -> after 90.0%** for ZMQ-related source
+reconstruction confidence, and overall Quake Live source parity
+**55.62% -> 55.63%**.
+
+Completed work:
+
+1. Rechecked the Quake Live Steam libzmq factory cases for REP (`4`) and
+   ROUTER (`6`) against HLIL, Ghidra function rows, vtable symbols, existing
+   aliases, and the retained server RCON `QL_ZMQ_ROUTER` source usage.
+2. Added 20 REP/router aliases and re-pinned 4 existing ROUTER aliases covering
+   constructor/destructor ownership, REP send/receive state gating, ROUTER pipe
+   attachment, option handling, termination, activation, identity lookup, and
+   multipart send/receive callbacks.
+3. Added a focused regression guard tying the aliases to factory-call evidence,
+   source-file strings, vtable slots, function rows, and the retained RCON
+   ROUTER socket construction.
+
+### Task A294: Reconstruct botlib import callback surface delete identity [COMPLETED]
+Priority: High
+Primary areas: `src/code/server/sv_bot.c`,
+`src/code/game/botlib.h`,
+`tests/test_botlib_import_callback_surface_parity.py`,
+`tests/test_botlib_server_game_bridge_parity.py`,
+`tests/test_botlib_internal_parity.py`,
+`tests/test_engine_cvar_retail_parity.py`,
+`docs/reverse-engineering/botlib-import-callback-surface-mapping-2026-06-06.md`
+Parity estimate: **before 94% -> after 99%** for focused botlib import
+callback surface mapping, **before 85% -> after 99%** for focused debug
+line/polygon callback identity, and overall botlib plus related server/game
+wiring **97% -> 97%**.
+
+Completed work:
+
+1. Rechecked the `SV_BotInitBotLib` callback table at retail
+   `0x004DD940` against the Quake Live HLIL locals, promoted aliases, Ghidra
+   rows, `botlib_import_t` field order, and source assignment order.
+2. Reconstructed the retail delete callback identity by assigning
+   `botlib_import.DebugLineDelete` directly to `BotImport_DebugPolygonDelete`,
+   matching retail's shared `sub_4dd430` table entry for both line and polygon
+   delete.
+3. Preserved the compatibility `BotImport_DebugLineDelete` wrapper while
+   keeping the runtime callback table faithful to retail pointer identity.
+4. Added focused parity coverage for trace copying, BSP metadata callbacks,
+   memory/hunk callbacks, filesystem callback placement, and debug
+   line/polygon callback behavior.
+5. Normalized the botlib parity gates' Ghidra `functions.csv` references to
+   the committed `references/reverse-engineering/ghidra/quakelive_steam/`
+   corpus while keeping alias-map lookups on the existing
+   `quakelive_steam_srp` key.
+
+### Task A293: Pin botlib debug draw native micro-slab [COMPLETED]
+Priority: High
+Primary areas: `src/code/game/g_public.h`,
+`src/code/game/g_syscalls.c`, `src/code/game/ai_main.c`,
+`src/code/game/botlib.h`, `src/code/server/sv_game.c`,
+`src/code/botlib/be_interface.c`, `src/code/botlib/be_ai_move.c`,
+`tests/test_botlib_debug_draw_native_micro_slab_parity.py`,
+`docs/reverse-engineering/botlib-debug-draw-native-micro-slab-mapping-2026-06-06.md`
+Parity estimate: **before 72% -> after 99%** for focused botlib debug
+draw native micro-slab mapping, **before 90% -> after 97%** for focused
+direct-only botlib native import classification, and overall botlib plus
+qagame native import wiring **96% -> 97%**.
+
+Completed work:
+
+1. Rechecked native slots 83 and 84 against the Quake Live HLIL native import
+   table, Ghidra row sizes, source native enum, qagame direct import wrappers,
+   and the server native import initializer.
+2. Pinned the odd retail relationship where these native table slots sit
+   between the AAS tail and EA slab, while their botlib export offsets follow
+   the AI movement/weapon/genetic tail at `0x1e8` and `0x1ec`.
+3. Verified that the helpers are direct-native only and do not belong in
+   `G_MapNativeImport` as legacy syscall-compatible IDs.
+4. Tied the qagame `BotTestAAS` caller to the botlib AI export bodies for
+   `BotDrawDebugAreas` and `BotDrawAvoidSpots`.
+
+### Task A292: Pin botlib AI movement/weapon native tail [COMPLETED]
+Priority: High
+Primary areas: `src/code/game/g_public.h`,
+`src/code/game/g_syscalls.c`, `src/code/server/sv_game.c`,
+`src/code/server/ql_game_imports.inc`,
+`tests/test_botlib_ai_movement_weapon_native_tail_parity.py`,
+`docs/reverse-engineering/botlib-ai-movement-weapon-native-tail-mapping-2026-06-06.md`
+Parity estimate: **before 78% -> after 99%** for focused AI
+movement/weapon/genetic native tail mapping, **before 95% -> after 97%** for
+focused botlib native import table coverage, and overall botlib plus qagame
+native import wiring **95% -> 96%**.
+
+Completed work:
+
+1. Rechecked native slots 166 through 184 against the Quake Live HLIL import
+   table, Ghidra row sizes where present, source native enum, legacy syscall
+   map, server import initializer, and generated qagame wrappers.
+2. Pinned the non-linear `AddAvoidSpot` ordering: wrapper order before
+   `BotMoveToGoal`, retail native slot 177 after `InitMoveState`, and retail
+   trampoline address `0x004e23d0`.
+3. Preserved the raw-thunk classifications for `AllocMoveState` at `0x4e2500`
+   and `AllocWeaponState` at `0x4e25b0`.
+4. Verified the movement float ABI paths for `AddAvoidSpot`,
+   `MoveInDirection`, and `MovementViewTarget`.
+5. Added focused parity coverage to keep botlib AI slot 184 from drifting into
+   the adjacent Quake Live service import slab.
+
+### Task A291: Reconstruct botlib AI goal native slab float marshaling [COMPLETED]
+Priority: High
+Primary areas: `src/code/game/g_syscalls.c`,
+`src/code/server/ql_game_imports.inc`,
+`tests/test_botlib_ai_goal_native_slab_parity.py`,
+`docs/reverse-engineering/botlib-ai-goal-native-slab-mapping-2026-06-06.md`
+Parity estimate: **before 76% -> after 99%** for focused AI goal/item native
+slab mapping, **before 90% -> after 96%** for focused botlib float
+syscall/native marshaling coverage, and overall botlib plus qagame native
+import wiring **94% -> 95%**.
+
+Completed work:
+
+1. Rechecked native slots 137 through 165 against the Quake Live HLIL import
+   table, Ghidra row sizes where present, source native enum, legacy syscall
+   map, server import initializer, and generated qagame wrappers.
+2. Pinned the retail native table-order differences for avoid-goal reset/remove
+   wrappers and camp/map/level goal lookup wrappers.
+3. Preserved the non-row classifications for `BotInitLevelItems` at
+   `0x4e22a0` and raw `BotUpdateEntityItems` table address `0x4e22b0`.
+4. Reconstructed `BotMutateGoalFuzzyLogic` float argument marshaling through
+   `PASSFLOAT(range)` and `QL_G_PASSFLOAT(range)`.
+5. Added focused parity coverage to prevent the goal/item native slab from
+   being reordered by legacy export offset or losing float ABI conversions.
+
+### Task A290: Reconstruct botlib AI character/chat native slots [COMPLETED]
+Priority: High
+Primary areas: `src/code/game/g_public.h`,
+`src/code/game/g_syscalls.c`, `src/code/server/sv_game.c`,
+`src/code/server/ql_game_imports.inc`,
+`tests/test_botlib_ai_character_chat_native_slab_parity.py`,
+`tests/test_botlib_chat_parity.py`,
+`tests/test_game_native_export_helper_parity.py`,
+`docs/reverse-engineering/botlib-ai-character-chat-native-slab-mapping-2026-06-06.md`
+Parity estimate: **before 74% -> after 99%** for focused AI character/chat
+native slab mapping, **before 88% -> after 95%** for focused botlib native
+import direct-vs-compat classification, and overall botlib plus qagame native
+import wiring **93% -> 94%**.
+
+Completed work:
+
+1. Rechecked native slots 110 through 136 against the Quake Live HLIL import
+   table, Ghidra row sizes, source native enum, legacy syscall map, server
+   import initializer, and generated qagame wrappers.
+2. Reconstructed `G_QL_IMPORT_BOTLIB_AI_CHAT_LENGTH = 126` and mapped
+   `BOTLIB_AI_CHAT_LENGTH` directly to `QL_G_trap_BotChatLength`.
+3. Reconstructed `G_QL_IMPORT_BOTLIB_AI_STRING_CONTAINS = 129` and mapped
+   `BOTLIB_AI_STRING_CONTAINS` directly to `QL_G_trap_StringContains`.
+4. Preserved the raw-thunk classification for `BotAllocChatState` at
+   `0x4e1d80` instead of promoting a fake Ghidra function row.
+5. Updated stale compatibility-only coverage and added focused parity coverage
+   to prevent the character/chat native import slab from regressing.
+
 ### Task A289: Reconstruct client SteamUserStats float descriptor lane [COMPLETED]
 Priority: High
 Primary areas: `src/code/client/cl_main.c`,

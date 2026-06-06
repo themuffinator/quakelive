@@ -175,8 +175,9 @@ resource slots.
   `ql_game_compat_imports` into the compatibility slab.
 - `src/code/server/ql_game_imports.inc` preserves legacy compatibility wrappers
   while also providing the direct-only `QL_G_trap_EA_Walk` native wrapper.
-  Remaining compatibility-only IDs include `BOTLIB_AI_CHAT_LENGTH`,
-  `BOTLIB_AI_STRING_CONTAINS`, and parser helpers like
+  A later 2026-06-06 slab pass recovered `BOTLIB_AI_CHAT_LENGTH` and
+  `BOTLIB_AI_STRING_CONTAINS` as direct native slots 126 and 129; the remaining
+  compatibility-only botlib IDs are parser helpers like
   `BOTLIB_PC_LOAD_SOURCE`, `BOTLIB_PC_FREE_SOURCE`,
   `BOTLIB_PC_READ_TOKEN`, and `BOTLIB_PC_SOURCE_FILE_AND_LINE`.
 

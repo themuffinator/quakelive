@@ -653,7 +653,7 @@ void S_ClearSoundBuffer( void ) {
 va
 =============
 */
-char *va( char *format, ... ) {
+char *va( const char *format, ... ) {
 	static char buffer[4096];
 	va_list args;
 	va_start( args, format );

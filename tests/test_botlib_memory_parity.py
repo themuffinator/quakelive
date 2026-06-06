@@ -92,7 +92,7 @@ def test_botlib_memory_log_retail_function_map_is_pinned() -> None:
 	functions_csv = _read(QL_STEAM_FUNCTIONS)
 	imports = _read(QL_STEAM_IMPORTS)
 	hlil = _read(QL_STEAM_HLIL_PART03)
-	aliases = json.loads(_read(SYMBOL_ALIASES))["quakelive_steam"]
+	aliases = json.loads(_read(SYMBOL_ALIASES))["quakelive_steam_srp"]
 
 	for expected in (
 		"program_name=quakelive_steam.exe",

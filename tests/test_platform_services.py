@@ -5700,10 +5700,293 @@ def test_server_zmq_runtime_reconstructs_retail_publication_and_rcon_owners() ->
     assert "idZMQ_UnloadLibrary();" in shutdown_runtime_block
 
 
+def test_zmq_idzmq_host_round_420_aliases_are_pinned() -> None:
+    aliases = json.loads(
+        (REPO_ROOT / "references/analysis/quakelive_symbol_aliases.json").read_text(encoding="utf-8")
+    )["quakelive_steam_srp"]
+    functions_csv = (
+        REPO_ROOT / "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+    ).read_text(encoding="utf-8").lower()
+    analysis_symbols = (
+        REPO_ROOT / "references/reverse-engineering/ghidra/quakelive_steam/analysis_symbols.txt"
+    ).read_text(encoding="utf-8")
+    hlil_part04 = (
+        REPO_ROOT
+        / "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part04.txt"
+    ).read_text(encoding="utf-8")
+    hlil_part05 = (
+        REPO_ROOT
+        / "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part05.txt"
+    ).read_text(encoding="utf-8")
+    hlil_part06 = (
+        REPO_ROOT
+        / "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part06.txt"
+    ).read_text(encoding="utf-8")
+    sv_zmq = (REPO_ROOT / "src/code/server/sv_zmq.c").read_text(encoding="utf-8")
+    sv_init = (REPO_ROOT / "src/code/server/sv_init.c").read_text(encoding="utf-8")
+    sv_main = (REPO_ROOT / "src/code/server/sv_main.c").read_text(encoding="utf-8")
+    sv_game = (REPO_ROOT / "src/code/server/sv_game.c").read_text(encoding="utf-8")
+    common = (REPO_ROOT / "src/code/qcommon/common.c").read_text(encoding="utf-8")
+    mapping_round = (
+        REPO_ROOT / "docs/reverse-engineering/quakelive_steam_mapping_round_420.md"
+    ).read_text(encoding="utf-8")
+
+    expected_aliases = {
+        "sub_4E2620": "SV_SubmitMatchReport",
+        "sub_4E2640": "SV_ReportPlayerEvent",
+        "sub_4F3D70": "idZMQ_ApplyPasswords",
+        "sub_4F3DD0": "Zmq_ShutdownStatsPublisher",
+        "sub_4F3DF0": "Zmq_ShutdownRuntime",
+        "sub_4F3F20": "idZMQ_UpdatePasswords",
+        "sub_4F3F80": "idZMQ_RegisterCvarsAndInitRcon",
+        "sub_4F4130": "Zmq_UpdatePasswords",
+        "sub_4F4140": "Zmq_RegisterCvarsAndInitRcon",
+        "sub_4F4210": "idZMQ_InitStatsPublisher",
+        "sub_4F43A0": "Zmq_InitStatsPublisher",
+        "sub_4F4B20": "idZMQ_ReportPlayerEvent",
+        "sub_4F4C30": "idZMQ_SubmitMatchReport",
+        "sub_4F4D40": "idZMQ_BroadcastRconOutput",
+        "sub_4F4E10": "Zmq_ReportPlayerEvent",
+        "sub_4F4E40": "Zmq_SubmitMatchReport",
+        "sub_4F4E60": "Zmq_BroadcastRconOutput",
+        "sub_4F4ED0": "idZMQ_PumpRcon",
+        "sub_4F4FD0": "Zmq_PumpRcon",
+        "sub_4F5080": "idZMQ_Destroy",
+        "sub_4F46B0": "idZMQ_EraseRconPeer",
+        "sub_4F4910": "idZMQ_FindRconPeer",
+        "sub_4F4980": "idZMQ_FreeRconPeerSubtree",
+        "sub_4F49C0": "idZMQ_InsertRconPeer",
+        "sub_4F4E80": "idZMQ_ClearRconPeers",
+        "sub_4F4FE0": "idZMQ_EraseRconPeerRange",
+    }
+
+    for symbol, alias in expected_aliases.items():
+        address = f"00{symbol.removeprefix('sub_')}".lower()
+        assert aliases[symbol] == alias
+        assert f"fun_{address},{address}" in functions_csv
+        assert f"| `{symbol}` | `{alias}` | High |" in mapping_round
+
+    assert "005483f0 IMPORTED idZMQ::vftable" in analysis_symbols
+    assert "004e2628  sub_468ee0(arg1)" in hlil_part05
+    assert "004e2638  return sub_4f4e40(arg1)" in hlil_part05
+    assert "004e265a  sub_468030(arg1, arg2, arg3)" in hlil_part05
+    assert "004e2676  return sub_4f4e10(arg1, arg2, arg3, arg4, arg5)" in hlil_part05
+    assert "004ed8c1  sub_4f4140()" in hlil_part05
+    assert "004e354c  sub_4f43a0()" in hlil_part05
+    assert "004cc8ef              sub_4f4130()" in hlil_part04
+    assert "004cc906      sub_4f4fd0()" in hlil_part04
+    assert "004c9942  sub_4f4e60(&var_1008)" in hlil_part04
+
+    assert "004f4135  return sub_4f3f20(&data_5756fc) __tailcall" in hlil_part05
+    assert "004f4145  return sub_4f3f80(&data_5756fc) __tailcall" in hlil_part05
+    assert "004f43a5  return sub_4f4210(&data_5756fc) __tailcall" in hlil_part05
+    assert "004f4e32  return sub_4f4b20(&data_5756fc, arg1, arg2)" in hlil_part05
+    assert "004f4e52  return sub_4f4c30(&data_5756fc, arg1)" in hlil_part05
+    assert "004f4e72  return sub_4f4d40(&data_5756fc)" in hlil_part05
+    assert "004f4fd5  return sub_4f4ed0(&data_5756fc) __tailcall" in hlil_part05
+
+    assert 'sub_4f5190(&data_575704, "zmq\\id_zmq.cpp", 0x73)' in hlil_part05
+    assert 'sub_4f5190(&data_575708, "zmq\\id_zmq.cpp", 0xe2)' in hlil_part05
+    assert "sub_4f5b50(&data_575700)" in hlil_part05
+    assert 'sub_4f5100(6, "zmq\\id_zmq.cpp", 0xc7)' in hlil_part05
+    assert 'sub_4f5750(eax_12, "rcon")' in hlil_part05
+    assert "sub_4f5790(var_10_3)" in hlil_part05
+    assert "sub_4f5980(*(arg1 + 0xc))" in hlil_part05
+    assert "if (sub_4f5200(*(arg1 + 0xc), eax_11) == 0xffffffff)" in hlil_part05
+    assert 'sub_4f5100(1, "zmq\\id_zmq.cpp", 0x5c)' in hlil_part05
+    assert 'sub_4f5750(eax_11, "stats")' in hlil_part05
+    assert "sub_4f5790(var_3c_5)" in hlil_part05
+    assert "if (sub_4f5200(*(arg1 + 8), eax_10) == 0xffffffff)" in hlil_part05
+
+    assert "0054825c  char const data_54825c[0x15] = \"zmq RCON socket: %s\\n\", 0" in hlil_part06
+    assert "00548340  char const data_548340[0x14] = \"zmq PUB socket: %s\\n\", 0" in hlil_part06
+    assert "00548378  char const data_548378[0xd] = \"MATCH_REPORT\", 0" in hlil_part06
+    assert "00548388  char const data_548388[0x22] = \"zmq RCON client disconnected: %s\\n\", 0" in hlil_part06
+    assert "005483ac  char const data_5483ac[0x1e] = \"zmq RCON command from %s: %s\\n\", 0" in hlil_part06
+    assert "005483cc  char const data_5483cc[0x1f] = \"zmq RCON client connected: %s\\n\", 0" in hlil_part06
+    assert "005482f4  char const data_5482f4[0x11] = \"zmq_stats_enable\", 0" in hlil_part06
+    assert "00548308  char const data_548308[0x10] = \"zmq_rcon_enable\", 0" in hlil_part06
+
+    assert "004f4f4c              void** ecx_3 = *sub_4f4910(arg1 + 0x14, &var_10, &var_8)" in hlil_part05
+    assert "004f4f7a                  sub_4f49c0(arg1 + 0x14, &var_14, sub_4f4640(arg1 + 0x14), nullptr)" in hlil_part05
+    assert "004f4d8a                  i = *sub_4f46b0(arg1 + 0x14, &var_8, i)" in hlil_part05
+    assert "004f4ffa      sub_4f4e80(arg1)" in hlil_part05
+    assert "004f50c9  sub_4f4fe0(&arg1[5], &var_18, *eax_3, eax_3)" in hlil_part05
+    assert "004f4e99          sub_4f4980(esi[2])" in hlil_part05
+
+    register_block = _extract_function_block(sv_zmq, "void Zmq_RegisterCvarsAndInitRcon( void )")
+    update_passwords_block = _extract_function_block(sv_zmq, "void Zmq_UpdatePasswords( void )")
+    init_publisher_block = _extract_function_block(sv_zmq, "void Zmq_InitStatsPublisher( void )")
+    shutdown_stats_block = _extract_function_block(sv_zmq, "void Zmq_ShutdownStatsPublisher( void )")
+    shutdown_runtime_block = _extract_function_block(sv_zmq, "void Zmq_ShutdownRuntime( void )")
+    pump_block = _extract_function_block(sv_zmq, "void Zmq_PumpRcon( void )")
+    broadcast_block = _extract_function_block(sv_zmq, "void Zmq_BroadcastRconOutput( const char *message )")
+    init_block = _extract_function_block(sv_init, "void SV_Init (void)")
+    spawn_block = _extract_function_block(sv_init, "void SV_SpawnServer( char *server, qboolean killBots )")
+    shutdown_block = _extract_function_block(sv_init, "void SV_Shutdown( char *finalmsg )")
+    frame_block = _extract_function_block(sv_main, "void SV_Frame( int msec )")
+    submit_block = _extract_function_block(sv_game, "static void SV_SubmitMatchReport( void *report )")
+    event_block = _extract_function_block(
+        sv_game, "static void SV_ReportPlayerEvent( uint32_t steamIdLow, uint32_t steamIdHigh, const void *clientStats, const char *eventName, void *payload )"
+    )
+    printf_block = _extract_function_block(common, "void QDECL Com_Printf( const char *fmt, ... )")
+    com_shutdown_block = _extract_function_block(common, "void Com_Shutdown (void)")
+
+    assert 'Cvar_Get( "zmq_rcon_enable", "0", CVAR_INIT );' in register_block
+    assert 'Cvar_Get( "zmq_stats_enable", "0", CVAR_INIT );' in register_block
+    assert "Zmq_UpdatePasswords();" in register_block
+    assert "idZMQ_EnsureRconSocket();" in register_block
+    assert "idZMQ_ApplyPasswords( rconModeChanged, statsModeChanged );" in update_passwords_block
+    assert 'Com_Printf( "zmq stats and rcon passwords updated\\n" );' in update_passwords_block
+    assert "idZMQ_CloseSocket( &s_zmq.pubSocket );" in init_publisher_block
+    assert "idZMQ_EnsureStatsPublisher();" in init_publisher_block
+    assert "idZMQ_CloseStatsTranscript();" in shutdown_stats_block
+    assert "idZMQ_CloseSocket( &s_zmq.pubSocket );" in shutdown_stats_block
+    assert "Zmq_ShutdownStatsPublisher();" in shutdown_runtime_block
+    assert "idZMQ_ClearRconPeers();" in shutdown_runtime_block
+    assert "idZMQ_CloseAuthSocket();" in shutdown_runtime_block
+    assert "idZMQ_UnloadLibrary();" in shutdown_runtime_block
+    assert 'idZMQ_Publish( "MATCH_REPORT", (const char *)report );' in sv_zmq
+    assert 'idZMQ_Publish( eventName && eventName[0] ? eventName : "UNKNOWN_EVENT", (const char *)payload );' in sv_zmq
+    assert 'Com_Printf( "zmq RCON client disconnected: %s\\n", peer->label );' in broadcast_block
+    assert 'Com_Printf( "zmq RCON client connected: %s\\n", peer->label );' in pump_block
+    assert 'Com_Printf( "zmq RCON command from %s: %s\\n", peer->label, command );' in pump_block
+    assert "Cmd_ExecuteString( command );" in pump_block
+
+    assert "Zmq_RegisterCvarsAndInitRcon();" in init_block
+    assert "Zmq_InitStatsPublisher();" in spawn_block
+    assert "Zmq_ShutdownStatsPublisher();" in shutdown_block
+    assert "Zmq_UpdatePasswords();" in frame_block
+    assert "Zmq_PumpRcon();" in frame_block
+    assert "Zmq_SubmitMatchReport( report );" in submit_block
+    assert "Zmq_ReportPlayerEvent( steamIdLow, steamIdHigh, clientStats, eventName, payload );" in event_block
+    assert "Zmq_BroadcastRconOutput( msg );" in printf_block
+    assert "Zmq_ShutdownRuntime();" in com_shutdown_block
+
+    assert "This pass re-pinned 26 existing aliases" in mapping_round
+    assert "retained Quake Live server integration" in mapping_round
+    assert "not a request to vendor CZMQ or libzmq" in mapping_round
+    assert "before 76% -> after 95%" in mapping_round
+
+
+def test_zmq_dependency_boundary_stays_out_of_src_code_library_space() -> None:
+    sv_zmq = (REPO_ROOT / "src/code/server/sv_zmq.c").read_text(encoding="utf-8")
+    vcxproj = (REPO_ROOT / "src/code/quakelive_steam.vcxproj").read_text(encoding="utf-8")
+    readme = (REPO_ROOT / "README.md").read_text(encoding="utf-8")
+    ownership_note = (
+        REPO_ROOT / "docs/reverse-engineering/zmq-dependency-ownership-2026-06-06.md"
+    ).read_text(encoding="utf-8")
+
+    source_suffixes = {".c", ".cc", ".cpp", ".cxx", ".h", ".hpp"}
+    zmq_source_files = sorted(
+        source.relative_to(REPO_ROOT).as_posix()
+        for source in (REPO_ROOT / "src/code").rglob("*")
+        if source.is_file()
+        and source.suffix.lower() in source_suffixes
+        and any(token in source.name.lower() for token in ("zmq", "zeromq", "libzmq"))
+    )
+
+    assert zmq_source_files == ["src/code/server/sv_zmq.c"]
+    assert not (REPO_ROOT / "src/libs/zmq").exists()
+    assert not (REPO_ROOT / "src/libs/libzmq").exists()
+    assert '<ClCompile Include="server\\sv_zmq.c">' in vcxproj
+    assert "src\\libs\\zmq" not in vcxproj
+    assert "src\\libs\\libzmq" not in vcxproj
+
+    assert '#define QL_ZMQ_LIB_PRIMARY "libzmq.dll"' in sv_zmq
+    assert '#define QL_ZMQ_LIB_PRIMARY "libzmq.so.5"' in sv_zmq
+    assert "#define QL_ZMQ_OPEN( name ) LoadLibraryA( name )" in sv_zmq
+    assert "#define QL_ZMQ_SYM( name ) GetProcAddress( (HMODULE)s_zmq.library, name )" in sv_zmq
+    assert "static qboolean idZMQ_LoadLibrary( void )" in sv_zmq
+    assert "#if !QL_PLATFORM_HAS_ONLINE_SERVICES" in sv_zmq
+    assert 'Com_Printf( "ZMQ runtime disabled by build policy (QL_BUILD_ONLINE_SERVICES=0); keeping retained fallback paths.\\n" );' in sv_zmq
+    assert 'idZMQ_LoadSymbol( (void **)&s_zmq.zmq_ctx_new, "zmq_ctx_new" )' in sv_zmq
+    assert 'idZMQ_LoadSymbol( (void **)&s_zmq.zmq_socket, "zmq_socket" )' in sv_zmq
+    assert "#include <zmq.h>" not in sv_zmq
+
+    assert "The repo does not vendor libzmq" in readme
+    assert "Do not install or vendor libzmq under `src/libs/` in this pass" in ownership_note
+    assert "hand-rolling that library under `src/code`" in ownership_note
+    assert "Keep `sv_zmq.c` in `src/code/server/` as Quake Live server integration code" in ownership_note
+
+
+def test_zmq_option_switch_tables_round_419_pin_source_constants() -> None:
+    aliases = json.loads(
+        (REPO_ROOT / "references/analysis/quakelive_symbol_aliases.json").read_text(encoding="utf-8")
+    )["quakelive_steam_srp"]
+    functions_csv = (
+        REPO_ROOT / "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+    ).read_text(encoding="utf-8").lower()
+    hlil_part01 = (
+        REPO_ROOT
+        / "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part01.txt"
+    ).read_text(encoding="utf-8")
+    sv_zmq = (REPO_ROOT / "src/code/server/sv_zmq.c").read_text(encoding="utf-8")
+    mapping_round = (
+        REPO_ROOT / "docs/reverse-engineering/quakelive_steam_mapping_round_419.md"
+    ).read_text(encoding="utf-8")
+
+    expected_aliases = {
+        "sub_40E0E0": "zmq_options_t_setsockopt",
+        "sub_40E690": "zmq_options_t_getsockopt",
+    }
+
+    for symbol, alias in expected_aliases.items():
+        address = f"00{symbol.removeprefix('sub_')}".lower()
+        assert aliases[symbol] == alias
+        assert f"fun_{address},{address}" in functions_csv
+        assert f"| `{symbol}` | `{alias}` | High |" in mapping_round
+
+    assert "0040e0e0    int32_t __fastcall sub_40e0e0" in hlil_part01
+    assert "if (arg3 - 4 u> 0x33)" in hlil_part01
+    assert "switch (arg3 + &jump_table_40e5e4[0x1d])" in hlil_part01
+    assert "0040e5e4  uint32_t jump_table_40e5e4[0x1e] =" in hlil_part01
+    assert "0040e65c  uint8_t lookup_table_40e65c[0x34] =" in hlil_part01
+    assert "*_errno(eax_2) = 0x16" in hlil_part01
+
+    assert "0040e3e6          case &lookup_table_40e65c[0x21]" in hlil_part01
+    assert "arg2[0x5a] = edx" in hlil_part01
+    assert "0040e515          case &lookup_table_40e65c[0x28]" in hlil_part01
+    assert "arg2[0x60] = edx" in hlil_part01
+    assert "arg2[0x5f] = eax_13" in hlil_part01
+    assert "0040e5a1          case &lookup_table_40e65c[0x33]" in hlil_part01
+    assert "sub_406e80(&arg2[0x61], arg1, arg4)" in hlil_part01
+
+    assert "0040e690    int32_t __stdcall sub_40e690" in hlil_part01
+    assert "if (arg3 - 4 u<= 0x33)" in hlil_part01
+    assert "switch (arg3 + &jump_table_40ea44[0x1e])" in hlil_part01
+    assert "0040ea44  uint32_t jump_table_40ea44[0x1f] =" in hlil_part01
+    assert "0040eac0  uint8_t lookup_table_40eac0[0x34] =" in hlil_part01
+    assert "0040e90d          case &lookup_table_40eac0[0x21]" in hlil_part01
+    assert "*arg1 = arg2[0x5a]" in hlil_part01
+    assert "0040e93d          case &lookup_table_40eac0[0x28]" in hlil_part01
+    assert "*arg1 = ecx_17" in hlil_part01
+    assert "0040e9df          case &lookup_table_40eac0[0x33]" in hlil_part01
+    assert "void* ecx_23 = &arg2[0x61]" in hlil_part01
+    assert "*arg4 = arg2[0x65] + 1" in hlil_part01
+
+    assert "#define QL_ZMQ_ROUTER_MANDATORY 33" in sv_zmq
+    assert "#define QL_ZMQ_PLAIN_SERVER 44" in sv_zmq
+    assert "#define QL_ZMQ_ZAP_DOMAIN 55" in sv_zmq
+    assert 'idZMQ_TrySetSocketString( socket, QL_ZMQ_ZAP_DOMAIN, "rcon" );' in sv_zmq
+    assert 'idZMQ_TrySetSocketString( socket, QL_ZMQ_ZAP_DOMAIN, "stats" );' in sv_zmq
+    assert "idZMQ_TrySetSocketInt( socket, QL_ZMQ_ROUTER_MANDATORY, 1 );" in sv_zmq
+    assert "idZMQ_TrySetSocketInt( socket, QL_ZMQ_PLAIN_SERVER, s_zmq.rconPassword[0] ? 1 : 0 );" in sv_zmq
+    assert "idZMQ_TrySetSocketInt( socket, QL_ZMQ_PLAIN_SERVER, s_zmq.statsPassword[0] ? 1 : 0 );" in sv_zmq
+
+    assert "This pass re-pinned 2 existing aliases" in mapping_round
+    assert "ROUTER mandatory delivery, PLAIN server mode, and ZAP domain strings" in mapping_round
+    assert "option `0x21`" in mapping_round
+    assert "option `0x2c`" in mapping_round
+    assert "option `0x37`" in mapping_round
+    assert "source-owned behavior is the Quake Live" in mapping_round
+    assert "server's RCON/stats application" in mapping_round
+
+
 def test_zmq_public_api_aliases_and_round_365_evidence_are_pinned() -> None:
     aliases = json.loads(
         (REPO_ROOT / "references/analysis/quakelive_symbol_aliases.json").read_text(encoding="utf-8")
-    )["quakelive_steam"]
+    )["quakelive_steam_srp"]
     functions_csv = (
         REPO_ROOT / "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
     ).read_text(encoding="utf-8").lower()
@@ -5759,10 +6042,603 @@ def test_zmq_public_api_aliases_and_round_365_evidence_are_pinned() -> None:
     assert "Z85 helper lane" in mapping_round
 
 
+def test_zmq_windows_err_helpers_round_411_aliases_are_pinned() -> None:
+    aliases = json.loads(
+        (REPO_ROOT / "references/analysis/quakelive_symbol_aliases.json").read_text(encoding="utf-8")
+    )["quakelive_steam_srp"]
+    functions_csv = (
+        REPO_ROOT / "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+    ).read_text(encoding="utf-8").lower()
+    imports_txt = (
+        REPO_ROOT / "references/reverse-engineering/ghidra/quakelive_steam/imports.txt"
+    ).read_text(encoding="utf-8")
+    hlil_part01 = (
+        REPO_ROOT
+        / "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part01.txt"
+    ).read_text(encoding="utf-8")
+    hlil_part06 = (
+        REPO_ROOT
+        / "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part06.txt"
+    ).read_text(encoding="utf-8")
+    mapping_round = (
+        REPO_ROOT / "docs/reverse-engineering/quakelive_steam_mapping_round_411.md"
+    ).read_text(encoding="utf-8")
+
+    expected_aliases = {
+        "sub_401CD0": "zmq_abort",
+        "sub_401CF0": "zmq_wsa_error",
+        "sub_401FB0": "zmq_win_error",
+        "sub_402030": "zmq_wsa_error_to_errno",
+    }
+
+    for symbol, alias in expected_aliases.items():
+        address = f"00{symbol.removeprefix('sub_')}".lower()
+        assert aliases[symbol] == alias
+        assert f"fun_{address},{address}" in functions_csv
+        assert f"| `{symbol}` | `{alias}` | High |" in mapping_round
+
+    assert aliases["sub_401D10"] == "zmq_wsa_error_no"
+    assert "KERNEL32.DLL!FormatMessageA" in imports_txt
+    assert "WS2_32.DLL!WSAGetLastError" in imports_txt
+
+    assert "00401cd0    void __convention(\"regparm\") sub_401cd0" in hlil_part01
+    assert "RaiseException(dwExceptionCode: 0x40000015" in hlil_part01
+    assert "00401cf0    int32_t sub_401cf0()" in hlil_part01
+    assert "enum WSA_ERROR eax_2 = WSAGetLastError()" in hlil_part01
+    assert "if (eax_2 != WSAEWOULDBLOCK)" in hlil_part01
+    assert "return sub_401d10(eax_2) __tailcall" in hlil_part01
+    assert "00401d10    char const* const __convention(\"regparm\") sub_401d10" in hlil_part01
+    assert 'return "Operation would block"' in hlil_part01
+    assert 'return "error not defined"' in hlil_part01
+
+    assert "00401fb0    uint32_t __convention(\"regparm\") sub_401fb0" in hlil_part01
+    assert "dwFlags: FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS" in hlil_part01
+    assert "dwMessageId: GetLastError()" in hlil_part01
+    assert "dwLanguageId: 0x400, lpBuffer: arg4," in hlil_part01
+    assert "nSize: 0x100, Arguments: nullptr)" in hlil_part01
+    assert "\"..\\..\\..\\src\\err.cpp\", 0xd5" in hlil_part01
+
+    assert "00402030    int32_t __convention(\"regparm\") sub_402030" in hlil_part01
+    assert "arg1 == 0x2afa || arg1 == 0x2afb || arg1 == 0x2afc" in hlil_part01
+    assert "case 0x2733" in hlil_part01
+    assert "return 0x10" in hlil_part01
+    assert "case 0x2736" in hlil_part01
+    assert "return 0x80" in hlil_part01
+    assert "case 0x2738" in hlil_part01
+    assert "return 0x73" in hlil_part01
+    assert "\"..\\..\\..\\src\\err.cpp\", 0x172" in hlil_part01
+
+    assert "*eax_36 = sub_402030(eax_37, edx_9, ecx_24)" in hlil_part01
+    assert "uint32_t eax_40 = sub_401cf0()" in hlil_part01
+    assert "sub_401cd0(eax_40, edx_10, ecx_25)" in hlil_part01
+    assert "sub_401fb0(eax_17, edx_4, &var_110, &var_110)" in hlil_part01
+    assert "uint32_t eax_11 = sub_401cf0()" in hlil_part01
+    assert "sub_401cd0(eax_11, edx_1, ecx)" in hlil_part01
+    assert "*eax_15 = sub_402030(eax_16, edx_2, ecx_1)" in hlil_part01
+
+    assert "0052c09c  uint32_t (__stdcall* const KERNEL32:FormatMessageA)" in hlil_part06
+    assert "0052c5bc  enum WSA_ERROR (__stdcall* const WS2_32:WSAGetLastError)()" in hlil_part06
+    assert "0054f780  char const data_54f780[0x15] = \"..\\\\..\\\\..\\\\src\\\\err.cpp\"" in hlil_part06
+    assert "0054f8d0  char const data_54f8d0[0x10] = \"errno == EAGAIN\"" in hlil_part06
+
+    assert "This pass added 4 aliases" in mapping_round
+    assert "Windows `err.cpp` helper wiring" in mapping_round
+    assert "`sub_402260` is an 8-byte `DeleteCriticalSection` wrapper" in mapping_round
+    assert "0x00402270..0x00402480" in mapping_round
+
+
+def test_zmq_ctx_constructor_maps_round_412_aliases_are_pinned() -> None:
+    aliases = json.loads(
+        (REPO_ROOT / "references/analysis/quakelive_symbol_aliases.json").read_text(encoding="utf-8")
+    )["quakelive_steam_srp"]
+    functions_csv = (
+        REPO_ROOT / "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+    ).read_text(encoding="utf-8").lower()
+    imports_txt = (
+        REPO_ROOT / "references/reverse-engineering/ghidra/quakelive_steam/imports.txt"
+    ).read_text(encoding="utf-8")
+    hlil_part01 = (
+        REPO_ROOT
+        / "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part01.txt"
+    ).read_text(encoding="utf-8")
+    hlil_part06 = (
+        REPO_ROOT
+        / "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part06.txt"
+    ).read_text(encoding="utf-8")
+    mapping_round = (
+        REPO_ROOT / "docs/reverse-engineering/quakelive_steam_mapping_round_412.md"
+    ).read_text(encoding="utf-8")
+
+    expected_aliases = {
+        "sub_402270": "zmq_ctx_t_ctor",
+        "sub_402420": "std_tree_zmq_endpoint_node_map_dtor",
+        "sub_402480": "std_tree_zmq_pending_connection_node_map_dtor",
+        "sub_4032F0": "zmq_ctx_t_register_endpoint",
+        "sub_403560": "zmq_ctx_t_unregister_endpoint",
+        "sub_4036F0": "zmq_ctx_t_find_endpoint",
+        "sub_404AF0": "std_tree_erase_zmq_pending_connection_node_range",
+        "sub_405540": "std_tree_erase_zmq_endpoint_node_range",
+    }
+
+    for symbol, alias in expected_aliases.items():
+        address = f"00{symbol.removeprefix('sub_')}".lower()
+        assert aliases[symbol] == alias
+        assert f"fun_{address},{address}" in functions_csv
+        assert f"| `{symbol}` | `{alias}` | High |" in mapping_round
+
+    existing_aliases = {
+        "sub_401000": "zmq_ctx_new",
+        "sub_4024E0": "zmq_ctx_t_dtor",
+        "sub_402790": "zmq_ctx_t_term",
+        "sub_402BA0": "zmq_ctx_t_set",
+        "sub_402C50": "zmq_ctx_t_create_socket",
+        "sub_404010": "zmq_ctx_t_connect_inproc_sockets",
+        "sub_404710": "std_tree_erase_zmq_endpoint_node",
+        "sub_404E60": "std_tree_erase_zmq_pending_connection_node",
+    }
+
+    for symbol, alias in existing_aliases.items():
+        assert aliases[symbol] == alias
+
+    assert "KERNEL32.DLL!DeleteCriticalSection" in imports_txt
+    assert "KERNEL32.DLL!InitializeCriticalSection" in imports_txt
+
+    assert "void* eax_9 = sub_526684(0x10c)" in hlil_part01
+    assert "uint32_t result = GSI1::QueryMiniPDBForTiDefnUDT2(eax_9)" in hlil_part01
+    assert "if (result != 0)" in hlil_part01
+    assert "00402270    void* __stdcall GSI1::QueryMiniPDBForTiDefnUDT2" in hlil_part01
+    assert "*arg1 = 0xabadcafe" in hlil_part01
+    assert "InitializeCriticalSection(lpCriticalSection: &arg1[0xa])" in hlil_part01
+    assert "ebx, result = sub_40c630()" in hlil_part01
+    assert "operator new(0x280)" in hlil_part01
+    assert "*(*(result + 0xb4) + 0x278) = 1" in hlil_part01
+    assert "*(*(result + 0xb4) + 0x279) = 1" in hlil_part01
+    assert "operator new(0x288)" in hlil_part01
+    assert "*(*(result + 0xc4) + 0x280) = 1" in hlil_part01
+    assert "*(*(result + 0xc4) + 0x281) = 1" in hlil_part01
+    assert "InitializeCriticalSection(lpCriticalSection: result + 0xd0)" in hlil_part01
+    assert "*(result + 0xe8) = 0x3ff" in hlil_part01
+    assert "*(result + 0xec) = 1" in hlil_part01
+    assert "*(result + 0xf0) = ebx.b" in hlil_part01
+    assert "InitializeCriticalSection(lpCriticalSection: result + 0xf4)" in hlil_part01
+
+    assert "004032f0    int32_t __fastcall sub_4032f0" in hlil_part01
+    assert "EnterCriticalSection(lpCriticalSection: arg1 + 0xd0)" in hlil_part01
+    assert "sub_406e80(&var_34, arg2, eax_4 - &eax_4[1])" in hlil_part01
+    assert "sub_4068f0(&var_2a0, &var_34)" in hlil_part01
+    assert "sub_4038b0(&var_278, &arg3[2])" in hlil_part01
+    assert "void* var_2c4_5 = sub_406230(arg1 + 0xb0)" in hlil_part01
+    assert "sub_405c00(arg1 + 0xb0)" in hlil_part01
+    assert "*_errno(eax_2) = 0x64" in hlil_part01
+    assert "00403560    int32_t sub_403560" in hlil_part01
+    assert "sub_404a60(arg1 + 0xb0, edi, &var_8)" in hlil_part01
+    assert "if (eax_1 == *(arg1 + 0xb4) || eax_1[0xc] != arg_4)" in hlil_part01
+    assert "*_errno() = 2" in hlil_part01
+    assert "sub_404710(arg1 + 0xb0, &arg_4)" in hlil_part01
+    assert "004036f0    int32_t* __fastcall sub_4036f0" in hlil_part01
+    assert "sub_404a60(arg1 + 0xb0, &var_34, &var_4d4)" in hlil_part01
+    assert "InterlockedExchangeAdd(ecx_3 + 0x254, 1)" in hlil_part01
+    assert "*_errno(eax_2) = 0x6b" in hlil_part01
+    assert "sub_40df50(&var_4c0)" in hlil_part01
+
+    assert "00402420    int32_t __thiscall Concurrency::details::_Micro_queue::_Pop_finalizer::~_Pop_finalizer" in hlil_part01
+    assert "sub_405540(ecx, arg2, &var_14, ecx, eax_3)" in hlil_part01
+    assert "operator delete(*(arg2 + 4))" in hlil_part01
+    assert "00402480    int32_t __thiscall sub_402480" in hlil_part01
+    assert "sub_404af0(ecx, arg2, &var_14, ecx, eax_3)" in hlil_part01
+
+    assert "004024e0    void* __stdcall sub_4024e0" in hlil_part01
+    assert 'if (arg1[1] != arg1[2])' in hlil_part01
+    assert '"sockets.empty ()"' in hlil_part01
+    assert "*arg1 = 0xdeadbeef" in hlil_part01
+    assert "DeleteCriticalSection(lpCriticalSection: &arg1[0x3d])" in hlil_part01
+    assert "DeleteCriticalSection(lpCriticalSection: &arg1[0x34])" in hlil_part01
+    assert "sub_404af0(ecx_15, &arg1[0x30], &var_20, ecx_15, eax_17)" in hlil_part01
+    assert "sub_405540(ecx_16, &arg1[0x2c], &arguments, ecx_16, eax_18)" in hlil_part01
+    assert "DeleteCriticalSection(lpCriticalSection: &arg1[0x25])" in hlil_part01
+    assert "sub_41d290(&arg1[0x23])" in hlil_part01
+    assert "DeleteCriticalSection(lpCriticalSection: &arg1[0xa])" in hlil_part01
+
+    assert "00404af0    int32_t* __thiscall sub_404af0" in hlil_part01
+    assert "if (*(i + 0x281) == 0)" in hlil_part01
+    assert "sub_404e60(arg2, &var_8)" in hlil_part01
+    assert "00405540    int32_t* __thiscall sub_405540" in hlil_part01
+    assert "if (*(i + 0x279) == 0)" in hlil_part01
+    assert "sub_404710(arg2, &var_8)" in hlil_part01
+
+    assert "0054f79c  char const data_54f79c[0x15] = \"..\\\\..\\\\..\\\\src\\\\ctx.cpp\"" in hlil_part06
+    assert "0054f7b4  char const data_54f7b4[0x11] = \"sockets.empty ()\"" in hlil_part06
+    assert "0054f7c8  char const data_54f7c8[0x1c] = \"cmd.type == command_t::done\"" in hlil_part06
+    assert "zmq::ypipe_t<struct zmq::command_t, 16>::`vftable'" in hlil_part06
+    assert "0052c0e0  void (__stdcall* const KERNEL32:DeleteCriticalSection)" in hlil_part06
+    assert "0052c0e4  void (__stdcall* const KERNEL32:InitializeCriticalSection)" in hlil_part06
+
+    assert "This pass added 8 aliases" in mapping_round
+    assert "ctx constructor, endpoint map, and map-cleanup wiring" in mapping_round
+    assert "0x10c" in mapping_round
+    assert "`sub_402260` `DeleteCriticalSection` wrapper remains unnamed" in mapping_round
+
+
+def test_zmq_ctx_runtime_inproc_round_413_aliases_are_pinned() -> None:
+    aliases = json.loads(
+        (REPO_ROOT / "references/analysis/quakelive_symbol_aliases.json").read_text(encoding="utf-8")
+    )["quakelive_steam_srp"]
+    functions_csv = (
+        REPO_ROOT / "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+    ).read_text(encoding="utf-8").lower()
+    hlil_part01 = (
+        REPO_ROOT
+        / "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part01.txt"
+    ).read_text(encoding="utf-8")
+    hlil_part06 = (
+        REPO_ROOT
+        / "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part06.txt"
+    ).read_text(encoding="utf-8")
+    mapping_round = (
+        REPO_ROOT / "docs/reverse-engineering/quakelive_steam_mapping_round_413.md"
+    ).read_text(encoding="utf-8")
+
+    expected_aliases = {
+        "sub_403120": "zmq_ctx_t_destroy_socket",
+        "sub_403260": "zmq_ctx_t_choose_io_thread",
+        "sub_403470": "zmq_ctx_endpoint_t_dtor",
+        "sub_403480": "zmq_options_t_dtor",
+        "sub_4035E0": "zmq_ctx_t_unregister_endpoints",
+        "sub_4038B0": "zmq_options_t_copy_ctor",
+        "sub_403BB0": "zmq_ctx_t_pend_connection",
+        "sub_403E40": "zmq_ctx_t_connect_pending",
+    }
+
+    for symbol, alias in expected_aliases.items():
+        address = f"00{symbol.removeprefix('sub_')}".lower()
+        assert aliases[symbol] == alias
+        assert f"fun_{address},{address}" in functions_csv
+        assert f"| `{symbol}` | `{alias}` | High |" in mapping_round
+
+    existing_aliases = {
+        "sub_4032F0": "zmq_ctx_t_register_endpoint",
+        "sub_403560": "zmq_ctx_t_unregister_endpoint",
+        "sub_4036F0": "zmq_ctx_t_find_endpoint",
+        "sub_404010": "zmq_ctx_t_connect_inproc_sockets",
+        "sub_404AF0": "std_tree_erase_zmq_pending_connection_node_range",
+        "sub_40DF50": "zmq_options_t_ctor",
+        "sub_40E0E0": "zmq_options_t_setsockopt",
+        "sub_40E690": "zmq_options_t_getsockopt",
+    }
+
+    for symbol, alias in existing_aliases.items():
+        assert aliases[symbol] == alias
+
+    assert "00403120    int32_t __stdcall sub_403120" in hlil_part01
+    assert "EnterCriticalSection(lpCriticalSection: arg1 + 0x28)" in hlil_part01
+    assert "int32_t ebx = *(arg2 + 8)" in hlil_part01
+    assert "*(arg1 + 0x18) += 4" in hlil_part01
+    assert "*(*(arg1 + 0x58) + (ebx << 2)) = 0" in hlil_part01
+    assert "if (*(arg1 + 0x25) != 0 && *(arg1 + 4) == *(arg1 + 8))" in hlil_part01
+    assert "sub_41d3f0(&esi_2[0xc])" in hlil_part01
+    assert "sub_403120(arg1[1], arg1)" in hlil_part01
+
+    assert "00403260    int32_t __stdcall sub_403260" in hlil_part01
+    assert "if ((arg2 | arg3) == 0)" in hlil_part01
+    assert "__allshl(1, 0, i.b)" in hlil_part01
+    assert "*(*(*(*(arg1 + 0x44) + (i << 2)) + 0x68) + 0x28)" in hlil_part01
+    assert "int32_t* eax_13 = sub_403260(arg2[1], arg2[6], arg2[7])" in hlil_part01
+    assert "uint32_t arguments_2 = sub_403260(*(arg1 + 4), *(arg1 + 0x18), *(arg1 + 0x1c))" in hlil_part01
+    assert "eax_10, ecx_6 = sub_403260(*(arg1 - 0x274), *(arg1 - 0x260), *(arg1 - 0x25c))" in hlil_part01
+
+    assert "00403470    int32_t __convention(\"regparm\") sub_403470" in hlil_part01
+    assert "return sub_403480(arg1 + 8)" in hlil_part01
+    assert "00403480    void sub_403480" in hlil_part01
+    assert "if (*(arg1 + 0x1d0) u>= 0x10)" in hlil_part01
+    assert "operator delete(*(arg1 + 0x16c))" in hlil_part01
+    assert "*(arg1 + 0x174) = 0" in hlil_part01
+
+    assert "004035e0    int32_t __thiscall sub_4035e0" in hlil_part01
+    assert "CRITICAL_SECTION* lpCriticalSection = arg2 + 0xd0" in hlil_part01
+    assert "if (i[0xc] == arg3)" in hlil_part01
+    assert "sub_404710(arg2 + 0xb0, &var_8)" in hlil_part01
+    assert "int32_t edx = sub_4035e0(arg1, ebx[1], ebx)" in hlil_part01
+
+    assert "004038b0    int32_t* __stdcall sub_4038b0" in hlil_part01
+    assert "__builtin_memcpy(dest: arg1 + 0x11, src: arg2 + 0x11, n: 0x100)" in hlil_part01
+    assert "sub_404380(&arg1[0x5b], &arg2[0x5b])" in hlil_part01
+    assert "sub_406ab0(&arg1[0x61], &arg2[0x61], 0, 0xffffffff)" in hlil_part01
+    assert "arg1[0x8f].b = arg2[0x8f].b" in hlil_part01
+    assert "sub_4038b0(&var_298, &arg2[2])" in hlil_part01
+
+    assert "00403bb0    int32_t __fastcall std::money_get" in hlil_part01
+    assert "sub_404a60(arg1 + 0xb0, &var_34, &var_2cc)" in hlil_part01
+    assert "sub_404010(eax_7[0xc], &eax_7[0xe], arg2, 0)" in hlil_part01
+    assert "InterlockedExchangeAdd(*arg2 + 0x254, 1)" in hlil_part01
+    assert "void* var_2e4_8 = sub_4066f0(arg1 + 0xc0)" in hlil_part01
+    assert "sub_406330(arg1 + 0xc0, &var_2d0)" in hlil_part01
+    assert "std::money_get<char,class std::istreambuf_iterator<char,struct std::char_traits<char> > >::_Getmfld(" in hlil_part01
+
+    assert "00403e40    int32_t __thiscall sub_403e40" in hlil_part01
+    assert "sub_4051b0(arg1 + 0xc0, &i_3, &var_30)" in hlil_part01
+    assert "ecx_3 = sub_404010(arg3, sub_404550(arg1 + 0xb0, &var_30) + 8, &i_2[0xc], 1)" in hlil_part01
+    assert "sub_404af0(ecx_3, var_34, &var_34, i_2, var_38)" in hlil_part01
+
+    assert "00404010    int32_t __fastcall sub_404010" in hlil_part01
+    assert "InterlockedExchangeAdd(&arg1[0x95], 1)" in hlil_part01
+    assert "if (*(arg2 + 0x159) == 0)" in hlil_part01
+    assert "sub_410330(&var_2c, edx, arg3[0x93])" in hlil_part01
+    assert "sub_40b520(&var_2c)" in hlil_part01
+    assert "if (arg4 != 1)" in hlil_part01
+    assert "sub_40d510(&var_1c, edx, ecx, arg1)" in hlil_part01
+    assert "result = sub_410400(arg3[0x93], &var_2c)" in hlil_part01
+
+    assert "0054f79c  char const data_54f79c[0x15] = \"..\\\\..\\\\..\\\\src\\\\ctx.cpp\"" in hlil_part06
+    assert "0054f7e4" in hlil_part06 and "6f 6b 00 00" in hlil_part06
+    assert "0054f7e8  char const data_54f7e8[0x8] = \"written\"" in hlil_part06
+    assert "0054f7f0  char const data_54f7f0[0x1c] = \"invalid map/set<T> iterator\"" in hlil_part06
+    assert "0054f8e0  char const data_54f8e0[0x16] = \"options.recv_identity\"" in hlil_part06
+
+    assert "This pass added 6 aliases and corrected 2 stale aliases" in mapping_round
+    assert "ctx runtime and inproc-pending wiring" in mapping_round
+    assert "std_Locinfo_copy_ctor" in mapping_round
+    assert "sub_403DD0" in mapping_round
+
+
+def test_zmq_ctx_map_helper_round_414_aliases_are_pinned() -> None:
+    aliases = json.loads(
+        (REPO_ROOT / "references/analysis/quakelive_symbol_aliases.json").read_text(encoding="utf-8")
+    )["quakelive_steam_srp"]
+    functions_csv = (
+        REPO_ROOT / "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+    ).read_text(encoding="utf-8").lower()
+    hlil_part01 = (
+        REPO_ROOT
+        / "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part01.txt"
+    ).read_text(encoding="utf-8")
+    hlil_part06 = (
+        REPO_ROOT
+        / "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part06.txt"
+    ).read_text(encoding="utf-8")
+    mapping_round = (
+        REPO_ROOT / "docs/reverse-engineering/quakelive_steam_mapping_round_414.md"
+    ).read_text(encoding="utf-8")
+
+    expected_aliases = {
+        "sub_404380": "std_vector_zmq_tcp_address_mask_copy_ctor",
+        "sub_404450": "std_vector_zmq_tcp_address_mask_dtor",
+        "sub_404550": "std_tree_get_or_insert_zmq_endpoint_node",
+        "sub_404A60": "std_tree_find_zmq_endpoint_node",
+        "sub_404C20": "std_tree_rotate_left_zmq_endpoint_node",
+        "sub_404C80": "std_tree_rotate_right_zmq_endpoint_node",
+        "sub_404CE0": "std_tree_rightmost_zmq_endpoint_node",
+        "sub_404D00": "std_tree_leftmost_zmq_endpoint_node",
+        "sub_404D80": "std_tree_zmq_pending_connection_node_map_copy_ctor",
+        "sub_405610": "std_tree_lower_bound_zmq_endpoint_node",
+        "sub_405710": "std_tree_copy_zmq_pending_connection_node_map",
+        "sub_4057A0": "std_tree_free_zmq_pending_connection_node_subtree",
+        "sub_405860": "std_tree_rotate_left_zmq_pending_connection_node",
+        "sub_4058C0": "std_tree_rotate_right_zmq_pending_connection_node",
+        "sub_405920": "std_tree_rightmost_zmq_pending_connection_node",
+        "sub_405940": "std_tree_leftmost_zmq_pending_connection_node",
+        "sub_405960": "std_tree_next_zmq_pending_connection_node",
+        "sub_4059C0": "std_tree_next_zmq_endpoint_node",
+        "sub_405A80": "std_tree_copy_zmq_pending_connection_node_subtree",
+        "sub_405B40": "std_tree_free_zmq_endpoint_node_subtree",
+        "sub_405C00": "std_tree_find_or_insert_zmq_endpoint_node",
+        "sub_405D90": "std_tree_insert_zmq_endpoint_node_with_hint",
+        "sub_4061B0": "std_tree_prev_zmq_endpoint_node",
+        "sub_406230": "std_tree_create_zmq_endpoint_node",
+        "sub_406330": "std_tree_insert_zmq_pending_connection_node_unique",
+        "sub_4066F0": "std_tree_create_zmq_pending_connection_node",
+        "sub_406820": "zmq_ctx_pending_connection_t_copy_ctor",
+    }
+
+    for symbol, alias in expected_aliases.items():
+        address = f"00{symbol.removeprefix('sub_')}".lower()
+        assert aliases[symbol] == alias
+        assert f"fun_{address},{address}" in functions_csv
+        assert f"| `{symbol}` | `{alias}` | High |" in mapping_round
+
+    existing_aliases = {
+        "sub_4032F0": "zmq_ctx_t_register_endpoint",
+        "sub_403BB0": "zmq_ctx_t_pend_connection",
+        "sub_403E40": "zmq_ctx_t_connect_pending",
+        "sub_404710": "std_tree_erase_zmq_endpoint_node",
+        "sub_404AF0": "std_tree_erase_zmq_pending_connection_node_range",
+        "sub_404E60": "std_tree_erase_zmq_pending_connection_node",
+        "sub_4051B0": "std_tree_lower_bound_zmq_pending_connection_node",
+        "sub_405540": "std_tree_erase_zmq_endpoint_node_range",
+        "sub_405EF0": "std_tree_insert_zmq_endpoint_node",
+        "sub_406430": "std_tree_insert_zmq_pending_connection_node",
+    }
+
+    for symbol, alias in existing_aliases.items():
+        assert aliases[symbol] == alias
+
+    assert "00404380    int32_t* __stdcall sub_404380" in hlil_part01
+    assert "edx:eax_3 = muls.dp.d(0x38e38e39, arg2[1] - *arg2)" in hlil_part01
+    assert "result[1] = sub_4067c0(eax_4, arg1, ecx_5)" in hlil_part01
+    assert "00404450    int32_t __stdcall sub_404450" in hlil_part01
+    assert "for (int32_t edi_1 = arg1[1]; i != edi_1; i = &i[9])" in hlil_part01
+
+    assert "00404550    void* __fastcall sub_404550" in hlil_part01
+    assert "void** eax_4 = sub_405610(arg1, arg2)" in hlil_part01
+    assert "sub_405d90(&var_4c8, arg1, eax_4, sub_406230(arg1))" in hlil_part01
+    assert "00404a60    void*** __stdcall sub_404a60" in hlil_part01
+    assert "void** eax = sub_405610(arg1, arg2)" in hlil_part01
+
+    assert "00404c20    int32_t* __thiscall sub_404c20" in hlil_part01
+    assert "00404c80    void* __thiscall sub_404c80" in hlil_part01
+    assert "00404ce0    void __convention(\"regparm\") sub_404ce0" in hlil_part01
+    assert "00404d00    void __convention(\"regparm\") sub_404d00" in hlil_part01
+    assert "if (*(edx_1 + 0x279) == 0)" in hlil_part01
+    assert "while (*(ecx + 0x279) == 0)" in hlil_part01
+
+    assert "00404d80    void* __stdcall sub_404d80" in hlil_part01
+    assert "operator new(0x288)" in hlil_part01
+    assert "*(*(arg1 + 4) + 0x280) = 1" in hlil_part01
+    assert "*(*(arg1 + 4) + 0x281) = 1" in hlil_part01
+    assert "sub_405710(arg1, arg2)" in hlil_part01
+
+    assert "00404e60    int32_t* __stdcall sub_404e60" in hlil_part01
+    assert "if (*(eax_3 + 0x281) != 0)" in hlil_part01
+    assert "sub_405960(&arg_c)" in hlil_part01
+    assert "00405540    int32_t* __thiscall sub_405540" in hlil_part01
+    assert "if (*(i + 0x279) == 0)" in hlil_part01
+    assert "sub_404710(arg2, &var_8)" in hlil_part01
+
+    assert "00405610    void** __stdcall sub_405610" in hlil_part01
+    assert "if (*(ebx + 0x279) != 0)" in hlil_part01
+    assert "00405710    int32_t* __stdcall sub_405710" in hlil_part01
+    assert "004057a0    struct _EXCEPTION_REGISTRATION_RECORD** __stdcall sub_4057a0" in hlil_part01
+    assert "sub_4057a0(*(ebx + 8))" in hlil_part01
+    assert "sub_403480(edi + 0x38)" in hlil_part01
+
+    assert "00405860    int32_t* __thiscall sub_405860" in hlil_part01
+    assert "004058c0    void* __thiscall sub_4058c0" in hlil_part01
+    assert "00405920    void __convention(\"regparm\") sub_405920" in hlil_part01
+    assert "00405940    void __convention(\"regparm\") sub_405940" in hlil_part01
+    assert "00405960    void __convention(\"regparm\") sub_405960" in hlil_part01
+    assert "004059c0    void __convention(\"regparm\") sub_4059c0" in hlil_part01
+    assert "while (*(ecx + 0x281) == 0)" in hlil_part01
+
+    assert "00405a80    void* __thiscall sub_405a80" in hlil_part01
+    assert "void* result_1 = sub_4066f0(arg1)" in hlil_part01
+    assert "00405b40    struct _EXCEPTION_REGISTRATION_RECORD** __stdcall sub_405b40" in hlil_part01
+    assert "sub_405b40(*(ebx + 8))" in hlil_part01
+    assert "00405c00    int32_t** __stdcall sub_405c00" in hlil_part01
+    assert "*arg1 = *sub_405ef0(esi, var_3c, var_38_2, var_34_2, var_30_2)" in hlil_part01
+    assert "00405d90    int32_t** __stdcall sub_405d90" in hlil_part01
+
+    assert "004061b0    void __convention(\"regparm\") sub_4061b0" in hlil_part01
+    assert "00406230    void* __fastcall sub_406230" in hlil_part01
+    assert "operator new(0x280)" in hlil_part01
+    assert "sub_4038b0(result + 0x38, &result_2[0x28])" in hlil_part01
+    assert "00406330    int32_t** __stdcall sub_406330" in hlil_part01
+    assert "sub_406430(eax_4, arg1, &arg_c, var_14, arg_c)" in hlil_part01
+    assert "004066f0    void* __fastcall sub_4066f0" in hlil_part01
+    assert "00406820    char* __stdcall sub_406820" in hlil_part01
+    assert "*(arg2 + 0x268) = arg1[0x9a]" in hlil_part01
+    assert "*(arg2 + 0x26c) = arg1[0x9b]" in hlil_part01
+
+    assert "0054f79c  char const data_54f79c[0x15] = \"..\\\\..\\\\..\\\\src\\\\ctx.cpp\"" in hlil_part06
+    assert "0054f7f0  char const data_54f7f0[0x1c] = \"invalid map/set<T> iterator\"" in hlil_part06
+
+    assert "This pass added 27 aliases" in mapping_round
+    assert "ctx endpoint and pending inproc connection maps" in mapping_round
+    assert "`0x278/0x279`" in mapping_round
+    assert "`0x280/0x281`" in mapping_round
+    assert "compiler-emitted `std::map` machinery" in mapping_round
+
+
+def test_zmq_socket_base_endpoint_map_round_415_aliases_are_pinned() -> None:
+    aliases = json.loads(
+        (REPO_ROOT / "references/analysis/quakelive_symbol_aliases.json").read_text(encoding="utf-8")
+    )["quakelive_steam_srp"]
+    functions_csv = (
+        REPO_ROOT / "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+    ).read_text(encoding="utf-8").lower()
+    hlil_part01 = (
+        REPO_ROOT
+        / "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part01.txt"
+    ).read_text(encoding="utf-8")
+    hlil_part06 = (
+        REPO_ROOT
+        / "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part06.txt"
+    ).read_text(encoding="utf-8")
+    mapping_round = (
+        REPO_ROOT / "docs/reverse-engineering/quakelive_steam_mapping_round_415.md"
+    ).read_text(encoding="utf-8")
+
+    expected_aliases = {
+        "sub_408D90": "zmq_socket_base_t_add_endpoint",
+        "sub_409ED0": "std_string_ctor_substr_zmq_socket_base",
+        "sub_409F10": "zmq_array_item_0_dtor",
+        "sub_40A1B0": "std_tree_erase_zmq_socket_base_pending_connection_node_range",
+        "sub_40A2F0": "zmq_array_item_0_scalar_deleting_dtor",
+        "sub_40AB80": "std_tree_rotate_left_zmq_socket_base_pending_connection_node",
+        "sub_40ABE0": "std_tree_rotate_right_zmq_socket_base_pending_connection_node",
+        "sub_40AC40": "std_tree_rightmost_zmq_socket_base_pending_connection_node",
+        "sub_40AC60": "std_tree_free_zmq_socket_base_endpoint_node_subtree",
+        "sub_40ACD0": "std_tree_rotate_left_zmq_socket_base_endpoint_node",
+        "sub_40AD30": "std_tree_free_zmq_socket_base_pending_connection_node_subtree",
+        "sub_40ADA0": "std_tree_next_zmq_socket_base_pending_connection_node",
+        "sub_40ADF0": "std_tree_next_zmq_socket_base_endpoint_node",
+        "sub_40B280": "std_tree_create_zmq_socket_base_pending_connection_node",
+        "sub_40B360": "std_tree_create_zmq_socket_base_endpoint_node",
+    }
+
+    for symbol, alias in expected_aliases.items():
+        address = f"00{symbol.removeprefix('sub_')}".lower()
+        assert aliases[symbol] == alias
+        assert f"fun_{address},{address}" in functions_csv
+        assert f"| `{symbol}` | `{alias}` | High |" in mapping_round
+
+    existing_aliases = {
+        "sub_408EC0": "zmq_socket_base_t_term_endpoint",
+        "sub_409F20": "std_tree_erase_zmq_pending_connection_node_iter",
+        "sub_40A3D0": "std_tree_erase_zmq_endpoint_node_iter",
+        "sub_40A660": "std_tree_equal_range_zmq_endpoint_node",
+        "sub_40A8F0": "std_tree_equal_range_zmq_pending_connection_node",
+        "sub_40AEB0": "std_tree_insert_zmq_endpoint_node",
+        "sub_40AF80": "std_tree_insert_zmq_pending_connection_node",
+        "sub_40B050": "std_tree_insert_zmq_pending_connection_node_rebalance",
+        "sub_419AD0": "std_tree_insert_zmq_string_pair_node_rebalance",
+    }
+
+    for symbol, alias in existing_aliases.items():
+        assert aliases[symbol] == alias
+
+    assert "00408d90    void** __fastcall sub_408d90" in hlil_part01
+    assert "sub_40f200(arg2, arg1)" in hlil_part01
+    assert "sub_40aeb0(arg1 + 0x288, &var_5c, sub_40b360(arg1 + 0x288))" in hlil_part01
+    assert "sub_408d90(arg2, esi_4, edi_3, 0)" in hlil_part01
+    assert "sub_408d90(arg2, var_79c, arg1, edi_11)" in hlil_part01
+
+    assert "00409ed0    char* __thiscall sub_409ed0" in hlil_part01
+    assert "sub_406ab0(arg2, arg1, arg3, arg4)" in hlil_part01
+    assert "00409f10    int32_t __fastcall sub_409f10" in hlil_part01
+    assert "*arg1 = &zmq::array_item_t<0>::`vftable'" in hlil_part01
+    assert "0040a2f0    struct zmq::array_item_t<0>::VTable** __thiscall sub_40a2f0" in hlil_part01
+
+    assert "0040a1b0    int32_t* __thiscall sub_40a1b0" in hlil_part01
+    assert "if (*(i + 0x2d) == 0)" in hlil_part01
+    assert "sub_409f20(arg2, &var_8, i_2)" in hlil_part01
+    assert "sub_40af80(&arg2[0xa6], &var_778, sub_40b280(&arg2[0xa6]))" in hlil_part01
+
+    assert "0040ab80    int32_t* __thiscall sub_40ab80" in hlil_part01
+    assert "0040abe0    void* __thiscall sub_40abe0" in hlil_part01
+    assert "0040ac40    void __convention(\"regparm\") sub_40ac40" in hlil_part01
+    assert "while (*(ecx + 0x2d) == 0)" in hlil_part01
+    assert "0040ac60    void __stdcall sub_40ac60" in hlil_part01
+    assert "if (*(esi + 0x31) == 0)" in hlil_part01
+    assert "0040acd0    int32_t* __thiscall sub_40acd0" in hlil_part01
+    assert "0040ad30    void __stdcall sub_40ad30" in hlil_part01
+    assert "if (*(esi + 0x2d) == 0)" in hlil_part01
+    assert "0040ada0    void __convention(\"regparm\") sub_40ada0" in hlil_part01
+    assert "0040adf0    void __convention(\"regparm\") sub_40adf0" in hlil_part01
+    assert "while (*(ecx + 0x31) == 0)" in hlil_part01
+
+    assert "0040b280    void* __fastcall sub_40b280" in hlil_part01
+    assert "operator new(0x30)" in hlil_part01
+    assert "*(result + 0x2c) = 0" in hlil_part01
+    assert "*(result + 0x28) = *(result_2 + 0x1c)" in hlil_part01
+    assert "0040b360    void* __fastcall sub_40b360" in hlil_part01
+    assert "operator new(0x34)" in hlil_part01
+    assert "*(result + 0x30) = 0" in hlil_part01
+    assert "*(result + 0x2c) = *(result_2 + 0x20)" in hlil_part01
+
+    assert "0054f874  char const data_54f874[0x1d] = \"..\\\\..\\\\..\\\\src\\\\socket_base.cpp\"" in hlil_part06
+    assert "struct zmq::array_item_t<0>::VTable zmq::array_item_t<0>::`vftable'" in hlil_part06
+
+    assert "This pass added 15 aliases" in mapping_round
+    assert "socket-base endpoint and pending-connection wiring" in mapping_round
+    assert "`socket_base_t + 0x288`" in mapping_round
+    assert "`socket_base_t + 0x298`" in mapping_round
+    assert "`0x30/0x31`" in mapping_round
+    assert "`0x2C/0x2D`" in mapping_round
+
+
 def test_zmq_socket_base_and_msg_internal_aliases_round_374_are_pinned() -> None:
     aliases = json.loads(
         (REPO_ROOT / "references/analysis/quakelive_symbol_aliases.json").read_text(encoding="utf-8")
-    )["quakelive_steam"]
+    )["quakelive_steam_srp"]
     functions_csv = (
         REPO_ROOT / "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
     ).read_text(encoding="utf-8").lower()
@@ -5823,7 +6699,7 @@ def test_zmq_socket_base_and_msg_internal_aliases_round_374_are_pinned() -> None
 def test_zmq_io_thread_reaper_object_command_round_376_aliases_are_pinned() -> None:
     aliases = json.loads(
         (REPO_ROOT / "references/analysis/quakelive_symbol_aliases.json").read_text(encoding="utf-8")
-    )["quakelive_steam"]
+    )["quakelive_steam_srp"]
     functions_csv = (
         REPO_ROOT / "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
     ).read_text(encoding="utf-8").lower()
@@ -5929,10 +6805,363 @@ def test_zmq_io_thread_reaper_object_command_round_376_aliases_are_pinned() -> N
     assert "failure handlers unnamed" in mapping_round
 
 
+def test_zmq_object_default_command_round_416_aliases_are_pinned() -> None:
+    aliases = json.loads(
+        (REPO_ROOT / "references/analysis/quakelive_symbol_aliases.json").read_text(encoding="utf-8")
+    )["quakelive_steam_srp"]
+    functions_csv = (
+        REPO_ROOT / "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+    ).read_text(encoding="utf-8").lower()
+    hlil_part01 = (
+        REPO_ROOT
+        / "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part01.txt"
+    ).read_text(encoding="utf-8")
+    hlil_part06 = (
+        REPO_ROOT
+        / "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part06.txt"
+    ).read_text(encoding="utf-8")
+    mapping_round = (
+        REPO_ROOT / "docs/reverse-engineering/quakelive_steam_mapping_round_416.md"
+    ).read_text(encoding="utf-8")
+
+    expected_aliases = {
+        "sub_40CF60": "zmq_io_thread_t_out_event_assert",
+        "sub_40CFB0": "zmq_io_thread_t_timer_event_assert",
+        "sub_40D2E0": "zmq_reaper_t_out_event_assert",
+        "sub_40D330": "zmq_reaper_t_timer_event_assert",
+        "sub_40DA50": "zmq_object_t_process_stop_assert",
+        "sub_40DAA0": "zmq_object_t_process_plug_assert",
+        "sub_40DAF0": "zmq_object_t_process_own_assert",
+        "sub_40DB40": "zmq_object_t_process_attach_assert",
+        "sub_40DB90": "zmq_object_t_process_bind_assert",
+        "sub_40DBE0": "zmq_object_t_process_activate_read_assert",
+        "sub_40DC30": "zmq_object_t_process_activate_write_assert",
+        "sub_40DC80": "zmq_object_t_process_hiccup_assert",
+        "sub_40DCD0": "zmq_object_t_process_pipe_term_assert",
+        "sub_40DD20": "zmq_object_t_process_pipe_term_ack_assert",
+        "sub_40DD70": "zmq_object_t_process_term_req_assert",
+        "sub_40DDC0": "zmq_object_t_process_term_assert",
+        "sub_40DE10": "zmq_object_t_process_term_ack_assert",
+        "sub_40DE60": "zmq_object_t_process_reap_assert",
+        "sub_40DEB0": "zmq_object_t_process_reaped_assert",
+        "sub_40DF00": "zmq_object_t_process_seqnum_assert",
+    }
+
+    for symbol, alias in expected_aliases.items():
+        address = f"00{symbol.removeprefix('sub_')}".lower()
+        assert aliases[symbol] == alias
+        assert f"fun_{address},{address}" in functions_csv
+        assert f"| `{symbol}` | `{alias}` | High |" in mapping_round
+
+    existing_aliases = {
+        "sub_40CEC0": "zmq_io_thread_t_in_event",
+        "sub_40D000": "zmq_io_thread_t_process_stop",
+        "sub_40D240": "zmq_reaper_t_in_event",
+        "sub_40D380": "zmq_reaper_t_process_stop",
+        "sub_40D410": "zmq_reaper_t_process_reap",
+        "sub_40D430": "zmq_reaper_t_process_reaped",
+        "sub_40D510": "zmq_command_t_process",
+        "sub_40D6E0": "zmq_object_t_send_plug",
+        "sub_40D760": "zmq_object_t_send_own",
+        "sub_40D7E0": "zmq_object_t_send_bind",
+        "sub_40D860": "zmq_object_t_send_activate_read",
+        "sub_40D8C0": "zmq_object_t_send_activate_write",
+        "sub_40D930": "zmq_object_t_send_pipe_term",
+        "sub_40D990": "zmq_object_t_send_pipe_term_ack",
+        "sub_40D9F0": "zmq_object_t_send_term_ack",
+        "sub_40F1E0": "zmq_own_t_process_seqnum",
+        "sub_40F270": "zmq_own_t_process_term_req",
+        "sub_40F320": "zmq_own_t_process_own",
+        "sub_40F450": "zmq_own_t_process_term",
+        "sub_410620": "zmq_pipe_t_process_activate_read",
+        "sub_410650": "zmq_pipe_t_process_activate_write",
+        "sub_410680": "zmq_pipe_t_process_hiccup",
+        "sub_410870": "zmq_pipe_t_process_pipe_term",
+        "sub_4109D0": "zmq_pipe_t_process_pipe_term_ack",
+    }
+
+    for symbol, alias in existing_aliases.items():
+        assert aliases[symbol] == alias
+
+    assert "0040cf60    void __fastcall sub_40cf60(uint32_t arg1) __noreturn" in hlil_part01
+    assert "\"..\\..\\..\\src\\io_thread.cpp\", 0x54, arguments" in hlil_part01
+    assert "0040cfb0    void __fastcall sub_40cfb0(uint32_t arg1) __noreturn" in hlil_part01
+    assert "\"..\\..\\..\\src\\io_thread.cpp\", 0x5a, arguments" in hlil_part01
+    assert "0040d2e0    void __fastcall sub_40d2e0(uint32_t arg1) __noreturn" in hlil_part01
+    assert "\"..\\..\\..\\src\\reaper.cpp\"" in hlil_part01
+    assert "0x59, arguments) + 0x40)" in hlil_part01
+    assert "0040d330    void __fastcall sub_40d330(uint32_t arg1) __noreturn" in hlil_part01
+    assert "0x5e, arguments) + 0x40)" in hlil_part01
+
+    object_defaults = {
+        "0040da50": "0x157",
+        "0040daa0": "0x15c",
+        "0040daf0": "0x161",
+        "0040db40": "0x166",
+        "0040db90": "0x16b",
+        "0040dbe0": "0x170",
+        "0040dc30": "0x175",
+        "0040dc80": "0x17a",
+        "0040dcd0": "0x17f",
+        "0040dd20": "0x184",
+        "0040dd70": "0x189",
+        "0040ddc0": "0x18e",
+        "0040de10": "0x193",
+        "0040de60": "0x198",
+        "0040deb0": "0x19d",
+        "0040df00": "0x1a2",
+    }
+    for address, source_line in object_defaults.items():
+        assert f"{address}    void __fastcall sub_{address[2:]}" in hlil_part01
+        assert "\"..\\..\\..\\src\\object.cpp\"" in hlil_part01
+        assert f"{source_line}, arguments) + 0x40)" in hlil_part01
+
+    assert "0040d510    int32_t __convention(\"regparm\") sub_40d510" in hlil_part01
+    assert "if (ecx u> 0xf)" in hlil_part01
+    assert "case 0" in hlil_part01 and "return (*(*arg4 + 4))()" in hlil_part01
+    assert "case 1" in hlil_part01 and "(*(*arg4 + 8))()" in hlil_part01
+    assert "return (*(*arg4 + 0x40))()" in hlil_part01
+    assert "case 2" in hlil_part01 and "(*(*arg4 + 0xc))(*(arg1 + 8))" in hlil_part01
+    assert "case 3" in hlil_part01 and "(*(*arg4 + 0x10))(*(arg1 + 8))" in hlil_part01
+    assert "case 4" in hlil_part01 and "(*(*arg4 + 0x14))(*(arg1 + 8))" in hlil_part01
+    assert "case 5" in hlil_part01 and "return (*(*arg4 + 0x18))()" in hlil_part01
+    assert "case 6" in hlil_part01 and "return (*(*arg4 + 0x1c))(*(arg1 + 8), *(arg1 + 0xc))" in hlil_part01
+    assert "case 0xd" in hlil_part01 and "return (*(*arg4 + 0x38))(*(arg1 + 8))" in hlil_part01
+    assert "case 0xe" in hlil_part01 and "return (*(*arg4 + 0x3c))()" in hlil_part01
+    assert "case 0xf" in hlil_part01 and "return (*(*arg4 + 0x40))()" in hlil_part01
+
+    assert "int32_t var_14 = 1" in hlil_part01
+    assert "int32_t var_10 = 2" in hlil_part01
+    assert "int32_t var_14 = 4" in hlil_part01
+    assert "int32_t var_10 = 5" in hlil_part01
+    assert "int32_t var_14 = 6" in hlil_part01
+    assert "int32_t var_10 = 8" in hlil_part01
+    assert "int32_t var_10 = 9" in hlil_part01
+    assert "int32_t var_10 = 0xc" in hlil_part01
+
+    assert "struct zmq::i_poll_events::zmq::io_thread_t::VTable zmq::io_thread_t::`vftable'{for `zmq::i_poll_events'}" in hlil_part06
+    assert "0054fbd4      int32_t (* const _purecall)() = sub_40cf60" in hlil_part06
+    assert "0054fbd8      int32_t (* const _purecall)() = sub_40cfb0" in hlil_part06
+    assert "struct zmq::i_poll_events::zmq::reaper_t::VTable zmq::reaper_t::`vftable'{for `zmq::i_poll_events'}" in hlil_part06
+    assert "0054fc4c      int32_t (* const _purecall)() = sub_40d2e0" in hlil_part06
+    assert "0054fc50      int32_t (* const _purecall)() = sub_40d330" in hlil_part06
+
+    assert "struct zmq::object_t::VTable zmq::object_t::`vftable'" in hlil_part06
+    assert "0054fc78      void (__fastcall* const vFunc_1)(uint32_t arg1) __noreturn = sub_40da50" in hlil_part06
+    assert "0054fcb4      void (__fastcall* const vFunc_16)(uint32_t arg1) __noreturn = sub_40df00" in hlil_part06
+    assert "struct zmq::object_t::zmq::reaper_t::VTable zmq::reaper_t::`vftable'{for `zmq::object_t'}" in hlil_part06
+    assert "0054fc34      void (__fastcall* const vFunc_14)(uint32_t arg1) __noreturn = sub_40d410" in hlil_part06
+    assert "0054fc38      void (__fastcall* const vFunc_15)(uint32_t arg1) __noreturn = sub_40d430" in hlil_part06
+
+    assert "This pass added 20 aliases" in mapping_round
+    assert "default ZMQ object-command and poll-event assertion" in mapping_round
+    assert "surface" in mapping_round
+    assert "process_seqnum" in mapping_round
+    assert "process_attach" in mapping_round
+    assert "supersedes that gap" in mapping_round
+
+
+def test_zmq_own_ptr_tree_round_417_aliases_are_pinned() -> None:
+    aliases = json.loads(
+        (REPO_ROOT / "references/analysis/quakelive_symbol_aliases.json").read_text(encoding="utf-8")
+    )["quakelive_steam_srp"]
+    functions_csv = (
+        REPO_ROOT / "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+    ).read_text(encoding="utf-8").lower()
+    hlil_part01 = (
+        REPO_ROOT
+        / "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part01.txt"
+    ).read_text(encoding="utf-8")
+    mapping_round = (
+        REPO_ROOT / "docs/reverse-engineering/quakelive_steam_mapping_round_417.md"
+    ).read_text(encoding="utf-8")
+
+    expected_aliases = {
+        "sub_40F720": "std_tree_free_zmq_ptr_node_subtree",
+        "sub_40F760": "std_tree_rotate_right_zmq_ptr_node",
+        "sub_40F7C0": "std_tree_rightmost_zmq_ptr_node",
+        "sub_40FA10": "std_tree_prev_zmq_ptr_node",
+        "sub_40FA70": "std_tree_find_zmq_ptr_node_iter",
+        "sub_40FAE0": "std_tree_create_zmq_ptr_node",
+        "sub_416510": "std_tree_erase_zmq_ptr_node_range",
+        "sub_4166B0": "std_tree_clear_zmq_ptr_node_tree",
+    }
+
+    for symbol, alias in expected_aliases.items():
+        address = f"00{symbol.removeprefix('sub_')}".lower()
+        assert aliases[symbol] == alias
+        assert f"fun_{address},{address}" in functions_csv
+        assert f"| `{symbol}` | `{alias}` | High |" in mapping_round
+
+    existing_aliases = {
+        "sub_40F150": "zmq_own_t_dtor",
+        "sub_40F270": "zmq_own_t_process_term_req",
+        "sub_40F320": "zmq_own_t_process_own",
+        "sub_40F450": "zmq_own_t_process_term",
+        "sub_40F670": "zmq_own_t_check_term_acks",
+        "sub_40F7E0": "std_tree_insert_zmq_ptr_node_rebalance",
+        "sub_416020": "std_tree_erase_zmq_ptr_node_iter",
+        "sub_416700": "std_tree_find_or_insert_zmq_ptr_node",
+    }
+    for symbol, alias in existing_aliases.items():
+        assert aliases[symbol] == alias
+
+    assert "0040f050    struct zmq::object_t::VTable** __stdcall sub_40f050" in hlil_part01
+    assert "arg1[0x9a] = eax_5" in hlil_part01
+    assert "*eax_5 = eax_5" in hlil_part01
+    assert "arg1[0x9d] = 0" in hlil_part01
+
+    assert "0040f150    int32_t __fastcall sub_40f150" in hlil_part01
+    assert "sub_416510(ecx, &arg1[0x99], &var_1c, ecx, eax_3)" in hlil_part01
+    assert "operator delete(arg1[0x9a])" in hlil_part01
+
+    assert "0040f270    void __fastcall sub_40f270" in hlil_part01
+    assert "sub_40fa70(&var_8, edx, &arg_4, *edi_1, edi_1)" in hlil_part01
+    assert "sub_416020(arg1 + 0x264, &var_8, eax)" in hlil_part01
+    assert "*(arg1 + 0x274) += 1" in hlil_part01
+
+    assert "0040f320    void** __fastcall sub_40f320" in hlil_part01
+    assert "return sub_416700(&var_c, arg1 + 0x264, sub_40fae0(arg1 + 0x264))" in hlil_part01
+
+    assert "0040f450    int32_t __thiscall sub_40f450" in hlil_part01
+    assert "sub_40f720(esi[2])" in hlil_part01
+    assert "ebx[0x9d] += ebx[0x9b]" in hlil_part01
+    assert "ebx[0x9b] = 0" in hlil_part01
+    assert "ebx[0x94].b = 1" in hlil_part01
+
+    assert "0040f720    void __stdcall sub_40f720(void** arg1)" in hlil_part01
+    assert "if (*(edi + 0x11) == 0)" in hlil_part01
+    assert "operator delete(edi)" in hlil_part01
+    assert "0040f760    void* __thiscall sub_40f760(int32_t* arg1, void* arg2)" in hlil_part01
+    assert "*arg1 = *(result + 8)" in hlil_part01
+    assert "if (arg1 == *(edx_4 + 4))" in hlil_part01
+    assert "0040f7c0    void __convention(\"regparm\") sub_40f7c0(void* arg1)" in hlil_part01
+    assert "while (*(ecx + 0x11) == 0)" in hlil_part01
+
+    assert "0040fa10    void __convention(\"regparm\") sub_40fa10(int32_t* arg1)" in hlil_part01
+    assert "if (*(ecx_3 + 0x11) != 0)" in hlil_part01
+    assert "while (*arg1 == *ecx_2)" in hlil_part01
+    assert "0040fa70    void __convention(\"regparm\") sub_40fa70" in hlil_part01
+    assert "while (i[3] != *arg3)" in hlil_part01
+    assert "0040fae0    void* sub_40fae0(void* arg1 @ esi)" in hlil_part01
+    assert "operator new(0x14)" in hlil_part01
+    assert "*(result + 0x10) = 0" in hlil_part01
+    assert "*(result + 0xc) = *arg_4" in hlil_part01
+
+    assert "00416510    int32_t* __thiscall sub_416510" in hlil_part01
+    assert "if (i == *eax && arg5 == eax)" in hlil_part01
+    assert "sub_4166b0(arg2)" in hlil_part01
+    assert "sub_416020(arg2, &var_8, i_2)" in hlil_part01
+    assert "004166b0    void* sub_4166b0(void* arg1 @ edi)" in hlil_part01
+    assert "*(arg1 + 8) = 0" in hlil_part01
+
+    assert "This pass added 8 aliases" in mapping_round
+    assert "owned pointer set" in mapping_round
+    assert "command opcode `0xB`" in mapping_round
+    assert "container-level shape" in mapping_round
+
+
+def test_zmq_clock_thread_round_418_aliases_are_pinned() -> None:
+    aliases = json.loads(
+        (REPO_ROOT / "references/analysis/quakelive_symbol_aliases.json").read_text(encoding="utf-8")
+    )["quakelive_steam_srp"]
+    functions_csv = (
+        REPO_ROOT / "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+    ).read_text(encoding="utf-8").lower()
+    hlil_part01 = (
+        REPO_ROOT
+        / "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part01.txt"
+    ).read_text(encoding="utf-8")
+    hlil_part06 = (
+        REPO_ROOT
+        / "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part06.txt"
+    ).read_text(encoding="utf-8")
+    mapping_round = (
+        REPO_ROOT / "docs/reverse-engineering/quakelive_steam_mapping_round_418.md"
+    ).read_text(encoding="utf-8")
+
+    expected_aliases = {
+        "sub_40B9A0": "zmq_clock_t_now_ms_cached",
+        "sub_40BA00": "zmq_thread_t_thread_routine",
+        "sub_40BA20": "zmq_thread_t_start",
+        "sub_40BB30": "zmq_thread_t_stop",
+        "sub_52B070": "zmq_clock_t_tickcount_lock_atexit",
+    }
+
+    for symbol, alias in expected_aliases.items():
+        address = f"00{symbol.removeprefix('sub_')}".lower()
+        assert aliases[symbol] == alias
+        assert f"fun_{address},{address}" in functions_csv
+        assert f"| `{symbol}` | `{alias}` | High |" in mapping_round
+
+    existing_aliases = {
+        "sub_40BCE0": "zmq_select_t_ctor",
+        "sub_40BDA0": "zmq_select_t_dtor",
+        "sub_40C460": "zmq_select_t_loop_entry",
+        "sub_40CCC0": "zmq_io_thread_t_ctor",
+        "sub_40D030": "zmq_reaper_t_ctor",
+        "sub_40D510": "zmq_command_t_process",
+        "sub_41C7F0": "zmq_poller_base_t_add_timer",
+        "sub_41C970": "zmq_poller_base_t_execute_timers",
+    }
+    for symbol, alias in existing_aliases.items():
+        assert aliases[symbol] == alias
+
+    assert "0040b950    int32_t sub_40b950()" in hlil_part01
+    assert "EnterCriticalSection(lpCriticalSection: &data_12d3460)" in hlil_part01
+    assert "uint32_t result = GetTickCount()" in hlil_part01
+    assert "data_12d3490 += 1" in hlil_part01
+    assert "LeaveCriticalSection(lpCriticalSection: &data_12d3460)" in hlil_part01
+
+    assert "0040b9a0    int32_t sub_40b9a0(int32_t* arg1 @ esi)" in hlil_part01
+    assert "eax_1, edx_2 = _rdtsc(tsc)" in hlil_part01
+    assert "jump(data_12d3478)" in hlil_part01
+    assert "result, edx_1 = data_12d3478()" in hlil_part01
+    assert "arg1[2] = result" in hlil_part01
+    assert "arg1[3] = edx_1" in hlil_part01
+
+    assert "0040ba00    int32_t __stdcall sub_40ba00(int32_t* arg1)" in hlil_part01
+    assert "(*arg1)(arg1[1])" in hlil_part01
+    assert "0040ba20    int32_t __thiscall sub_40ba20" in hlil_part01
+    assert "*arg1 = sub_40c460" in hlil_part01
+    assert "arg1[1] = arg2" in hlil_part01
+    assert "_beginthreadex(0, 0, sub_40ba00, arg1, 0, 0)" in hlil_part01
+    assert "\"..\\..\\..\\src\\thread.cpp\", 0x33" in hlil_part01
+    assert "0040bb30    BOOL sub_40bb30(void* arg1 @ esi)" in hlil_part01
+    assert "WaitForSingleObject(hHandle: *(arg1 + 8), dwMilliseconds: 0xffffffff)" in hlil_part01
+    assert "\"..\\..\\..\\src\\thread.cpp\", 0x39" in hlil_part01
+    assert "BOOL result = CloseHandle(hObject: *(arg1 + 8))" in hlil_part01
+    assert "\"..\\..\\..\\src\\thread.cpp\", 0x3b" in hlil_part01
+
+    assert "00402da8      sub_40ba20(eax_16 + 0x6060, eax_16)" in hlil_part01
+    assert "00402eb1              sub_40ba20(eax_26 + 0x6060, eax_26)" in hlil_part01
+    assert "0040bdb3  sub_40bb30(&arg1[0x1818])" in hlil_part01
+    assert "00409226                  eax_8, edx_2 = sub_40b9a0()" in hlil_part01
+    assert "0040927c                          edi_1 = var_10 - sub_40b9a0()" in hlil_part01
+    assert "00409395                      eax_6, edx_2 = sub_40b9a0()" in hlil_part01
+    assert "00409403                              ebx_1 = var_10 - sub_40b9a0()" in hlil_part01
+
+    assert "0052a9e0    int32_t sub_52a9e0()" in hlil_part06
+    assert "InitializeCriticalSection(lpCriticalSection: &data_12d3460)" in hlil_part06
+    assert "return _atexit(sub_52b070)" in hlil_part06
+    assert "0052aa00    int32_t (*)() sub_52aa00()" in hlil_part06
+    assert "LoadLibraryA(lpLibFileName: \"Kernel32.dll\")" in hlil_part06
+    assert "GetProcAddress(hModule, lpProcName: \"GetTickCount64\")" in hlil_part06
+    assert "result = sub_40b950" in hlil_part06
+    assert "data_12d3478 = result" in hlil_part06
+    assert "0052b070    int32_t sub_52b070()" in hlil_part06
+    assert "return DeleteCriticalSection(lpCriticalSection: &data_12d3460)" in hlil_part06
+
+    assert "This pass added 5 aliases" in mapping_round
+    assert "cached millisecond clock helper" in mapping_round
+    assert "thread start/stop wrappers" in mapping_round
+    assert "not promoted as an alias" in mapping_round
+
+
 def test_zmq_options_default_and_mask_vector_round_378_aliases_are_pinned() -> None:
     aliases = json.loads(
         (REPO_ROOT / "references/analysis/quakelive_symbol_aliases.json").read_text(encoding="utf-8")
-    )["quakelive_steam"]
+    )["quakelive_steam_srp"]
     functions_csv = (
         REPO_ROOT / "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
     ).read_text(encoding="utf-8").lower()
@@ -6019,7 +7248,7 @@ def test_zmq_options_default_and_mask_vector_round_378_aliases_are_pinned() -> N
 def test_zmq_tcp_connecter_round_379_aliases_are_pinned() -> None:
     aliases = json.loads(
         (REPO_ROOT / "references/analysis/quakelive_symbol_aliases.json").read_text(encoding="utf-8")
-    )["quakelive_steam"]
+    )["quakelive_steam_srp"]
     functions_csv = (
         REPO_ROOT / "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
     ).read_text(encoding="utf-8").lower()
@@ -6129,7 +7358,7 @@ def test_zmq_tcp_connecter_round_379_aliases_are_pinned() -> None:
 def test_zmq_tcp_listener_round_390_aliases_are_pinned() -> None:
     aliases = json.loads(
         (REPO_ROOT / "references/analysis/quakelive_symbol_aliases.json").read_text(encoding="utf-8")
-    )["quakelive_steam"]
+    )["quakelive_steam_srp"]
     functions_csv = (
         REPO_ROOT / "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
     ).read_text(encoding="utf-8").lower()
@@ -6236,7 +7465,7 @@ def test_zmq_tcp_listener_round_390_aliases_are_pinned() -> None:
 def test_zmq_tcp_socket_and_endpoint_round_391_aliases_are_pinned() -> None:
     aliases = json.loads(
         (REPO_ROOT / "references/analysis/quakelive_symbol_aliases.json").read_text(encoding="utf-8")
-    )["quakelive_steam"]
+    )["quakelive_steam_srp"]
     functions_csv = (
         REPO_ROOT / "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
     ).read_text(encoding="utf-8").lower()
@@ -6318,10 +7547,78 @@ def test_zmq_tcp_socket_and_endpoint_round_391_aliases_are_pinned() -> None:
     assert "endpoint string-pair constructor/destructor" in mapping_round
 
 
+def test_zmq_endpoint_lifecycle_round_407_aliases_are_pinned() -> None:
+    aliases = json.loads(
+        (REPO_ROOT / "references/analysis/quakelive_symbol_aliases.json").read_text(encoding="utf-8")
+    )["quakelive_steam_srp"]
+    functions_csv = (
+        REPO_ROOT / "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+    ).read_text(encoding="utf-8").lower()
+    hlil_part01 = (
+        REPO_ROOT
+        / "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part01.txt"
+    ).read_text(encoding="utf-8")
+    hlil_part06 = (
+        REPO_ROOT
+        / "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part06.txt"
+    ).read_text(encoding="utf-8")
+    mapping_round = (
+        REPO_ROOT / "docs/reverse-engineering/quakelive_steam_mapping_round_407.md"
+    ).read_text(encoding="utf-8")
+
+    expected_aliases = {
+        "sub_41AAE0": "zmq_endpoint_t_ctor",
+        "sub_41AB60": "zmq_endpoint_t_dtor",
+    }
+
+    for symbol, alias in expected_aliases.items():
+        address = f"00{symbol.removeprefix('sub_')}".lower()
+        assert aliases[symbol] == alias
+        assert f"fun_{address},{address}" in functions_csv
+        assert f"| `{symbol}` | `{alias}` | High |" in mapping_round
+
+    assert aliases["sub_41AC10"] == "zmq_endpoint_t_to_string"
+    assert "| `sub_41AC10` | `zmq_endpoint_t_to_string` | Existing |" in mapping_round
+
+    assert "0054f8c0  74 63 70 00" in hlil_part06
+    assert "var_790_1 = sub_41aae0(arguments_2, &var_54, &var_70)" in hlil_part01
+    assert "eax_63, edx_15 = sub_40ae40(&var_54, &data_54f8c0)" in hlil_part01
+    assert "var_790_1[0xe] = eax_64" in hlil_part01
+    assert "___std_fs_get_file_attributes_by_handle@8(ecx_25," in hlil_part01
+    assert "var_790_1[0xe], 0, arg2[0x58].b)" in hlil_part01
+    assert "sub_41ab60(var_790_1)" in hlil_part01
+    assert "operator delete(var_790_1)" in hlil_part01
+    assert "sub_41ac10(&arg2[0xd2], var_790_1)" in hlil_part01
+    assert "sub_41afa0(var_790_1, edx_15, ecx_26, &arg2[4], ecx_26," in hlil_part01
+
+    assert "0041aae0    char* __stdcall sub_41aae0" in hlil_part01
+    assert "*(arg1 + 0x14) = 0xf" in hlil_part01
+    assert "sub_406ab0(arg1, arg2, 0, 0xffffffff)" in hlil_part01
+    assert "*(arg1 + 0x30) = 0xf" in hlil_part01
+    assert "sub_406ab0(&arg1[0x1c], arg3, 0, 0xffffffff)" in hlil_part01
+    assert "*(arg1 + 0x38) = 0" in hlil_part01
+
+    assert "0041ab60    int32_t __stdcall sub_41ab60" in hlil_part01
+    assert "char result = sub_40ae40(arg1, &data_54f8c0)" in hlil_part01
+    assert "result = (**ecx_1)(1)" in hlil_part01
+    assert "arg1[0xe] = 0" in hlil_part01
+    assert "operator delete(arg1[7])" in hlil_part01
+    assert "operator delete(*arg1)" in hlil_part01
+    assert "sub_41ab60(esi)" in hlil_part01
+
+    assert "if (sub_40ae40(arg2, &data_54f8c0) != 0 && arg2[0xe] != 0)" in hlil_part01
+    assert "result = (*(*arg2[0xe] + 4))(edi)" in hlil_part01
+    assert '"://"' in hlil_part01
+
+    assert "This pass added 2 aliases" in mapping_round
+    assert "endpoint container lifecycle" in mapping_round
+    assert "MSVC stringstream failure handling" in mapping_round
+
+
 def test_zmq_stream_engine_peer_round_392_aliases_are_pinned() -> None:
     aliases = json.loads(
         (REPO_ROOT / "references/analysis/quakelive_symbol_aliases.json").read_text(encoding="utf-8")
-    )["quakelive_steam"]
+    )["quakelive_steam_srp"]
     functions_csv = (
         REPO_ROOT / "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
     ).read_text(encoding="utf-8").lower()
@@ -6410,7 +7707,7 @@ def test_zmq_stream_engine_peer_round_392_aliases_are_pinned() -> None:
 def test_zmq_stream_engine_state_machine_round_393_aliases_are_pinned() -> None:
     aliases = json.loads(
         (REPO_ROOT / "references/analysis/quakelive_symbol_aliases.json").read_text(encoding="utf-8")
-    )["quakelive_steam"]
+    )["quakelive_steam_srp"]
     functions_csv = (
         REPO_ROOT / "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
     ).read_text(encoding="utf-8").lower()
@@ -6529,10 +7826,2136 @@ def test_zmq_stream_engine_state_machine_round_393_aliases_are_pinned() -> None:
     assert "backpressure retry callback" in mapping_round
 
 
+def test_zmq_codec_round_394_aliases_are_pinned() -> None:
+    aliases = json.loads(
+        (REPO_ROOT / "references/analysis/quakelive_symbol_aliases.json").read_text(encoding="utf-8")
+    )["quakelive_steam_srp"]
+    functions_csv = (
+        REPO_ROOT / "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+    ).read_text(encoding="utf-8").lower()
+    analysis_symbols = (
+        REPO_ROOT / "references/reverse-engineering/ghidra/quakelive_steam/analysis_symbols.txt"
+    ).read_text(encoding="utf-8")
+    hlil_part01 = (
+        REPO_ROOT
+        / "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part01.txt"
+    ).read_text(encoding="utf-8")
+    hlil_part06 = (
+        REPO_ROOT
+        / "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part06.txt"
+    ).read_text(encoding="utf-8")
+    mapping_round = (
+        REPO_ROOT / "docs/reverse-engineering/quakelive_steam_mapping_round_394.md"
+    ).read_text(encoding="utf-8")
+
+    expected_aliases = {
+        "sub_424940": "zmq_i_encoder_t_scalar_deleting_dtor",
+        "sub_424970": "zmq_raw_encoder_t_scalar_deleting_dtor",
+        "sub_4249B0": "zmq_raw_encoder_t_message_ready",
+        "sub_424A10": "zmq_raw_encoder_t_ctor",
+        "sub_424A80": "zmq_encoder_base_t_encode",
+        "sub_424BF0": "zmq_i_decoder_t_dtor",
+        "sub_424C00": "zmq_i_decoder_t_scalar_deleting_dtor",
+        "sub_424C30": "zmq_raw_decoder_t_msg",
+        "sub_424C40": "zmq_raw_decoder_t_ctor",
+        "sub_424CC0": "zmq_raw_decoder_t_scalar_deleting_dtor",
+        "sub_424CF0": "zmq_raw_decoder_t_dtor",
+        "sub_424DB0": "zmq_raw_decoder_t_get_buffer",
+        "sub_424DD0": "zmq_raw_decoder_t_decode",
+        "sub_424E60": "zmq_v1_encoder_t_ctor",
+        "sub_424EB0": "zmq_v1_encoder_t_scalar_deleting_dtor",
+        "sub_424EF0": "zmq_v1_encoder_t_size_ready",
+        "sub_424F50": "zmq_v1_encoder_t_message_ready",
+        "sub_425030": "zmq_encoder_base_v1_encoder_t_ctor",
+        "sub_4250A0": "zmq_v1_decoder_t_msg",
+        "sub_4250B0": "zmq_get_uint64",
+        "sub_425130": "zmq_v1_decoder_t_ctor",
+        "sub_4251A0": "zmq_v1_decoder_t_scalar_deleting_dtor",
+        "sub_4251D0": "zmq_v1_decoder_t_dtor",
+        "sub_425290": "zmq_v1_decoder_t_one_byte_size_ready",
+        "sub_4253E0": "zmq_v1_decoder_t_eight_byte_size_ready",
+        "sub_425520": "zmq_v1_decoder_t_flags_ready",
+        "sub_425580": "zmq_v1_decoder_t_message_ready",
+        "sub_4255C0": "zmq_decoder_base_v1_decoder_t_ctor",
+        "sub_425660": "zmq_decoder_base_v1_decoder_t_dtor",
+        "sub_425680": "zmq_decoder_base_t_decode",
+        "sub_425780": "zmq_decoder_base_v1_decoder_t_scalar_deleting_dtor",
+        "sub_4257C0": "zmq_v2_encoder_t_ctor",
+        "sub_425810": "zmq_v2_encoder_t_scalar_deleting_dtor",
+        "sub_425850": "zmq_v2_encoder_t_message_ready",
+        "sub_425940": "zmq_v2_encoder_t_size_ready",
+        "sub_4259A0": "zmq_encoder_base_v2_encoder_t_ctor",
+        "sub_425A10": "zmq_encoder_base_t_load_msg",
+        "sub_425A80": "zmq_v2_decoder_t_msg",
+        "sub_425A90": "zmq_v2_decoder_t_ctor",
+        "sub_425B00": "zmq_v2_decoder_t_scalar_deleting_dtor",
+        "sub_425B30": "zmq_v2_decoder_t_dtor",
+        "sub_425BF0": "zmq_v2_decoder_t_flags_ready",
+        "sub_425C60": "zmq_v2_decoder_t_one_byte_size_ready",
+        "sub_425D70": "zmq_v2_decoder_t_eight_byte_size_ready",
+        "sub_425E90": "zmq_v2_decoder_t_message_ready",
+        "sub_425ED0": "zmq_decoder_base_v2_decoder_t_ctor",
+        "sub_425F70": "zmq_decoder_base_v2_decoder_t_dtor",
+        "sub_425F90": "zmq_decoder_base_t_get_buffer",
+        "sub_425FD0": "zmq_decoder_base_v2_decoder_t_scalar_deleting_dtor",
+    }
+
+    for symbol, alias in expected_aliases.items():
+        address = f"00{symbol.removeprefix('sub_')}".lower()
+        assert aliases[symbol] == alias
+        assert f"fun_{address},{address}" in functions_csv
+        assert f"| `{symbol}` | `{alias}` | High |" in mapping_round
+
+    assert "00551460 IMPORTED zmq::i_encoder::vftable" in analysis_symbols
+    assert "005514c4 IMPORTED zmq::raw_decoder_t::vftable" in analysis_symbols
+    assert "00551558 IMPORTED zmq::v1_decoder_t::vftable" in analysis_symbols
+    assert "00551580 IMPORTED zmq::v2_encoder_t::vftable" in analysis_symbols
+    assert "005515bc IMPORTED zmq::v2_decoder_t::vftable" in analysis_symbols
+
+    assert "sub_424a10(&data_5266a8, esi_1)" in hlil_part01
+    assert "eax_14 = sub_424c40(&data_5266a8, eax_13)" in hlil_part01
+    assert "sub_424e60(eax_59)" in hlil_part01
+    assert "sub_425130(eax_62, arg1[0x88], arg1[0x89])" in hlil_part01
+    assert "sub_4257c0(eax_42)" in hlil_part01
+    assert "sub_425a90(eax_45, arg1[0x88], arg1[0x89])" in hlil_part01
+
+    assert "00424940    struct zmq::i_encoder::VTable** __thiscall sub_424940" in hlil_part01
+    assert "*arg1 = &zmq::i_encoder::`vftable'" in hlil_part01
+    assert "00424970    struct zmq::i_encoder::zmq::encoder_base_t<class zmq::raw_encoder_t>::VTable** __thiscall sub_424970" in hlil_part01
+    assert "free(eax)" in hlil_part01
+    assert "00424a10    struct zmq::i_encoder::zmq::encoder_base_t<class zmq::raw_encoder_t>::VTable** __fastcall sub_424a10" in hlil_part01
+    assert "arg2[9] = 0x2000" in hlil_part01
+    assert "arg2[0xa] = eax" in hlil_part01
+    assert "00424a80    int32_t __thiscall sub_424a80" in hlil_part01
+    assert "if (*(arg1 + 0x2c) == 0)" in hlil_part01
+    assert "sub_40b520(*(arg1 + 0x2c)) != 0" in hlil_part01
+    assert "*(arg1 + 0x2c) = 0" in hlil_part01
+    assert "00425a10    int32_t __thiscall sub_425a10" in hlil_part01
+    assert "in_progress == NULL" in hlil_part01
+    assert "*(arg1 + 0x2c) = arg2" in hlil_part01
+
+    assert "00424bf0    int32_t __fastcall sub_424bf0" in hlil_part01
+    assert "00424c00    struct zmq::i_decoder::VTable** __thiscall sub_424c00" in hlil_part01
+    assert "00424c30    int32_t __fastcall sub_424c30(int32_t arg1) __pure" in hlil_part01
+    assert "return arg1 + 4" in hlil_part01
+    assert "00424c40    struct zmq::i_decoder::zmq::raw_decoder_t::VTable** __fastcall sub_424c40" in hlil_part01
+    assert "*arg2 = &zmq::raw_decoder_t::`vftable'{for `zmq::i_decoder'}" in hlil_part01
+    assert '"..\\..\\..\\src\\raw_decoder.cpp", 0x26' in hlil_part01
+    assert "00424cf0    int32_t __fastcall sub_424cf0" in hlil_part01
+    assert "sub_40b520(arg1 + 4) == 0" in hlil_part01
+    assert "00424db0    int32_t __thiscall sub_424db0" in hlil_part01
+    assert "*arg2 = *(arg1 + 0x30)" in hlil_part01
+    assert "00424dd0    int32_t __thiscall sub_424dd0" in hlil_part01
+    assert "memcpy(sub_40b660(ecx), arg2, ebx)" in hlil_part01
+
+    assert "00424e60    struct zmq::i_encoder::zmq::encoder_base_t<class zmq::v1_encoder_t>::VTable**" in hlil_part01
+    assert "sub_425030(ecx, arg1)" in hlil_part01
+    assert "*(arg1 + 0x10) = sub_424f50.q" in hlil_part01
+    assert "00424f50    int32_t __fastcall sub_424f50" in hlil_part01
+    assert "if (result u>= 0xff)" in hlil_part01
+    assert "*(arg1 + 0x39) = result.b" in hlil_part01
+    assert "*(arg1 + 0x10) = sub_424ef0.q" in hlil_part01
+    assert "00425130    struct zmq::i_decoder::zmq::decoder_base_t<class zmq::v1_decoder_t>::VTable**" in hlil_part01
+    assert "*(arg1 + 8) = sub_425290.q" in hlil_part01
+    assert "00425290    int32_t __fastcall sub_425290" in hlil_part01
+    assert "if (ebx.b != 0xff)" in hlil_part01
+    assert "*_errno() = 0x86" in hlil_part01
+    assert "004253e0    int32_t __fastcall sub_4253e0" in hlil_part01
+    assert "eax, edx = sub_4250b0(arg1 + 0x28)" in hlil_part01
+    assert "00425520    int32_t __fastcall sub_425520" in hlil_part01
+    assert "*(arg1 + 0x4f) |= *(arg1 + 0x28) & 1" in hlil_part01
+    assert "00425680    int32_t __thiscall sub_425680" in hlil_part01
+    assert "size_ <= to_read" in hlil_part01
+    assert "memcpy(*(arg1 + 0x18), ecx_2 + arg2, edi_1)" in hlil_part01
+
+    assert "004257c0    struct zmq::i_encoder::zmq::encoder_base_t<class zmq::v2_encoder_t>::VTable**" in hlil_part01
+    assert "sub_4259a0(ecx, arg1)" in hlil_part01
+    assert "*(arg1 + 0x10) = sub_425850.q" in hlil_part01
+    assert "00425850    uint32_t __fastcall sub_425850" in hlil_part01
+    assert "if ((*(*(arg1 + 0x2c) + 0x1f) & 1) != 0)" in hlil_part01
+    assert "if ((*(*(arg1 + 0x2c) + 0x1f) & 2) != 0)" in hlil_part01
+    assert "*(arg1 + 0x10) = sub_425940.q" in hlil_part01
+    assert "00425a90    struct zmq::i_decoder::zmq::decoder_base_t<class zmq::v2_decoder_t>::VTable**" in hlil_part01
+    assert "*(arg1 + 8) = sub_425bf0.q" in hlil_part01
+    assert "00425bf0    int32_t __fastcall sub_425bf0" in hlil_part01
+    assert "if ((edx & 2) == 0)" in hlil_part01
+    assert "var_14 = sub_425c60" in hlil_part01
+    assert "var_14 = sub_425d70" in hlil_part01
+    assert "00425c60    int32_t __fastcall sub_425c60" in hlil_part01
+    assert '"..\\..\\..\\src\\v2_decoder.cpp", 0x54' in hlil_part01
+    assert "00425d70    int32_t __fastcall sub_425d70" in hlil_part01
+    assert "eax, edx = sub_4250b0(arg1 + 0x28)" in hlil_part01
+    assert "00425e90    int32_t __fastcall sub_425e90" in hlil_part01
+    assert "*(arg1 + 8) = sub_425bf0.q" in hlil_part01
+    assert "00425f90    int32_t* __thiscall sub_425f90" in hlil_part01
+    assert "if (*(arg1 + 0x1c) u>= *(arg1 + 0x20))" in hlil_part01
+
+    assert "zmq::i_encoder::`vftable'" in hlil_part06
+    assert "void*** (__thiscall* const vFunc_0)(void*** arg1, char arg2) = sub_424940" in hlil_part06
+    assert "zmq::raw_encoder_t::`vftable'{for `zmq::encoder_base_t<class zmq::raw_encoder_t>'}" in hlil_part06
+    assert "int32_t (* const _purecall)() = sub_424a80" in hlil_part06
+    assert "int32_t (* const _purecall)() = sub_425a10" in hlil_part06
+    assert "zmq::raw_decoder_t::`vftable'{for `zmq::i_decoder'}" in hlil_part06
+    assert "int32_t (* const _purecall)() = sub_424dd0" in hlil_part06
+    assert "zmq::v1_decoder_t::`vftable'{for `zmq::decoder_base_t<class zmq::v1_decoder_t>'}" in hlil_part06
+    assert "zmq::v2_decoder_t::`vftable'{for `zmq::decoder_base_t<class zmq::v2_decoder_t>'}" in hlil_part06
+    assert "int32_t (* const _purecall)() = sub_425f90" in hlil_part06
+    assert "int32_t (* const _purecall)() = sub_425680" in hlil_part06
+
+    assert "This pass added 49 aliases" in mapping_round
+    assert "raw/v1/v2 codec wiring" in mapping_round
+    assert "v2 decoder flags callback" in mapping_round
+
+
+def test_zmq_null_mechanism_round_395_aliases_are_pinned() -> None:
+    aliases = json.loads(
+        (REPO_ROOT / "references/analysis/quakelive_symbol_aliases.json").read_text(encoding="utf-8")
+    )["quakelive_steam_srp"]
+    functions_csv = (
+        REPO_ROOT / "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+    ).read_text(encoding="utf-8").lower()
+    analysis_symbols = (
+        REPO_ROOT / "references/reverse-engineering/ghidra/quakelive_steam/analysis_symbols.txt"
+    ).read_text(encoding="utf-8")
+    hlil_part01 = (
+        REPO_ROOT
+        / "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part01.txt"
+    ).read_text(encoding="utf-8")
+    hlil_part06 = (
+        REPO_ROOT
+        / "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part06.txt"
+    ).read_text(encoding="utf-8")
+    mapping_round = (
+        REPO_ROOT / "docs/reverse-engineering/quakelive_steam_mapping_round_395.md"
+    ).read_text(encoding="utf-8")
+
+    expected_aliases = {
+        "sub_426010": "zmq_mechanism_t_passthrough_encode_decode",
+        "sub_426020": "zmq_null_mechanism_t_ctor",
+        "sub_426100": "zmq_null_mechanism_t_scalar_deleting_dtor",
+        "sub_426130": "zmq_null_mechanism_t_dtor",
+        "sub_4261B0": "zmq_null_mechanism_t_next_handshake_command",
+        "sub_426370": "zmq_null_mechanism_t_process_handshake_command",
+        "sub_426480": "zmq_null_mechanism_t_zap_msg_available",
+        "sub_4264B0": "zmq_null_mechanism_t_status",
+        "sub_4283A0": "zmq_mechanism_t_scalar_deleting_dtor",
+        "sub_428400": "zmq_mechanism_t_dtor",
+        "sub_428450": "zmq_mechanism_t_get_user_id",
+        "sub_4284F0": "zmq_mechanism_t_socket_type_string",
+        "sub_428550": "zmq_mechanism_t_add_property",
+        "sub_428AC0": "zmq_mechanism_t_property",
+    }
+
+    for symbol, alias in expected_aliases.items():
+        address = f"00{symbol.removeprefix('sub_')}".lower()
+        assert aliases[symbol] == alias
+        assert f"fun_{address},{address}" in functions_csv
+        assert f"| `{symbol}` | `{alias}` | High |" in mapping_round
+
+    assert aliases["sub_4264D0"] == "zmq_null_mechanism_t_send_zap_request"
+    assert aliases["sub_4269D0"] == "zmq_null_mechanism_t_receive_and_process_zap_reply"
+    assert aliases["sub_428650"] == "zmq_mechanism_t_parse_metadata"
+    assert aliases["sub_428AE0"] == "zmq_mechanism_t_check_socket_type"
+    assert "zmq_null_mechanism_t_send_zap_request" in mapping_round
+    assert "zmq_null_mechanism_t_receive_and_process_zap_reply" in mapping_round
+    assert "zmq_mechanism_t_parse_metadata" in mapping_round
+    assert "zmq_mechanism_t_check_socket_type" in mapping_round
+
+    assert "00551630 IMPORTED zmq::null_mechanism_t::vftable" in analysis_symbols
+    assert "005517b0 IMPORTED zmq::mechanism_t::vftable" in analysis_symbols
+    assert "00554474 IMPORTED zmq::null_mechanism_t::RTTI_Complete_Object_Locator" in analysis_symbols
+    assert "00554540 IMPORTED zmq::mechanism_t::RTTI_Complete_Object_Locator" in analysis_symbols
+    assert "00584fac IMPORTED zmq::null_mechanism_t::RTTI_Type_Descriptor" in analysis_symbols
+
+    assert "00426010    int32_t sub_426010() __pure" in hlil_part01
+    assert "00426012  return 0" in hlil_part01
+    assert "00426020    struct zmq::mechanism_t::VTable** __stdcall sub_426020" in hlil_part01
+    assert "*arg1 = &zmq::mechanism_t::`vftable'" in hlil_part01
+    assert "*arg1 = &zmq::null_mechanism_t::`vftable'{for `zmq::mechanism_t'}" in hlil_part01
+    assert "arg1[0x9a] = arg2" in hlil_part01
+    assert "sub_406ab0(&arg1[0x9b], arg3, 0, 0xffffffff)" in hlil_part01
+    assert "if (sub_41bb60(arg1[0x9a]) == 0)" in hlil_part01
+    assert "*(arg1 + 0x28a) = 1" in hlil_part01
+
+    assert "00426100    struct zmq::mechanism_t::zmq::null_mechanism_t::VTable** __thiscall sub_426100" in hlil_part01
+    assert "sub_426130(arg1)" in hlil_part01
+    assert "00426130    int32_t __fastcall sub_426130" in hlil_part01
+    assert "operator delete(arg1[0x9b])" in hlil_part01
+    assert "*arg1 = &zmq::mechanism_t::`vftable'" in hlil_part01
+    assert "operator delete(arg1[0x92])" in hlil_part01
+    assert "return sub_403480(&arg1[2])" in hlil_part01
+
+    assert "004261b0    int32_t __thiscall sub_4261b0" in hlil_part01
+    assert "if (*(arg1 + 0x28a) != 0 && *(arg1 + 0x28c) == 0)" in hlil_part01
+    assert "sub_4264d0(arg1)" in hlil_part01
+    assert "sub_4269d0(arg1) != 0" in hlil_part01
+    assert "*eax_4 = 0x41455205" in hlil_part01
+    assert "*(eax_4 + 4) = 0x5944" in hlil_part01
+    assert "char* esi_2 = sub_4284f0(0x41455205, *(arg1 + 0x130))" in hlil_part01
+    assert 'int32_t eax_9 = sub_428550(ecx_1, eax_4 + 6, "Socket-Type", esi_2)' in hlil_part01
+    assert 'edi_1 += sub_428550(arguments_3 + 0x19, edi_1, "Identity", arguments_3 + 0x19)' in hlil_part01
+    assert "memcpy(sub_40b660(arg2), eax_4, arguments_4)" in hlil_part01
+    assert "*(arguments_3 + 0x288) = 1" in hlil_part01
+
+    assert "00426370    int32_t __thiscall sub_426370" in hlil_part01
+    assert "eax_3 u< 6 || *eax_2 != 0x41455205" in hlil_part01
+    assert "int32_t result = sub_428650(esi, eax_2 + 6, eax_3 - 6)" in hlil_part01
+    assert "*(esi + 0x289) = 1" in hlil_part01
+
+    assert "00426480    void* __fastcall sub_426480" in hlil_part01
+    assert "if (arg1[0xa3].b != 0)" in hlil_part01
+    assert "void* result = sub_4269d0(arg1)" in hlil_part01
+    assert "arg1[0xa3].b = 1" in hlil_part01
+    assert "004264b0    int32_t __fastcall sub_4264b0" in hlil_part01
+    assert "if (*(arg1 + 0x289) != 0 && *(arg1 + 0x288) != 0)" in hlil_part01
+
+    assert "004283a0    struct zmq::mechanism_t::VTable** __thiscall sub_4283a0" in hlil_part01
+    assert "00428400    int32_t __fastcall sub_428400" in hlil_part01
+    assert "00428450    int32_t __stdcall sub_428450" in hlil_part01
+    assert "if (sub_40b4a0(arg1, *(ebx + 0x258)) != 0)" in hlil_part01
+    assert "memcpy(sub_40b660(ecx), eax_8, ecx)" in hlil_part01
+    assert "*(arg1 + 0x1f) |= 0x40" in hlil_part01
+    assert "004284f0    int32_t __fastcall sub_4284f0" in hlil_part01
+    assert "socket_type >= 0 && socket_type" in hlil_part01
+    assert "00428550    int32_t __thiscall sub_428550" in hlil_part01
+    assert "name_len <= 255" in hlil_part01
+    assert "value_len <= 0x7FFFFFFF" in hlil_part01
+    assert "*esi_2 = (arg4 u>> 0x18).b" in hlil_part01
+    assert "return eax + arg4 + 5" in hlil_part01
+    assert "if ((*(*arg1 + 0x1c))() != 0xffffffff)" in hlil_part01
+    assert "00428ac0    int32_t __stdcall sub_428ac0" in hlil_part01
+    assert "00428ae0    int32_t __stdcall sub_428ae0" in hlil_part01
+    assert "if (sub_428ae0() != 0)" in hlil_part01
+
+    assert "zmq::null_mechanism_t::`vftable'{for `zmq::mechanism_t'}" in hlil_part06
+    assert "void*** (__thiscall* const vFunc_0)(void*** arg1, char arg2) = sub_426100" in hlil_part06
+    assert "int32_t (* const _purecall)() = sub_4261b0" in hlil_part06
+    assert "int32_t (* const _purecall)() = sub_426370" in hlil_part06
+    assert "int32_t (* const vFunc_3)() __pure = sub_426010" in hlil_part06
+    assert "int32_t (* const vFunc_4)() __pure = sub_426010" in hlil_part06
+    assert "int32_t (* const vFunc_5)() __pure = sub_426480" in hlil_part06
+    assert "int32_t (* const _purecall)() = sub_4264b0" in hlil_part06
+    assert "int32_t (__stdcall* const vFunc_7)(void* arg1, int32_t arg2) = sub_428ac0" in hlil_part06
+    assert "zmq::mechanism_t::`vftable'" in hlil_part06
+    assert "void*** (__thiscall* const vFunc_0)(void*** arg1, char arg2) = sub_4283a0" in hlil_part06
+
+    assert "This pass added 14 aliases" in mapping_round
+    assert "NULL mechanism READY/ZAP metadata wiring" in mapping_round
+    assert "PLAIN mechanism lifecycle" in mapping_round
+
+
+def test_zmq_plain_mechanism_round_396_aliases_are_pinned() -> None:
+    aliases = json.loads(
+        (REPO_ROOT / "references/analysis/quakelive_symbol_aliases.json").read_text(encoding="utf-8")
+    )["quakelive_steam_srp"]
+    functions_csv = (
+        REPO_ROOT / "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+    ).read_text(encoding="utf-8").lower()
+    analysis_symbols = (
+        REPO_ROOT / "references/reverse-engineering/ghidra/quakelive_steam/analysis_symbols.txt"
+    ).read_text(encoding="utf-8")
+    hlil_part01 = (
+        REPO_ROOT
+        / "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part01.txt"
+    ).read_text(encoding="utf-8")
+    hlil_part06 = (
+        REPO_ROOT
+        / "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part06.txt"
+    ).read_text(encoding="utf-8")
+    mapping_round = (
+        REPO_ROOT / "docs/reverse-engineering/quakelive_steam_mapping_round_396.md"
+    ).read_text(encoding="utf-8")
+
+    expected_aliases = {
+        "sub_426D50": "zmq_plain_mechanism_t_ctor",
+        "sub_426E00": "zmq_plain_mechanism_t_scalar_deleting_dtor",
+        "sub_426E30": "zmq_plain_mechanism_t_dtor",
+        "sub_426EB0": "zmq_plain_mechanism_t_next_handshake_command",
+        "sub_426FA0": "zmq_plain_mechanism_t_process_handshake_command",
+        "sub_4270E0": "zmq_plain_mechanism_t_status",
+        "sub_4270F0": "zmq_plain_mechanism_t_zap_msg_available",
+    }
+
+    rechecked_aliases = {
+        "sub_427130": "zmq_plain_mechanism_t_produce_hello",
+        "sub_427360": "zmq_plain_mechanism_t_process_hello",
+        "sub_4274E0": "zmq_plain_mechanism_t_process_welcome",
+        "sub_427530": "zmq_plain_mechanism_t_produce_initiate",
+        "sub_4276D0": "zmq_plain_mechanism_t_process_initiate",
+        "sub_427740": "zmq_plain_mechanism_t_produce_ready",
+        "sub_4278E0": "zmq_plain_mechanism_t_process_ready",
+        "sub_427940": "zmq_plain_mechanism_t_send_zap_request",
+        "sub_428020": "zmq_plain_mechanism_t_receive_and_process_zap_reply",
+    }
+
+    for symbol, alias in expected_aliases.items():
+        address = f"00{symbol.removeprefix('sub_')}".lower()
+        assert aliases[symbol] == alias
+        assert f"fun_{address},{address}" in functions_csv
+        assert f"| `{symbol}` | `{alias}` | High |" in mapping_round
+
+    for symbol, alias in rechecked_aliases.items():
+        address = f"00{symbol.removeprefix('sub_')}".lower()
+        assert aliases[symbol] == alias
+        assert f"fun_{address},{address}" in functions_csv
+        assert alias in mapping_round
+
+    assert "005516d0 IMPORTED zmq::plain_mechanism_t::vftable" in analysis_symbols
+    assert "005544f4 IMPORTED zmq::plain_mechanism_t::RTTI_Complete_Object_Locator" in analysis_symbols
+    assert "00554524 IMPORTED zmq::plain_mechanism_t::RTTI_Base_Class_Descriptor_at_(0,-1,0,64)" in analysis_symbols
+    assert "00584fd0 IMPORTED zmq::plain_mechanism_t::RTTI_Type_Descriptor" in analysis_symbols
+
+    assert 'char const* const eax_53 = "PLAIN"' in hlil_part01
+    assert "sub_426d50(eax_54, arg1[0x37], &arg1[0xd8], &arg1[0x38])" in hlil_part01
+    assert "00426d50    struct zmq::mechanism_t::VTable** __stdcall sub_426d50" in hlil_part01
+    assert "*arg1 = &zmq::mechanism_t::`vftable'" in hlil_part01
+    assert "*arg1 = &zmq::plain_mechanism_t::`vftable'{for `zmq::mechanism_t'}" in hlil_part01
+    assert "arg1[0x9a] = arg2" in hlil_part01
+    assert "sub_406ab0(&arg1[0x9b], arg3, 0, 0xffffffff)" in hlil_part01
+    assert "ecx_2.b = arg1[0x62] != 0" in hlil_part01
+    assert "arg1[0xa3] = ecx_2" in hlil_part01
+
+    assert "00426e00    struct zmq::mechanism_t::zmq::plain_mechanism_t::VTable** __thiscall sub_426e00" in hlil_part01
+    assert "sub_426e30(arg1)" in hlil_part01
+    assert "00426e30    int32_t __fastcall sub_426e30" in hlil_part01
+    assert "operator delete(arg1[0x9b])" in hlil_part01
+    assert "operator delete(arg1[0x92])" in hlil_part01
+    assert "return sub_403480(&arg1[2])" in hlil_part01
+
+    assert "00426eb0    int32_t __thiscall sub_426eb0" in hlil_part01
+    assert "switch (esi[0xa3])" in hlil_part01
+    assert "sub_427130(arg1, arg2)" in hlil_part01
+    assert "esi[0xa3] = 3" in hlil_part01
+    assert "*(arg2 + 0x1e) = 0x65" in hlil_part01
+    assert "*(arg2 + 0x1d) = 8" in hlil_part01
+    assert "*eax_4 = 0x4c455707" in hlil_part01
+    assert "__builtin_strncpy(dest: eax_4 + 4, src: \"COME\", n: 4)" in hlil_part01
+    assert "esi[0xa3] = 5" in hlil_part01
+    assert "eax_2, esi_1 = sub_427530(arg1, esi)" in hlil_part01
+    assert "*(esi_1 + 0x28c) = 7" in hlil_part01
+    assert "eax_2, esi_2 = sub_427740(arg2, esi)" in hlil_part01
+    assert "*(esi_2 + 0x28c) = 9" in hlil_part01
+    assert "*_errno() = 0xb" in hlil_part01
+
+    assert "00426fa0    int32_t __thiscall sub_426fa0" in hlil_part01
+    assert "switch (arg1[0xa3] - 1)" in hlil_part01
+    assert "result = sub_427360(arg1)" in hlil_part01
+    assert "arg1[0xa3] = (sbb.d(eax_3, eax_3, eax_2 != 0) & 6) + 2" in hlil_part01
+    assert "result = sub_4274e0()" in hlil_part01
+    assert "arg1[0xa3] = 4" in hlil_part01
+    assert "result = sub_4276d0(arg1)" in hlil_part01
+    assert "arg1[0xa3] = 6" in hlil_part01
+    assert "result = sub_4278e0(arg1)" in hlil_part01
+    assert "arg1[0xa3] = 9" in hlil_part01
+    assert "if (sub_40b520(edi) == 0)" in hlil_part01
+    assert "*_errno() = 0x86" in hlil_part01
+
+    assert "004270e0    int32_t __fastcall sub_4270e0" in hlil_part01
+    assert "result.b = *(arg1 + 0x28c) == 9" in hlil_part01
+    assert "004270f0    void* __fastcall sub_4270f0" in hlil_part01
+    assert "if (arg1[0xa3] != 8)" in hlil_part01
+    assert "*_errno() = 0x9523dfb" in hlil_part01
+    assert "void* result = sub_428020(arg1)" in hlil_part01
+    assert "arg1[0xa3] = 2" in hlil_part01
+
+    assert "00427130    int32_t __thiscall sub_427130" in hlil_part01
+    assert "username.length () < 256" in hlil_part01
+    assert "password.length () < 256" in hlil_part01
+    assert "*esi_3 = 0x4c454805" in hlil_part01
+    assert "*(esi_3 + 4) = 0x4f4c" in hlil_part01
+    assert "00427360    int32_t __stdcall sub_427360" in hlil_part01
+    assert "*eax_4 == 0x4c454805" in hlil_part01
+    assert "sub_427940(&var_30, &var_4c, arg1)" in hlil_part01
+    assert "if (sub_428020(arg1) == 0)" in hlil_part01
+    assert "arg1[0xa2].b = 1" in hlil_part01
+    assert "004274e0    int32_t sub_4274e0()" in hlil_part01
+    assert "int32_t* const eax_2 = &data_5516b4" in hlil_part01
+
+    assert "00427530    int32_t __thiscall sub_427530" in hlil_part01
+    assert "*eax = 0x54414954494e4908" in hlil_part01
+    assert 'int32_t eax_8 = sub_428550(ecx, eax + 9, "Socket-Type", edx)' in hlil_part01
+    assert 'esi_2 = &esi_2[sub_428550(arguments_3 + 0x19, esi_2, "Identity", arguments_3 + 0x19)]' in hlil_part01
+    assert "004276d0    int32_t __stdcall sub_4276d0" in hlil_part01
+    assert "return sub_428650(arg1, eax_1 + 9, eax_2 - 9)" in hlil_part01
+    assert "00427740    int32_t __thiscall sub_427740" in hlil_part01
+    assert "*eax = 0x41455205" in hlil_part01
+    assert 'int32_t eax_8 = sub_428550(ecx, eax + 6, "Socket-Type", edx)' in hlil_part01
+    assert "004278e0    int32_t __stdcall sub_4278e0" in hlil_part01
+    assert "return sub_428650(arg1, eax + 6, eax_1 - 6)" in hlil_part01
+    assert "00427940    int32_t __fastcall sub_427940" in hlil_part01
+    assert '__builtin_strncpy(dest: sub_40b660(ecx_15), src: "PLAIN", n: 5)' in hlil_part01
+    assert "00428020    void* __stdcall sub_428020" in hlil_part01
+
+    assert "zmq::plain_mechanism_t::`vftable'{for `zmq::mechanism_t'}" in hlil_part06
+    assert "void*** (__thiscall* const vFunc_0)(void*** arg1, char arg2) = sub_426e00" in hlil_part06
+    assert "int32_t (* const _purecall)() = sub_426eb0" in hlil_part06
+    assert "int32_t (* const _purecall)() = sub_426fa0" in hlil_part06
+    assert "int32_t (* const vFunc_3)() __pure = sub_426010" in hlil_part06
+    assert "int32_t (* const vFunc_4)() __pure = sub_426010" in hlil_part06
+    assert "int32_t (* const vFunc_5)() __pure = sub_4270f0" in hlil_part06
+    assert "int32_t (* const _purecall)() = sub_4270e0" in hlil_part06
+    assert "int32_t (__stdcall* const vFunc_7)(void* arg1, int32_t arg2) = sub_428ac0" in hlil_part06
+
+    assert "This pass added 7 aliases" in mapping_round
+    assert "PLAIN mechanism dispatch/state wiring" in mapping_round
+    assert "ZAP wait" in mapping_round
+
+
+def test_zmq_session_base_round_397_aliases_are_pinned() -> None:
+    aliases = json.loads(
+        (REPO_ROOT / "references/analysis/quakelive_symbol_aliases.json").read_text(encoding="utf-8")
+    )["quakelive_steam_srp"]
+    functions_csv = (
+        REPO_ROOT / "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+    ).read_text(encoding="utf-8").lower()
+    analysis_symbols = (
+        REPO_ROOT / "references/reverse-engineering/ghidra/quakelive_steam/analysis_symbols.txt"
+    ).read_text(encoding="utf-8")
+    hlil_part01 = (
+        REPO_ROOT
+        / "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part01.txt"
+    ).read_text(encoding="utf-8")
+    hlil_part06 = (
+        REPO_ROOT
+        / "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part06.txt"
+    ).read_text(encoding="utf-8")
+    mapping_round = (
+        REPO_ROOT / "docs/reverse-engineering/quakelive_steam_mapping_round_397.md"
+    ).read_text(encoding="utf-8")
+
+    expected_aliases = {
+        "sub_41B0E0": "zmq_session_base_t_ctor",
+        "sub_41B230": "zmq_session_base_t_scalar_deleting_dtor",
+        "sub_41B260": "zmq_session_base_t_dtor",
+        "sub_41B430": "zmq_session_base_t_attach_pipe",
+        "sub_41B570": "zmq_session_base_t_write_zap_msg",
+        "sub_41BEB0": "zmq_session_base_t_attach_engine",
+        "sub_41C320": "zmq_session_base_t_detach",
+        "sub_41C6F0": "zmq_session_base_t_io_object_scalar_deleting_dtor",
+        "sub_41C700": "zmq_session_base_t_i_pipe_events_scalar_deleting_dtor",
+    }
+
+    rechecked_aliases = {
+        "sub_41AFA0": "zmq_session_base_t_create",
+        "sub_41B630": "zmq_session_base_t_flush",
+        "sub_41B670": "zmq_session_base_t_clean_pipes",
+        "sub_41B820": "zmq_session_base_t_pipe_terminated",
+        "sub_41B970": "zmq_session_base_t_read_activated",
+        "sub_41BA40": "zmq_session_base_t_write_activated",
+        "sub_41BAF0": "zmq_session_base_t_hiccuped",
+        "sub_41BB40": "zmq_session_base_t_process_plug",
+        "sub_41BB60": "zmq_session_base_t_zap_connect",
+        "sub_41BE90": "zmq_session_base_t_zap_enabled",
+        "sub_41C120": "zmq_session_base_t_process_term",
+        "sub_41C260": "zmq_session_base_t_timer_event",
+        "sub_41C400": "zmq_session_base_t_start_connecting",
+    }
+
+    for symbol, alias in expected_aliases.items():
+        address = f"00{symbol.removeprefix('sub_')}".lower()
+        assert aliases[symbol] == alias
+        assert f"fun_{address},{address}" in functions_csv
+        assert f"| `{symbol}` | `{alias}` | High |" in mapping_round
+
+    for symbol, alias in rechecked_aliases.items():
+        address = f"00{symbol.removeprefix('sub_')}".lower()
+        assert aliases[symbol] == alias
+        assert f"fun_{address},{address}" in functions_csv
+        assert alias in mapping_round
+
+    assert "00550d4c IMPORTED zmq::session_base_t::vftable" in analysis_symbols
+    assert "00550d9c IMPORTED zmq::session_base_t::vftable" in analysis_symbols
+    assert "00550db0 IMPORTED zmq::session_base_t::vftable" in analysis_symbols
+    assert "00553ef0 IMPORTED zmq::session_base_t::RTTI_Complete_Object_Locator" in analysis_symbols
+    assert "00553f04 IMPORTED zmq::session_base_t::RTTI_Complete_Object_Locator" in analysis_symbols
+    assert "00553f18 IMPORTED zmq::session_base_t::RTTI_Complete_Object_Locator" in analysis_symbols
+    assert "00584bf4 IMPORTED zmq::session_base_t::RTTI_Type_Descriptor" in analysis_symbols
+
+    assert "0041afa0    struct zmq::own_t::zmq::session_base_t::VTable** __convention(\"regparm\") sub_41afa0" in hlil_part01
+    assert "void* arguments_2 = sub_526684(0x2b8)" in hlil_part01
+    assert "result = sub_41b0e0(arguments_2, arg5, arg6, arg7, arg4)" in hlil_part01
+    assert "struct zmq::session_base_t::zmq::req_session_t::VTable** arguments_1 =" in hlil_part01
+    assert "result = sub_414410(arg4, arguments_1, arg5, arg6, arg7)" in hlil_part01
+
+    assert "0041b0e0    struct zmq::own_t::zmq::session_base_t::VTable** __stdcall sub_41b0e0" in hlil_part01
+    assert "uint32_t ecx_1 = sub_40f050(arg1, arg2)" in hlil_part01
+    assert "arg1[0x9e] = &zmq::io_object_t::`vftable'{for `zmq::i_poll_events'}" in hlil_part01
+    assert "sub_41df90(ecx_1, &arg1[0x9e], arg2)" in hlil_part01
+    assert "arg1[0xa0] = &zmq::i_pipe_events::`vftable'" in hlil_part01
+    assert "*arg1 = &zmq::session_base_t::`vftable'{for `zmq::own_t'}" in hlil_part01
+    assert "arg1[0x9e] = &zmq::session_base_t::`vftable'{for `zmq::io_object_t'}" in hlil_part01
+    assert "arg1[0xa0] = &zmq::session_base_t::`vftable'{for `zmq::i_pipe_events'}" in hlil_part01
+    assert "arg1[0xa2] = 0" in hlil_part01
+    assert "arg1[0xa3] = 0" in hlil_part01
+    assert "arg1[0xa5]->__offset(0x10).d.b = 1" in hlil_part01
+    assert "arg1[0xab] = arg2" in hlil_part01
+    assert "arg1[0xad] = arg5" in hlil_part01
+
+    assert "0041b230    struct zmq::own_t::zmq::session_base_t::VTable** __thiscall sub_41b230" in hlil_part01
+    assert "sub_41b260(arg1)" in hlil_part01
+    assert "if ((arg2 & 1) != 0)" in hlil_part01
+    assert "0041b260    int32_t __fastcall sub_41b260" in hlil_part01
+    assert "Assertion failed: %s (%s:%d)\\n\", \"!pipe\"" in hlil_part01
+    assert "Assertion failed: %s (%s:%d)\\n\", \"!zap_pipe\"" in hlil_part01
+    assert "sub_41c8a0(arg1[0x9f], 0x20, &arg1[0x9e])" in hlil_part01
+    assert "(*(*ecx + 8))(eax_2)" in hlil_part01
+    assert "sub_41ab60(esi)" in hlil_part01
+    assert "sub_416510(ecx_1, &arg1[0xa4], &var_1c, ecx_1, eax_10)" in hlil_part01
+    assert "arg1[0xa0] = &zmq::i_pipe_events::`vftable'" in hlil_part01
+    assert "arg1[0x9e] = &zmq::i_poll_events::`vftable'" in hlil_part01
+    assert "*arg1 = &zmq::own_t::`vftable'{for `zmq::object_t'}" in hlil_part01
+    assert "sub_416510(ecx_2, &arg1[0x99], &arguments, ecx_2, eax_12)" in hlil_part01
+    assert "int32_t result = sub_403480(&arg1[4])" in hlil_part01
+
+    assert "0041b430    void* __thiscall sub_41b430(uint32_t arg1, void* arg2)" in hlil_part01
+    assert "\"!is_terminating ()\"" in hlil_part01
+    assert "\"pipe_\"" in hlil_part01
+    assert "*(arguments_2 + 0x288) = arg2" in hlil_part01
+    assert "arguments = arguments_2 + 0x280" in hlil_part01
+    assert "*(arg2 + 0x54) = arguments_2 + 0x280" in hlil_part01
+    assert "\"!sink\", \"..\\..\\..\\src\\pipe.cpp\", 0x64" in hlil_part01
+
+    assert "0041b570    int32_t __stdcall sub_41b570" in hlil_part01
+    assert "void* esi = *(ebx + 0x28c)" in hlil_part01
+    assert "*_errno() = 0x7e" in hlil_part01
+    assert "if (sub_410400(esi, arg1) == 0)" in hlil_part01
+    assert "if ((*(arg1 + 0x1f) & 1) == 0)" in hlil_part01
+    assert "sub_40d860(*(esi_1 + 0x50), edx_2, esi_1)" in hlil_part01
+    assert "*(arg1 + 0x1e) = 0x65" in hlil_part01
+    assert "*(arg1 + 0x1d) = 0" in hlil_part01
+
+    assert "0041beb0    int32_t __thiscall sub_41beb0(void* arg1, uint32_t arg2)" in hlil_part01
+    assert "\"engine_ != NULL\"" in hlil_part01
+    assert "uint32_t ecx_2 = sub_40fd50(&var_20, &var_18, &var_10, &arguments)" in hlil_part01
+    assert "sub_4101d0(ecx_2, esi_2, arg1 + 0x280)" in hlil_part01
+    assert "*(arg1 + 0x288) = esi_2" in hlil_part01
+    assert "if (*(arg1 + 0x2a4) == 0)" in hlil_part01
+    assert "*(arg1 + 0x2a4) = esi" in hlil_part01
+    assert "return (*(*esi + 4))(eax_16, arg1)" in hlil_part01
+
+    assert "0041c320    int32_t __stdcall sub_41c320(int32_t* arg1)" in hlil_part01
+    assert "if (arg1[0xa1].b == 0)" in hlil_part01
+    assert "return sub_40f3c0(arg1)" in hlil_part01
+    assert "sub_410df0(arg1[0xa2])" in hlil_part01
+    assert "sub_410c00(0, arg1[0xa2])" in hlil_part01
+    assert "arg1[0xa2] = 0" in hlil_part01
+    assert "int32_t result = (*(*arg1 + 0x48))()" in hlil_part01
+    assert "if (arg1[0x50] != 0xffffffff)" in hlil_part01
+    assert "result = sub_41c400(arg1, 1)" in hlil_part01
+    assert "if (ebx_1 == 2 || ebx_1 == 0xa)" in hlil_part01
+
+    assert "0041c6f0    int32_t __fastcall sub_41c6f0(int32_t arg1)" in hlil_part01
+    assert "return sub_41b230(arg1 - 0x278) __tailcall" in hlil_part01
+    assert "0041c700    int32_t __fastcall sub_41c700(int32_t arg1)" in hlil_part01
+    assert "return sub_41b230(arg1 - 0x280) __tailcall" in hlil_part01
+
+    assert "struct zmq::own_t::zmq::session_base_t::VTable zmq::session_base_t::`vftable'{for `zmq::own_t'}" in hlil_part06
+    assert "void*** (__thiscall* const vFunc_0)(void*** arg1, char arg2) = sub_41b230" in hlil_part06
+    assert "void (__fastcall* const vFunc_2)(uint32_t arg1) __noreturn = sub_41bb40" in hlil_part06
+    assert "void (__fastcall* const vFunc_4)(uint32_t arg1) __noreturn = sub_41beb0" in hlil_part06
+    assert "struct zmq::io_object_t::zmq::session_base_t::VTable zmq::session_base_t::`vftable'{for `zmq::io_object_t'}" in hlil_part06
+    assert "void*** (__thiscall* const vFunc_0)(void*** arg1, char arg2) = sub_41c6f0" in hlil_part06
+    assert "int32_t (* const _purecall)() = sub_41c260" in hlil_part06
+    assert "struct zmq::i_pipe_events::zmq::session_base_t::VTable zmq::session_base_t::`vftable'{for `zmq::i_pipe_events'}" in hlil_part06
+    assert "void*** (__thiscall* const vFunc_0)(void*** arg1, char arg2) = sub_41c700" in hlil_part06
+    assert "int32_t (* const _purecall)() = sub_41b970" in hlil_part06
+    assert "int32_t (* const _purecall)() = sub_41ba40" in hlil_part06
+    assert "int32_t (* const _purecall)() = sub_41baf0" in hlil_part06
+    assert "int32_t (* const _purecall)() = sub_41b820" in hlil_part06
+
+    assert "This pass added 8 aliases and corrected 1 existing alias" in mapping_round
+    assert "session_base_t lifecycle/pipe/ZAP/engine wiring" in mapping_round
+    assert "Corrects the prior round-131 name" in mapping_round
+    assert "multiple-inheritance destructor thunks" in mapping_round
+
+
+def test_zmq_req_dealer_round_398_aliases_are_pinned() -> None:
+    aliases = json.loads(
+        (REPO_ROOT / "references/analysis/quakelive_symbol_aliases.json").read_text(encoding="utf-8")
+    )["quakelive_steam_srp"]
+    functions_csv = (
+        REPO_ROOT / "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+    ).read_text(encoding="utf-8").lower()
+    analysis_symbols = (
+        REPO_ROOT / "references/reverse-engineering/ghidra/quakelive_steam/analysis_symbols.txt"
+    ).read_text(encoding="utf-8")
+    hlil_part01 = (
+        REPO_ROOT
+        / "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part01.txt"
+    ).read_text(encoding="utf-8")
+    hlil_part06 = (
+        REPO_ROOT
+        / "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part06.txt"
+    ).read_text(encoding="utf-8")
+    mapping_round = (
+        REPO_ROOT / "docs/reverse-engineering/quakelive_steam_mapping_round_398.md"
+    ).read_text(encoding="utf-8")
+
+    expected_aliases = {
+        "sub_413E10": "zmq_req_t_ctor",
+        "sub_413E90": "zmq_req_t_xsend",
+        "sub_414290": "zmq_req_t_xhas_in",
+        "sub_4142B0": "zmq_req_t_xhas_out",
+        "sub_4142D0": "zmq_req_t_xsetsockopt",
+        "sub_414370": "zmq_req_t_xterminated",
+        "sub_4143B0": "zmq_req_t_recv_reply_from_fq",
+        "sub_414410": "zmq_req_session_t_ctor",
+        "sub_414460": "zmq_req_session_t_scalar_deleting_dtor",
+        "sub_4144A0": "zmq_req_session_t_reset",
+        "sub_4144B0": "zmq_req_session_t_i_pipe_events_scalar_deleting_dtor",
+        "sub_4144C0": "zmq_dealer_t_array_item_scalar_deleting_dtor",
+        "sub_4144D0": "zmq_dealer_t_i_poll_events_scalar_deleting_dtor",
+        "sub_4144E0": "zmq_req_session_t_io_object_scalar_deleting_dtor",
+        "sub_414770": "zmq_dealer_t_ctor",
+        "sub_414810": "zmq_dealer_t_scalar_deleting_dtor",
+        "sub_414870": "zmq_dealer_t_xattach_pipe",
+        "sub_4149B0": "zmq_dealer_t_xsetsockopt",
+        "sub_414A00": "zmq_dealer_t_xsend",
+        "sub_414A20": "zmq_dealer_t_xrecv",
+        "sub_414A40": "zmq_dealer_t_xhas_in",
+        "sub_414A50": "zmq_dealer_t_xhas_out",
+        "sub_414A60": "zmq_dealer_t_xwrite_activated",
+        "sub_414A80": "zmq_dealer_t_xterminated",
+        "sub_414AB0": "zmq_dealer_t_i_pipe_events_scalar_deleting_dtor",
+    }
+
+    for symbol, alias in expected_aliases.items():
+        address = f"00{symbol.removeprefix('sub_')}".lower()
+        assert aliases[symbol] == alias
+        assert f"fun_{address},{address}" in functions_csv
+        assert f"| `{symbol}` | `{alias}` | High |" in mapping_round
+
+    assert aliases["sub_414050"] == "zmq_req_t_xrecv"
+    assert "fun_00414050,00414050" in functions_csv
+    assert "| `sub_414050` | `zmq_req_t_xrecv` | Existing |" in mapping_round
+
+    assert "00550384 IMPORTED zmq::req_t::vftable" in analysis_symbols
+    assert "005503f8 IMPORTED zmq::req_t::vftable" in analysis_symbols
+    assert "00550400 IMPORTED zmq::req_t::vftable" in analysis_symbols
+    assert "00550414 IMPORTED zmq::req_t::vftable" in analysis_symbols
+    assert "0055042c IMPORTED zmq::req_session_t::vftable" in analysis_symbols
+    assert "0055047c IMPORTED zmq::req_session_t::vftable" in analysis_symbols
+    assert "00550490 IMPORTED zmq::req_session_t::vftable" in analysis_symbols
+    assert "00550584 IMPORTED zmq::dealer_t::vftable" in analysis_symbols
+    assert "005505f8 IMPORTED zmq::dealer_t::vftable" in analysis_symbols
+    assert "00550600 IMPORTED zmq::dealer_t::vftable" in analysis_symbols
+    assert "00550614 IMPORTED zmq::dealer_t::vftable" in analysis_symbols
+    assert "00584c18 IMPORTED zmq::req_session_t::RTTI_Type_Descriptor" in analysis_symbols
+    assert "00584c38 IMPORTED zmq::dealer_t::RTTI_Type_Descriptor" in analysis_symbols
+    assert "00584c54 IMPORTED zmq::req_t::RTTI_Type_Descriptor" in analysis_symbols
+
+    assert "void*** eax_30 = sub_413e10(arg6, eax_28, arg4)" in hlil_part01
+    assert "sub_414770(arg3, arg4, eax_44, arg6)" in hlil_part01
+    assert "result = sub_414410(arg4, arguments_1, arg5, arg6, arg7)" in hlil_part01
+
+    assert "00413e10    struct zmq::socket_base_t::zmq::dealer_t::VTable** __stdcall sub_413e10" in hlil_part01
+    assert "sub_414770(ecx, arg3, arg2, arg1)" in hlil_part01
+    assert "*arg2 = &zmq::req_t::`vftable'{for `zmq::dealer_t'}" in hlil_part01
+    assert "arg2[0x9e] = &zmq::req_t::`vftable'{for `zmq::array_item_t<0>'}" in hlil_part01
+    assert "arg2[0xa0] = &zmq::req_t::`vftable'{for `zmq::i_poll_events'}" in hlil_part01
+    assert "arg2[0xa1] = &zmq::req_t::`vftable'{for `zmq::i_pipe_events'}" in hlil_part01
+    assert "arg2[0xf0].w = 0x100" in hlil_part01
+    assert "arg2[0xf3] = rand() << 0x1f | eax_1" in hlil_part01
+    assert "arg2[0xf4].b = 1" in hlil_part01
+    assert "arg2[0x4e] = 3" in hlil_part01
+
+    assert "00413e90    int32_t __thiscall sub_413e90" in hlil_part01
+    assert "if (*(esi + 0x3c0) != 0)" in hlil_part01
+    assert "if (*(esi + 0x3d0) != 0)" in hlil_part01
+    assert "*_errno() = 0x9523dfb" in hlil_part01
+    assert "*(esi + 0x3c0) = 0x100" in hlil_part01
+    assert "if (*(esi + 0x3c1) != 0)" in hlil_part01
+    assert "*(esi + 0x3cc) += 1" in hlil_part01
+    assert "int16_t var_2e_1 = 0x168" in hlil_part01
+    assert "int16_t var_f_1 = 0x6500" in hlil_part01
+    assert "sub_41e460(esi + 0x380, &var_6c, nullptr)" in hlil_part01
+    assert "int32_t result = sub_41e9a0(esi + 0x39c, arg2, nullptr)" in hlil_part01
+    assert "*(esi + 0x3c0) = 0x101" in hlil_part01
+
+    assert "00414050    int32_t __thiscall sub_414050" in hlil_part01
+    assert "if (*(arg1 + 0x3c0) == 0)" in hlil_part01
+    assert "result, ecx_2 = sub_4143b0(edi, arg1)" in hlil_part01
+    assert "if (eax_3 == 4 && eax_5 == *(arg1 + 0x3cc))" in hlil_part01
+    assert "sub_41e460(ebx_1, edi, &arg2)" in hlil_part01
+    assert "sub_41e460(arg1 + 0x380, edi, &arg2)" in hlil_part01
+    assert "*(arg1 + 0x3c0) = 0x100" in hlil_part01
+
+    assert "00414290    int32_t __fastcall sub_414290" in hlil_part01
+    assert "return sub_41e6b0(arg1 + 0x380)" in hlil_part01
+    assert "004142b0    int32_t __fastcall sub_4142b0" in hlil_part01
+    assert "return sub_41ebf0(arg1 + 0x39c) __tailcall" in hlil_part01
+    assert "004142d0    int32_t __thiscall sub_4142d0" in hlil_part01
+    assert "if (arg2 == 0x34)" in hlil_part01
+    assert "else if (arg2 != 0x35)" in hlil_part01
+    assert "if (arg2 != 0x33 || cond:0 == 0 || eax_3 s< 0)" in hlil_part01
+    assert "*(arg1 + 0x3c8) = eax != 0" in hlil_part01
+    assert "*(arg1 + 0x3d0) = eax.b" in hlil_part01
+    assert "*(arg1 + 0x3b8) = eax_3.b" in hlil_part01
+
+    assert "00414370    void* __thiscall sub_414370" in hlil_part01
+    assert "if (*(arg1 + 0x3c4) == arg2)" in hlil_part01
+    assert "sub_41e320(arg1 + 0x380, arg2)" in hlil_part01
+    assert "sub_41e850(arg1 + 0x39c, arg2)" in hlil_part01
+    assert "004143b0    int32_t __stdcall sub_4143b0" in hlil_part01
+    assert "int32_t eax = sub_41e460(ebx + 0x380, arg1, &arg2)" in hlil_part01
+    assert "if (eax_1 == 0 || arg2 == eax_1)" in hlil_part01
+
+    assert "00414410    struct zmq::session_base_t::zmq::req_session_t::VTable** __thiscall sub_414410" in hlil_part01
+    assert "sub_41b0e0(arg2, arg3, arg4, arg5, arg1)" in hlil_part01
+    assert "*arg2 = &zmq::req_session_t::`vftable'{for `zmq::session_base_t'}" in hlil_part01
+    assert "arg2[0x9e] = &zmq::req_session_t::`vftable'{for `zmq::io_object_t'}" in hlil_part01
+    assert "arg2[0xa0] = &zmq::req_session_t::`vftable'{for `zmq::i_pipe_events'}" in hlil_part01
+    assert "arg2[0xae] = 0" in hlil_part01
+    assert "00414460    struct zmq::session_base_t::zmq::req_session_t::VTable** __thiscall sub_414460" in hlil_part01
+    assert "sub_41b260(arg1)" in hlil_part01
+    assert "004144a0    int32_t __fastcall sub_4144a0" in hlil_part01
+    assert "004144a0  *(arg1 + 0x2b8) = 0" in hlil_part01
+    assert "return sub_414460(arg1 - 0x280) __tailcall" in hlil_part01
+    assert "return sub_414460(arg1 - 0x278) __tailcall" in hlil_part01
+
+    assert "00414770    struct zmq::socket_base_t::zmq::dealer_t::VTable** __thiscall sub_414770" in hlil_part01
+    assert "sub_4074c0(arg3, arg1, arg2)" in hlil_part01
+    assert "*arg3 = &zmq::dealer_t::`vftable'{for `zmq::socket_base_t'}" in hlil_part01
+    assert "arg3[0x9e] = &zmq::dealer_t::`vftable'{for `zmq::array_item_t<0>'}" in hlil_part01
+    assert "arg3[0xa0] = &zmq::dealer_t::`vftable'{for `zmq::i_poll_events'}" in hlil_part01
+    assert "arg3[0xa1] = &zmq::dealer_t::`vftable'{for `zmq::i_pipe_events'}" in hlil_part01
+    assert "arg3[0x4e] = 5" in hlil_part01
+    assert "00414810    struct zmq::socket_base_t::zmq::dealer_t::VTable** __thiscall sub_414810" in hlil_part01
+    assert "sub_41e230(sub_41e7d0(arg1, &result[0xe7]), &result[0xe0])" in hlil_part01
+    assert "sub_407790(result)" in hlil_part01
+    assert "return sub_414810(arg1 - 0x278) __tailcall" in hlil_part01
+    assert "return sub_414810(arg1 - 0x280) __tailcall" in hlil_part01
+    assert "return sub_414810(arg1 - 0x284) __tailcall" in hlil_part01
+
+    assert "00414870    int32_t* __thiscall sub_414870" in hlil_part01
+    assert "\"pipe_\"" in hlil_part01
+    assert "\"..\\..\\..\\src\\dealer.cpp\", 0x28" in hlil_part01
+    assert "if (*(arg1 + 0x3b8) != 0)" in hlil_part01
+    assert "sub_410400(arg2, &var_2c)" in hlil_part01
+    assert "sub_41e2b0(arg2, edx, arg1 + 0x380)" in hlil_part01
+    assert "sub_41e930(arg2, sub_41ecc0(arg1 + 0x39c, arg2), arg1 + 0x39c)" in hlil_part01
+    assert "004149b0    int32_t __thiscall sub_4149b0" in hlil_part01
+    assert "if (arg2 != 0x33 || edx == 0 || eax_1 s< 0)" in hlil_part01
+    assert "00414a00    int32_t __thiscall sub_414a00" in hlil_part01
+    assert "return sub_41e9a0(arg1 + 0x39c, arg2, nullptr)" in hlil_part01
+    assert "00414a20    int32_t __thiscall sub_414a20" in hlil_part01
+    assert "return sub_41e460(arg1 + 0x380, arg2, nullptr)" in hlil_part01
+    assert "00414a40    int32_t __fastcall sub_414a40" in hlil_part01
+    assert "00414a50    int32_t __fastcall sub_414a50" in hlil_part01
+    assert "00414a60    int32_t* __thiscall sub_414a60" in hlil_part01
+    assert "return sub_41e930(arg2, edx, arg1 + 0x39c)" in hlil_part01
+    assert "00414a80    int32_t* __thiscall sub_414a80" in hlil_part01
+
+    assert "struct zmq::dealer_t::zmq::req_t::VTable zmq::req_t::`vftable'{for `zmq::dealer_t'}" in hlil_part06
+    assert "void*** (__thiscall* const vFunc_0)(void*** arg1, char arg2) = sub_414810" in hlil_part06
+    assert "int32_t (* const _purecall)() = sub_414870" in hlil_part06
+    assert "int32_t (* const vFunc_19)() = sub_4142d0" in hlil_part06
+    assert "int32_t (* const vFunc_20)() __pure = sub_4142b0" in hlil_part06
+    assert "int32_t (* const vFunc_21)() = sub_413e90" in hlil_part06
+    assert "int32_t (* const vFunc_22)() __pure = sub_414290" in hlil_part06
+    assert "int32_t (* const vFunc_23)() = sub_414050" in hlil_part06
+    assert "void (__fastcall* const vFunc_25)(uint32_t arg1) __noreturn = sub_414a60" in hlil_part06
+    assert "int32_t (* const _purecall)() = sub_414370" in hlil_part06
+    assert "struct zmq::session_base_t::zmq::req_session_t::VTable zmq::req_session_t::`vftable'{for `zmq::session_base_t'}" in hlil_part06
+    assert "void*** (__thiscall* const vFunc_0)(void*** arg1, char arg2) = sub_414460" in hlil_part06
+    assert "int32_t (* const vFunc_18)() __pure = sub_4144a0" in hlil_part06
+    assert "struct zmq::socket_base_t::zmq::dealer_t::VTable zmq::dealer_t::`vftable'{for `zmq::socket_base_t'}" in hlil_part06
+    assert "int32_t (* const vFunc_19)() = sub_4149b0" in hlil_part06
+    assert "int32_t (* const vFunc_21)() = sub_414a00" in hlil_part06
+    assert "int32_t (* const vFunc_23)() = sub_414a20" in hlil_part06
+    assert "int32_t (* const _purecall)() = sub_414a80" in hlil_part06
+
+    assert "This pass added 25 aliases and re-pinned 1 existing alias" in mapping_round
+    assert "REQ/dealer socket and req_session_t wiring" in mapping_round
+    assert "REQ reuses this base destructor" in mapping_round
+    assert "The REP/router socket family" in mapping_round
+
+
+def test_zmq_rep_router_round_399_aliases_are_pinned() -> None:
+    aliases = json.loads(
+        (REPO_ROOT / "references/analysis/quakelive_symbol_aliases.json").read_text(encoding="utf-8")
+    )["quakelive_steam_srp"]
+    functions_csv = (
+        REPO_ROOT / "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+    ).read_text(encoding="utf-8").lower()
+    analysis_symbols = (
+        REPO_ROOT / "references/reverse-engineering/ghidra/quakelive_steam/analysis_symbols.txt"
+    ).read_text(encoding="utf-8")
+    hlil_part01 = (
+        REPO_ROOT
+        / "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part01.txt"
+    ).read_text(encoding="utf-8")
+    hlil_part06 = (
+        REPO_ROOT
+        / "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part06.txt"
+    ).read_text(encoding="utf-8")
+    sv_zmq = (REPO_ROOT / "src/code/server/sv_zmq.c").read_text(encoding="utf-8")
+    mapping_round = (
+        REPO_ROOT / "docs/reverse-engineering/quakelive_steam_mapping_round_399.md"
+    ).read_text(encoding="utf-8")
+
+    expected_aliases = {
+        "sub_4144F0": "zmq_rep_t_ctor",
+        "sub_414540": "zmq_rep_t_scalar_deleting_dtor",
+        "sub_414590": "zmq_rep_t_xsend",
+        "sub_4145E0": "zmq_rep_t_xrecv",
+        "sub_414710": "zmq_rep_t_xhas_in",
+        "sub_414730": "zmq_rep_t_xhas_out",
+        "sub_414740": "zmq_rep_t_array_item_scalar_deleting_dtor",
+        "sub_414750": "zmq_rep_t_i_poll_events_scalar_deleting_dtor",
+        "sub_414760": "zmq_rep_t_i_pipe_events_scalar_deleting_dtor",
+        "sub_414CB0": "zmq_router_t_scalar_deleting_dtor",
+        "sub_414DA0": "zmq_router_t_dtor",
+        "sub_414F20": "zmq_router_t_xattach_pipe",
+        "sub_415090": "zmq_router_t_xsetsockopt",
+        "sub_415130": "zmq_router_t_xterminated",
+        "sub_4152A0": "zmq_router_t_xread_activated",
+        "sub_415320": "zmq_router_t_xwrite_activated",
+        "sub_415A80": "zmq_router_t_xhas_in",
+        "sub_416AB0": "zmq_router_t_array_item_scalar_deleting_dtor",
+        "sub_416AC0": "zmq_router_t_i_poll_events_scalar_deleting_dtor",
+        "sub_416AD0": "zmq_router_t_i_pipe_events_scalar_deleting_dtor",
+    }
+
+    for symbol, alias in expected_aliases.items():
+        address = f"00{symbol.removeprefix('sub_')}".lower()
+        assert aliases[symbol] == alias
+        assert f"fun_{address},{address}" in functions_csv
+        assert f"| `{symbol}` | `{alias}` | High |" in mapping_round
+
+    existing_aliases = {
+        "sub_414AC0": "zmq_router_t_ctor",
+        "sub_415420": "zmq_router_t_xsend",
+        "sub_415770": "zmq_router_t_xrecv",
+        "sub_415C30": "zmq_router_t_identify_peer",
+    }
+
+    for symbol, alias in existing_aliases.items():
+        address = f"00{symbol.removeprefix('sub_')}".lower()
+        assert aliases[symbol] == alias
+        assert f"fun_{address},{address}" in functions_csv
+        assert f"| `{symbol}` | `{alias}` | Existing |" in mapping_round
+
+    assert "#define QL_ZMQ_ROUTER 6" in sv_zmq
+    assert "socket = s_zmq.zmq_socket( s_zmq.context, QL_ZMQ_ROUTER );" in sv_zmq
+
+    assert "005504c4 IMPORTED zmq::rep_t::vftable" in analysis_symbols
+    assert "00550538 IMPORTED zmq::rep_t::vftable" in analysis_symbols
+    assert "00550540 IMPORTED zmq::rep_t::vftable" in analysis_symbols
+    assert "00550554 IMPORTED zmq::rep_t::vftable" in analysis_symbols
+    assert "005506c4 IMPORTED zmq::router_t::vftable" in analysis_symbols
+    assert "00550738 IMPORTED zmq::router_t::vftable" in analysis_symbols
+    assert "00550740 IMPORTED zmq::router_t::vftable" in analysis_symbols
+    assert "00550754 IMPORTED zmq::router_t::vftable" in analysis_symbols
+
+    assert "case 4" in hlil_part01
+    assert "struct zmq::router_t::zmq::rep_t::VTable** eax_38 = sub_4144f0(eax_36, arg3)" in hlil_part01
+    assert "case 6" in hlil_part01
+    assert "void*** eax_53 = sub_414ac0(arg3, eax_52)" in hlil_part01
+
+    assert "004144f0    struct zmq::router_t::zmq::rep_t::VTable** __stdcall sub_4144f0" in hlil_part01
+    assert "sub_414ac0(arg2, arg1)" in hlil_part01
+    assert "*arg1 = &zmq::rep_t::`vftable'{for `zmq::router_t'}" in hlil_part01
+    assert "arg1[0x106].w = 0x100" in hlil_part01
+    assert "arg1[0x4e] = 4" in hlil_part01
+    assert "00414540    struct zmq::router_t::zmq::rep_t::VTable** __thiscall sub_414540" in hlil_part01
+    assert "sub_414da0(arg1)" in hlil_part01
+    assert "return sub_414540(arg1 - 0x278) __tailcall" in hlil_part01
+    assert "return sub_414540(arg1 - 0x280) __tailcall" in hlil_part01
+    assert "return sub_414540(arg1 - 0x284) __tailcall" in hlil_part01
+
+    assert "00414590    int32_t __thiscall sub_414590" in hlil_part01
+    assert "if (*(arg1 + 0x418) == 0)" in hlil_part01
+    assert "int32_t result = sub_415420(arg1, arg2)" in hlil_part01
+    assert "*(arg1 + 0x418) = result.b" in hlil_part01
+    assert "004145e0    int32_t __thiscall sub_4145e0" in hlil_part01
+    assert "if (*(arg1 + 0x418) != 0)" in hlil_part01
+    assert "eax_3 = sub_415770(arg1, arg2)" in hlil_part01
+    assert "sub_410480(ecx_3)" in hlil_part01
+    assert "if (sub_415420(arg1, arg2) != 0)" in hlil_part01
+    assert "00414710    int32_t __fastcall sub_414710" in hlil_part01
+    assert "return sub_415a80(arg1) __tailcall" in hlil_part01
+    assert "00414730    int32_t __fastcall sub_414730" in hlil_part01
+    assert "result.b = *(arg1 + 0x418) != 0" in hlil_part01
+
+    assert "00414ac0    struct zmq::object_t::zmq::own_t::VTable** __thiscall sub_414ac0" in hlil_part01
+    assert "*result = &zmq::router_t::`vftable'{for `zmq::socket_base_t'}" in hlil_part01
+    assert "result[0xfa] = eax_4" in hlil_part01
+    assert "result[0xfe] = eax_8" in hlil_part01
+    assert "result[0x4e] = 6" in hlil_part01
+    assert "*(result + 0x169) = 1" in hlil_part01
+    assert "00414cb0    struct zmq::socket_base_t::zmq::router_t::VTable** __thiscall sub_414cb0" in hlil_part01
+    assert "00414da0    int32_t __stdcall sub_414da0" in hlil_part01
+    assert '"anonymous_pipes.empty ()"' in hlil_part01
+    assert '"outpipes.empty ()"' in hlil_part01
+    assert "sub_40b520(&arg1[0xe8])" in hlil_part01
+    assert "sub_40b520(&arg1[0xf0])" in hlil_part01
+
+    assert "00414f20    void** __thiscall sub_414f20" in hlil_part01
+    assert '"pipe_",' in hlil_part01
+    assert '"..\\..\\..\\src\\router.cpp", 0x3d' in hlil_part01
+    assert "if (*(arg1 + 0x412) != 0)" in hlil_part01
+    assert "result, edx_4 = sub_415c30(arg2, arg1)" in hlil_part01 or "eax_11, edx_4 = sub_415c30(arg2, arg1)" in hlil_part01
+    assert "00415090    int32_t __thiscall sub_415090" in hlil_part01
+    assert "if (arg2 == 0x21)" in hlil_part01
+    assert "else if (arg2 == 0x29)" in hlil_part01
+    assert "else if (arg2 == 0x33" in hlil_part01
+    assert "00415130    int32_t* __thiscall sub_415130" in hlil_part01
+    assert "sub_416280(arg1 + 0x3e4, &var_38, &var_3c)" in hlil_part01
+    assert "004152a0    int32_t* __fastcall sub_4152a0" in hlil_part01
+    assert "sub_415c30(ebx, arg1)" in hlil_part01
+    assert "00415320    void __thiscall sub_415320" in hlil_part01
+    assert '"!it->second.active"' in hlil_part01
+
+    assert "00415420    int32_t __thiscall sub_415420" in hlil_part01
+    assert '"!current_out"' in hlil_part01
+    assert "sub_416360(esi_1, eax_6, eax_5)" in hlil_part01
+    assert "sub_410400(*(arg1 + 0x404), arg2)" in hlil_part01
+    assert "00415770    int32_t __thiscall sub_415770" in hlil_part01
+    assert "sub_41e460(arg1 + 0x380, arg2, &var_30)" in hlil_part01
+    assert "sub_40b580(arg1 + 0x3c0, arg2)" in hlil_part01
+    assert "00415a80    int32_t __fastcall sub_415a80" in hlil_part01
+    assert "if (*(arg1 + 0x3e0) != 0 || *(arg1 + 0x39c) != 0)" in hlil_part01
+    assert "00415c30    int32_t __fastcall sub_415c30" in hlil_part01
+    assert "if (*(arg2 + 0x16a) != 0)" in hlil_part01
+    assert "sub_410330(&var_44, arg2, arg1)" in hlil_part01
+    assert "sub_4167d0(arg2 + 0x3f4, &arguments, sub_4169c0(arg2 + 0x3f4))" in hlil_part01
+
+    assert "struct zmq::router_t::zmq::rep_t::VTable zmq::rep_t::`vftable'{for `zmq::router_t'}" in hlil_part06
+    assert "int32_t (* const vFunc_21)() = sub_414590" in hlil_part06
+    assert "int32_t (* const vFunc_22)() __pure = sub_414710" in hlil_part06
+    assert "int32_t (* const vFunc_23)() = sub_4145e0" in hlil_part06
+    assert "struct zmq::socket_base_t::zmq::router_t::VTable zmq::router_t::`vftable'{for `zmq::socket_base_t'}" in hlil_part06
+    assert "int32_t (* const vFunc_21)() = sub_415420" in hlil_part06
+    assert "int32_t (* const vFunc_22)() __pure = sub_415a80" in hlil_part06
+    assert "int32_t (* const vFunc_23)() = sub_415770" in hlil_part06
+    assert "void*** (__thiscall* const vFunc_0)(void*** arg1, char arg2) = sub_416ab0" in hlil_part06
+    assert "void*** (__thiscall* const vFunc_0)(void*** arg1, char arg2) = sub_416ac0" in hlil_part06
+    assert "void*** (__thiscall* const vFunc_0)(void*** arg1, char arg2) = sub_416ad0" in hlil_part06
+
+    assert "This pass added 20 aliases and re-pinned 4 existing aliases" in mapping_round
+    assert "REP/router socket-family wiring" in mapping_round
+    assert "ROUTER socket used by the retained RCON path" in mapping_round
+
+
+def test_zmq_pub_sub_pipeline_round_400_aliases_are_pinned() -> None:
+    aliases = json.loads(
+        (REPO_ROOT / "references/analysis/quakelive_symbol_aliases.json").read_text(encoding="utf-8")
+    )["quakelive_steam_srp"]
+    functions_csv = (
+        REPO_ROOT / "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+    ).read_text(encoding="utf-8").lower()
+    analysis_symbols = (
+        REPO_ROOT / "references/reverse-engineering/ghidra/quakelive_steam/analysis_symbols.txt"
+    ).read_text(encoding="utf-8")
+    hlil_part01 = (
+        REPO_ROOT
+        / "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part01.txt"
+    ).read_text(encoding="utf-8")
+    hlil_part06 = (
+        REPO_ROOT
+        / "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part06.txt"
+    ).read_text(encoding="utf-8")
+    sv_zmq = (REPO_ROOT / "src/code/server/sv_zmq.c").read_text(encoding="utf-8")
+    mapping_round = (
+        REPO_ROOT / "docs/reverse-engineering/quakelive_steam_mapping_round_400.md"
+    ).read_text(encoding="utf-8")
+
+    expected_aliases = {
+        "sub_413A60": "zmq_pub_t_ctor",
+        "sub_413AB0": "zmq_pub_t_scalar_deleting_dtor",
+        "sub_413B00": "zmq_pub_t_xattach_pipe",
+        "sub_413B70": "zmq_socket_false",
+        "sub_413B80": "zmq_pub_t_array_item_scalar_deleting_dtor",
+        "sub_413B90": "zmq_pub_t_i_poll_events_scalar_deleting_dtor",
+        "sub_413BA0": "zmq_pub_t_i_pipe_events_scalar_deleting_dtor",
+        "sub_413BB0": "zmq_sub_t_ctor",
+        "sub_413C00": "zmq_sub_t_scalar_deleting_dtor",
+        "sub_413C50": "zmq_sub_t_xsetsockopt",
+        "sub_413DE0": "zmq_sub_t_i_pipe_events_scalar_deleting_dtor",
+        "sub_413DF0": "zmq_sub_t_array_item_scalar_deleting_dtor",
+        "sub_413E00": "zmq_sub_t_i_poll_events_scalar_deleting_dtor",
+        "sub_416AE0": "zmq_pull_t_ctor",
+        "sub_416B50": "zmq_pull_t_scalar_deleting_dtor",
+        "sub_416BB0": "zmq_pull_t_xattach_pipe",
+        "sub_416C30": "zmq_pull_t_xterminated",
+        "sub_416C40": "zmq_pull_t_xrecv",
+        "sub_416C60": "zmq_pull_t_i_pipe_events_scalar_deleting_dtor",
+        "sub_416C70": "zmq_pull_t_array_item_scalar_deleting_dtor",
+        "sub_416C80": "zmq_pull_t_i_poll_events_scalar_deleting_dtor",
+        "sub_416C90": "zmq_push_t_ctor",
+        "sub_416D00": "zmq_push_t_scalar_deleting_dtor",
+        "sub_416D60": "zmq_push_t_xattach_pipe",
+        "sub_416D90": "zmq_push_t_xwrite_activated",
+        "sub_416DB0": "zmq_push_t_xterminated",
+        "sub_416DC0": "zmq_push_t_xsend",
+        "sub_416DE0": "zmq_push_t_xhas_out",
+        "sub_416DF0": "zmq_push_t_array_item_scalar_deleting_dtor",
+        "sub_416E00": "zmq_push_t_i_poll_events_scalar_deleting_dtor",
+        "sub_416E10": "zmq_push_t_i_pipe_events_scalar_deleting_dtor",
+        "sub_416FB0": "zmq_xpub_t_scalar_deleting_dtor",
+        "sub_418280": "zmq_xpub_t_array_item_scalar_deleting_dtor",
+        "sub_418290": "zmq_xpub_t_i_poll_events_scalar_deleting_dtor",
+        "sub_4182A0": "zmq_xpub_t_i_pipe_events_scalar_deleting_dtor",
+        "sub_418380": "zmq_xsub_t_scalar_deleting_dtor",
+        "sub_418B40": "zmq_xsub_t_array_item_scalar_deleting_dtor",
+        "sub_418B50": "zmq_xsub_t_i_poll_events_scalar_deleting_dtor",
+        "sub_418B60": "zmq_xsub_t_i_pipe_events_scalar_deleting_dtor",
+    }
+
+    for symbol, alias in expected_aliases.items():
+        address = f"00{symbol.removeprefix('sub_')}".lower()
+        assert aliases[symbol] == alias
+        assert f"fun_{address},{address}" in functions_csv
+        assert f"| `{symbol}` | `{alias}` | High |" in mapping_round
+
+    existing_aliases = {
+        "sub_416C10": "zmq_xsub_t_xread_activated",
+        "sub_416E20": "zmq_xpub_t_ctor",
+        "sub_416FE0": "zmq_xpub_t_dtor",
+        "sub_4170B0": "zmq_xpub_t_xattach_pipe",
+        "sub_417130": "zmq_xpub_t_xread_activated",
+        "sub_417650": "zmq_xpub_t_xwrite_activated",
+        "sub_417670": "zmq_xpub_t_xsetsockopt",
+        "sub_4176B0": "zmq_xpub_t_xterminated",
+        "sub_417700": "zmq_xpub_t_xsend",
+        "sub_417780": "empty_output_buffer",
+        "sub_417790": "zmq_xpub_t_xrecv",
+        "sub_4179A0": "zmq_xpub_t_xhas_in",
+        "sub_4179B0": "zmq_xpub_t_send_unsubscription",
+        "sub_4182B0": "zmq_xsub_t_ctor",
+        "sub_4183B0": "zmq_xsub_t_dtor",
+        "sub_4184B0": "zmq_xsub_t_xattach_pipe",
+        "sub_418570": "zmq_xsub_t_xwrite_activated",
+        "sub_418590": "zmq_xsub_t_xterminated",
+        "sub_4185C0": "zmq_xsub_t_xhiccuped",
+        "sub_418620": "zmq_xsub_t_xsend",
+        "sub_418750": "zmq_xsub_t_xrecv",
+        "sub_418900": "zmq_xsub_t_xhas_in",
+        "sub_418A80": "zmq_xsub_t_send_subscription",
+    }
+
+    for symbol, alias in existing_aliases.items():
+        address = f"00{symbol.removeprefix('sub_')}".lower()
+        assert aliases[symbol] == alias
+        assert f"fun_{address},{address}" in functions_csv
+        assert f"| `{symbol}` | `{alias}` | Existing |" in mapping_round
+
+    assert "#define QL_ZMQ_PUB 1" in sv_zmq
+    assert "socket = s_zmq.zmq_socket( s_zmq.context, QL_ZMQ_PUB );" in sv_zmq
+    assert 'idZMQ_Publish( "MATCH_REPORT", (const char *)report );' in sv_zmq
+    assert 'idZMQ_Publish( eventName && eventName[0] ? eventName : "UNKNOWN_EVENT", (const char *)payload );' in sv_zmq
+
+    assert "00550204 IMPORTED zmq::pub_t::vftable" in analysis_symbols
+    assert "005502c4 IMPORTED zmq::sub_t::vftable" in analysis_symbols
+    assert "00550784 IMPORTED zmq::pull_t::vftable" in analysis_symbols
+    assert "0055082c IMPORTED zmq::push_t::vftable" in analysis_symbols
+    assert "00550904 IMPORTED zmq::xpub_t::vftable" in analysis_symbols
+    assert "005509c4 IMPORTED zmq::xsub_t::vftable" in analysis_symbols
+
+    assert "case 1" in hlil_part01
+    assert "sub_413a60(arg6, eax_12, arg3)" in hlil_part01
+    assert "case 2" in hlil_part01
+    assert "sub_413bb0(arg6, eax_20, arg4)" in hlil_part01
+    assert "case 7" in hlil_part01
+    assert "sub_416ae0(arg3, arg4, eax_59, arg6)" in hlil_part01
+    assert "case 8" in hlil_part01
+    assert "sub_416c90(arg3, arg4, eax_67, arg6)" in hlil_part01
+    assert "case 9" in hlil_part01
+    assert "sub_416e20(arg3, eax_75, arg6)" in hlil_part01
+    assert "case 0xa" in hlil_part01
+    assert "sub_4182b0(arg3, arg4, eax_82, arg6)" in hlil_part01
+
+    assert "00413a60    struct zmq::xpub_t::zmq::pub_t::VTable** __thiscall sub_413a60" in hlil_part01
+    assert "sub_416e20(arg3, arg2, arg1)" in hlil_part01
+    assert "arg2[0x4e] = 1" in hlil_part01
+    assert "00413ab0    struct zmq::xpub_t::zmq::pub_t::VTable** __thiscall sub_413ab0" in hlil_part01
+    assert "sub_416fe0(arg1)" in hlil_part01
+    assert "00413b00    int32_t __thiscall sub_413b00" in hlil_part01
+    assert '"..\\..\\..\\src\\pub.cpp", 0x25' in hlil_part01
+    assert "*(esi + 0x5c) = 0" in hlil_part01
+    assert "return sub_4170b0(arg1, esi, arg3)" in hlil_part01
+    assert "00413b70    int32_t sub_413b70() __pure" in hlil_part01
+    assert "result.b = 0" in hlil_part01
+    assert "return sub_413ab0(arg1 - 0x278) __tailcall" in hlil_part01
+    assert "return sub_413ab0(arg1 - 0x280) __tailcall" in hlil_part01
+    assert "return sub_413ab0(arg1 - 0x284) __tailcall" in hlil_part01
+
+    assert "00413bb0    struct zmq::socket_base_t::zmq::xsub_t::VTable** __stdcall sub_413bb0" in hlil_part01
+    assert "sub_4182b0(ecx, arg3, arg2, arg1)" in hlil_part01
+    assert "arg2[0x4e] = 2" in hlil_part01
+    assert "arg2[0x5a].b = 1" in hlil_part01
+    assert "00413c50    int32_t __thiscall sub_413c50" in hlil_part01
+    assert "if (arg2 != 6 && arg2 != 7)" in hlil_part01
+    assert "sub_40b4a0(&var_2c, arg4 + 1)" in hlil_part01
+    assert "*eax_10 = 1" in hlil_part01
+    assert "*eax_10 = 0" in hlil_part01
+    assert "memcpy(eax_10 + 1, arg3, arg4)" in hlil_part01
+    assert "sub_418620(arguments_4, &var_2c)" in hlil_part01
+    assert '"..\\..\\..\\src\\sub.cpp", 0x30' in hlil_part01
+    assert '"..\\..\\..\\src\\sub.cpp", 0x3f' in hlil_part01
+    assert "return sub_413c00(arg1 - 0x284) __tailcall" in hlil_part01
+    assert "return sub_413c00(arg1 - 0x278) __tailcall" in hlil_part01
+    assert "return sub_413c00(arg1 - 0x280) __tailcall" in hlil_part01
+
+    assert "00416ae0    struct zmq::socket_base_t::zmq::pull_t::VTable** __thiscall sub_416ae0" in hlil_part01
+    assert "arg3[0x4e] = 7" in hlil_part01
+    assert "sub_41e230(arg1, &result[0xe0])" in hlil_part01
+    assert '"..\\..\\..\\src\\pull.cpp", 0x28' in hlil_part01
+    assert "sub_41e2b0(edi, edx, arg1 + 0x380)" in hlil_part01
+    assert "return sub_41e320(arg1 + 0x380) __tailcall" in hlil_part01
+    assert "return sub_41e460(arg1 + 0x380, arg2, nullptr)" in hlil_part01
+    assert "return sub_416b50(arg1 - 0x284) __tailcall" in hlil_part01
+    assert "return sub_416b50(arg1 - 0x278) __tailcall" in hlil_part01
+    assert "return sub_416b50(arg1 - 0x280) __tailcall" in hlil_part01
+
+    assert "00416c90    struct zmq::socket_base_t::zmq::push_t::VTable** __thiscall sub_416c90" in hlil_part01
+    assert "arg3[0x4e] = 8" in hlil_part01
+    assert "00416d00    struct zmq::socket_base_t::zmq::push_t::VTable** __thiscall sub_416d00" in hlil_part01
+    assert "sub_41e7d0(arg1, &result[0xe0])" in hlil_part01
+    assert "00416d60    int32_t* __thiscall sub_416d60" in hlil_part01
+    assert "*(arg2 + 0x5c) = 0" in hlil_part01
+    assert "sub_41e930(arg2, sub_41ecc0(arg1 + 0x380, arg2), arg1 + 0x380)" in hlil_part01
+    assert "00416d90    int32_t* __thiscall sub_416d90" in hlil_part01
+    assert "return sub_41e930(arg2, edx, arg1 + 0x380)" in hlil_part01
+    assert "return sub_41e850(arg1 + 0x380) __tailcall" in hlil_part01
+    assert "return sub_41e9a0(arg1 + 0x380, arg2, nullptr)" in hlil_part01
+    assert "return sub_41ebf0(arg1 + 0x380) __tailcall" in hlil_part01
+    assert "return sub_416d00(arg1 - 0x278) __tailcall" in hlil_part01
+    assert "return sub_416d00(arg1 - 0x280) __tailcall" in hlil_part01
+    assert "return sub_416d00(arg1 - 0x284) __tailcall" in hlil_part01
+
+    assert "00416fb0    struct zmq::socket_base_t::zmq::xpub_t::VTable** __thiscall sub_416fb0" in hlil_part01
+    assert "sub_416fe0(arg1)" in hlil_part01
+    assert "return sub_416fb0(arg1 - 0x278) __tailcall" in hlil_part01
+    assert "return sub_416fb0(arg1 - 0x280) __tailcall" in hlil_part01
+    assert "return sub_416fb0(arg1 - 0x284) __tailcall" in hlil_part01
+    assert "00418380    struct zmq::socket_base_t::zmq::xsub_t::VTable** __thiscall sub_418380" in hlil_part01
+    assert "sub_4183b0(arg1, result)" in hlil_part01
+    assert "arg3[0x4e] = 0xa" in hlil_part01
+    assert "*(arg3 + 0x3ee) = 0x65" in hlil_part01
+    assert "return sub_418380(arg1 - 0x278) __tailcall" in hlil_part01
+    assert "return sub_418380(arg1 - 0x280) __tailcall" in hlil_part01
+    assert "return sub_418380(arg1 - 0x284) __tailcall" in hlil_part01
+
+    assert "struct zmq::xpub_t::zmq::pub_t::VTable zmq::pub_t::`vftable'{for `zmq::xpub_t'}" in hlil_part06
+    assert "int32_t (* const _purecall)() = sub_413b00" in hlil_part06
+    assert "int32_t (* const vFunc_22)() __pure = sub_413b70" in hlil_part06
+    assert "struct zmq::xsub_t::zmq::sub_t::VTable zmq::sub_t::`vftable'{for `zmq::xsub_t'}" in hlil_part06
+    assert "int32_t (* const vFunc_19)() = sub_413c50" in hlil_part06
+    assert "void (__fastcall* const vFunc_24)(uint32_t arg1) __noreturn = sub_416c10" in hlil_part06
+    assert "struct zmq::socket_base_t::zmq::pull_t::VTable zmq::pull_t::`vftable'{for `zmq::socket_base_t'}" in hlil_part06
+    assert "int32_t (* const _purecall)() = sub_416bb0" in hlil_part06
+    assert "int32_t (* const vFunc_23)() = sub_416c40" in hlil_part06
+    assert "struct zmq::socket_base_t::zmq::push_t::VTable zmq::push_t::`vftable'{for `zmq::socket_base_t'}" in hlil_part06
+    assert "int32_t (* const _purecall)() = sub_416d60" in hlil_part06
+    assert "int32_t (* const vFunc_20)() __pure = sub_416de0" in hlil_part06
+    assert "int32_t (* const vFunc_21)() = sub_416dc0" in hlil_part06
+    assert "void*** (__thiscall* const vFunc_0)(void*** arg1, char arg2) = sub_416fb0" in hlil_part06
+    assert "void*** (__thiscall* const vFunc_0)(void*** arg1, char arg2) = sub_418280" in hlil_part06
+    assert "void*** (__thiscall* const vFunc_0)(void*** arg1, char arg2) = sub_418380" in hlil_part06
+    assert "void*** (__thiscall* const vFunc_0)(void*** arg1, char arg2) = sub_418b40" in hlil_part06
+
+    assert "This pass added 39 aliases and re-pinned 23 existing aliases" in mapping_round
+    assert "PUB/SUB/PULL/PUSH and XPUB/XSUB socket-family wiring" in mapping_round
+    assert "stats socket" in mapping_round
+
+
+def test_zmq_pair_stream_round_401_aliases_are_pinned() -> None:
+    aliases = json.loads(
+        (REPO_ROOT / "references/analysis/quakelive_symbol_aliases.json").read_text(encoding="utf-8")
+    )["quakelive_steam_srp"]
+    functions_csv = (
+        REPO_ROOT / "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+    ).read_text(encoding="utf-8").lower()
+    analysis_symbols = (
+        REPO_ROOT / "references/reverse-engineering/ghidra/quakelive_steam/analysis_symbols.txt"
+    ).read_text(encoding="utf-8")
+    hlil_part01 = (
+        REPO_ROOT
+        / "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part01.txt"
+    ).read_text(encoding="utf-8")
+    hlil_part06 = (
+        REPO_ROOT
+        / "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part06.txt"
+    ).read_text(encoding="utf-8")
+    sv_zmq = (REPO_ROOT / "src/code/server/sv_zmq.c").read_text(encoding="utf-8")
+    mapping_round = (
+        REPO_ROOT / "docs/reverse-engineering/quakelive_steam_mapping_round_401.md"
+    ).read_text(encoding="utf-8")
+
+    expected_aliases = {
+        "sub_4136F0": "zmq_pair_t_ctor",
+        "sub_413740": "zmq_pair_t_scalar_deleting_dtor",
+        "sub_413770": "zmq_pair_t_dtor",
+        "sub_4137F0": "zmq_pair_t_xattach_pipe",
+        "sub_413860": "zmq_pair_t_xterminated",
+        "sub_413880": "zmq_pair_t_xread_write_activated_noop",
+        "sub_413890": "zmq_pair_t_xsend",
+        "sub_413910": "zmq_pair_t_xrecv",
+        "sub_4139C0": "zmq_pair_t_xhas_in",
+        "sub_4139E0": "zmq_pair_t_xhas_out",
+        "sub_413A30": "zmq_pair_t_array_item_scalar_deleting_dtor",
+        "sub_413A40": "zmq_pair_t_i_poll_events_scalar_deleting_dtor",
+        "sub_413A50": "zmq_pair_t_i_pipe_events_scalar_deleting_dtor",
+        "sub_418B70": "zmq_stream_t_ctor",
+        "sub_418CE0": "zmq_stream_t_scalar_deleting_dtor",
+        "sub_418D10": "zmq_stream_t_dtor",
+        "sub_418E20": "zmq_stream_t_xattach_pipe",
+        "sub_418E90": "zmq_stream_t_xterminated",
+        "sub_418FD0": "zmq_stream_t_xwrite_activated",
+        "sub_419D60": "zmq_stream_t_array_item_scalar_deleting_dtor",
+        "sub_419D70": "zmq_stream_t_i_poll_events_scalar_deleting_dtor",
+        "sub_419D80": "zmq_stream_t_i_pipe_events_scalar_deleting_dtor",
+    }
+
+    for symbol, alias in expected_aliases.items():
+        address = f"00{symbol.removeprefix('sub_')}".lower()
+        assert aliases[symbol] == alias
+        assert f"fun_{address},{address}" in functions_csv
+        assert f"| `{symbol}` | `{alias}` | High |" in mapping_round
+
+    existing_aliases = {
+        "sub_416C10": "zmq_xsub_t_xread_activated",
+        "sub_417780": "empty_output_buffer",
+        "sub_4190C0": "zmq_stream_t_xsend",
+        "sub_4193B0": "zmq_stream_t_xrecv",
+        "sub_419640": "zmq_stream_t_xhas_in",
+    }
+
+    for symbol, alias in existing_aliases.items():
+        address = f"00{symbol.removeprefix('sub_')}".lower()
+        assert aliases[symbol] == alias
+        assert f"fun_{address},{address}" in functions_csv
+        assert f"| `{symbol}` | `{alias}` | Existing |" in mapping_round
+
+    assert "#define QL_ZMQ_REP 4" in sv_zmq
+    assert "#define QL_ZMQ_PUB 1" in sv_zmq
+    assert "#define QL_ZMQ_ROUTER 6" in sv_zmq
+    assert "QL_ZMQ_STREAM" not in sv_zmq
+    assert "QL_ZMQ_PAIR" not in sv_zmq
+
+    assert "00550144 IMPORTED zmq::pair_t::vftable" in analysis_symbols
+    assert "005501b8 IMPORTED zmq::pair_t::vftable" in analysis_symbols
+    assert "005501c0 IMPORTED zmq::pair_t::vftable" in analysis_symbols
+    assert "005501d4 IMPORTED zmq::pair_t::vftable" in analysis_symbols
+    assert "00550ab4 IMPORTED zmq::stream_t::vftable" in analysis_symbols
+    assert "00550b28 IMPORTED zmq::stream_t::vftable" in analysis_symbols
+    assert "00550b30 IMPORTED zmq::stream_t::vftable" in analysis_symbols
+    assert "00550b44 IMPORTED zmq::stream_t::vftable" in analysis_symbols
+
+    assert "case nullptr" in hlil_part01
+    assert "sub_4136f0(arg3, arg4, eax_4, arg6)" in hlil_part01
+    assert "case 0xb" in hlil_part01
+    assert "void*** eax_91 = sub_418b70(arg3, eax_90, arg6)" in hlil_part01
+
+    assert "004136f0    struct zmq::socket_base_t::zmq::pair_t::VTable** __thiscall sub_4136f0" in hlil_part01
+    assert "arg3[0xe0] = 0" in hlil_part01
+    assert "arg3[0x4e] = 0" in hlil_part01
+    assert "*arg3 = &zmq::pair_t::`vftable'{for `zmq::socket_base_t'}" in hlil_part01
+    assert "00413740    struct zmq::socket_base_t::zmq::pair_t::VTable** __thiscall sub_413740" in hlil_part01
+    assert "sub_413770(arg1, result)" in hlil_part01
+    assert "00413770    int32_t __fastcall sub_413770" in hlil_part01
+    assert '"!pipe", "..\\..\\..\\src\\pair.cpp", 0x23' in hlil_part01
+    assert "004137f0    void __thiscall sub_4137f0" in hlil_part01
+    assert '"pipe_ != NULL"' in hlil_part01
+    assert "if (*(arg1 + 0x380) == 0)" in hlil_part01
+    assert "*(arg1 + 0x380) = edi" in hlil_part01
+    assert "sub_410c00(arg1.b, edi)" in hlil_part01
+    assert "00413860    int32_t __thiscall sub_413860" in hlil_part01
+    assert "if (arg2 == *(arg1 + 0x380))" in hlil_part01
+    assert "00413880    int32_t sub_413880() __pure" in hlil_part01
+    assert "00413890    int32_t __thiscall sub_413890" in hlil_part01
+    assert "sub_410400(esi, arg2) != 0" in hlil_part01
+    assert "sub_40d860(*(esi_1 + 0x50), edx_2, esi_1)" in hlil_part01
+    assert "00413910    int32_t __thiscall sub_413910" in hlil_part01
+    assert "sub_40b520(esi) != 0" in hlil_part01
+    assert "sub_410330(esi, arg1, ecx) != 0" in hlil_part01
+    assert "004139c0    int32_t __fastcall sub_4139c0" in hlil_part01
+    assert "return sub_410250(ecx_1) __tailcall" in hlil_part01
+    assert "004139e0    int32_t __fastcall sub_4139e0" in hlil_part01
+    assert "if (*(ecx + 0x2d) != 0 && *(ecx + 0x58) == 0)" in hlil_part01
+    assert "return sub_413740(arg1 - 0x278) __tailcall" in hlil_part01
+    assert "return sub_413740(arg1 - 0x280) __tailcall" in hlil_part01
+    assert "return sub_413740(arg1 - 0x284) __tailcall" in hlil_part01
+
+    assert "00418b70    struct zmq::object_t::zmq::own_t::VTable** __thiscall sub_418b70" in hlil_part01
+    assert "*result = &zmq::stream_t::`vftable'{for `zmq::socket_base_t'}" in hlil_part01
+    assert "result[0xe0] = 0" in hlil_part01
+    assert "result[0xf9] = eax_4" in hlil_part01
+    assert "result[0x4e] = 0xb" in hlil_part01
+    assert "*(result + 0x16a) = 1" in hlil_part01
+    assert "00418ce0    struct zmq::socket_base_t::zmq::stream_t::VTable** __thiscall sub_418ce0" in hlil_part01
+    assert "sub_418d10(arg1)" in hlil_part01
+    assert "00418d10    int32_t __stdcall sub_418d10" in hlil_part01
+    assert '"outpipes.empty ()"' in hlil_part01
+    assert '"..\\..\\..\\src\\stream.cpp", 0x2d' in hlil_part01
+    assert "sub_40b520(&arg1[0xe8])" in hlil_part01
+    assert "sub_40b520(&arg1[0xf0])" in hlil_part01
+    assert "sub_419a10(ecx, &arg1[0xf8], &var_18, ecx, eax_5)" in hlil_part01
+    assert "00418e20    int32_t __thiscall sub_418e20" in hlil_part01
+    assert '"..\\..\\..\\src\\stream.cpp", 0x36' in hlil_part01
+    assert "return sub_41e2b0(edi, __vcasan::OnAsanReport(arg1, edi), arg1 + 0x380)" in hlil_part01
+    assert "00418e90    void* __thiscall sub_418e90" in hlil_part01
+    assert '"it != outpipes.end ()", ' in hlil_part01
+    assert "sub_40a3d0(arg1 + 0x3e0, &arguments, ebx_1)" in hlil_part01
+    assert "sub_41e320(arg1 + 0x380, arg2)" in hlil_part01
+    assert "00418fd0    void __thiscall sub_418fd0" in hlil_part01
+    assert '"!it->second.active"' in hlil_part01
+    assert "j[0xb].b = 1" in hlil_part01
+
+    assert "004190c0    int32_t __thiscall sub_4190c0" in hlil_part01
+    assert '"!current_out"' in hlil_part01
+    assert "sub_419990(esi_1, arg1 + 0x3e0, &arguments)" in hlil_part01
+    assert "sub_410400(*(arg1 + 0x3f0), arg2)" in hlil_part01
+    assert "sub_410c00(0, *(arg1 + 0x3f0))" in hlil_part01
+    assert "004193b0    int32_t __thiscall sub_4193b0" in hlil_part01
+    assert "sub_41e460(arg1 + 0x380, arg1 + 0x3c0, &var_30) != 0" in hlil_part01
+    assert '"pipe != NULL", ' in hlil_part01
+    assert "memcpy(sub_40b660(var_14), eax_25, var_14)" in hlil_part01
+    assert "00419640    void* __fastcall sub_419640" in hlil_part01
+    assert "memcpy(sub_40b660(ecx_3), eax_14, var_14)" in hlil_part01
+    assert "return sub_418ce0(arg1 - 0x278) __tailcall" in hlil_part01
+    assert "return sub_418ce0(arg1 - 0x280) __tailcall" in hlil_part01
+    assert "return sub_418ce0(arg1 - 0x284) __tailcall" in hlil_part01
+
+    assert "struct zmq::socket_base_t::zmq::pair_t::VTable zmq::pair_t::`vftable'{for `zmq::socket_base_t'}" in hlil_part06
+    assert "void*** (__thiscall* const vFunc_0)(void*** arg1, char arg2) = sub_413740" in hlil_part06
+    assert "int32_t (* const _purecall)() = sub_4137f0" in hlil_part06
+    assert "int32_t (* const vFunc_21)() = sub_413890" in hlil_part06
+    assert "int32_t (* const vFunc_22)() __pure = sub_4139c0" in hlil_part06
+    assert "int32_t (* const vFunc_23)() = sub_413910" in hlil_part06
+    assert "void (__fastcall* const vFunc_24)(uint32_t arg1) __noreturn = sub_413880" in hlil_part06
+    assert "void*** (__thiscall* const vFunc_0)(void*** arg1, char arg2) = sub_413a30" in hlil_part06
+    assert "struct zmq::socket_base_t::zmq::stream_t::VTable zmq::stream_t::`vftable'{for `zmq::socket_base_t'}" in hlil_part06
+    assert "void*** (__thiscall* const vFunc_0)(void*** arg1, char arg2) = sub_418ce0" in hlil_part06
+    assert "int32_t (* const _purecall)() = sub_418e20" in hlil_part06
+    assert "int32_t (* const vFunc_20)() __pure = sub_417780" in hlil_part06
+    assert "int32_t (* const vFunc_21)() = sub_4190c0" in hlil_part06
+    assert "int32_t (* const vFunc_22)() __pure = sub_419640" in hlil_part06
+    assert "int32_t (* const vFunc_23)() = sub_4193b0" in hlil_part06
+    assert "void (__fastcall* const vFunc_25)(uint32_t arg1) __noreturn = sub_418fd0" in hlil_part06
+    assert "int32_t (* const _purecall)() = sub_418e90" in hlil_part06
+    assert "void*** (__thiscall* const vFunc_0)(void*** arg1, char arg2) = sub_419d60" in hlil_part06
+    assert "void*** (__thiscall* const vFunc_0)(void*** arg1, char arg2) = sub_419d70" in hlil_part06
+    assert "void*** (__thiscall* const vFunc_0)(void*** arg1, char arg2) = sub_419d80" in hlil_part06
+
+    assert "This pass added 22 aliases and re-pinned 5 existing aliases" in mapping_round
+    assert "PAIR/STREAM socket-family wiring" in mapping_round
+    assert "not exposed as\n  active reconstructed server service endpoints" in mapping_round
+
+
+def test_zmq_socket_base_default_callbacks_round_402_aliases_are_pinned() -> None:
+    aliases = json.loads(
+        (REPO_ROOT / "references/analysis/quakelive_symbol_aliases.json").read_text(encoding="utf-8")
+    )["quakelive_steam_srp"]
+    functions_csv = (
+        REPO_ROOT / "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+    ).read_text(encoding="utf-8").lower()
+    hlil_part01 = (
+        REPO_ROOT
+        / "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part01.txt"
+    ).read_text(encoding="utf-8")
+    hlil_part06 = (
+        REPO_ROOT
+        / "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part06.txt"
+    ).read_text(encoding="utf-8")
+    mapping_round = (
+        REPO_ROOT / "docs/reverse-engineering/quakelive_steam_mapping_round_402.md"
+    ).read_text(encoding="utf-8")
+
+    expected_aliases = {
+        "sub_407700": "zmq_socket_base_t_scalar_deleting_dtor",
+        "sub_409860": "zmq_socket_base_t_process_destroy",
+        "sub_409870": "zmq_socket_base_t_xsetsockopt_default",
+        "sub_409890": "zmq_socket_base_t_xsend_recv_unsupported",
+        "sub_4098B0": "zmq_socket_base_t_xread_activated_assert",
+        "sub_409900": "zmq_socket_base_t_xwrite_activated_assert",
+        "sub_409950": "zmq_socket_base_t_xhiccuped_assert",
+        "sub_4099A0": "zmq_socket_base_t_i_poll_events_in_event",
+        "sub_4099C0": "zmq_socket_base_t_i_poll_events_out_event_assert",
+        "sub_409A10": "zmq_socket_base_t_i_poll_events_timer_event_assert",
+        "sub_409AF0": "zmq_socket_base_t_i_pipe_events_read_activated",
+        "sub_409B10": "zmq_socket_base_t_i_pipe_events_write_activated",
+        "sub_409B30": "zmq_socket_base_t_i_pipe_events_hiccuped",
+        "sub_409B60": "zmq_socket_base_t_i_pipe_events_pipe_terminated",
+        "sub_40B450": "zmq_socket_base_t_array_item_scalar_deleting_dtor",
+        "sub_40B460": "zmq_socket_base_t_i_poll_events_scalar_deleting_dtor",
+        "sub_40B470": "zmq_socket_base_t_i_pipe_events_scalar_deleting_dtor",
+    }
+
+    for symbol, alias in expected_aliases.items():
+        address = f"00{symbol.removeprefix('sub_')}".lower()
+        assert aliases[symbol] == alias
+        assert f"fun_{address},{address}" in functions_csv
+        assert f"| `{symbol}` | `{alias}` | High |" in mapping_round
+
+    existing_aliases = {
+        "sub_407790": "zmq_socket_base_t_dtor",
+        "sub_409510": "zmq_socket_base_t_process_commands",
+        "sub_409A60": "zmq_socket_base_t_check_destroy",
+        "sub_409F20": "std_tree_erase_zmq_pending_connection_node_iter",
+    }
+
+    for symbol, alias in existing_aliases.items():
+        address = f"00{symbol.removeprefix('sub_')}".lower()
+        assert aliases[symbol] == alias
+        assert f"fun_{address},{address}" in functions_csv
+        assert f"| `{symbol}` | `{alias}` | Existing |" in mapping_round
+
+    assert "..\\..\\..\\src\\socket_base.cpp" in hlil_part01
+    assert "..\\..\\..\\src\\own.cpp" in hlil_part01
+    assert "00407700    struct zmq::own_t::zmq::socket_base_t::VTable** __thiscall sub_407700" in hlil_part01
+    assert "sub_407790(arg1)" in hlil_part01
+    assert "00409860    int32_t __fastcall sub_409860" in hlil_part01
+    assert "*(arg1 + 0x2ad) = 1" in hlil_part01
+    assert "00409870    int32_t sub_409870()" in hlil_part01
+    assert "*_errno() = 0x16" in hlil_part01
+    assert "00409890    int32_t sub_409890()" in hlil_part01
+    assert "*_errno() = 0x81" in hlil_part01
+    assert "004098b0    void __fastcall sub_4098b0" in hlil_part01
+    assert '"..\\..\\..\\src\\socket_base.cpp", 0x3ea' in hlil_part01
+    assert "00409900    void __fastcall sub_409900" in hlil_part01
+    assert '"..\\..\\..\\src\\socket_base.cpp", 0x3ee' in hlil_part01
+    assert "00409950    void __fastcall sub_409950" in hlil_part01
+    assert '"..\\..\\..\\src\\socket_base.cpp", 0x3f3' in hlil_part01
+    assert "sub_409510(0, arg1 - 0x280, 0)" in hlil_part01
+    assert "return sub_409a60(arg1 - 0x280)" in hlil_part01
+    assert "004099c0    void __fastcall sub_4099c0" in hlil_part01
+    assert '"..\\..\\..\\src\\socket_base.cpp", 0x402' in hlil_part01
+    assert "00409a10    void __fastcall sub_409a10" in hlil_part01
+    assert '"..\\..\\..\\src\\socket_base.cpp", 0x407' in hlil_part01
+    assert "00409a60    void sub_409a60" in hlil_part01
+    assert "sub_40bf30(arg1[0xc5], arg1[0xc6])" in hlil_part01
+    assert "sub_403120(arg1[1], arg1)" in hlil_part01
+    assert "(**arg1)(1)" in hlil_part01
+    assert "00409af0    int32_t __fastcall sub_409af0" in hlil_part01
+    assert "jump(*(*(arg1 - 0x284) + 0x60))" in hlil_part01
+    assert "00409b10    int32_t __fastcall sub_409b10" in hlil_part01
+    assert "jump(*(*(arg1 - 0x284) + 0x64))" in hlil_part01
+    assert "00409b30    int32_t __thiscall sub_409b30" in hlil_part01
+    assert "jump(*(*(arg1 - 0x284) + 0x68))" in hlil_part01
+    assert "return sub_410c00(arg1.b, arg2)" in hlil_part01
+    assert "00409b60    int32_t __thiscall sub_409b60" in hlil_part01
+    assert "(*(*(arg1 - 0x284) + 0x6c))(ebx)" in hlil_part01
+    assert "sub_409f20(arg1 + 0x14, &arg2, i)" in hlil_part01
+    assert "return sub_40f670(arg1 - 0x284)" in hlil_part01
+    assert '"term_acks > 0", ' in hlil_part01
+    assert '"..\\..\\..\\src\\own.cpp", 0xab' in hlil_part01
+    assert "return sub_407700(arg1 - 0x278) __tailcall" in hlil_part01
+    assert "return sub_407700(arg1 - 0x280) __tailcall" in hlil_part01
+    assert "return sub_407700(arg1 - 0x284) __tailcall" in hlil_part01
+
+    assert "struct zmq::own_t::zmq::socket_base_t::VTable zmq::socket_base_t::`vftable'{for `zmq::own_t'}" in hlil_part06
+    assert "void*** (__thiscall* const vFunc_0)(void*** arg1, char arg2) = sub_407700" in hlil_part06
+    assert "void (__fastcall* const vFunc_17)(int32_t* arg1) = sub_409860" in hlil_part06
+    assert "int32_t (* const vFunc_19)() = sub_409870" in hlil_part06
+    assert "int32_t (* const vFunc_21)() = sub_409890" in hlil_part06
+    assert "int32_t (* const vFunc_23)() = sub_409890" in hlil_part06
+    assert "void (__fastcall* const vFunc_24)(uint32_t arg1) __noreturn = sub_4098b0" in hlil_part06
+    assert "void (__fastcall* const vFunc_25)(uint32_t arg1) __noreturn = sub_409900" in hlil_part06
+    assert "void (__fastcall* const vFunc_26)(uint32_t arg1) __noreturn = sub_409950" in hlil_part06
+    assert "struct zmq::array_item_t<0>::zmq::socket_base_t::VTable zmq::socket_base_t::`vftable'" in hlil_part06
+    assert "void*** (__thiscall* const vFunc_0)(void*** arg1, char arg2) = sub_40b450" in hlil_part06
+    assert "struct zmq::i_poll_events::zmq::socket_base_t::VTable zmq::socket_base_t::`vftable'" in hlil_part06
+    assert "void*** (__thiscall* const vFunc_0)(void*** arg1, char arg2) = sub_40b460" in hlil_part06
+    assert "int32_t (* const _purecall)() = sub_4099a0" in hlil_part06
+    assert "int32_t (* const _purecall)() = sub_4099c0" in hlil_part06
+    assert "int32_t (* const _purecall)() = sub_409a10" in hlil_part06
+    assert "struct zmq::i_pipe_events::zmq::socket_base_t::VTable zmq::socket_base_t::`vftable'" in hlil_part06
+    assert "void*** (__thiscall* const vFunc_0)(void*** arg1, char arg2) = sub_40b470" in hlil_part06
+    assert "int32_t (* const _purecall)() = sub_409af0" in hlil_part06
+    assert "int32_t (* const _purecall)() = sub_409b10" in hlil_part06
+    assert "int32_t (* const _purecall)() = sub_409b30" in hlil_part06
+    assert "int32_t (* const _purecall)() = sub_409b60" in hlil_part06
+
+    assert "This pass added 17 aliases and re-pinned 4 existing aliases" in mapping_round
+    assert "socket_base_t default virtual/interface wiring" in mapping_round
+    assert "pending-connection cleanup" in mapping_round
+
+
+def test_zmq_msg_pipe_queue_round_403_aliases_are_pinned() -> None:
+    aliases = json.loads(
+        (REPO_ROOT / "references/analysis/quakelive_symbol_aliases.json").read_text(encoding="utf-8")
+    )["quakelive_steam_srp"]
+    functions_csv = (
+        REPO_ROOT / "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+    ).read_text(encoding="utf-8").lower()
+    hlil_part01 = (
+        REPO_ROOT
+        / "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part01.txt"
+    ).read_text(encoding="utf-8")
+    hlil_part06 = (
+        REPO_ROOT
+        / "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part06.txt"
+    ).read_text(encoding="utf-8")
+    mapping_round = (
+        REPO_ROOT / "docs/reverse-engineering/quakelive_steam_mapping_round_403.md"
+    ).read_text(encoding="utf-8")
+
+    expected_aliases = {
+        "sub_40FB60": "zmq_ypipe_conflate_msg_t_write_value",
+        "sub_40FC80": "zmq_ypipe_conflate_msg_t_read_value",
+        "sub_410140": "zmq_pipe_t_scalar_deleting_dtor",
+        "sub_410EF0": "zmq_ypipe_conflate_msg_t_ctor",
+        "sub_410F40": "zmq_ypipe_conflate_msg_t_write",
+        "sub_410F60": "zmq_ypipe_conflate_msg_t_unwrite_unsupported",
+        "sub_410F70": "zmq_ypipe_conflate_msg_t_flush",
+        "sub_410F80": "zmq_ypipe_conflate_msg_t_check_read",
+        "sub_410FB0": "zmq_ypipe_conflate_msg_t_read",
+        "sub_411060": "zmq_ypipe_msg_t_ctor",
+        "sub_4110A0": "zmq_ypipe_msg_t_write",
+        "sub_411100": "zmq_ypipe_msg_t_unwrite",
+        "sub_411160": "zmq_ypipe_t_flush_shared",
+        "sub_4111A0": "zmq_ypipe_msg_t_check_read",
+        "sub_4111E0": "zmq_ypipe_msg_t_read",
+        "sub_411270": "zmq_ypipe_msg_t_probe",
+        "sub_4112E0": "zmq_array_item_1_scalar_deleting_dtor",
+        "sub_411310": "zmq_array_item_2_scalar_deleting_dtor",
+        "sub_411340": "zmq_array_item_3_scalar_deleting_dtor",
+        "sub_411370": "zmq_ypipe_conflate_msg_t_scalar_deleting_dtor",
+        "sub_411400": "zmq_ypipe_base_msg_t_scalar_deleting_dtor",
+        "sub_411430": "zmq_ypipe_msg_t_scalar_deleting_dtor",
+        "sub_411520": "zmq_yqueue_msg_t_ctor",
+        "sub_411590": "zmq_yqueue_msg_t_dtor",
+        "sub_4115E0": "zmq_yqueue_msg_t_push",
+        "sub_4116B0": "zmq_yqueue_msg_t_unpush",
+        "sub_4119E0": "zmq_pipe_t_array_item_1_scalar_deleting_dtor",
+        "sub_4119F0": "zmq_pipe_t_array_item_2_scalar_deleting_dtor",
+        "sub_411A00": "zmq_pipe_t_array_item_3_scalar_deleting_dtor",
+    }
+
+    for symbol, alias in expected_aliases.items():
+        address = f"00{symbol.removeprefix('sub_')}".lower()
+        assert aliases[symbol] == alias
+        assert f"fun_{address},{address}" in functions_csv
+        assert f"| `{symbol}` | `{alias}` | High |" in mapping_round
+
+    existing_aliases = {
+        "sub_40FD50": "zmq_pipepair",
+        "sub_410070": "zmq_pipe_t_ctor",
+        "sub_410170": "zmq_pipe_t_dtor",
+        "sub_410330": "zmq_pipe_t_read",
+        "sub_410400": "zmq_pipe_t_write",
+        "sub_410480": "zmq_pipe_t_rollback",
+        "sub_410DF0": "zmq_pipe_t_hiccup",
+    }
+
+    for symbol, alias in existing_aliases.items():
+        address = f"00{symbol.removeprefix('sub_')}".lower()
+        assert aliases[symbol] == alias
+        assert f"fun_{address},{address}" in functions_csv
+        assert f"| `{symbol}` | `{alias}` | Existing |" in mapping_round
+
+    assert "..\\..\\..\\src\\pipe.cpp" in hlil_part01
+    assert "zeromq\\\\src\\\\ypipe.hpp" in hlil_part06
+    assert "zeromq\\\\src\\\\yqueue.hpp" in hlil_part06
+
+    assert "0040fd50    int32_t sub_40fd50" in hlil_part01
+    assert "if (*arg4 == 0)" in hlil_part01
+    assert "var_8 = sub_410ef0(eax_1)" in hlil_part01
+    assert "arguments_1 = sub_410ef0(eax_12)" in hlil_part01
+    assert "eax_23 = sub_410070(var_8, arg3[1], *arg1, eax_20, var_8, arguments_1, *arg3, *arg4)" in hlil_part01
+    assert "eax_29 = sub_410070(arguments_2, *arg3, arg1[1], eax_26, arguments_2, var_8, arg3[1]," in hlil_part01
+    assert "*(edi_6 + 0x50) = arguments" in hlil_part01
+    assert "*(esi_3 + 0x50) = *arg2" in hlil_part01
+    assert '"!peer", ' in hlil_part01
+    assert "00410140    struct zmq::object_t::zmq::pipe_t::VTable** __thiscall sub_410140" in hlil_part01
+    assert "sub_410170(arg1)" in hlil_part01
+
+    assert "0040fb60    BOOL __stdcall sub_40fb60" in hlil_part01
+    assert "sub_40b480(arg1) == 0" in hlil_part01
+    assert '"xvalue.check ()"' in hlil_part01
+    assert "sub_40b520(esi) s>= 0" in hlil_part01
+    assert "TryEnterCriticalSection(lpCriticalSection: ebx + 0x48)" in hlil_part01
+    assert "*(ebx + 0x60) = 1" in hlil_part01
+    assert "0040fc80    int32_t __fastcall sub_40fc80" in hlil_part01
+    assert "if (arg3 == 0)" in hlil_part01
+    assert "EnterCriticalSection(lpCriticalSection: arg2 + 0x48)" in hlil_part01
+    assert '"front->check ()"' in hlil_part01
+    assert "*(arg2 + 0x60) = 0" in hlil_part01
+
+    assert "00410ef0    struct zmq::ypipe_base_t<class zmq::msg_t, 256>::zmq::ypipe_conflate_t" in hlil_part01
+    assert "*arg1 = &zmq::ypipe_conflate_t<class zmq::msg_t, 256>::`vftable'" in hlil_part01
+    assert "InitializeCriticalSection(lpCriticalSection: &arg1[0x13])" in hlil_part01
+    assert "return sub_40fb60(arg2, arg1 + 4)" in hlil_part01
+    assert "result.b = 0" in hlil_part01
+    assert "result.b = *(arg1 + 0x68)" in hlil_part01
+    assert "EnterCriticalSection(lpCriticalSection: arg1 + 0x4c)" in hlil_part01
+    assert "return sub_40fc80(ecx, &arg1[1], arg2)" in hlil_part01
+    assert "sub_40b520(arg1[0x11])" in hlil_part01
+    assert "sub_40b520(arg1[0x12])" in hlil_part01
+    assert "DeleteCriticalSection(lpCriticalSection: &arg1[0x13])" in hlil_part01
+
+    assert "00411060    struct zmq::ypipe_base_t<class zmq::msg_t, 256>::zmq::ypipe_t" in hlil_part01
+    assert "*arg1 = &zmq::ypipe_t<class zmq::msg_t, 256>::`vftable'" in hlil_part01
+    assert "uint32_t ecx_1 = sub_411520(ecx, &arg1[1])" in hlil_part01
+    assert "int64_t* eax_2 = (*(arg1 + 0x10) << 5) + *(arg1 + 0xc)" in hlil_part01
+    assert "void* result = sub_4115e0(arg2, arg1 + 4)" in hlil_part01
+    assert "if (*(arg1 + 0x28) == (*(arg1 + 0x10) << 5) + *(arg1 + 0xc))" in hlil_part01
+    assert "InterlockedCompareExchange(arg1 + 0x2c, ecx, eax) == *(arg1 + 0x20)" in hlil_part01
+    assert "InterlockedCompareExchange(arg1 + 0x2c, 0, result)" in hlil_part01
+    assert "sub_4116b0(arg1 + 4)" in hlil_part01
+    assert "if (arg1[2] == 0x100)" in hlil_part01
+    assert "return arg2((*(arg1 + 8) << 5) + *(arg1 + 4))" in hlil_part01
+    assert "sub_411590(&arg1[1])" in hlil_part01
+
+    assert "int32_t eax = malloc(0x2008)" in hlil_part01
+    assert "while (*arg1 != arg1[4])" in hlil_part01
+    assert "*(*(arg2 + 0x10) + 0x2004) = malloc(0x2008)" in hlil_part01
+    assert "if (result == 0x100)" in hlil_part01
+    assert "*(arg1 + 0xc) = 0xff" in hlil_part01
+
+    assert "return sub_410140(arg1 - 0xc) __tailcall" in hlil_part01
+    assert "return sub_410140(arg1 - 0x14) __tailcall" in hlil_part01
+    assert "return sub_410140(arg1 - 0x1c) __tailcall" in hlil_part01
+
+    assert "struct zmq::object_t::zmq::pipe_t::VTable zmq::pipe_t::`vftable'{for `zmq::object_t'}" in hlil_part06
+    assert "void*** (__thiscall* const vFunc_0)(void*** arg1, char arg2) = sub_410140" in hlil_part06
+    assert "struct zmq::array_item_t<1>::zmq::pipe_t::VTable zmq::pipe_t::`vftable'{for `zmq::array_item_t<1>'}" in hlil_part06
+    assert "void*** (__thiscall* const vFunc_0)(void*** arg1, char arg2) = sub_4119e0" in hlil_part06
+    assert "void*** (__thiscall* const vFunc_0)(void*** arg1, char arg2) = sub_4119f0" in hlil_part06
+    assert "void*** (__thiscall* const vFunc_0)(void*** arg1, char arg2) = sub_411a00" in hlil_part06
+    assert "struct zmq::ypipe_base_t<class zmq::msg_t, 256>::VTable zmq::ypipe_base_t<class zmq::msg_t, 256>::`vftable'" in hlil_part06
+    assert "void*** (__thiscall* const vFunc_0)(void*** arg1, char arg2) = sub_411400" in hlil_part06
+    assert "struct zmq::ypipe_base_t<class zmq::msg_t, 256>::zmq::ypipe_t<class zmq::msg_t, 256>::VTable" in hlil_part06
+    assert "void*** (__thiscall* const vFunc_0)(void*** arg1, char arg2) = sub_411430" in hlil_part06
+    assert "int32_t (* const _purecall)() = sub_4110a0" in hlil_part06
+    assert "int32_t (* const _purecall)() = sub_411100" in hlil_part06
+    assert "int32_t (* const _purecall)() = sub_411160" in hlil_part06
+    assert "int32_t (* const _purecall)() = sub_4111a0" in hlil_part06
+    assert "int32_t (* const _purecall)() = sub_4111e0" in hlil_part06
+    assert "int32_t (* const _purecall)() = sub_411270" in hlil_part06
+    assert "struct zmq::ypipe_base_t<class zmq::msg_t, 256>::zmq::ypipe_conflate_t<class zmq::msg_t, 256>::VTable" in hlil_part06
+    assert "void*** (__thiscall* const vFunc_0)(void*** arg1, char arg2) = sub_411370" in hlil_part06
+    assert "int32_t (* const _purecall)() = sub_410f40" in hlil_part06
+    assert "int32_t (* const _purecall)() = sub_410f60" in hlil_part06
+    assert "int32_t (* const _purecall)() = sub_410f70" in hlil_part06
+    assert "int32_t (* const _purecall)() = sub_410f80" in hlil_part06
+    assert "int32_t (* const _purecall)() = sub_410fb0" in hlil_part06
+
+    assert "This pass added 28 aliases and re-pinned 7 existing aliases" in mapping_round
+    assert "ZMQ message pipe backing queue wiring" in mapping_round
+    assert "0x2008-byte chunks" in mapping_round
+    assert "operator new[]`-named function" in mapping_round
+
+
+def test_zmq_msg_pipe_queue_tail_round_408_aliases_are_pinned() -> None:
+    aliases = json.loads(
+        (REPO_ROOT / "references/analysis/quakelive_symbol_aliases.json").read_text(encoding="utf-8")
+    )["quakelive_steam_srp"]
+    functions_csv = (
+        REPO_ROOT / "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+    ).read_text(encoding="utf-8").lower()
+    analysis_symbols = (
+        REPO_ROOT / "references/reverse-engineering/ghidra/quakelive_steam/analysis_symbols.txt"
+    ).read_text(encoding="utf-8")
+    hlil_part01 = (
+        REPO_ROOT
+        / "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part01.txt"
+    ).read_text(encoding="utf-8")
+    hlil_part06 = (
+        REPO_ROOT
+        / "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part06.txt"
+    ).read_text(encoding="utf-8")
+    mapping_round = (
+        REPO_ROOT / "docs/reverse-engineering/quakelive_steam_mapping_round_408.md"
+    ).read_text(encoding="utf-8")
+
+    expected_aliases = {
+        "sub_410FE0": "zmq_ypipe_conflate_msg_t_probe",
+        "sub_411050": "zmq_ypipe_base_msg_t_dtor",
+    }
+
+    for symbol, alias in expected_aliases.items():
+        address = f"00{symbol.removeprefix('sub_')}".lower()
+        assert aliases[symbol] == alias
+        assert f"fun_{address},{address}" in functions_csv
+        assert f"| `{symbol}` | `{alias}` | High |" in mapping_round
+
+    existing_aliases = {
+        "sub_410EF0": "zmq_ypipe_conflate_msg_t_ctor",
+        "sub_410F40": "zmq_ypipe_conflate_msg_t_write",
+        "sub_410F60": "zmq_ypipe_conflate_msg_t_unwrite_unsupported",
+        "sub_410F70": "zmq_ypipe_conflate_msg_t_flush",
+        "sub_410F80": "zmq_ypipe_conflate_msg_t_check_read",
+        "sub_410FB0": "zmq_ypipe_conflate_msg_t_read",
+        "sub_411400": "zmq_ypipe_base_msg_t_scalar_deleting_dtor",
+    }
+
+    for symbol, alias in existing_aliases.items():
+        assert aliases[symbol] == alias
+
+    assert "0054ff30 IMPORTED zmq::ypipe_conflate_t<class_zmq::msg_t,256>::vftable_meta_ptr" in analysis_symbols
+    assert "0054ff34 IMPORTED zmq::ypipe_conflate_t<class_zmq::msg_t,256>::vftable" in analysis_symbols
+    assert "00553034 IMPORTED zmq::ypipe_conflate_t<class_zmq::msg_t,256>::RTTI_Complete_Object_Locator" in analysis_symbols
+
+    assert "00410fe0    int32_t __thiscall operator new[](void* arg1, int32_t arg2)" in hlil_part01
+    assert "EnterCriticalSection(lpCriticalSection: arg1 + 0x4c)" in hlil_part01
+    assert "ebx.b = arg2(*(arg1 + 0x48), eax_2)" in hlil_part01
+    assert "LeaveCriticalSection(lpCriticalSection: arg1 + 0x4c)" in hlil_part01
+    assert "result.b = ebx.b" in hlil_part01
+
+    assert "00411050    int32_t __fastcall sub_411050" in hlil_part01
+    assert "*arg1 = &zmq::ypipe_base_t<class zmq::msg_t, 256>::`vftable'" in hlil_part01
+
+    assert "struct zmq::ypipe_base_t<class zmq::msg_t, 256>::zmq::ypipe_conflate_t<class zmq::msg_t, 256>::VTable" in hlil_part06
+    assert "void*** (__thiscall* const vFunc_0)(void*** arg1, char arg2) = sub_411370" in hlil_part06
+    assert "int32_t (* const _purecall)() = sub_410f40" in hlil_part06
+    assert "int32_t (* const _purecall)() = sub_410f60" in hlil_part06
+    assert "int32_t (* const _purecall)() = sub_410f70" in hlil_part06
+    assert "int32_t (* const _purecall)() = sub_410f80" in hlil_part06
+    assert "int32_t (* const _purecall)() = sub_410fb0" in hlil_part06
+    assert "int32_t (* const _purecall)() = operator new[](uint32_t, enum std::align_val_t, struct std::nothrow_t const&)" in hlil_part06
+    assert "struct zmq::ypipe_base_t<class zmq::msg_t, 256>::VTable zmq::ypipe_base_t<class zmq::msg_t, 256>::`vftable'" in hlil_part06
+    assert "void*** (__thiscall* const vFunc_0)(void*** arg1, char arg2) = sub_411400" in hlil_part06
+
+    assert "This pass added 2 aliases" in mapping_round
+    assert "ypipe_conflate_t<msg_t,256> helper names" in mapping_round
+    assert "decompiler artifact" in mapping_round
+    assert "0x00411470..0x00411990" in mapping_round
+
+
+def test_zmq_fq_lb_dist_round_404_aliases_are_pinned() -> None:
+    aliases = json.loads(
+        (REPO_ROOT / "references/analysis/quakelive_symbol_aliases.json").read_text(encoding="utf-8")
+    )["quakelive_steam_srp"]
+    functions_csv = (
+        REPO_ROOT / "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+    ).read_text(encoding="utf-8").lower()
+    hlil_part01 = (
+        REPO_ROOT
+        / "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part01.txt"
+    ).read_text(encoding="utf-8")
+    hlil_part06 = (
+        REPO_ROOT
+        / "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part06.txt"
+    ).read_text(encoding="utf-8")
+    mapping_round = (
+        REPO_ROOT / "docs/reverse-engineering/quakelive_steam_mapping_round_404.md"
+    ).read_text(encoding="utf-8")
+
+    expected_aliases = {
+        "sub_41E230": "zmq_fq_t_dtor",
+        "sub_41E2B0": "zmq_fq_t_attach",
+        "sub_41E320": "zmq_fq_t_terminated",
+        "sub_41E3F0": "zmq_fq_t_activate",
+        "sub_41E6B0": "zmq_fq_t_has_in",
+        "sub_41E750": "std_vector_zmq_fq_pipe_push_back",
+        "sub_41E7D0": "zmq_lb_t_dtor",
+        "sub_41E850": "zmq_lb_t_terminated",
+        "sub_41E930": "zmq_lb_t_activate",
+        "sub_41EBF0": "zmq_lb_t_has_out",
+        "sub_41ECC0": "std_vector_zmq_lb_pipe_push_back",
+        "sub_420120": "zmq_dist_t_dtor",
+        "sub_4201A0": "zmq_dist_t_attach",
+        "sub_420280": "zmq_dist_t_terminated",
+        "sub_420430": "zmq_dist_t_activate",
+        "sub_420500": "zmq_dist_t_send_to_matching",
+        "sub_4206C0": "zmq_dist_t_write",
+    }
+
+    for symbol, alias in expected_aliases.items():
+        address = f"00{symbol.removeprefix('sub_')}".lower()
+        assert aliases[symbol] == alias
+        assert f"fun_{address},{address}" in functions_csv
+        assert f"| `{symbol}` | `{alias}` | High |" in mapping_round
+
+    existing_aliases = {
+        "sub_41E460": "zmq_fq_t_recvpipe",
+        "sub_41E9A0": "zmq_lb_t_sendpipe",
+    }
+
+    for symbol, alias in existing_aliases.items():
+        address = f"00{symbol.removeprefix('sub_')}".lower()
+        assert aliases[symbol] == alias
+        assert f"fun_{address},{address}" in functions_csv
+        assert f"| `{symbol}` | `{alias}` | Existing |" in mapping_round
+
+    assert "..\\..\\..\\src\\fq.cpp" in hlil_part01
+    assert "..\\..\\..\\src\\lb.cpp" in hlil_part01
+    assert "..\\..\\..\\src\\dist.cpp" in hlil_part01
+    assert "..\\\\..\\\\..\\\\src\\\\fq.cpp" in hlil_part06
+    assert "..\\\\..\\\\..\\\\src\\\\lb.cpp" in hlil_part06
+    assert "..\\\\..\\\\..\\\\src\\\\dist.cpp" in hlil_part06
+
+    assert "0041e230    void* __fastcall sub_41e230" in hlil_part01
+    assert '"pipes.empty ()", ' in hlil_part01
+    assert "0041e2b0    int32_t __convention(\"regparm\") sub_41e2b0" in hlil_part01
+    assert "sub_41e750(arg3, arg1)" in hlil_part01
+    assert "arg3[4] += 1" in hlil_part01
+    assert "0041e320    void __stdcall sub_41e320" in hlil_part01
+    assert "if (arg1[5] == arg1[4])" in hlil_part01
+    assert "0041e3f0    int32_t* __convention(\"regparm\") sub_41e3f0" in hlil_part01
+    assert "0041e460    int32_t __stdcall sub_41e460" in hlil_part01
+    assert "sub_40b520(esi) != 0" in hlil_part01
+    assert "(*(**(edi_2 + 0x24) + 0x14))(esi_1)" in hlil_part01
+    assert '"!more"' in hlil_part01
+    assert "*_errno() = 0xb" in hlil_part01
+    assert "0041e6b0    int32_t sub_41e6b0" in hlil_part01
+    assert "sub_410250(*(*arg1 + (arg1[5] << 2))).b != 0" in hlil_part01
+    assert "0041e750    void** __stdcall sub_41e750" in hlil_part01
+    assert "*(edi + 0x10) = (arg1[1] - *arg1) s>> 2" in hlil_part01
+    assert "sub_404bc0(arg1)" in hlil_part01
+
+    assert "0041e7d0    void* __fastcall sub_41e7d0" in hlil_part01
+    assert "0041e850    void __stdcall sub_41e850" in hlil_part01
+    assert "*(arg1 + 0x19) = 1" in hlil_part01
+    assert "0041e930    int32_t* __convention(\"regparm\") sub_41e930" in hlil_part01
+    assert "0041e9a0    int32_t __stdcall sub_41e9a0" in hlil_part01
+    assert "(*(**(edi_2 + 0x28) + 4))(arg2, arguments)" in hlil_part01
+    assert "sub_40d860(*(edi_4 + 0x50), edx_10, edi_4)" in hlil_part01
+    assert "0041ebf0    int32_t __fastcall sub_41ebf0" in hlil_part01
+    assert "0041ecc0    void** __stdcall sub_41ecc0" in hlil_part01
+    assert "*(edi + 0x18) = (arg1[1] - *arg1) s>> 2" in hlil_part01
+
+    assert "00420120    void* __fastcall sub_420120" in hlil_part01
+    assert "004201a0    int32_t __convention(\"regparm\") sub_4201a0" in hlil_part01
+    assert "if (arg3[7].b != 0)" in hlil_part01
+    assert "sub_41ecc0(arg3, arg1)" in hlil_part01
+    assert "arg3[5] += 1" in hlil_part01
+    assert "arg3[6] += 1" in hlil_part01
+    assert "00420280    void __stdcall sub_420280" in hlil_part01
+    assert "00420430    void __convention(\"regparm\") sub_420430" in hlil_part01
+    assert "arg1[6] += 1" in hlil_part01
+    assert "arg1[5] += 1" in hlil_part01
+    assert "00420500    int32_t* __convention(\"regparm\") sub_420500" in hlil_part01
+    assert "if (*(arg1 + 0x1e) == 0x65)" in hlil_part01
+    assert "sub_4206c0(arg1, arg3, *(*arg3 + (i << 2))).b == 0" in hlil_part01
+    assert "sub_40b8a0(arg1, edx_4, ecx_3, arguments_3)" in hlil_part01
+    assert "004206c0    int32_t __stdcall sub_4206c0" in hlil_part01
+    assert "if (sub_410400(arg3, arg1) != 0)" in hlil_part01
+    assert "sub_40d860(*(arg3 + 0x50), edx_5, arg3)" in hlil_part01
+
+    assert "This pass added 17 aliases and re-pinned 2 existing aliases" in mapping_round
+    assert "FQ/LB/DIST pipe routing helper wiring" in mapping_round
+    assert "trie_t`/`mtrie_t`" in mapping_round
+
+
+def test_zmq_subscription_trie_round_405_aliases_are_pinned() -> None:
+    aliases = json.loads(
+        (REPO_ROOT / "references/analysis/quakelive_symbol_aliases.json").read_text(encoding="utf-8")
+    )["quakelive_steam_srp"]
+    functions_csv = (
+        REPO_ROOT / "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+    ).read_text(encoding="utf-8").lower()
+    hlil_part01 = (
+        REPO_ROOT
+        / "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part01.txt"
+    ).read_text(encoding="utf-8")
+    hlil_part06 = (
+        REPO_ROOT
+        / "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part06.txt"
+    ).read_text(encoding="utf-8")
+    mapping_round = (
+        REPO_ROOT / "docs/reverse-engineering/quakelive_steam_mapping_round_405.md"
+    ).read_text(encoding="utf-8")
+
+    expected_aliases = {
+        "sub_41ED40": "zmq_mtrie_t_dtor",
+        "sub_41EE80": "zmq_mtrie_t_destroy_pipe_set",
+        "sub_41EEF0": "zmq_mtrie_t_destroy_node",
+        "sub_41FF60": "zmq_mtrie_t_match_to_dist",
+        "sub_420100": "zmq_mtrie_t_is_redundant",
+        "sub_420840": "zmq_trie_t_dtor",
+        "sub_420900": "zmq_trie_t_destroy_node",
+        "sub_421320": "zmq_trie_t_apply",
+    }
+
+    for symbol, alias in expected_aliases.items():
+        address = f"00{symbol.removeprefix('sub_')}".lower()
+        assert aliases[symbol] == alias
+        assert f"fun_{address},{address}" in functions_csv
+        assert f"| `{symbol}` | `{alias}` | High |" in mapping_round
+
+    existing_aliases = {
+        "sub_41EF10": "zmq_mtrie_t_add",
+        "sub_41F3C0": "zmq_mtrie_t_rm_helper",
+        "sub_41FA70": "zmq_mtrie_t_rm",
+        "sub_420920": "zmq_trie_t_add",
+        "sub_420D90": "zmq_trie_t_rm",
+    }
+
+    for symbol, alias in existing_aliases.items():
+        address = f"00{symbol.removeprefix('sub_')}".lower()
+        assert aliases[symbol] == alias
+        assert f"fun_{address},{address}" in functions_csv
+        assert f"| `{symbol}` | `{alias}` | Existing |" in mapping_round
+
+    assert "..\\..\\..\\src\\mtrie.cpp" in hlil_part01
+    assert "..\\..\\..\\src\\trie.cpp" in hlil_part01
+    assert "..\\\\..\\\\..\\\\src\\\\mtrie.cpp" in hlil_part06
+    assert "..\\\\..\\\\..\\\\src\\\\trie.cpp" in hlil_part06
+
+    assert "sub_41ed40(&arg1[0xe0])" in hlil_part01
+    assert "sub_41ff60(arg1 + 0x380, sub_40b660(ecx), eax_1, arg1)" in hlil_part01
+    assert "sub_420500(edi, edx, arg1 + 0x390)" in hlil_part01
+    assert "sub_420840(&arg2[0xef])" in hlil_part01
+    assert "sub_421320(arg1 + 0x3bc, &arg2, nullptr, nullptr, sub_418a80, esi)" in hlil_part01
+    assert "sub_421320(arg1 + 0x3bc, &var_8, nullptr, nullptr, sub_418a80, arg2)" in hlil_part01
+
+    assert "0041ed40    uint32_t __fastcall sub_41ed40" in hlil_part01
+    assert "sub_416510(ecx, arguments_1, &var_18, ecx, eax_3)" in hlil_part01
+    assert "operator delete(*(arguments_1 + 4))" in hlil_part01
+    assert "sub_41ed40(eax_2)" in hlil_part01
+    assert '"next.node"' in hlil_part01
+    assert "0041ee80    void* __thiscall sub_41ee80" in hlil_part01
+    assert "operator delete(*(arg2 + 4))" in hlil_part01
+    assert "operator delete(arg2)" in hlil_part01
+    assert "0041eef0    void* sub_41eef0" in hlil_part01
+    assert "sub_41ed40(arg1)" in hlil_part01
+    assert "0041ef10    void** __thiscall sub_41ef10" in hlil_part01
+    assert "0041f3c0    uint32_t __thiscall sub_41f3c0" in hlil_part01
+    assert "arg1, edx = sub_416510" in hlil_part01
+    assert "arg1, edx = sub_41ee80(arg1, eax_5)" in hlil_part01
+    assert '"live_nodes > 0"' in hlil_part01
+    assert "0041fa70    uint32_t __thiscall sub_41fa70" in hlil_part01
+    assert '"erased == 1"' in hlil_part01
+    assert "if (sub_420100(esi_4).b != 0)" in hlil_part01
+    assert "sub_41eef0(esi_4)" in hlil_part01
+    assert "0041ff60    int32_t* __stdcall sub_41ff60" in hlil_part01
+    assert "*(ebx + 0x3a0) += 1" in hlil_part01
+    assert "00420100    int32_t __convention(\"regparm\") sub_420100" in hlil_part01
+    assert "if (*arg1 == 0 && arg1[2].w == 0)" in hlil_part01
+
+    assert "00420840    uint32_t __fastcall sub_420840" in hlil_part01
+    assert "sub_420840()" in hlil_part01
+    assert "return free(*(arg1 + 0xc))" in hlil_part01
+    assert "00420900    void* sub_420900" in hlil_part01
+    assert "sub_420840(arg1)" in hlil_part01
+    assert "00420920    int32_t __stdcall sub_420920" in hlil_part01
+    assert "00420d90    uint32_t __thiscall sub_420d90" in hlil_part01
+    assert "sub_420900(esi_3)" in hlil_part01
+    assert "00421320    uint32_t __thiscall sub_421320" in hlil_part01
+    assert "arg5(*edi, esi, arg6)" in hlil_part01
+    assert "realloc(*edi, &esi[0x100])" in hlil_part01
+    assert "sub_421320(edi, &esi[1], arg4, arg5, arg6)" in hlil_part01
+
+    assert "This pass added 8 aliases and re-pinned 5 existing aliases" in mapping_round
+    assert "ZMQ subscription trie/mtrie wiring" in mapping_round
+    assert "match_to_dist" in mapping_round
+
+
+def test_zmq_tcp_address_round_406_aliases_are_pinned() -> None:
+    aliases = json.loads(
+        (REPO_ROOT / "references/analysis/quakelive_symbol_aliases.json").read_text(encoding="utf-8")
+    )["quakelive_steam_srp"]
+    functions_csv = (
+        REPO_ROOT / "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+    ).read_text(encoding="utf-8").lower()
+    analysis_symbols = (
+        REPO_ROOT / "references/reverse-engineering/ghidra/quakelive_steam/analysis_symbols.txt"
+    ).read_text(encoding="utf-8")
+    hlil_part01 = (
+        REPO_ROOT
+        / "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part01.txt"
+    ).read_text(encoding="utf-8")
+    hlil_part06 = (
+        REPO_ROOT
+        / "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part06.txt"
+    ).read_text(encoding="utf-8")
+    mapping_round = (
+        REPO_ROOT / "docs/reverse-engineering/quakelive_steam_mapping_round_406.md"
+    ).read_text(encoding="utf-8")
+
+    expected_aliases = {
+        "sub_411D20": "zmq_tcp_address_t_resolve_nic_name",
+        "sub_411E20": "zmq_tcp_address_t_ctor",
+        "sub_411E50": "zmq_tcp_address_t_ctor_from_sockaddr",
+        "sub_411F20": "zmq_tcp_address_t_dtor",
+        "sub_412970": "zmq_tcp_address_mask_t_match_address",
+    }
+
+    for symbol, alias in expected_aliases.items():
+        address = f"00{symbol.removeprefix('sub_')}".lower()
+        assert aliases[symbol] == alias
+        assert f"fun_{address},{address}" in functions_csv
+        assert f"| `{symbol}` | `{alias}` | High |" in mapping_round
+
+    existing_aliases = {
+        "sub_411A10": "zmq_tcp_address_t_resolve_interface",
+        "sub_411F30": "zmq_tcp_address_t_resolve",
+        "sub_412180": "zmq_tcp_address_t_to_string",
+        "sub_4124E0": "zmq_tcp_address_mask_t_resolve",
+        "sub_412720": "zmq_tcp_address_mask_t_to_string",
+    }
+
+    for symbol, alias in existing_aliases.items():
+        address = f"00{symbol.removeprefix('sub_')}".lower()
+        assert aliases[symbol] == alias
+        assert f"fun_{address},{address}" in functions_csv
+        assert f"| `{symbol}` | `{alias}` | Existing |" in mapping_round
+
+    assert "0054f838 IMPORTED zmq::tcp_address_t::vftable" in analysis_symbols
+    assert "0054f844 IMPORTED zmq::tcp_address_mask_t::vftable" in analysis_symbols
+    assert "..\\..\\..\\src\\tcp_address.cpp" in hlil_part01
+    assert "..\\\\..\\\\..\\\\src\\\\tcp_address.cpp" in hlil_part06
+
+    assert "struct zmq::tcp_address_t::VTable zmq::tcp_address_t::`vftable'" in hlil_part06
+    assert "int32_t (__thiscall* const vFunc_1)(void* arg1, void** arg2) = sub_412180" in hlil_part06
+    assert "struct zmq::tcp_address_t::zmq::tcp_address_mask_t::VTable zmq::tcp_address_mask_t::`vftable'{for `zmq::tcp_address_t'}" in hlil_part06
+    assert "int32_t (__thiscall* const vFunc_1)(void* arg1, void** arg2) = sub_412720" in hlil_part06
+
+    assert "sub_411e20(eax_64)" in hlil_part01
+    assert "if (sub_4124e0(ecx_2, &var_38, arg2[0x54].b) != 0)" in hlil_part01
+    assert "sub_411e50(&var_34, &name, namelen)" in hlil_part01
+    assert "sub_412180(&var_34, ebx)" in hlil_part01
+    assert "sub_412970(ecx_2, esi_2 + arguments, &addr)" in hlil_part01
+
+    assert "00411a10    int32_t __thiscall sub_411a10" in hlil_part01
+    assert "htonl(hostlong: 0)" in hlil_part01
+    assert "getaddrinfo(pNodeName: arg1, pServiceName: nullptr, pHints: &var_dc" in hlil_part01
+    assert '"out_addrlen <= sizeof address"' in hlil_part01
+    assert "00411d20    int32_t __fastcall sub_411d20" in hlil_part01
+    assert "getaddrinfo(pNodeName: arg2, pServiceName: nullptr, pHints: &var_30" in hlil_part01
+    assert "*_errno() = 0xc" in hlil_part01
+    assert "*_errno() = 0x16" in hlil_part01
+    assert "00411e20    void __convention(\"regparm\") sub_411e20" in hlil_part01
+    assert "*arg1 = &zmq::tcp_address_t::`vftable'" in hlil_part01
+    assert "__builtin_memset(s: &arg1[1], c: 0, n: 0x1c)" in hlil_part01
+    assert "00411e50    struct zmq::tcp_address_t::VTable** __stdcall sub_411e50" in hlil_part01
+    assert '"sa && sa_len > 0"' in hlil_part01
+    assert "*(arg1 + 0xc) = *(arg2 + 8)" in hlil_part01
+    assert "arg1[7] = *(arg2 + 0x18)" in hlil_part01
+    assert "00411f20    int32_t __fastcall sub_411f20" in hlil_part01
+
+    assert "00411f30    int32_t __thiscall" in hlil_part01
+    assert "int32_t eax_4 = strrchr(arg1, 0x3a" in hlil_part01
+    assert "sub_406e80(&var_30, arg1, eax_4 - arg1)" in hlil_part01
+    assert "sub_409ed0(&var_30, &var_68, 1, var_20_1 - 2)" in hlil_part01
+    assert "hostshort_1, ecx_9 = atoi(eax_13)" in hlil_part01
+    assert "hostshort = hostshort_1" in hlil_part01
+    assert "eax_15 = sub_411d20(ecx_9, edx_3, eax_16.b, arg2)" in hlil_part01
+    assert "eax_15 = sub_411a10(ecx_12, ebx_1, arg4)" in hlil_part01
+    assert "*(ebx_1 + 6) = htons(hostshort)" in hlil_part01
+
+    assert "00412180    int32_t __thiscall sub_412180" in hlil_part01
+    assert "getnameinfo(pSockaddr: arg1 + 4" in hlil_part01
+    assert '"tcp://["' in hlil_part01
+    assert '"tcp://"' in hlil_part01
+    assert "004124e0    int32_t __thiscall sub_4124e0" in hlil_part01
+    assert "int32_t eax_4 = strrchr(arg1, 0x2f" in hlil_part01
+    assert "int32_t result_1 = sub_411d20(ecx_4, edx_3, arg3, arg2)" in hlil_part01
+    assert "*(arg2 + 0x20) = eax_15" in hlil_part01
+    assert "00412720    int32_t __thiscall sub_412720" in hlil_part01
+    assert "*(arg1 + 0x20) != 0xffffffff" in hlil_part01
+    assert 'U"[/")' in hlil_part01
+    assert "00412970    char* __thiscall sub_412970" in hlil_part01
+    assert '"address_mask != -1 && ss != NULL' in hlil_part01
+    assert "if (ecx_1.w == *(result + 4))" in hlil_part01
+    assert "if (arguments_2 != 0x1c)" in hlil_part01
+    assert "if (arguments_2 != 0x10)" in hlil_part01
+    assert "edx_3.b = 0xff << (8 - ebx_2.b)" in hlil_part01
+
+    assert "This pass added 5 aliases and re-pinned 5 existing aliases" in mapping_round
+    assert "ZMQ TCP address endpoint parser wiring" in mapping_round
+    assert "MSVC stringstream/stringbuf helpers" in mapping_round
+
+
 def test_zmq_poller_base_io_object_round_377_aliases_are_pinned() -> None:
     aliases = json.loads(
         (REPO_ROOT / "references/analysis/quakelive_symbol_aliases.json").read_text(encoding="utf-8")
-    )["quakelive_steam"]
+    )["quakelive_steam_srp"]
     functions_csv = (
         REPO_ROOT / "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
     ).read_text(encoding="utf-8").lower()
@@ -6625,10 +10048,190 @@ def test_zmq_poller_base_io_object_round_377_aliases_are_pinned() -> None:
     assert "0x0040C1B0" in mapping_round
 
 
+def test_zmq_io_object_default_callbacks_round_409_aliases_are_pinned() -> None:
+    aliases = json.loads(
+        (REPO_ROOT / "references/analysis/quakelive_symbol_aliases.json").read_text(encoding="utf-8")
+    )["quakelive_steam_srp"]
+    functions_csv = (
+        REPO_ROOT / "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+    ).read_text(encoding="utf-8").lower()
+    hlil_part01 = (
+        REPO_ROOT
+        / "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part01.txt"
+    ).read_text(encoding="utf-8")
+    hlil_part06 = (
+        REPO_ROOT
+        / "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part06.txt"
+    ).read_text(encoding="utf-8")
+    mapping_round = (
+        REPO_ROOT / "docs/reverse-engineering/quakelive_steam_mapping_round_409.md"
+    ).read_text(encoding="utf-8")
+
+    expected_aliases = {
+        "sub_41E140": "zmq_io_object_t_in_event_assert",
+        "sub_41E190": "zmq_io_object_t_out_event_assert",
+        "sub_41E1E0": "zmq_io_object_t_timer_event_assert",
+    }
+
+    for symbol, alias in expected_aliases.items():
+        address = f"00{symbol.removeprefix('sub_')}".lower()
+        assert aliases[symbol] == alias
+        assert f"fun_{address},{address}" in functions_csv
+        assert f"| `{symbol}` | `{alias}` | High |" in mapping_round
+
+    existing_aliases = {
+        "sub_41DF90": "zmq_io_object_t_plug",
+        "sub_41E080": "zmq_io_object_t_set_pollin",
+        "sub_41E0C0": "zmq_io_object_t_reset_pollin",
+        "sub_41E100": "zmq_io_object_t_set_pollout",
+    }
+
+    for symbol, alias in existing_aliases.items():
+        assert aliases[symbol] == alias
+
+    assert "0041e140    void __fastcall sub_41e140(uint32_t arg1) __noreturn" in hlil_part01
+    assert '"..\\..\\..\\src\\io_object.cpp", 0x5f, arguments' in hlil_part01
+    assert "0041e190    void __fastcall sub_41e190(uint32_t arg1) __noreturn" in hlil_part01
+    assert '"..\\..\\..\\src\\io_object.cpp", 0x64, arguments' in hlil_part01
+    assert "0041e1e0    void __fastcall sub_41e1e0(uint32_t arg1) __noreturn" in hlil_part01
+    assert '"..\\..\\..\\src\\io_object.cpp", 0x69, arguments' in hlil_part01
+    assert 'arguments = "false"' in hlil_part01
+    assert "RaiseException(dwExceptionCode: 0x40000015" in hlil_part01
+
+    assert "struct zmq::i_poll_events::zmq::io_object_t::VTable zmq::io_object_t::`vftable'{for `zmq::i_poll_events'}" in hlil_part06
+    assert "00550ebc      int32_t (* const _purecall)() = sub_41e140" in hlil_part06
+    assert "00550ec0      int32_t (* const _purecall)() = sub_41e190" in hlil_part06
+    assert "00550ec4      int32_t (* const _purecall)() = sub_41e1e0" in hlil_part06
+
+    assert "struct zmq::io_object_t::zmq::req_session_t::VTable zmq::req_session_t::`vftable'{for `zmq::io_object_t'}" in hlil_part06
+    assert "00550480      int32_t (* const _purecall)() = sub_41e140" in hlil_part06
+    assert "00550484      int32_t (* const _purecall)() = sub_41e190" in hlil_part06
+    assert "00550488      int32_t (* const _purecall)() = sub_41c260" in hlil_part06
+    assert "struct zmq::io_object_t::zmq::session_base_t::VTable zmq::session_base_t::`vftable'{for `zmq::io_object_t'}" in hlil_part06
+    assert "00550da0      int32_t (* const _purecall)() = sub_41e140" in hlil_part06
+    assert "00550da4      int32_t (* const _purecall)() = sub_41e190" in hlil_part06
+    assert "00550da8      int32_t (* const _purecall)() = sub_41c260" in hlil_part06
+
+    assert "struct zmq::io_object_t::zmq::tcp_listener_t::VTable zmq::tcp_listener_t::`vftable'{for `zmq::io_object_t'}" in hlil_part06
+    assert "00550bfc      int32_t (* const _purecall)() = sub_41a020" in hlil_part06
+    assert "00550c00      int32_t (* const _purecall)() = sub_41e190" in hlil_part06
+    assert "00550c04      int32_t (* const _purecall)() = sub_41e1e0" in hlil_part06
+    assert "struct zmq::io_object_t::zmq::stream_engine_t::VTable zmq::stream_engine_t::`vftable'{for `zmq::io_object_t'}" in hlil_part06
+    assert "00551300      int32_t (* const _purecall)() = sub_421e50" in hlil_part06
+    assert "00551304      int32_t (* const _purecall)() = sub_422040" in hlil_part06
+    assert "00551308      int32_t (* const _purecall)() = sub_41e1e0" in hlil_part06
+
+    assert "This pass added 3 aliases" in mapping_round
+    assert "io_object_t` default event callback surface" in mapping_round
+    assert "assert(false)" in mapping_round
+    assert "0x0040C1B0" in mapping_round
+
+
+def test_zmq_select_fd_vector_round_410_aliases_are_pinned() -> None:
+    aliases = json.loads(
+        (REPO_ROOT / "references/analysis/quakelive_symbol_aliases.json").read_text(encoding="utf-8")
+    )["quakelive_steam_srp"]
+    functions_csv = (
+        REPO_ROOT / "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+    ).read_text(encoding="utf-8").lower()
+    hlil_part01 = (
+        REPO_ROOT
+        / "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part01.txt"
+    ).read_text(encoding="utf-8")
+    hlil_part06 = (
+        REPO_ROOT
+        / "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part06.txt"
+    ).read_text(encoding="utf-8")
+    mapping_round = (
+        REPO_ROOT / "docs/reverse-engineering/quakelive_steam_mapping_round_410.md"
+    ).read_text(encoding="utf-8")
+
+    expected_aliases = {
+        "sub_40C1B0": "zmq_select_t_reset_pollout",
+        "sub_40C470": "std_vector_zmq_select_fd_entry_grow",
+        "sub_40C4D0": "std_vector_zmq_select_fd_entry_reserve",
+        "sub_40C5A0": "std_vector_zmq_select_fd_entry_allocate",
+        "sub_40C600": "std_uninitialized_copy_zmq_select_fd_entry",
+    }
+
+    for symbol, alias in expected_aliases.items():
+        address = f"00{symbol.removeprefix('sub_')}".lower()
+        assert aliases[symbol] == alias
+        assert f"fun_{address},{address}" in functions_csv
+        assert f"| `{symbol}` | `{alias}` | High |" in mapping_round
+
+    existing_aliases = {
+        "sub_40BCE0": "zmq_select_t_ctor",
+        "sub_40BE00": "zmq_select_t_add_fd",
+        "sub_40BF30": "zmq_select_t_rm_fd",
+        "sub_40C200": "zmq_select_t_loop",
+        "sub_40C460": "zmq_select_t_loop_entry",
+        "sub_41E100": "zmq_io_object_t_set_pollout",
+        "sub_422040": "zmq_stream_engine_t_out_event",
+    }
+
+    for symbol, alias in existing_aliases.items():
+        assert aliases[symbol] == alias
+
+    assert "..\\..\\..\\src\\select.cpp" in hlil_part01
+    assert "..\\\\..\\\\..\\\\src\\\\select.cpp" in hlil_part06
+    assert "char const data_54fa64[0x1a] = \"fds.size () <= FD_SETSIZE\"" in hlil_part06
+    assert "struct zmq::poller_base_t::zmq::select_t::VTable zmq::select_t::`vftable'{for `zmq::poller_base_t'}" in hlil_part06
+
+    assert "0040be00    int32_t __thiscall sub_40be00" in hlil_part01
+    assert "if (eax == *(arg1 + 0x38))" in hlil_part01
+    assert "sub_40c470(arg1 + 0x30)" in hlil_part01
+    assert '"fds.size () <= FD_SETSIZE"' in hlil_part01
+    assert "*(arg1 + (eax_8 << 2) + 0x204c) = i" in hlil_part01
+    assert "InterlockedExchangeAdd(arg1 + 0x28, 1)" in hlil_part01
+
+    assert "0040bf30    int32_t __stdcall sub_40bf30" in hlil_part01
+    assert "*(arg1 + 0x605c) = 1" in hlil_part01
+    assert "if (i == *(arg1 + 0x6058))" in hlil_part01
+    assert "return InterlockedExchangeAdd(arg1 + 0x28, 0xffffffff)" in hlil_part01
+    assert "0040c1b0    int32_t __fastcall sub_40c1b0" in hlil_part01
+    assert "int32_t esi = *(arg2 + 0x1044)" in hlil_part01
+    assert "void* ecx = arg2 + 0x1048" in hlil_part01
+    assert "*(arg2 + 0x1044) -= 1" in hlil_part01
+
+    assert "0040c200    void __convention(\"regparm\") sub_40c200" in hlil_part01
+    assert "memcpy(&edi[0xc13], &edi[0x10], 0x1004)" in hlil_part01
+    assert "memcpy(&edi[0x1014], &edi[0x411], 0x1004)" in hlil_part01
+    assert "memcpy(&edi[0x1415], &edi[0x812], 0x1004)" in hlil_part01
+    assert "select(nfds: 0, readfds: &edi[0xc13], writefds: &edi[0x1014]," in hlil_part01
+    assert "__WSAFDIsSet(fd: *(edx_3 + (i << 3)), param1: &edi[0x1415])" in hlil_part01
+    assert "if (*ecx_19 == 0xffffffff)" in hlil_part01
+
+    assert "0040c470    int32_t __fastcall sub_40c470(int32_t* arg1)" in hlil_part01
+    assert "std::_Xlength_error(\"vector<T> too long\")" in hlil_part01
+    assert "return sub_40c4d0(arg1, result_1)" in hlil_part01
+    assert "return sub_40c4d0(arg1, result_2)" in hlil_part01
+    assert "0040c4d0    int32_t __thiscall sub_40c4d0" in hlil_part01
+    assert "void* eax_5 = sub_40c5a0(ecx)" in hlil_part01
+    assert "sub_40c600(eax_5, arg1[1], arg2)" in hlil_part01
+    assert "operator delete(eax_8)" in hlil_part01
+    assert "arg1[2] = result" in hlil_part01
+    assert "0040c5a0    void* __fastcall sub_40c5a0" in hlil_part01
+    assert "result, arg1 = operator new(arg1 << 3)" in hlil_part01
+    assert "&std::bad_alloc::`vftable'{for `std::exception'}" in hlil_part01
+    assert "0040c600    void __convention(\"regparm\") sub_40c600" in hlil_part01
+    assert "*arg1 = *ecx" in hlil_part01
+    assert "arg1[1] = ecx[1]" in hlil_part01
+
+    assert "return sub_40c1b0(ecx_8, *(arg1 + 4), *(arg1 + 0x34))" in hlil_part01
+    assert "return sub_40c1b0(arguments_2, edx_6, edi_4)" in hlil_part01
+    assert "sub_41e100(arg1 - 8, *(arg1 + 0x2c))" in hlil_part01
+
+    assert "This pass added 5 aliases" in mapping_round
+    assert "select-poller fd-vector and pollout reset wiring" in mapping_round
+    assert "Round 370 named the public select-poller lane" in mapping_round
+    assert "0x0040C581" in mapping_round
+
+
 def test_zmq_mailbox_select_signaler_round_370_aliases_are_pinned() -> None:
     aliases = json.loads(
         (REPO_ROOT / "references/analysis/quakelive_symbol_aliases.json").read_text(encoding="utf-8")
-    )["quakelive_steam"]
+    )["quakelive_steam_srp"]
     functions_csv = (
         REPO_ROOT / "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
     ).read_text(encoding="utf-8").lower()
@@ -6695,7 +10298,7 @@ def test_zmq_mailbox_select_signaler_round_370_aliases_are_pinned() -> None:
 def test_zmq_ypipe_yqueue_round_371_aliases_are_pinned() -> None:
     aliases = json.loads(
         (REPO_ROOT / "references/analysis/quakelive_symbol_aliases.json").read_text(encoding="utf-8")
-    )["quakelive_steam"]
+    )["quakelive_steam_srp"]
     functions_csv = (
         REPO_ROOT / "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
     ).read_text(encoding="utf-8").lower()

@@ -33,7 +33,7 @@ def test_retail_application_startup_chain_maps_primary_owners() -> None:
 		(REPO_ROOT / "references/analysis/quakelive_symbol_aliases.json").read_text(
 			encoding="utf-8"
 		)
-	)["quakelive_steam"]
+	)["quakelive_steam_srp"]
 	functions_csv = (
 		REPO_ROOT / "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
 	).read_text(encoding="utf-8")

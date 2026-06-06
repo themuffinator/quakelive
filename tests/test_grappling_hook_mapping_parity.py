@@ -79,7 +79,7 @@ def test_grappling_hook_cross_binary_mapping_aliases_are_promoted() -> None:
 	aliases = json.loads(_read("references/analysis/quakelive_symbol_aliases.json"))
 	cgame_aliases = aliases["cgame"]
 	qagame_aliases = aliases["qagamex86"]
-	steam_aliases = aliases["quakelive_steam"]
+	steam_aliases = aliases["quakelive_steam_srp"]
 	qagame_functions = _read("references/reverse-engineering/ghidra/qagamex86/functions.csv")
 	cgame_functions = _read("references/reverse-engineering/ghidra/cgamex86/functions.csv")
 	steam_functions = _read("references/reverse-engineering/ghidra/quakelive_steam/functions.csv")

@@ -540,7 +540,7 @@ def test_botlib_knockback_prediction_and_teleported_blocking_are_mapped() -> Non
 		BOTLIB_AI_MOVE_PATH,
 		"bot_moveresult_t BotTravel_Teleport(bot_movestate_t *ms, aas_reachability_t *reach)",
 	)
-	aliases = json.loads(SYMBOL_ALIASES_PATH.read_text(encoding="utf-8"))["quakelive_steam"]
+	aliases = json.loads(SYMBOL_ALIASES_PATH.read_text(encoding="utf-8"))["quakelive_steam_srp"]
 
 	for expected in (
 		"viewangles[PITCH] = 90;",

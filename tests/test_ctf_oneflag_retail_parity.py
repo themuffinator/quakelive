@@ -363,7 +363,7 @@ def test_bot_ctf_and_oneflag_goal_state_wiring_tracks_neutral_flag_separately() 
 	oneflag_orders_block = _block(AI_TEAM, "void Bot1FCTFOrders(bot_state_t *bs) {")
 	team_ai_block = _block(AI_TEAM, "void BotTeamAI(bot_state_t *bs) {")
 
-	assert "if (gametype != GT_CTF) return CTF_FLAG_NONE;" in ctf_carry_block
+	assert "if (gametype != GT_CTF && gametype != GT_ATTACK_DEFEND) return CTF_FLAG_NONE;" in ctf_carry_block
 	assert "INVENTORY_REDFLAG" in ctf_carry_block
 	assert "INVENTORY_BLUEFLAG" in ctf_carry_block
 	assert "INVENTORY_NEUTRALFLAG" not in ctf_carry_block

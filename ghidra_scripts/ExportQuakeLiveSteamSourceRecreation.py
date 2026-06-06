@@ -133,7 +133,7 @@ def main():
 		repo_root,
 		"src2",
 		"ghidra",
-		"quakelive_steam",
+		"quakelive_steam_srp",
 	)
 
 	args = list(getScriptArgs())

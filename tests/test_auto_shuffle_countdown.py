@@ -66,7 +66,7 @@ def test_auto_shuffle_countdown_announces_each_second(tmp_path: Path) -> None:
             G_AutoShuffleCountdown_Frame();
         }
 
-        char *va(char *fmt, ...) {
+        char *va(const char *fmt, ...) {
             static char buffer[256];
             va_list args;
             va_start(args, fmt);

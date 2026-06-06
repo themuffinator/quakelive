@@ -3723,7 +3723,7 @@ def test_engine_cvar_thirtyfourth_server_botlib_import_bridge_matches_retail_con
 	sv_bot = _read_text(SV_BOT)
 	sv_game = _read_text(SV_GAME)
 	botlib_h = _read_text(BOTLIB_H)
-	aliases = json.loads(_read_text(REPO_ROOT / "references" / "analysis" / "quakelive_symbol_aliases.json"))["quakelive_steam"]
+	aliases = json.loads(_read_text(REPO_ROOT / "references" / "analysis" / "quakelive_symbol_aliases.json"))["quakelive_steam_srp"]
 	ql_steam_hlil_part04 = _read_text(QL_STEAM_HLIL_PART04)
 	round_61 = _read_text(REPO_ROOT / "docs" / "reverse-engineering" / "quakelive_steam_mapping_round_61.md")
 
@@ -3821,7 +3821,7 @@ def test_engine_cvar_thirtyfourth_server_botlib_import_bridge_matches_retail_con
 		"botlib_import.HunkAlloc = BotImport_HunkAlloc;",
 		"botlib_import.FS_FOpenFile = FS_FOpenFileByMode;",
 		"botlib_import.DebugLineCreate = BotImport_DebugLineCreate;",
-		"botlib_import.DebugLineDelete = BotImport_DebugLineDelete;",
+		"botlib_import.DebugLineDelete = BotImport_DebugPolygonDelete;",
 		"botlib_import.DebugLineShow = BotImport_DebugLineShow;",
 		"botlib_import.DebugPolygonCreate = BotImport_DebugPolygonCreate;",
 		"botlib_import.DebugPolygonDelete = BotImport_DebugPolygonDelete;",

@@ -1753,8 +1753,10 @@ static void SV_InitGameImports( void ) {
 	ql_game_imports[G_QL_IMPORT_BOTLIB_AI_INITIAL_CHAT] = (ql_import_f)QL_G_trap_BotInitialChat;
 	ql_game_imports[G_QL_IMPORT_BOTLIB_AI_NUM_INITIAL_CHATS] = (ql_import_f)QL_G_trap_BotNumInitialChats;
 	ql_game_imports[G_QL_IMPORT_BOTLIB_AI_REPLY_CHAT] = (ql_import_f)QL_G_trap_BotReplyChat;
+	ql_game_imports[G_QL_IMPORT_BOTLIB_AI_CHAT_LENGTH] = (ql_import_f)QL_G_trap_BotChatLength;
 	ql_game_imports[G_QL_IMPORT_BOTLIB_AI_ENTER_CHAT] = (ql_import_f)QL_G_trap_BotEnterChat;
 	ql_game_imports[G_QL_IMPORT_BOTLIB_AI_GET_CHAT_MESSAGE] = (ql_import_f)QL_G_trap_BotGetChatMessage;
+	ql_game_imports[G_QL_IMPORT_BOTLIB_AI_STRING_CONTAINS] = (ql_import_f)QL_G_trap_StringContains;
 	ql_game_imports[G_QL_IMPORT_BOTLIB_AI_FIND_MATCH] = (ql_import_f)QL_G_trap_BotFindMatch;
 	ql_game_imports[G_QL_IMPORT_BOTLIB_AI_MATCH_VARIABLE] = (ql_import_f)QL_G_trap_BotMatchVariable;
 	ql_game_imports[G_QL_IMPORT_BOTLIB_AI_UNIFY_WHITE_SPACES] = (ql_import_f)QL_G_trap_UnifyWhiteSpaces;

@@ -314,7 +314,7 @@ def load_mapping_doc_symbols(repo_root: Path) -> dict[str, str]:
 
 def load_analysis_symbols(repo_root: Path, present_tokens: set[str]) -> dict[str, str]:
 	analysis_path = (
-		repo_root / "references" / "reverse-engineering" / "ghidra" / "quakelive_steam" / "analysis_symbols.txt"
+		repo_root / "references" / "reverse-engineering" / "ghidra" / "quakelive_steam_srp" / "analysis_symbols.txt"
 	)
 	if not analysis_path.is_file():
 		return {}
@@ -470,7 +470,7 @@ def update_manifest(manifest_path: Path, payload: dict[str, object]) -> None:
 def main(argv: list[str] | None = None) -> int:
 	args = parse_args(argv)
 	repo_root = args.repo_root.resolve()
-	output_root = (args.output_root or (repo_root / "src2" / "ghidra" / "quakelive_steam")).resolve()
+	output_root = (args.output_root or (repo_root / "src2" / "ghidra" / "quakelive_steam_srp")).resolve()
 
 	main_cpp = output_root / "quakelive_steam_decomp.cpp"
 	compat_hpp = output_root / "include" / "quakelive_steam_ghidra_compat.hpp"

@@ -8,8 +8,12 @@ Ninja HLIL and Ghidra companion corpus. It covers the `BotImport_*` family,
 `SV_BotInitBotLib`, debug polygon/line wiring, and the legacy qagame syscall
 entry points that expose the bridge.
 
-The source body already matched the recovered retail contract, so this round
-adds parity evidence and notes instead of changing C code.
+The 2026-06-05 source body already matched the recovered retail behavior, so
+that round added parity evidence and notes instead of changing C code. A
+2026-06-06 follow-up tightened one callback-table identity: retail assigns both
+debug-line delete and debug-polygon delete to the same `sub_4dd430` thunk, so
+`SV_BotInitBotLib` now assigns `DebugLineDelete` directly to
+`BotImport_DebugPolygonDelete`.
 
 ## Observed Retail Facts
 
@@ -34,6 +38,9 @@ adds parity evidence and notes instead of changing C code.
   `numPoints * sizeof(vec3_t)`. The debug line creator delegates to the same
   allocator with a zero-point polygon, and debug-line show stores a four-point
   quad after expanding the line by two units along the perpendicular vector.
+- Retail initializes both the debug-line delete callback (`var_14`) and the
+  debug-polygon delete callback (`var_8`) to `sub_4dd430`, the promoted
+  `BotImport_DebugPolygonDelete` helper.
 - `BotDrawDebugPolygons` forwards `bot_highlightarea` through the botlib var
   import and calls botlib `Test` with the attack, reachability, and ground-only
   bitmask before drawing active debug polygons.
@@ -43,7 +50,8 @@ adds parity evidence and notes instead of changing C code.
 No source reconstruction was required in this pass. The following source owners
 already match the retail evidence:
 
-- `SV_BotInitBotLib`
+- `SV_BotInitBotLib`, including the shared retail delete-thunk assignment for
+  `DebugLineDelete` and `DebugPolygonDelete`
 - `BotImport_Trace`
 - `BotImport_EntityTrace`
 - `BotImport_BSPEntityData`
@@ -59,6 +67,8 @@ already match the retail evidence:
 - Added
   `test_engine_cvar_thirtyfourth_server_botlib_import_bridge_matches_retail_contracts`
   in `tests/test_engine_cvar_retail_parity.py`.
+- Added the 2026-06-06 focused callback-surface gate
+  `tests/test_botlib_import_callback_surface_parity.py`.
 - The test pins:
   - the alias map entries from `sub_4DD0B0` through `sub_4DD940`,
   - the `botlib_import_t` source field order,
@@ -68,6 +78,9 @@ already match the retail evidence:
   - the direct `CM_EntityString` tailcall,
   - the debug polygon and debug line storage behavior,
   - the qagame legacy syscall bridge for debug polygons and `BOTLIB_SETUP`.
+- The follow-up callback-surface gate also pins the shared
+  `sub_4dd430` delete thunk and keeps the source assignment from drifting back
+  to a separate wrapper pointer.
 
 ## Open Questions
 

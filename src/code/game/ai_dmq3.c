@@ -127,7 +127,7 @@ BotCTFCarryingFlag
 ==================
 */
 int BotCTFCarryingFlag(bot_state_t *bs) {
-	if (gametype != GT_CTF) return CTF_FLAG_NONE;
+	if (gametype != GT_CTF && gametype != GT_ATTACK_DEFEND) return CTF_FLAG_NONE;
 
 	if (bs->inventory[INVENTORY_REDFLAG] > 0) return CTF_FLAG_RED;
 	else if (bs->inventory[INVENTORY_BLUEFLAG] > 0) return CTF_FLAG_BLUE;
@@ -3741,8 +3741,8 @@ void BotMapScripts(bot_state_t *bs) {
 			}
 		}
 	}
-	else if (!Q_stricmp(mapname, "mpq3tourney6")) {
-		//NOTE: NEVER use the func_bobbing in mpq3tourney6
+	else if (!Q_stricmp(mapname, "beyondreality")) {
+		//NOTE: NEVER use the func_bobbing in beyondreality
 		bs->tfl &= ~TFL_FUNCBOB;
 	}
 }

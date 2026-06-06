@@ -71,7 +71,14 @@ QAGAME_HLIL_TYPE_00085 = (
 	/ "types"
 	/ "qagamex86.dll.bndb_hlil_type_00085_block.txt"
 )
-QL_STEAM_GHIDRA_DECOMP = REPO_ROOT / "src2" / "ghidra" / "quakelive_steam" / "quakelive_steam_decomp.cpp"
+QL_STEAM_GHIDRA_DECOMP = (
+	REPO_ROOT
+	/ "references"
+	/ "reverse-engineering"
+	/ "ghidra"
+	/ "quakelive_steam"
+	/ "decompile_top_functions.c"
+)
 QL_STEAM_HLIL_PART03 = (
 	REPO_ROOT
 	/ "references"
@@ -605,7 +612,6 @@ def test_botlib_ql_entity_state_tail_matches_retail_layout_references() -> None:
 	ai_main_source = GAME_AI_MAIN.read_text(encoding="utf-8")
 	qagame_ghidra = QAGAME_GHIDRA_TOP.read_text(encoding="utf-8")
 	qagame_hlil = QAGAME_HLIL_PART01.read_text(encoding="utf-8")
-	ql_steam_ghidra = QL_STEAM_GHIDRA_DECOMP.read_text(encoding="utf-8")
 	ql_steam_hlil = QL_STEAM_HLIL_PART03.read_text(encoding="utf-8")
 
 	assert "#define BOTLIB_QL_POWERUP_ACTIVE_COUNT\t16" in botlib_h
@@ -657,9 +663,8 @@ def test_botlib_ql_entity_state_tail_matches_retail_layout_references() -> None:
 	assert "if (*(edx_30 + 0x144) == 0)" in qagame_hlil
 	assert "void* esi_4 = edx_30 + 0x180" in qagame_hlil
 	assert "if (edx_31 s>= *j || edx_31 == 0xffffffff)" in qagame_hlil
-	assert "puVar4 = (std::uint32_t*)(param_1 * 0xf4 + DAT_016de9a8);" in ql_steam_ghidra
-	assert "Com_Memset(param_2, 0, 0xec);" in ql_steam_ghidra
-	assert "FUN_004cb7d0(param_2, param_1 * 0xf4 + DAT_016de9a8, 0xec);" in ql_steam_ghidra
+	assert "00484e6b  int32_t* ebx_2 = arg1 * 0xf4 + data_16de9a8" in ql_steam_hlil
+	assert "004851dd      return sub_4c95e0(arg2, 0, 0xec)" in ql_steam_hlil
 	assert "__builtin_memcpy(dest: &ebx_2[0x29], src: &arg2[0x22], n: 0x40)" in ql_steam_hlil
 	assert "return sub_4cb7d0(arg2, arg1 * 0xf4 + data_16de9a8, 0xec)" in ql_steam_hlil
 
@@ -669,9 +674,8 @@ def test_botlib_show_path_cache_and_move_debug_path_match_retail_references() ->
 	be_interface_h = BOTLIB_INTERFACE_H.read_text(encoding="utf-8")
 	aas_main = BOTLIB_AAS_MAIN.read_text(encoding="utf-8")
 	ai_move = BOTLIB_AI_MOVE.read_text(encoding="utf-8")
-	ql_steam_ghidra = QL_STEAM_GHIDRA_DECOMP.read_text(encoding="utf-8")
 	ql_steam_hlil = QL_STEAM_HLIL_PART03.read_text(encoding="utf-8")
-	aliases = json.loads(SYMBOL_ALIASES.read_text(encoding="utf-8"))["quakelive_steam"]
+	aliases = json.loads(SYMBOL_ALIASES.read_text(encoding="utf-8"))["quakelive_steam_srp"]
 
 	move_to_goal_block = _extract_function_block(
 		ai_move,
@@ -697,12 +701,9 @@ def test_botlib_show_path_cache_and_move_debug_path_match_retail_references() ->
 	assert aliases["sub_4844E0"] == "AAS_DebugLine"
 	assert aliases["sub_484A80"] == "AAS_DrawArrow"
 
-	assert 'FUN_004a8680("bot_showPath");' in ql_steam_ghidra
-	assert "DAT_016dd7ec = FUN_00526000();" in ql_steam_ghidra
-	assert "if (DAT_016dd7ec != 0)" in ql_steam_ghidra
-	assert "FUN_004844e0(pfVar1, pfVar1 + 0x14, 4);" in ql_steam_ghidra
-	assert "FUN_00484a80(local_a0, local_94, 3, 4);" in ql_steam_ghidra
 	assert 'data_16dd7ec = sub_526000(sub_4a8680("bot_showPath"))' in ql_steam_hlil
+	assert '004863bb  data_16dd7ec = sub_526000(sub_4a8680("bot_showPath"))' in ql_steam_hlil
+	assert '004a7d03  data_16dd7ec = sub_526000(sub_4a8680("bot_showPath"))' in ql_steam_hlil
 	assert "004a573e  if (data_16dd7ec != 0)" in ql_steam_hlil
 	assert "004a5757      sub_4844e0()" in ql_steam_hlil
 	assert "004a576e      eax_40 = sub_484a80()" in ql_steam_hlil
@@ -714,7 +715,7 @@ def test_botlib_move_state_lifecycle_and_avoidreach_reset_match_retail_reference
 	ai_move = BOTLIB_AI_MOVE.read_text(encoding="utf-8")
 	be_interface = BOTLIB_INTERFACE.read_text(encoding="utf-8")
 	ql_steam_hlil = QL_STEAM_HLIL_PART03.read_text(encoding="utf-8")
-	aliases = json.loads(SYMBOL_ALIASES.read_text(encoding="utf-8"))["quakelive_steam"]
+	aliases = json.loads(SYMBOL_ALIASES.read_text(encoding="utf-8"))["quakelive_steam_srp"]
 
 	move_state_struct = _extract_function_block(ai_move, "typedef struct bot_movestate_s")
 	alloc_move_state = _extract_function_block(ai_move, "int BotAllocMoveState(void)")
@@ -832,7 +833,7 @@ def test_botlib_export_table_retail_layout_includes_ea_walk_slot() -> None:
 	ai_move = BOTLIB_AI_MOVE.read_text(encoding="utf-8")
 	be_ea = BOTLIB_EA.read_text(encoding="utf-8")
 	ql_steam_hlil = QL_STEAM_HLIL_PART03.read_text(encoding="utf-8")
-	aliases = json.loads(SYMBOL_ALIASES.read_text(encoding="utf-8"))["quakelive_steam"]
+	aliases = json.loads(SYMBOL_ALIASES.read_text(encoding="utf-8"))["quakelive_steam_srp"]
 
 	aas_export = _extract_function_block(botlib_h, "typedef struct aas_export_s")
 	ea_export = _extract_function_block(botlib_h, "typedef struct ea_export_s")
@@ -1052,7 +1053,7 @@ def test_botlib_export_table_retail_layout_includes_ea_walk_slot() -> None:
 
 def test_botlib_export_table_aliases_cover_aas_ea_and_top_level_helpers() -> None:
 	ql_steam_hlil = QL_STEAM_HLIL_PART03.read_text(encoding="utf-8")
-	aliases = json.loads(SYMBOL_ALIASES.read_text(encoding="utf-8"))["quakelive_steam"]
+	aliases = json.loads(SYMBOL_ALIASES.read_text(encoding="utf-8"))["quakelive_steam_srp"]
 
 	for address, name in (
 		("4829F0", "AAS_PointContents"),
@@ -1193,7 +1194,7 @@ def test_botlib_lifecycle_parser_and_aas_internal_aliases_match_retail_reference
 	aas_main = BOTLIB_AAS_MAIN.read_text(encoding="utf-8")
 	ai_move = BOTLIB_AI_MOVE.read_text(encoding="utf-8")
 	ql_steam_hlil = QL_STEAM_HLIL_PART03.read_text(encoding="utf-8")
-	aliases = json.loads(SYMBOL_ALIASES.read_text(encoding="utf-8"))["quakelive_steam"]
+	aliases = json.loads(SYMBOL_ALIASES.read_text(encoding="utf-8"))["quakelive_steam_srp"]
 
 	setup = _extract_function_block(be_interface, "int Export_BotLibSetup(void)")
 	shutdown = _extract_function_block(be_interface, "int Export_BotLibShutdown(void)")
@@ -1293,7 +1294,7 @@ def test_botlib_lifecycle_parser_and_aas_internal_aliases_match_retail_reference
 def test_botlib_aas_cluster_and_debug_internal_aliases_match_retail_references() -> None:
 	ql_steam_hlil = QL_STEAM_HLIL_PART03.read_text(encoding="utf-8")
 	ghidra_functions = QL_STEAM_GHIDRA_FUNCTIONS.read_text(encoding="utf-8")
-	aliases = json.loads(SYMBOL_ALIASES.read_text(encoding="utf-8"))["quakelive_steam"]
+	aliases = json.loads(SYMBOL_ALIASES.read_text(encoding="utf-8"))["quakelive_steam_srp"]
 
 	for address, name in (
 		("4831B0", "AAS_UpdatePortal"),
@@ -1351,7 +1352,7 @@ def test_botlib_precompiler_and_script_internal_aliases_match_retail_references(
 	ql_steam_hlil_part03 = QL_STEAM_HLIL_PART03.read_text(encoding="utf-8")
 	ql_steam_hlil_part04 = QL_STEAM_HLIL_PART04.read_text(encoding="utf-8")
 	ghidra_functions = QL_STEAM_GHIDRA_FUNCTIONS.read_text(encoding="utf-8")
-	aliases = json.loads(SYMBOL_ALIASES.read_text(encoding="utf-8"))["quakelive_steam"]
+	aliases = json.loads(SYMBOL_ALIASES.read_text(encoding="utf-8"))["quakelive_steam_srp"]
 
 	for address, name in (
 		("4A8AD0", "SourceError"),
@@ -1457,7 +1458,7 @@ def test_botlib_structure_resource_reader_source_shape_matches_retail_references
 		/ "quakelive_steam"
 		/ "decompile_top_functions.c"
 	).read_text(encoding="utf-8")
-	aliases = json.loads(SYMBOL_ALIASES.read_text(encoding="utf-8"))["quakelive_steam"]
+	aliases = json.loads(SYMBOL_ALIASES.read_text(encoding="utf-8"))["quakelive_steam_srp"]
 
 	find_field = _extract_function_block(l_struct, "fielddef_t *FindField(fielddef_t *defs, char *name)")
 	read_number = _extract_function_block(l_struct, "qboolean ReadNumber(source_t *source, fielddef_t *fd, void *p)")
@@ -1574,7 +1575,7 @@ def test_botlib_structure_reader_consumers_match_retail_resource_tables() -> Non
 		/ "decompile_top_functions.c"
 	).read_text(encoding="utf-8")
 	ghidra_functions = QL_STEAM_GHIDRA_FUNCTIONS.read_text(encoding="utf-8")
-	aliases = json.loads(SYMBOL_ALIASES.read_text(encoding="utf-8"))["quakelive_steam"]
+	aliases = json.loads(SYMBOL_ALIASES.read_text(encoding="utf-8"))["quakelive_steam_srp"]
 
 	load_item_config = _extract_function_block(ai_goal, "itemconfig_t *LoadItemConfig(char *filename)")
 	load_weapon_config = _extract_function_block(ai_weap, "weaponconfig_t *LoadWeaponConfig(char *filename)")
@@ -1718,7 +1719,7 @@ def test_botlib_character_resource_parser_matches_retail_references() -> None:
 		/ "decompile_top_functions.c"
 	).read_text(encoding="utf-8")
 	ghidra_functions = QL_STEAM_GHIDRA_FUNCTIONS.read_text(encoding="utf-8")
-	aliases = json.loads(SYMBOL_ALIASES.read_text(encoding="utf-8"))["quakelive_steam"]
+	aliases = json.loads(SYMBOL_ALIASES.read_text(encoding="utf-8"))["quakelive_steam_srp"]
 
 	load_from_file = _extract_function_block(ai_char, "bot_character_t *BotLoadCharacterFromFile(char *charfile, int skill)")
 	load_cached = _extract_function_block(ai_char, "int BotLoadCachedCharacter(char *charfile, float skill, int reload)")
@@ -1838,7 +1839,7 @@ def test_botlib_weight_resource_parser_matches_retail_references() -> None:
 		/ "decompile_top_functions.c"
 	).read_text(encoding="utf-8")
 	ghidra_functions = QL_STEAM_GHIDRA_FUNCTIONS.read_text(encoding="utf-8")
-	aliases = json.loads(SYMBOL_ALIASES.read_text(encoding="utf-8"))["quakelive_steam"]
+	aliases = json.loads(SYMBOL_ALIASES.read_text(encoding="utf-8"))["quakelive_steam_srp"]
 
 	read_value = _extract_function_block(ai_weight, "int ReadValue(source_t *source, float *value)")
 	read_fuzzy_weight = _extract_function_block(ai_weight, "int ReadFuzzyWeight(source_t *source, fuzzyseperator_t *fs)")
@@ -1990,7 +1991,7 @@ def test_botlib_precompiler_source_handle_slice_matches_retail_references() -> N
 	ql_steam_hlil_part03 = QL_STEAM_HLIL_PART03.read_text(encoding="utf-8")
 	ql_steam_hlil_part04 = QL_STEAM_HLIL_PART04.read_text(encoding="utf-8")
 	ghidra_functions = QL_STEAM_GHIDRA_FUNCTIONS.read_text(encoding="utf-8")
-	aliases = json.loads(SYMBOL_ALIASES.read_text(encoding="utf-8"))["quakelive_steam"]
+	aliases = json.loads(SYMBOL_ALIASES.read_text(encoding="utf-8"))["quakelive_steam_srp"]
 
 	load_handle = _extract_function_block(l_precomp, "int PC_LoadSourceHandle(const char *filename)")
 	free_handle = _extract_function_block(l_precomp, "int PC_FreeSourceHandle(int handle)")
@@ -2167,13 +2168,13 @@ def test_botlib_precompiler_source_handle_slice_matches_retail_references() -> N
 def test_botlib_server_import_table_keeps_retail_shared_assignments() -> None:
 	sv_bot = SERVER_BOT.read_text(encoding="utf-8")
 	ql_steam_hlil = QL_STEAM_HLIL_PART04.read_text(encoding="utf-8")
-	aliases = json.loads(SYMBOL_ALIASES.read_text(encoding="utf-8"))["quakelive_steam"]
+	aliases = json.loads(SYMBOL_ALIASES.read_text(encoding="utf-8"))["quakelive_steam_srp"]
 
 	init_botlib = _extract_function_block(sv_bot, "void SV_BotInitBotLib(void)")
 	debug_line_delete = _extract_function_block(sv_bot, "void BotImport_DebugLineDelete(int line)")
 
 	assert "botlib_import.BSPEntityData = BotImport_BSPEntityData;" in init_botlib
-	assert "botlib_import.DebugLineDelete = BotImport_DebugLineDelete;" in init_botlib
+	assert "botlib_import.DebugLineDelete = BotImport_DebugPolygonDelete;" in init_botlib
 	assert "botlib_import.DebugPolygonDelete = BotImport_DebugPolygonDelete;" in init_botlib
 	assert "BotImport_DebugPolygonDelete(line);" in debug_line_delete
 	assert aliases["sub_4DD240"] == "BotImport_BSPEntityData"
@@ -2189,7 +2190,7 @@ def test_botlib_server_import_table_keeps_retail_shared_assignments() -> None:
 def test_botlib_chat_console_message_source_shape_matches_retail_references() -> None:
 	ai_chat = BOTLIB_AI_CHAT.read_text(encoding="utf-8")
 	ql_steam_hlil = QL_STEAM_HLIL_PART03.read_text(encoding="utf-8")
-	aliases = json.loads(SYMBOL_ALIASES.read_text(encoding="utf-8"))["quakelive_steam"]
+	aliases = json.loads(SYMBOL_ALIASES.read_text(encoding="utf-8"))["quakelive_steam_srp"]
 
 	remove_message = _extract_function_block(ai_chat, "void BotRemoveConsoleMessage(int chatstate, int handle)")
 	queue_message = _extract_function_block(ai_chat, "void BotQueueConsoleMessage(int chatstate, int type, char *message)")
@@ -2245,7 +2246,7 @@ def test_botlib_chat_console_message_source_shape_matches_retail_references() ->
 def test_botlib_avoid_spots_source_shape_matches_retail_references() -> None:
 	ai_move = BOTLIB_AI_MOVE.read_text(encoding="utf-8")
 	ql_steam_hlil = QL_STEAM_HLIL_PART03.read_text(encoding="utf-8")
-	aliases = json.loads(SYMBOL_ALIASES.read_text(encoding="utf-8"))["quakelive_steam"]
+	aliases = json.loads(SYMBOL_ALIASES.read_text(encoding="utf-8"))["quakelive_steam_srp"]
 
 	avoid_spots = _extract_function_block(
 		ai_move,
@@ -2291,7 +2292,7 @@ def test_botlib_avoid_spot_source_shape_matches_retail_references() -> None:
 	ai_move_h = (REPO_ROOT / "src" / "code" / "game" / "be_ai_move.h").read_text(encoding="utf-8")
 	ai_move = BOTLIB_AI_MOVE.read_text(encoding="utf-8")
 	ql_steam_hlil = QL_STEAM_HLIL_PART03.read_text(encoding="utf-8")
-	aliases = json.loads(SYMBOL_ALIASES.read_text(encoding="utf-8"))["quakelive_steam"]
+	aliases = json.loads(SYMBOL_ALIASES.read_text(encoding="utf-8"))["quakelive_steam_srp"]
 
 	add_avoid_spot = _extract_function_block(ai_move, "void BotAddAvoidSpot(int movestate, vec3_t origin, float radius, int type)")
 
@@ -2364,8 +2365,8 @@ def test_qagame_bot_obstacle_prediction_mapping_matches_retail_route_bridge() ->
 	aas_route = BOTLIB_AAS_ROUTE.read_text(encoding="utf-8")
 	qagame_ghidra = QAGAME_GHIDRA_TOP.read_text(encoding="utf-8")
 	qagame_hlil = QAGAME_HLIL_PART01.read_text(encoding="utf-8")
-	ql_steam_ghidra = QL_STEAM_GHIDRA_DECOMP.read_text(encoding="utf-8")
 	ql_steam_hlil = QL_STEAM_HLIL_PART03.read_text(encoding="utf-8")
+	ql_steam_functions = QL_STEAM_GHIDRA_FUNCTIONS.read_text(encoding="utf-8")
 	qagame_symbols = json.loads(QAGAME_SYMBOL_MAP.read_text(encoding="utf-8"))
 
 	entry = next(function for function in qagame_symbols["functions"] if function["address"] == "0x1001DCF0")
@@ -2413,12 +2414,7 @@ def test_qagame_bot_obstacle_prediction_mapping_matches_retail_route_bridge() ->
 	assert "sub_1001cc60(1)" in qagame_hlil
 	assert qagame_ghidra.count("FUN_1001dcf0(") >= 4
 
-	assert "AAS_PredictRoute @ 0x00494870 size 830" in ql_steam_ghidra
-	assert "param_1[3] = param_4;" in ql_steam_ghidra
-	assert "param_1[4] = 0;" in ql_steam_ghidra
-	assert "param_1[5] = 0;" in ql_steam_ghidra
-	assert "param_1[6] = 0;" in ql_steam_ghidra
-	assert "param_1[8] = 0;" in ql_steam_ghidra
+	assert "FUN_00494870,00494870,830,0,unknown" in ql_steam_functions
 	assert "00494884  esi[3] = ecx" in ql_steam_hlil
 	assert "0049488a  esi[4] = 0" in ql_steam_hlil
 	assert "0049488d  esi[5] = 0" in ql_steam_hlil

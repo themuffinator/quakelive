@@ -11,7 +11,7 @@ CG_VIEW_PATH = REPO_ROOT / "src" / "code" / "cgame" / "cg_view.c"
 COMMON_C_PATH = REPO_ROOT / "src" / "code" / "qcommon" / "common.c"
 QCOMMON_H_PATH = REPO_ROOT / "src" / "code" / "qcommon" / "qcommon.h"
 ALIASES_PATH = REPO_ROOT / "references" / "analysis" / "quakelive_symbol_aliases.json"
-FUNCTIONS_CSV_PATH = REPO_ROOT / "references" / "reverse-engineering" / "ghidra" / "quakelive_steam" / "functions.csv"
+FUNCTIONS_CSV_PATH = REPO_ROOT / "references" / "reverse-engineering" / "ghidra" / "quakelive_steam_srp" / "functions.csv"
 HLIL_PART01_PATH = REPO_ROOT / "references" / "hlil" / "quakelive" / "quakelive_steam.exe" / "quakelive_steam.exe_hlil_split" / "quakelive_steam.exe_hlil_part01.txt"
 HLIL_PART04_PATH = REPO_ROOT / "references" / "hlil" / "quakelive" / "quakelive_steam.exe" / "quakelive_steam.exe_hlil_split" / "quakelive_steam.exe_hlil_part04.txt"
 CGAME_SYMBOL_MAP_PATH = REPO_ROOT / "references" / "symbol-maps" / "cgame.json"
@@ -58,10 +58,10 @@ def test_demo_recording_envelope_and_protocol_91_extension_match_retail_evidence
 	assert "int demo_protocols[] =\n{ QL_RETAIL_PROTOCOL_VERSION, 0 };" in common_c
 	assert "return NET_GetProtocolProfile()->demoProtocol;" in _function_block(common_c, "int NET_DemoProtocol( void )")
 
-	assert aliases["quakelive_steam"]["sub_4B82A0"] == "CL_WriteDemoMessage"
-	assert aliases["quakelive_steam"]["sub_4B8300"] == "CL_StopRecord_f"
-	assert aliases["quakelive_steam"]["sub_4B8390"] == "CL_DemoFilename"
-	assert aliases["quakelive_steam"]["sub_4B8430"] == "CL_Record_f"
+	assert aliases["quakelive_steam_srp"]["sub_4B82A0"] == "CL_WriteDemoMessage"
+	assert aliases["quakelive_steam_srp"]["sub_4B8300"] == "CL_StopRecord_f"
+	assert aliases["quakelive_steam_srp"]["sub_4B8390"] == "CL_DemoFilename"
+	assert aliases["quakelive_steam_srp"]["sub_4B8430"] == "CL_Record_f"
 	assert "FUN_004b82a0,004b82a0,93,0,unknown" in functions_csv
 	assert "FUN_004b8300,004b8300,131,0,unknown" in functions_csv
 	assert "FUN_004b8390,004b8390,145,0,unknown" in functions_csv
@@ -112,11 +112,11 @@ def test_demo_playback_reader_fallback_completion_and_time_wiring_match_retail()
 	functions_csv = _read(FUNCTIONS_CSV_PATH)
 	hlil = _read(HLIL_PART04_PATH)
 
-	assert aliases["quakelive_steam"]["sub_4B87A0"] == "CL_WalkDemoExt"
-	assert aliases["quakelive_steam"]["sub_4B8830"] == "CL_NextDemo"
-	assert aliases["quakelive_steam"]["sub_4BB2A0"] == "CL_DemoCompleted"
-	assert aliases["quakelive_steam"]["sub_4BB330"] == "CL_ReadDemoMessage"
-	assert aliases["quakelive_steam"]["sub_4BB450"] == "CL_PlayDemo_f"
+	assert aliases["quakelive_steam_srp"]["sub_4B87A0"] == "CL_WalkDemoExt"
+	assert aliases["quakelive_steam_srp"]["sub_4B8830"] == "CL_NextDemo"
+	assert aliases["quakelive_steam_srp"]["sub_4BB2A0"] == "CL_DemoCompleted"
+	assert aliases["quakelive_steam_srp"]["sub_4BB330"] == "CL_ReadDemoMessage"
+	assert aliases["quakelive_steam_srp"]["sub_4BB450"] == "CL_PlayDemo_f"
 	assert "FUN_004bb2a0,004bb2a0,135,0,unknown" in functions_csv
 	assert "FUN_004bb330,004bb330,285,0,unknown" in functions_csv
 	assert "FUN_004bb450,004bb450,561,0,unknown" in functions_csv

@@ -43,7 +43,7 @@ _VOTE_THROTTLE_PROBE = textwrap.dedent(
     va
     =============
     */
-    char * QDECL va( char *format, ... ) {
+    char * QDECL va( const char *format, ... ) {
         static char buffer[4096];
         va_list args;
 

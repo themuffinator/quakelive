@@ -175,7 +175,7 @@ def test_client_command_handlers_match_retail_forward_restart_and_info_contracts
 	cl_main = (REPO_ROOT / "src/code/client/cl_main.c").read_text(encoding="utf-8")
 	aliases = json.loads(
 		(REPO_ROOT / "references/analysis/quakelive_symbol_aliases.json").read_text(encoding="utf-8")
-	)["quakelive_steam"]
+	)["quakelive_steam_srp"]
 
 	userinfo_guard_block = _extract_function_block(
 		cl_main, "static qboolean CL_CommandContainsUserinfoToken( const char *commandName ) {"
@@ -548,7 +548,7 @@ def test_client_steam_command_registration_and_identity_wiring_match_retail_surf
 	qcommon_h = (REPO_ROOT / "src/code/qcommon/qcommon.h").read_text(encoding="utf-8")
 	aliases = json.loads(
 		(REPO_ROOT / "references/analysis/quakelive_symbol_aliases.json").read_text(encoding="utf-8")
-	)["quakelive_steam"]
+	)["quakelive_steam_srp"]
 
 	init_block = _extract_function_block(cl_main, "void CL_Init( void ) {")
 	steam_client_init_block = _extract_function_block(cl_main, "void SteamClient_Init( void ) {")
@@ -676,7 +676,7 @@ def test_client_command_registration_matches_retail_cinematic_network_and_browse
 	client_h = (REPO_ROOT / "src/code/client/client.h").read_text(encoding="utf-8")
 	aliases = json.loads(
 		(REPO_ROOT / "references/analysis/quakelive_symbol_aliases.json").read_text(encoding="utf-8")
-	)["quakelive_steam"]
+	)["quakelive_steam_srp"]
 
 	init_block = _extract_function_block(cl_main, "void CL_Init( void ) {")
 	shutdown_block = _extract_function_block(cl_main, "void CL_Shutdown( void ) {")
@@ -778,7 +778,7 @@ def test_client_command_handlers_match_retail_cinematic_network_and_browser_cont
 	cl_main = (REPO_ROOT / "src/code/client/cl_main.c").read_text(encoding="utf-8")
 	aliases = json.loads(
 		(REPO_ROOT / "references/analysis/quakelive_symbol_aliases.json").read_text(encoding="utf-8")
-	)["quakelive_steam"]
+	)["quakelive_steam_srp"]
 
 	play_cinematic_block = _extract_function_block(cl_cin, "void CL_PlayCinematic_f(void) {")
 	request_local_block = _extract_function_block(cl_main, "static void CL_RequestLocalServers( void ) {")
@@ -863,7 +863,7 @@ def test_client_command_handlers_match_retail_cinematic_network_and_browser_cont
 def test_client_cgame_native_bridge_mapping_round_275_promotes_hlil_backed_symbols() -> None:
 	aliases = json.loads(
 		(REPO_ROOT / "references/analysis/quakelive_symbol_aliases.json").read_text(encoding="utf-8")
-	)["quakelive_steam"]
+	)["quakelive_steam_srp"]
 	host_hlil = (
 		REPO_ROOT
 		/ "references"
@@ -1046,7 +1046,7 @@ def test_client_cgame_native_bridge_mapping_round_275_promotes_hlil_backed_symbo
 def test_client_input_mapping_round_277_promotes_console_input_and_usercmd_symbols() -> None:
 	aliases = json.loads(
 		(REPO_ROOT / "references/analysis/quakelive_symbol_aliases.json").read_text(encoding="utf-8")
-	)["quakelive_steam"]
+	)["quakelive_steam_srp"]
 	host_hlil = (
 		REPO_ROOT
 		/ "references"
@@ -1194,7 +1194,7 @@ def test_client_input_mapping_round_277_promotes_console_input_and_usercmd_symbo
 def test_client_parse_screen_ui_mapping_round_280_promotes_hlil_backed_symbols() -> None:
 	aliases = json.loads(
 		(REPO_ROOT / "references/analysis/quakelive_symbol_aliases.json").read_text(encoding="utf-8")
-	)["quakelive_steam"]
+	)["quakelive_steam_srp"]
 	host_hlil = (
 		REPO_ROOT
 		/ "references"
@@ -1379,7 +1379,7 @@ def test_demo_recording_overlay_matches_retail_modes() -> None:
 def test_client_collision_mapping_round_283_promotes_hlil_backed_symbols() -> None:
 	aliases = json.loads(
 		(REPO_ROOT / "references/analysis/quakelive_symbol_aliases.json").read_text(encoding="utf-8")
-	)["quakelive_steam"]
+	)["quakelive_steam_srp"]
 	host_hlil = (
 		REPO_ROOT
 		/ "references"
@@ -1535,7 +1535,7 @@ def test_client_collision_mapping_round_283_promotes_hlil_backed_symbols() -> No
 def test_client_cinematic_and_browser_mapping_round_285_promotes_hlil_backed_symbols() -> None:
 	aliases = json.loads(
 		(REPO_ROOT / "references/analysis/quakelive_symbol_aliases.json").read_text(encoding="utf-8")
-	)["quakelive_steam"]
+	)["quakelive_steam_srp"]
 	host_hlil = (
 		REPO_ROOT
 		/ "references"

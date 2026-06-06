@@ -55,7 +55,7 @@ def _extract_function_block(text: str, signature: str) -> str:
 def test_botlib_weight_runtime_retail_function_map_is_bounded() -> None:
 	functions_csv = QL_STEAM_FUNCTIONS.read_text(encoding="utf-8")
 	hlil = QL_STEAM_HLIL_PART03.read_text(encoding="utf-8")
-	aliases = json.loads(SYMBOL_ALIASES.read_text(encoding="utf-8"))["quakelive_steam"]
+	aliases = json.loads(SYMBOL_ALIASES.read_text(encoding="utf-8"))["quakelive_steam_srp"]
 
 	for address, name in (
 		("4A63F0", "ReadValue"),

@@ -69,7 +69,7 @@ def test_botlib_precompiler_token_dispatch_matches_retail_references() -> None:
 	botlib_c = _all_botlib_c_text()
 	ql_steam_hlil = QL_STEAM_HLIL_PART04.read_text(encoding="utf-8")
 	ghidra_functions = QL_STEAM_GHIDRA_FUNCTIONS.read_text(encoding="utf-8")
-	aliases = json.loads(SYMBOL_ALIASES.read_text(encoding="utf-8"))["quakelive_steam"]
+	aliases = json.loads(SYMBOL_ALIASES.read_text(encoding="utf-8"))["quakelive_steam_srp"]
 
 	read_token = _extract_function_block(l_precomp, "int PC_ReadToken(source_t *source, token_t *token)")
 	expand_into_source = _extract_function_block(

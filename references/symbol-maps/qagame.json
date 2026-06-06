@@ -1109,7 +1109,7 @@
       "signature": "int BotCTFCarryingFlag(bot_state_t *bs)",
       "string_refs": [],
       "relocation_refs": [],
-      "comment": "CTF flag-carrier predicate identified by the GT_CTF or GT_NFCTF gametype gate and the direct red-flag or blue-flag inventory checks that return the CTF flag side enum from ai_dmq3.c::BotCTFCarryingFlag."
+      "comment": "CTF flag-carrier predicate identified by the GT_CTF or raw 0xb retail gametype gate, currently named GT_ATTACK_DEFEND in the reconstructed source, and the direct red-flag or blue-flag inventory checks that return the CTF flag side enum from ai_dmq3.c::BotCTFCarryingFlag."
     },
     {
       "address": "0x10013B00",
@@ -2001,7 +2001,7 @@
       "signature": "void BotSetEntityNumForGoal(bot_goal_t *goal, char *classname)",
       "string_refs": [],
       "relocation_refs": [],
-      "comment": "Goal entity linker identified by the live `g_entities` scan, the classname string match, the distance-to-goal-origin test, and the writeback of the resolved entity slot into `goal->entitynum`, matching ai_dmq3.c::BotSetEntityNumForGoal."
+      "comment": "Goal entity linker identified by the live `g_entities` scan, the retail-preserved classname guard that skips exact classname matches and falls through for absent or non-matching classnames, the distance-to-goal-origin test, and the writeback of the resolved entity slot into `goal->entitynum`, matching ai_dmq3.c::BotSetEntityNumForGoal."
     },
     {
       "address": "0x1001F580",

@@ -67,7 +67,7 @@ def _read(path: Path) -> str:
 
 
 def _aliases() -> dict[str, str]:
-	return json.loads(_read(SYMBOL_ALIASES))["quakelive_steam"]
+	return json.loads(_read(SYMBOL_ALIASES))["quakelive_steam_srp"]
 
 
 def _alias_key(address: int) -> str:
@@ -192,10 +192,10 @@ def test_botlib_native_import_bridge_has_complete_static_wiring() -> None:
 	)
 	registered_slots = {slot for slot, _ in registered_pairs}
 
-	assert len(public_slots) == 134
-	assert len(mapped_pairs) == 131
-	assert len(registered_pairs) == 134
-	assert len(registered_slots) == 134
+	assert len(public_slots) == 136
+	assert len(mapped_pairs) == 133
+	assert len(registered_pairs) == 136
+	assert len(registered_slots) == 136
 	assert public_slots == registered_slots
 	assert mapped_slots == public_slots - DIRECT_NATIVE_BOTLIB_IMPORTS
 	assert registered_slots - mapped_slots == DIRECT_NATIVE_BOTLIB_IMPORTS

@@ -83,7 +83,7 @@ def _read(path: Path) -> str:
 
 
 def _aliases() -> dict[str, str]:
-	return json.loads(_read(SYMBOL_ALIASES))["quakelive_steam"]
+	return json.loads(_read(SYMBOL_ALIASES))["quakelive_steam_srp"]
 
 
 def _function_rows() -> dict[str, str]:

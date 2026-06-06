@@ -59,7 +59,7 @@ def test_client_run_loop_round_292_maps_host_and_client_frame_wiring() -> None:
 		REPO_ROOT / "docs/reverse-engineering/quakelive_steam_mapping_round_292.md"
 	).read_text(encoding="utf-8")
 
-	steam_aliases = aliases["quakelive_steam"]
+	steam_aliases = aliases["quakelive_steam_srp"]
 	expected_aliases = {
 		"sub_4CC6C0": "Com_Frame",
 		"sub_4BC3E0": "CL_Frame",

@@ -135,7 +135,7 @@ def test_fake_vacban_telemetry_payload(tmp_path: Path) -> None:
 
 	void Huff_Compress( msg_t *buf, int offset ) { (void)buf; (void)offset; }
 
-	char *va( char *format, ... ) {
+	char *va( const char *format, ... ) {
 	static char buffer[1024];
 	va_list args;
 	va_start( args, format );

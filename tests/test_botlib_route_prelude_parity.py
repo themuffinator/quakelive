@@ -65,7 +65,7 @@ def _extract_function_block(text: str, signature: str) -> str:
 
 
 def test_botlib_route_prelude_aliases_match_retail_references() -> None:
-	aliases = json.loads(_read(SYMBOL_ALIASES))["quakelive_steam"]
+	aliases = json.loads(_read(SYMBOL_ALIASES))["quakelive_steam_srp"]
 	functions = _read(QL_STEAM_FUNCTIONS)
 	hlil = _read(QL_STEAM_HLIL_PART03)
 	hlil_strings = _read(QL_STEAM_HLIL_PART06)
@@ -271,7 +271,7 @@ def test_botlib_route_prelude_helpers_are_wired_into_aas_and_move_ai() -> None:
 
 
 def test_botlib_route_prelude_inline_or_fused_helpers_are_not_over_promoted() -> None:
-	aliases = json.loads(_read(SYMBOL_ALIASES))["quakelive_steam"]
+	aliases = json.loads(_read(SYMBOL_ALIASES))["quakelive_steam_srp"]
 	hlil = _read(QL_STEAM_HLIL_PART03)
 
 	assert "AAS_UnlinkCache" not in aliases.values()

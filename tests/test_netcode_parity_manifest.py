@@ -4422,7 +4422,7 @@ def test_manifest_covers_server_snapshot_authoring_lane() -> None:
 
 
 def test_related_snapshot_wiring_pins_bot_snapshot_bridge_to_retail_aliases() -> None:
-	aliases = json.loads(_read(REPO_ROOT / "references/analysis/quakelive_symbol_aliases.json"))["quakelive_steam"]
+	aliases = json.loads(_read(REPO_ROOT / "references/analysis/quakelive_symbol_aliases.json"))["quakelive_steam_srp"]
 	hlil_part04 = _read(HLIL_PART04_PATH)
 	hlil_part05 = _read(HLIL_PART05_PATH)
 	ghidra_functions = _read(GHIDRA_FUNCTIONS_PATH)
@@ -4506,7 +4506,7 @@ def test_networking_2_focused_parity_ledger_maps_first_plan_entry() -> None:
 	ledger = _networking_2_ledger()
 	msg_source = _read(MSG_C_PATH)
 	qcommon_h = _read(QCOMMON_H_PATH)
-	aliases = json.loads(_read(REPO_ROOT / "references/analysis/quakelive_symbol_aliases.json"))["quakelive_steam"]
+	aliases = json.loads(_read(REPO_ROOT / "references/analysis/quakelive_symbol_aliases.json"))["quakelive_steam_srp"]
 	hlil_part04 = _read(HLIL_PART04_PATH)
 	audit_note = _read(NETWORKING_2_AUDIT_PATH)
 	plan = _read(NETWORKING_2_PLAN_PATH)
@@ -5704,7 +5704,7 @@ def test_networking_2_client_message_sideband_producer_map_and_constant_high_bit
 	tr_cmds = _read(TR_CMDS_PATH)
 	functions_csv = _read(GHIDRA_FUNCTIONS_PATH)
 	ghidra_top = _read(GHIDRA_DECOMPILE_TOP_PATH)
-	aliases = json.loads(_read(REPO_ROOT / "references/analysis/quakelive_symbol_aliases.json"))["quakelive_steam"]
+	aliases = json.loads(_read(REPO_ROOT / "references/analysis/quakelive_symbol_aliases.json"))["quakelive_steam_srp"]
 	hlil_part02 = _read(HLIL_PART02_PATH)
 	hlil_part04 = _read(HLIL_PART04_PATH)
 	hlil_part07 = _read(HLIL_PART07_PATH)

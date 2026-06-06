@@ -72,7 +72,7 @@ def test_renderer_audit_and_repo_summaries_mark_rg_p5_complete() -> None:
 
 
 def test_representative_rg_g06_helper_seams_remain_present_in_source() -> None:
-	aliases = json.loads(_read("references/analysis/quakelive_symbol_aliases.json"))["quakelive_steam"]
+	aliases = json.loads(_read("references/analysis/quakelive_symbol_aliases.json"))["quakelive_steam_srp"]
 	tr_backend = _read("src/code/renderer/tr_backend.c")
 	tr_bsp = _read("src/code/renderer/tr_bsp.c")
 	tr_curve = _read("src/code/renderer/tr_curve.c")
@@ -97,7 +97,7 @@ def test_representative_rg_g06_helper_seams_remain_present_in_source() -> None:
 
 
 def test_renderer_mapping_round_314_keeps_image_hash_and_listing_parity() -> None:
-	aliases = json.loads(_read("references/analysis/quakelive_symbol_aliases.json"))["quakelive_steam"]
+	aliases = json.loads(_read("references/analysis/quakelive_symbol_aliases.json"))["quakelive_steam_srp"]
 	hlil_part02 = _read("references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part02.txt")
 	hlil_part04 = _read("references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part04.txt")
 	functions_csv = _read("references/reverse-engineering/ghidra/quakelive_steam/functions.csv").lower()
@@ -141,7 +141,7 @@ def test_renderer_mapping_round_314_keeps_image_hash_and_listing_parity() -> Non
 
 
 def test_renderer_mapping_round_315_restores_color_correct_upload_gamma_gate() -> None:
-	aliases = json.loads(_read("references/analysis/quakelive_symbol_aliases.json"))["quakelive_steam"]
+	aliases = json.loads(_read("references/analysis/quakelive_symbol_aliases.json"))["quakelive_steam_srp"]
 	hlil_part02 = _read("references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part02.txt")
 	mapping_round = _read("docs/reverse-engineering/quakelive_steam_mapping_round_315.md")
 	mapping_round_316 = _read("docs/reverse-engineering/quakelive_steam_mapping_round_316.md")
@@ -171,7 +171,7 @@ def test_renderer_mapping_round_315_restores_color_correct_upload_gamma_gate() -
 
 
 def test_renderer_mapping_round_317_reconstructs_bloom_scene_target_owner() -> None:
-	aliases = json.loads(_read("references/analysis/quakelive_symbol_aliases.json"))["quakelive_steam"]
+	aliases = json.loads(_read("references/analysis/quakelive_symbol_aliases.json"))["quakelive_steam_srp"]
 	hlil_part01 = _read("references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part01.txt").lower()
 	hlil_part02 = _read("references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part02.txt").lower()
 	mapping_round = _read("docs/reverse-engineering/quakelive_steam_mapping_round_317.md")
@@ -209,7 +209,7 @@ def test_renderer_mapping_round_317_reconstructs_bloom_scene_target_owner() -> N
 
 
 def test_renderer_mapping_round_318_reconstructs_postprocess_command_abi() -> None:
-	aliases = json.loads(_read("references/analysis/quakelive_symbol_aliases.json"))["quakelive_steam"]
+	aliases = json.loads(_read("references/analysis/quakelive_symbol_aliases.json"))["quakelive_steam_srp"]
 	hlil_part01 = _read("references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part01.txt").lower()
 	hlil_part02 = _read("references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part02.txt").lower()
 	mapping_round = _read("docs/reverse-engineering/quakelive_steam_mapping_round_318.md")
@@ -276,7 +276,7 @@ def test_renderer_mapping_round_318_reconstructs_postprocess_command_abi() -> No
 
 
 def test_renderer_mapping_round_319_reconstructs_postprocess_refexport_tail() -> None:
-	aliases = json.loads(_read("references/analysis/quakelive_symbol_aliases.json"))["quakelive_steam"]
+	aliases = json.loads(_read("references/analysis/quakelive_symbol_aliases.json"))["quakelive_steam_srp"]
 	hlil_part01 = _read("references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part01.txt").lower()
 	hlil_part02 = _read("references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part02.txt").lower()
 	mapping_round = _read("docs/reverse-engineering/quakelive_steam_mapping_round_319.md")
@@ -362,7 +362,7 @@ def test_renderer_mapping_round_320_corrects_bloom_uniform_slot_order() -> None:
 
 
 def test_renderer_mapping_round_321_reconstructs_color_correct_uniform_helper() -> None:
-	aliases = json.loads(_read("references/analysis/quakelive_symbol_aliases.json"))["quakelive_steam"]
+	aliases = json.loads(_read("references/analysis/quakelive_symbol_aliases.json"))["quakelive_steam_srp"]
 	ghidra = _read("src2/ghidra/quakelive_steam/quakelive_steam_decomp.cpp")
 	hlil_part02 = _read("references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part02.txt").lower()
 	mapping_round = _read("docs/reverse-engineering/quakelive_steam_mapping_round_321.md")
@@ -409,7 +409,7 @@ def test_renderer_mapping_round_321_reconstructs_color_correct_uniform_helper() 
 
 
 def test_renderer_mapping_round_322_reconstructs_live_postprocess_cvar_refresh() -> None:
-	aliases = json.loads(_read("references/analysis/quakelive_symbol_aliases.json"))["quakelive_steam"]
+	aliases = json.loads(_read("references/analysis/quakelive_symbol_aliases.json"))["quakelive_steam_srp"]
 	ghidra = _read("src2/ghidra/quakelive_steam/quakelive_steam_decomp.cpp")
 	hlil_part02 = _read("references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part02.txt").lower()
 	mapping_round = _read("docs/reverse-engineering/quakelive_steam_mapping_round_322.md")
@@ -504,7 +504,7 @@ def test_renderer_mapping_round_323_splits_color_correct_init_and_live_browser_o
 
 
 def test_renderer_mapping_round_324_retires_legacy_framebuffer_scratch_lane() -> None:
-	aliases = json.loads(_read("references/analysis/quakelive_symbol_aliases.json"))["quakelive_steam"]
+	aliases = json.loads(_read("references/analysis/quakelive_symbol_aliases.json"))["quakelive_steam_srp"]
 	hlil_part01 = _read("references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part01.txt").lower()
 	hlil_part02 = _read("references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part02.txt").lower()
 	mapping_round = _read("docs/reverse-engineering/quakelive_steam_mapping_round_324.md")
@@ -564,7 +564,7 @@ def test_renderer_mapping_round_324_retires_legacy_framebuffer_scratch_lane() ->
 
 
 def test_renderer_mapping_round_325_reconstructs_bloom_teardown_order() -> None:
-	aliases = json.loads(_read("references/analysis/quakelive_symbol_aliases.json"))["quakelive_steam"]
+	aliases = json.loads(_read("references/analysis/quakelive_symbol_aliases.json"))["quakelive_steam_srp"]
 	hlil_part01 = _read("references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part01.txt").lower()
 	hlil_part02 = _read("references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part02.txt").lower()
 	mapping_round = _read("docs/reverse-engineering/quakelive_steam_mapping_round_325.md")
@@ -613,7 +613,7 @@ def test_renderer_mapping_round_325_reconstructs_bloom_teardown_order() -> None:
 
 
 def test_renderer_mapping_round_326_reconstructs_depth_stencil_renderbuffer_cache() -> None:
-	aliases = json.loads(_read("references/analysis/quakelive_symbol_aliases.json"))["quakelive_steam"]
+	aliases = json.loads(_read("references/analysis/quakelive_symbol_aliases.json"))["quakelive_steam_srp"]
 	functions_csv = _read("references/reverse-engineering/ghidra/quakelive_steam/functions.csv").lower()
 	hlil_part02 = _read("references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part02.txt").lower()
 	mapping_round = _read("docs/reverse-engineering/quakelive_steam_mapping_round_326.md")
@@ -677,7 +677,7 @@ def test_renderer_mapping_round_326_reconstructs_depth_stencil_renderbuffer_cach
 
 
 def test_renderer_mapping_round_327_reconstructs_postprocess_gl_error_wiring() -> None:
-	aliases = json.loads(_read("references/analysis/quakelive_symbol_aliases.json"))["quakelive_steam"]
+	aliases = json.loads(_read("references/analysis/quakelive_symbol_aliases.json"))["quakelive_steam_srp"]
 	functions_csv = _read("references/reverse-engineering/ghidra/quakelive_steam/functions.csv").lower()
 	hlil_part02 = _read("references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part02.txt").lower()
 	mapping_round = _read("docs/reverse-engineering/quakelive_steam_mapping_round_327.md")
@@ -744,7 +744,7 @@ def test_renderer_mapping_round_327_reconstructs_postprocess_gl_error_wiring() -
 
 
 def test_renderer_mapping_round_328_splits_framebuffer_and_shader_proc_gates() -> None:
-	aliases = json.loads(_read("references/analysis/quakelive_symbol_aliases.json"))["quakelive_steam"]
+	aliases = json.loads(_read("references/analysis/quakelive_symbol_aliases.json"))["quakelive_steam_srp"]
 	hlil_part02 = _read("references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part02.txt").lower()
 	mapping_round = _read("docs/reverse-engineering/quakelive_steam_mapping_round_328.md")
 	tr_backend = _read("src/code/renderer/tr_backend.c")
@@ -835,7 +835,7 @@ def test_renderer_mapping_round_341_closes_postprocess_command_payload_wiring() 
 
 
 def test_renderer_mapping_round_342_closes_win32_gl_startup_wiring() -> None:
-	aliases = json.loads(_read("references/analysis/quakelive_symbol_aliases.json"))["quakelive_steam"]
+	aliases = json.loads(_read("references/analysis/quakelive_symbol_aliases.json"))["quakelive_steam_srp"]
 	functions_csv = _read("references/reverse-engineering/ghidra/quakelive_steam/functions.csv").lower()
 	hlil_part02 = _read("references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part02.txt").lower()
 	hlil_part06 = _read("references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part06.txt").lower()
@@ -920,7 +920,7 @@ def test_renderer_advertisement_debug_labels_use_host_text() -> None:
 
 
 def test_renderer_mapping_round_37_keeps_ambient_and_directed_scaling_retail_parity() -> None:
-	aliases = json.loads(_read("references/analysis/quakelive_symbol_aliases.json"))["quakelive_steam"]
+	aliases = json.loads(_read("references/analysis/quakelive_symbol_aliases.json"))["quakelive_steam_srp"]
 	hlil_part02 = _read("references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part02.txt")
 	hlil_part06 = _read("references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part06.txt")
 	ghidra = _read("references/reverse-engineering/ghidra/quakelive_steam/decompile_top_functions.c")
@@ -956,7 +956,7 @@ def test_renderer_mapping_round_37_keeps_ambient_and_directed_scaling_retail_par
 
 
 def test_renderer_mapping_round_278_promotes_tail_postprocess_and_command_symbols() -> None:
-	aliases = json.loads(_read("references/analysis/quakelive_symbol_aliases.json"))["quakelive_steam"]
+	aliases = json.loads(_read("references/analysis/quakelive_symbol_aliases.json"))["quakelive_steam_srp"]
 	functions_csv = _read("references/reverse-engineering/ghidra/quakelive_steam/functions.csv").lower()
 	hlil_part01 = _read("references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part01.txt").lower()
 	hlil_part02 = _read("references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part02.txt").lower()
@@ -1034,7 +1034,7 @@ def test_renderer_mapping_round_278_promotes_tail_postprocess_and_command_symbol
 
 
 def test_renderer_mapping_round_279_promotes_postprocess_program_and_command_symbols() -> None:
-	aliases = json.loads(_read("references/analysis/quakelive_symbol_aliases.json"))["quakelive_steam"]
+	aliases = json.loads(_read("references/analysis/quakelive_symbol_aliases.json"))["quakelive_steam_srp"]
 	functions_csv = _read("references/reverse-engineering/ghidra/quakelive_steam/functions.csv").lower()
 	hlil_part01 = _read("references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part01.txt").lower()
 	hlil_part02 = _read("references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part02.txt").lower()
@@ -1127,7 +1127,7 @@ def test_renderer_mapping_round_279_promotes_postprocess_program_and_command_sym
 
 
 def test_renderer_mapping_round_281_promotes_backend_command_handlers_and_scene_target_wiring() -> None:
-	aliases = json.loads(_read("references/analysis/quakelive_symbol_aliases.json"))["quakelive_steam"]
+	aliases = json.loads(_read("references/analysis/quakelive_symbol_aliases.json"))["quakelive_steam_srp"]
 	functions_csv = _read("references/reverse-engineering/ghidra/quakelive_steam/functions.csv").lower()
 	hlil_part01 = _read("references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part01.txt").lower()
 	hlil_part02 = _read("references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part02.txt").lower()
@@ -1259,7 +1259,7 @@ def test_renderer_screenshot_readback_matches_retail_command_wiring() -> None:
 
 
 def test_renderer_mapping_round_282_promotes_command_buffer_and_glimp_thread_wiring() -> None:
-	aliases = json.loads(_read("references/analysis/quakelive_symbol_aliases.json"))["quakelive_steam"]
+	aliases = json.loads(_read("references/analysis/quakelive_symbol_aliases.json"))["quakelive_steam_srp"]
 	functions_csv = _read("references/reverse-engineering/ghidra/quakelive_steam/functions.csv").lower()
 	hlil_part02 = _read("references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part02.txt").lower()
 	tr_cmds = _read("src/code/renderer/tr_cmds.c")
@@ -1335,7 +1335,7 @@ def test_renderer_mapping_round_282_promotes_command_buffer_and_glimp_thread_wir
 
 
 def test_renderer_mapping_round_284_promotes_patch_curve_grid_helpers() -> None:
-	aliases = json.loads(_read("references/analysis/quakelive_symbol_aliases.json"))["quakelive_steam"]
+	aliases = json.loads(_read("references/analysis/quakelive_symbol_aliases.json"))["quakelive_steam_srp"]
 	functions_csv = _read("references/reverse-engineering/ghidra/quakelive_steam/functions.csv").lower()
 	hlil_part02 = _read("references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part02.txt").lower()
 	mapping_round = _read("docs/reverse-engineering/quakelive_steam_mapping_round_284.md")

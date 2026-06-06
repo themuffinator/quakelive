@@ -42,8 +42,8 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 // q_shared.h -- included first by ALL program modules.
 // A user mod should never modify this file
 
-#define	QL_PRODUCT_NAME			"Quake Live"
-#define	QL_PRODUCT_NAME_W		L"Quake Live"
+#define	QL_PRODUCT_NAME			"Quake Live SRP"
+#define	QL_PRODUCT_NAME_W		L"Quake Live SRP"
 #define	QL_BASEGAME			"baseq3"
 #define	QL_RETAIL_VERSION		"1069"
 #define	QL_ENGINE_VERSION		"1069 win-x86 Jun  3 2016 16:09:18"

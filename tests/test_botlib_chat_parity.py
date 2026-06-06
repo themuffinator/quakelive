@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import csv
 import json
 from pathlib import Path
 
@@ -8,6 +9,7 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 BOTLIB_AI_CHAT = REPO_ROOT / "src" / "code" / "botlib" / "be_ai_chat.c"
 BOTLIB_INTERFACE = REPO_ROOT / "src" / "code" / "botlib" / "be_interface.c"
 BOTLIB_PUBLIC = REPO_ROOT / "src" / "code" / "game" / "botlib.h"
+GAME_AI_CHAT = REPO_ROOT / "src" / "code" / "game" / "ai_chat.c"
 GAME_PUBLIC = REPO_ROOT / "src" / "code" / "game" / "g_public.h"
 GAME_SYSCALLS = REPO_ROOT / "src" / "code" / "game" / "g_syscalls.c"
 SERVER_GAME = REPO_ROOT / "src" / "code" / "server" / "sv_game.c"
@@ -37,6 +39,23 @@ QAGAME_HLIL = (
 	/ "qagamex86.dll"
 	/ "qagamex86.dll.bndb_hlil.txt"
 )
+QAGAME_HLIL_PART01 = (
+	REPO_ROOT
+	/ "references"
+	/ "hlil"
+	/ "quakelive"
+	/ "qagamex86.dll"
+	/ "qagamex86.dll.bndb_hlil_split"
+	/ "qagamex86.dll.bndb_hlil_part01.txt"
+)
+QAGAME_FUNCTIONS = (
+	REPO_ROOT
+	/ "references"
+	/ "reverse-engineering"
+	/ "ghidra"
+	/ "qagamex86"
+	/ "functions.csv"
+)
 QAGAME_GHIDRA_TOP = (
 	REPO_ROOT
 	/ "references"
@@ -45,6 +64,31 @@ QAGAME_GHIDRA_TOP = (
 	/ "qagamex86"
 	/ "decompile_top_functions.c"
 )
+QAGAME_METADATA = (
+	REPO_ROOT
+	/ "references"
+	/ "reverse-engineering"
+	/ "ghidra"
+	/ "qagamex86"
+	/ "metadata.txt"
+)
+QAGAME_IMPORTS = (
+	REPO_ROOT
+	/ "references"
+	/ "reverse-engineering"
+	/ "ghidra"
+	/ "qagamex86"
+	/ "imports.txt"
+)
+QAGAME_EXPORTS = (
+	REPO_ROOT
+	/ "references"
+	/ "reverse-engineering"
+	/ "ghidra"
+	/ "qagamex86"
+	/ "exports.txt"
+)
+QAGAME_SYMBOL_MAP = REPO_ROOT / "references" / "symbol-maps" / "qagame.json"
 
 
 def _read(path: Path) -> str:
@@ -73,10 +117,335 @@ def _extract_function_block(text: str, signature: str) -> str:
 	raise AssertionError(f"unterminated function block for: {signature}")
 
 
+def _function_rows_by_entry(path: Path) -> dict[str, dict[str, str]]:
+	with path.open(newline="", encoding="utf-8") as file:
+		return {row["entry"].lower(): row for row in csv.DictReader(file)}
+
+
+def test_qagame_bot_chat_prologue_aliases_source_and_hlil_are_pinned() -> None:
+	game_chat = _read(GAME_AI_CHAT)
+	hlil = _read(QAGAME_HLIL_PART01)
+	aliases = json.loads(_read(SYMBOL_ALIASES))["qagamex86"]
+	function_rows = _function_rows_by_entry(QAGAME_FUNCTIONS)
+	symbol_map = {
+		entry["address"].lower(): entry
+		for entry in json.loads(_read(QAGAME_SYMBOL_MAP))["functions"]
+	}
+	metadata = _read(QAGAME_METADATA)
+	imports = _read(QAGAME_IMPORTS)
+	exports = _read(QAGAME_EXPORTS)
+
+	expected_functions = (
+		("10001000", "BotNumActivePlayers", "int BotNumActivePlayers(void)", 230),
+		("100010f0", "BotIsFirstInRankings", "int BotIsFirstInRankings(bot_state_t *bs)", 332),
+		("10001240", "BotIsLastInRankings", "int BotIsLastInRankings(bot_state_t *bs)", 332),
+		("10001390", "BotFirstClientInRankings", "char *BotFirstClientInRankings(void)", 340),
+		("100014f0", "BotLastClientInRankings", "char *BotLastClientInRankings(void)", 340),
+		("10001650", "BotRandomOpponentName", "char *BotRandomOpponentName(bot_state_t *bs)", 372),
+		("100017d0", "BotMapTitle", "char *BotMapTitle(void)", 110),
+		("10001840", "BotWeaponNameForMeansOfDeath", "char *BotWeaponNameForMeansOfDeath(int mod)", 122),
+		("10001930", "BotRandomWeaponName", "char *BotRandomWeaponName(void)", 131),
+		("100019e0", "BotVisibleEnemies", "int BotVisibleEnemies(bot_state_t *bs)", 290),
+		("10001b10", "BotValidChatPosition", "int BotValidChatPosition(bot_state_t *bs)", 506),
+		("10001d10", "BotChat_EnterGame", "int BotChat_EnterGame(bot_state_t *bs)", 374),
+		("10001e90", "BotChat_ExitGame", "int BotChat_ExitGame(bot_state_t *bs)", 297),
+		("10001fc0", "BotChat_StartLevel", "int BotChat_StartLevel(bot_state_t *bs)", 311),
+		("10002100", "BotChat_EndLevel", "int BotChat_EndLevel(bot_state_t *bs)", 587),
+		("10002350", "BotChat_Death", "int BotChat_Death(bot_state_t *bs)", 1102),
+		("100027a0", "BotChat_Kill", "int BotChat_Kill(bot_state_t *bs)", 665),
+		("10002a40", "BotChat_EnemySuicide", "int BotChat_EnemySuicide(bot_state_t *bs)", 326),
+		("10002b90", "BotChat_HitTalking", "int BotChat_HitTalking(bot_state_t *bs)", 422),
+		("10002d40", "BotChat_HitNoDeath", "int BotChat_HitNoDeath(bot_state_t *bs)", 476),
+		("10002f20", "BotChat_HitNoKill", "int BotChat_HitNoKill(bot_state_t *bs)", 421),
+		("100030d0", "BotChat_Random", "int BotChat_Random(bot_state_t *bs)", 724),
+		("100033b0", "BotChatTime", "float BotChatTime(bot_state_t *bs)", 42),
+		("100033f0", "BotChatTest", "void BotChatTest(bot_state_t *bs)", 4693),
+	)
+
+	assert "program_name=qagamex86.dll" in metadata
+	assert "function_count=1027" in metadata
+	assert "import_count=65" in metadata
+	assert "export_count=2" in metadata
+	assert "MSVCR100.DLL!rand" in imports
+	assert "10053120 dllEntry" in exports
+	assert "1007af8c entry" in exports
+
+	for address, name, signature, size in expected_functions:
+		fun_key = f"FUN_{address}"
+		sub_key = f"sub_{address}"
+		assert aliases[fun_key] == name
+		assert aliases[sub_key] == name
+
+		row = function_rows[address]
+		assert row["name"] == fun_key
+		assert int(row["size"]) == size
+		assert row["thunk"] == "0"
+
+		symbol = symbol_map[f"0x{address}"]
+		assert symbol["raw_name"] == fun_key
+		assert symbol["normalized_name"] == name
+		assert symbol["status"] == "matched"
+		assert symbol["signature"] == signature
+
+	source_blocks = {
+		name: _extract_function_block(game_chat, signature)
+		for _, name, signature, _ in expected_functions
+	}
+
+	for expected in (
+		'trap_Cvar_VariableIntegerValue("sv_maxclients")',
+		"trap_GetConfigstring(CS_PLAYERS+i, buf, sizeof(buf));",
+		"Info_ValueForKey(buf, PLAYER_INFO_KEY_NAME)",
+		"TEAM_SPECTATOR",
+		"return num;",
+	):
+		assert expected in source_blocks["BotNumActivePlayers"]
+
+	for expected in (
+		"score = bs->cur_ps.persistant[PERS_SCORE];",
+		"BotAI_GetClientState(i, &ps);",
+		"if (score < ps.persistant[PERS_SCORE]) return qfalse;",
+	):
+		assert expected in source_blocks["BotIsFirstInRankings"]
+
+	for expected in (
+		"if (score > ps.persistant[PERS_SCORE]) return qfalse;",
+		"return qtrue;",
+	):
+		assert expected in source_blocks["BotIsLastInRankings"]
+
+	for expected in (
+		"bestscore = -999999;",
+		"EasyClientName(bestclient, name, 32);",
+		"return name;",
+	):
+		assert expected in source_blocks["BotFirstClientInRankings"]
+
+	for expected in (
+		"worstscore = 999999;",
+		"if (ps.persistant[PERS_SCORE] < worstscore)",
+		"EasyClientName(bestclient, name, 32);",
+	):
+		assert expected in source_blocks["BotLastClientInRankings"]
+
+	for expected in (
+		"if (i == bs->client) continue;",
+		"if (BotSameTeam(bs, i)) continue;",
+		"count = random() * numopponents;",
+		"EasyClientName(opponents[0], name, sizeof(name));",
+	):
+		assert expected in source_blocks["BotRandomOpponentName"]
+
+	for expected in (
+		"trap_GetServerinfo(info, sizeof(info));",
+		"SERVERINFO_KEY_MAPNAME",
+		"mapname[sizeof(mapname)-1] = '\\0';",
+	):
+		assert expected in source_blocks["BotMapTitle"]
+
+	for expected in (
+		'case MOD_ROCKET_SPLASH: return "Rocket Launcher";',
+		'case MOD_PROXIMITY_MINE: return "Proximity Launcher";',
+		'case MOD_JUICED: return "Prox mine";',
+		'case MOD_GRAPPLE: return "Grapple";',
+		'default: return "[unknown weapon]";',
+	):
+		assert expected in source_blocks["BotWeaponNameForMeansOfDeath"]
+
+	for expected in (
+		"rnd = random() * 11.9;",
+		'case 10: return "Proximity Launcher";',
+		'default: return "BFG10K";',
+	):
+		assert expected in source_blocks["BotRandomWeaponName"]
+
+	for expected in (
+		"BotEntityInfo(i, &entinfo);",
+		"if (!entinfo.valid) continue;",
+		"if (EntityIsInvisible(&entinfo) && !EntityIsShooting(&entinfo))",
+		"if (BotSameTeam(bs, i)) continue;",
+		"vis = BotEntityVisible(bs->entitynum, bs->eye, bs->viewangles, 360, i);",
+	):
+		assert expected in source_blocks["BotVisibleEnemies"]
+
+	for expected in (
+		"if (BotIsDead(bs)) return qtrue;",
+		"bs->inventory[INVENTORY_QUAD]",
+		"CONTENTS_LAVA|CONTENTS_SLIME",
+		"MASK_WATER",
+		"trap_AAS_PresenceTypeBoundingBox(PRESENCE_CROUCH, mins, maxs);",
+		"if (trace.ent != ENTITYNUM_WORLD) return qfalse;",
+	):
+		assert expected in source_blocks["BotValidChatPosition"]
+
+	for expected in (
+		"if (TeamPlayIsOn()) return qfalse;",
+		"if (gametype == GT_TOURNAMENT) return qfalse;",
+		"CHARACTERISTIC_CHAT_ENTEREXITGAME",
+		"if (BotNumActivePlayers() <= 1) return qfalse;",
+		"if (!BotValidChatPosition(bs)) return qfalse;",
+		'BotAI_BotInitialChat(bs, "game_enter",',
+		"bs->chatto = CHAT_ALL;",
+	):
+		assert expected in source_blocks["BotChat_EnterGame"]
+
+	for expected in (
+		'BotAI_BotInitialChat(bs, "game_exit",',
+		"BotRandomOpponentName(bs)",
+		"BotMapTitle()",
+	):
+		assert expected in source_blocks["BotChat_ExitGame"]
+
+	for expected in (
+		"if (BotIsObserver(bs)) return qfalse;",
+		'trap_EA_Command(bs->client, "vtaunt");',
+		"CHARACTERISTIC_CHAT_STARTENDLEVEL",
+		'BotAI_BotInitialChat(bs, "level_start",',
+	):
+		assert expected in source_blocks["BotChat_StartLevel"]
+
+	for expected in (
+		"if (BotIsFirstInRankings(bs))",
+		'trap_EA_Command(bs->client, "vtaunt");',
+		'BotAI_BotInitialChat(bs, "level_end_victory",',
+		'BotAI_BotInitialChat(bs, "level_end_lose",',
+		'BotAI_BotInitialChat(bs, "level_end",',
+		"BotLastClientInRankings()",
+		"BotFirstClientInRankings()",
+	):
+		assert expected in source_blocks["BotChat_EndLevel"]
+
+	for expected in (
+		'BotAI_BotInitialChat(bs, "death_teammate", name, NULL);',
+		'trap_EA_Command(bs->client, "vtaunt");',
+		'"death_drown"',
+		'"death_slime"',
+		'"death_lava"',
+		'"death_cratered"',
+		'"death_suicide"',
+		'"death_telefrag"',
+		'trap_BotNumInitialChats(bs->cs, "death_kamikaze")',
+		'"death_gauntlet"',
+		'"death_rail"',
+		'"death_bfg"',
+		'"death_insult"',
+		'"death_praise"',
+	):
+		assert expected in source_blocks["BotChat_Death"]
+
+	for expected in (
+		"if (!BotValidChatPosition(bs)) return qfalse;",
+		"if (BotVisibleEnemies(bs)) return qfalse;",
+		'"kill_teammate"',
+		'"kill_gauntlet"',
+		'"kill_rail"',
+		'"kill_telefrag"',
+		'trap_BotNumInitialChats(bs->cs, "kill_kamikaze")',
+		'"kill_insult"',
+		'"kill_praise"',
+	):
+		assert expected in source_blocks["BotChat_Kill"]
+
+	for expected in (
+		'"enemy_suicide"',
+		"if (!BotValidChatPosition(bs)) return qfalse;",
+		"if (BotVisibleEnemies(bs)) return qfalse;",
+	):
+		assert expected in source_blocks["BotChat_EnemySuicide"]
+
+	for expected in (
+		"lasthurt_client = g_entities[bs->client].client->lasthurt_client;",
+		"ClientName(g_entities[bs->client].client->lasthurt_client, name, sizeof(name));",
+		'BotAI_BotInitialChat(bs, "hit_talking", name, weap, NULL);',
+	):
+		assert expected in source_blocks["BotChat_HitTalking"]
+
+	for expected in (
+		"if (EntityIsShooting(&entinfo)) return qfalse;",
+		"weap = BotWeaponNameForMeansOfDeath(g_entities[bs->client].client->lasthurt_mod);",
+		'BotAI_BotInitialChat(bs, "hit_nodeath", name, weap, NULL);',
+	):
+		assert expected in source_blocks["BotChat_HitNoDeath"]
+
+	for expected in (
+		"ClientName(bs->enemy, name, sizeof(name));",
+		"weap = BotWeaponNameForMeansOfDeath(g_entities[bs->enemy].client->lasthurt_mod);",
+		'BotAI_BotInitialChat(bs, "hit_nokill", name, weap, NULL);',
+	):
+		assert expected in source_blocks["BotChat_HitNoKill"]
+
+	for expected in (
+		"bs->ltgtype == LTG_TEAMHELP",
+		"bs->ltgtype == LTG_TEAMACCOMPANY",
+		"bs->ltgtype == LTG_RUSHBASE",
+		"if (BotVisibleEnemies(bs)) return qfalse;",
+		'BotAI_BotInitialChat(bs, "random_misc",',
+		'BotAI_BotInitialChat(bs, "random_insult",',
+		"BotRandomWeaponName()",
+	):
+		assert expected in source_blocks["BotChat_Random"]
+
+	assert "CHARACTERISTIC_CHAT_CPM" in source_blocks["BotChatTime"]
+	assert "return 2.0;" in source_blocks["BotChatTime"]
+
+	for expected in (
+		'trap_BotNumInitialChats(bs->cs, "game_enter")',
+		'trap_BotNumInitialChats(bs->cs, "level_end_victory")',
+		'trap_BotNumInitialChats(bs->cs, "death_drown")',
+		'trap_BotNumInitialChats(bs->cs, "kill_gauntlet")',
+		'trap_BotNumInitialChats(bs->cs, "hit_talking")',
+		'trap_BotNumInitialChats(bs->cs, "random_misc")',
+		"trap_BotEnterChat(bs->cs, 0, CHAT_ALL);",
+	):
+		assert expected in source_blocks["BotChatTest"]
+
+	for expected in (
+		"10001000    int32_t sub_10001000()",
+		"100010f0    int32_t sub_100010f0(void* arg1)",
+		"10001240    int32_t sub_10001240(void* arg1)",
+		"10001390    int32_t sub_10001390()",
+		"100014f0    int32_t sub_100014f0()",
+		"10001650    int32_t sub_10001650(void* arg1)",
+		"100017d0    int32_t sub_100017d0()",
+		'10001840    int32_t __convention("regparm") sub_10001840(int32_t arg1)',
+		"10001930    int32_t __fastcall sub_10001930(int32_t arg1)",
+		"100019e0    int32_t __fastcall sub_100019e0(void* arg1)",
+		"10001b10    int32_t __fastcall sub_10001b10(void* arg1)",
+		"10001d10    int32_t sub_10001d10(void* arg1 @ esi)",
+		"10001e90    int32_t sub_10001e90(void* arg1 @ esi)",
+		"10001fc0    int32_t sub_10001fc0(void* arg1 @ esi)",
+		"10002100    int32_t sub_10002100(void* arg1 @ esi)",
+		"10002350    int32_t sub_10002350(void* arg1 @ esi)",
+		"100027a0    int32_t sub_100027a0(void* arg1 @ esi, long double arg2 @ st1)",
+		"10002a40    int32_t sub_10002a40(void* arg1 @ esi)",
+		"10002b90    int32_t sub_10002b90()",
+		"10002d40    int32_t sub_10002d40()",
+		"10002f20    int32_t sub_10002f20()",
+		"100030d0    int32_t sub_100030d0(void* arg1 @ esi)",
+		'100033b0    int32_t __convention("regparm") sub_100033b0(void* arg1)',
+		"100033f0    int32_t sub_100033f0(void* arg1 @ esi)",
+		"10001ded                      && sub_10001000() s> 1 && sub_10001b10(arg1) != 0)",
+		"10001e0a                  sub_100017d0()",
+		"10001e1b                  sub_10001650(arg1)",
+		"10002194              if (sub_100010f0(arg1) != 0)",
+		"1000228e                      if (sub_10001240(arg1) == 0)",
+		"100022d5                          int32_t var_44_5 = sub_100014f0()",
+		"100022d6                          sub_10001390()",
+		"1000285e                      && sub_10001b10(arg1) != 0 && sub_100019e0(arg1) == 0)",
+		"10002980                                  \"kill_kamikaze\")",
+		"10002afe                      && sub_10001b10(arg1) != 0 && sub_100019e0(arg1) == 0)",
+		"10003346                                  int32_t var_44_6 = sub_10001930(ecx_8)",
+		"1000335d                                  sub_10001650(arg1)",
+		"100033d9  return (*(data_104b13ac + 0x1cc))(*(arg1 + 0x1958), 0x17, 1, 0xfa0)",
+		'1000341f  int32_t i_58 = (*(data_104b13ac + 0x1f0))(*(arg1 + 0x1964), "game_enter")',
+	):
+		assert expected in hlil
+
+
 def test_botlib_chat_tail_exports_match_retail_hlil_body_shapes() -> None:
 	ai_chat = _read(BOTLIB_AI_CHAT)
 	hlil = _read(QL_STEAM_HLIL_PART03)
-	aliases = json.loads(_read(SYMBOL_ALIASES))["quakelive_steam"]
+	aliases = json.loads(_read(SYMBOL_ALIASES))["quakelive_steam_srp"]
 
 	for address, name in (
 		("49B6C0", "BotInitialChat"),
@@ -148,7 +517,7 @@ def test_botlib_chat_matching_helpers_are_pinned_to_retail_reference_shape() -> 
 	ai_chat = _read(BOTLIB_AI_CHAT)
 	hlil = _read(QL_STEAM_HLIL_PART03)
 	functions = _read(QL_STEAM_FUNCTIONS)
-	aliases = json.loads(_read(SYMBOL_ALIASES))["quakelive_steam"]
+	aliases = json.loads(_read(SYMBOL_ALIASES))["quakelive_steam_srp"]
 
 	for address, name in (
 		("497F00", "UnifyWhiteSpaces"),
@@ -213,7 +582,7 @@ def test_botlib_chat_resource_loaders_are_pinned_to_retail_reference_shape() -> 
 	ai_chat = _read(BOTLIB_AI_CHAT)
 	hlil = _read(QL_STEAM_HLIL_PART03)
 	functions = _read(QL_STEAM_FUNCTIONS)
-	aliases = json.loads(_read(SYMBOL_ALIASES))["quakelive_steam"]
+	aliases = json.loads(_read(SYMBOL_ALIASES))["quakelive_steam_srp"]
 
 	for address, name in (
 		("498210", "BotLoadSynonyms"),
@@ -348,7 +717,7 @@ def test_botlib_chat_construction_selection_and_lifecycle_match_retail_reference
 	ai_chat = _read(BOTLIB_AI_CHAT)
 	hlil = _read(QL_STEAM_HLIL_PART03)
 	functions = _read(QL_STEAM_FUNCTIONS)
-	aliases = json.loads(_read(SYMBOL_ALIASES))["quakelive_steam"]
+	aliases = json.loads(_read(SYMBOL_ALIASES))["quakelive_steam_srp"]
 
 	for address, name in (
 		("49B170", "BotConstructChatMessage"),
@@ -539,6 +908,8 @@ def test_botlib_chat_export_and_native_import_boundary_stays_split_by_retail_evi
 
 	assert "case BOTLIB_AI_ENTER_CHAT: return G_QL_IMPORT_BOTLIB_AI_ENTER_CHAT;" in map_native_import
 	assert "case BOTLIB_AI_GET_CHAT_MESSAGE: return G_QL_IMPORT_BOTLIB_AI_GET_CHAT_MESSAGE;" in map_native_import
+	assert "case BOTLIB_AI_CHAT_LENGTH: return G_QL_IMPORT_BOTLIB_AI_CHAT_LENGTH;" in map_native_import
+	assert "case BOTLIB_AI_STRING_CONTAINS: return G_QL_IMPORT_BOTLIB_AI_STRING_CONTAINS;" in map_native_import
 	assert "case BOTLIB_AI_FIND_MATCH: return G_QL_IMPORT_BOTLIB_AI_FIND_MATCH;" in map_native_import
 	assert "case BOTLIB_AI_MATCH_VARIABLE: return G_QL_IMPORT_BOTLIB_AI_MATCH_VARIABLE;" in map_native_import
 	assert "case BOTLIB_AI_UNIFY_WHITE_SPACES: return G_QL_IMPORT_BOTLIB_AI_UNIFY_WHITE_SPACES;" in map_native_import
@@ -547,15 +918,13 @@ def test_botlib_chat_export_and_native_import_boundary_stays_split_by_retail_evi
 
 	assert "G_QL_IMPORT_BOTLIB_AI_ENTER_CHAT = 127," in game_public
 	assert "G_QL_IMPORT_BOTLIB_AI_GET_CHAT_MESSAGE = 128," in game_public
+	assert "G_QL_IMPORT_BOTLIB_AI_CHAT_LENGTH = 126," in game_public
+	assert "G_QL_IMPORT_BOTLIB_AI_STRING_CONTAINS = 129," in game_public
 	assert "G_QL_IMPORT_BOTLIB_AI_FIND_MATCH = 130," in game_public
 	assert "G_QL_IMPORT_BOTLIB_AI_MATCH_VARIABLE = 131," in game_public
 	assert "G_QL_IMPORT_BOTLIB_AI_UNIFY_WHITE_SPACES = 132," in game_public
 	assert "G_QL_IMPORT_BOTLIB_AI_SET_CHAT_GENDER = 135," in game_public
 	assert "G_QL_IMPORT_BOTLIB_AI_SET_CHAT_NAME = 136," in game_public
-	assert "G_QL_IMPORT_BOTLIB_AI_CHAT_LENGTH" not in game_public
-	assert "G_QL_IMPORT_BOTLIB_AI_STRING_CONTAINS" not in game_public
-	assert "case BOTLIB_AI_CHAT_LENGTH: return" not in map_native_import
-	assert "case BOTLIB_AI_STRING_CONTAINS: return" not in map_native_import
 
 	assert "[BOTLIB_AI_CHAT_LENGTH] = (ql_import_f)QL_G_trap_BotChatLength," in server_game
 	assert "[BOTLIB_AI_STRING_CONTAINS] = (ql_import_f)QL_G_trap_StringContains," in server_game

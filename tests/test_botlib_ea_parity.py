@@ -80,7 +80,7 @@ def _extract_function_block(text: str, signature: str) -> str:
 def test_botlib_ea_retail_function_map_and_export_slots_are_pinned() -> None:
 	functions_csv = _read(QL_STEAM_FUNCTIONS)
 	hlil = _read(QL_STEAM_HLIL_PART03)
-	aliases = json.loads(_read(SYMBOL_ALIASES))["quakelive_steam"]
+	aliases = json.loads(_read(SYMBOL_ALIASES))["quakelive_steam_srp"]
 
 	for address, name in (
 		("4A78C0", "EA_Say"),

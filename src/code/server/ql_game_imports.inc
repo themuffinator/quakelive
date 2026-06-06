@@ -1539,7 +1539,7 @@ QL_G_trap_BotMutateGoalFuzzyLogic
 ==============
 */
 static void QDECL QL_G_trap_BotMutateGoalFuzzyLogic( int goalstate, float range ) {
-	G_Import_Syscall( BOTLIB_AI_MUTATE_GOAL_FUZZY_LOGIC, goalstate, range );
+	G_Import_Syscall( BOTLIB_AI_MUTATE_GOAL_FUZZY_LOGIC, goalstate, QL_G_PASSFLOAT(range) );
 }
 
 /*

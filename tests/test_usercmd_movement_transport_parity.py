@@ -360,7 +360,7 @@ def test_cgame_prediction_imports_host_usercmd_ring_without_bypassing_bounds() -
 
 
 def test_usercmd_movement_transport_is_backed_by_committed_retail_evidence() -> None:
-	aliases = json.loads(ALIASES_PATH.read_text(encoding="utf-8"))["quakelive_steam"]
+	aliases = json.loads(ALIASES_PATH.read_text(encoding="utf-8"))["quakelive_steam_srp"]
 	hlil = HLIL_PART04_PATH.read_text(encoding="utf-8")
 	round_17 = ROUND_17_PATH.read_text(encoding="utf-8")
 	round_57 = ROUND_57_PATH.read_text(encoding="utf-8")

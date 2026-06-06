@@ -178,8 +178,10 @@ static int G_MapNativeImport( int arg, const intptr_t *stack ) {
 	case BOTLIB_AI_INITIAL_CHAT: return G_QL_IMPORT_BOTLIB_AI_INITIAL_CHAT;
 	case BOTLIB_AI_NUM_INITIAL_CHATS: return G_QL_IMPORT_BOTLIB_AI_NUM_INITIAL_CHATS;
 	case BOTLIB_AI_REPLY_CHAT: return G_QL_IMPORT_BOTLIB_AI_REPLY_CHAT;
+	case BOTLIB_AI_CHAT_LENGTH: return G_QL_IMPORT_BOTLIB_AI_CHAT_LENGTH;
 	case BOTLIB_AI_ENTER_CHAT: return G_QL_IMPORT_BOTLIB_AI_ENTER_CHAT;
 	case BOTLIB_AI_GET_CHAT_MESSAGE: return G_QL_IMPORT_BOTLIB_AI_GET_CHAT_MESSAGE;
+	case BOTLIB_AI_STRING_CONTAINS: return G_QL_IMPORT_BOTLIB_AI_STRING_CONTAINS;
 	case BOTLIB_AI_FIND_MATCH: return G_QL_IMPORT_BOTLIB_AI_FIND_MATCH;
 	case BOTLIB_AI_MATCH_VARIABLE: return G_QL_IMPORT_BOTLIB_AI_MATCH_VARIABLE;
 	case BOTLIB_AI_UNIFY_WHITE_SPACES: return G_QL_IMPORT_BOTLIB_AI_UNIFY_WHITE_SPACES;
@@ -1262,7 +1264,7 @@ void trap_BotSaveGoalFuzzyLogic(int goalstate, char *filename) {
 }
 
 void trap_BotMutateGoalFuzzyLogic(int goalstate, float range) {
-	syscall( BOTLIB_AI_MUTATE_GOAL_FUZZY_LOGIC, goalstate, range );
+	syscall( BOTLIB_AI_MUTATE_GOAL_FUZZY_LOGIC, goalstate, PASSFLOAT(range) );
 }
 
 int trap_BotAllocGoalState(int state) {

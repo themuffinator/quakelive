@@ -100,7 +100,7 @@ def _rename_function_if_default(func, desired_name):
 def _load_alias_bucket(alias_path):
 	with open(alias_path, "r") as handle:
 		alias_data = json.load(handle)
-	return alias_data.get("quakelive_steam", {}) or {}
+	return alias_data.get("quakelive_steam_srp", {}) or {}
 
 
 def _iter_analysis_symbols(analysis_path):
@@ -141,7 +141,7 @@ def main():
 		"references",
 		"reverse-engineering",
 		"ghidra",
-		"quakelive_steam",
+		"quakelive_steam_srp",
 		"analysis_symbols.txt",
 	)
 

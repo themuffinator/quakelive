@@ -55,7 +55,7 @@ def _extract_function_block(text: str, signature: str) -> str:
 
 
 def test_botlib_move_edge_and_grapple_helper_aliases_match_retail_references() -> None:
-	aliases = json.loads(_read(SYMBOL_ALIASES))["quakelive_steam"]
+	aliases = json.loads(_read(SYMBOL_ALIASES))["quakelive_steam_srp"]
 	functions = _read(QL_STEAM_FUNCTIONS)
 	hlil = _read(QL_STEAM_HLIL_PART03)
 
@@ -205,7 +205,7 @@ def test_botlib_angle_and_grapple_helpers_match_source_and_retail_usage() -> Non
 
 
 def test_botlib_weapon_jump_wrappers_remain_folded_and_unpromoted() -> None:
-	aliases = json.loads(_read(SYMBOL_ALIASES))["quakelive_steam"]
+	aliases = json.loads(_read(SYMBOL_ALIASES))["quakelive_steam_srp"]
 	aas_move = _read(BOTLIB_AAS_MOVE)
 	hlil = _read(QL_STEAM_HLIL_PART03)
 

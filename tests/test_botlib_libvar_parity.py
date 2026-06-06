@@ -229,7 +229,7 @@ def test_botlib_libvar_export_and_qagame_bridge_wiring_match_retail_evidence() -
 	qagame_hlil = _read(QAGAME_HLIL)
 	qagame_ghidra = _read(QAGAME_GHIDRA_TOP)
 	functions = _read(QL_STEAM_FUNCTIONS)
-	aliases = json.loads(_read(SYMBOL_ALIASES))["quakelive_steam"]
+	aliases = json.loads(_read(SYMBOL_ALIASES))["quakelive_steam_srp"]
 
 	assert aliases["sub_4A7E40"] == "Export_BotLibVarSet"
 	assert aliases["sub_4A7E60"] == "Export_BotLibVarGet"

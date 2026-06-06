@@ -69,7 +69,7 @@ def _extract_function_block(text: str, signature: str) -> str:
 
 
 def test_botlib_route_cache_internal_aliases_match_retail_references() -> None:
-	aliases = json.loads(_read(SYMBOL_ALIASES))["quakelive_steam"]
+	aliases = json.loads(_read(SYMBOL_ALIASES))["quakelive_steam_srp"]
 	functions = _read(QL_STEAM_FUNCTIONS)
 	hlil = _read(QL_STEAM_HLIL_PART03)
 

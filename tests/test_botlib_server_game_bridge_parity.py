@@ -132,7 +132,7 @@ def _read(path: Path) -> str:
 
 
 def _aliases() -> dict[str, str]:
-	return json.loads(_read(SYMBOL_ALIASES))["quakelive_steam"]
+	return json.loads(_read(SYMBOL_ALIASES))["quakelive_steam_srp"]
 
 
 def _function_rows() -> dict[str, str]:
@@ -257,7 +257,7 @@ def test_server_bot_source_matches_retail_bridge_lifecycle_shape() -> None:
 		"botlib_import.FreeMemory = BotImport_FreeMemory;",
 		"botlib_import.HunkAlloc = BotImport_HunkAlloc;",
 		"botlib_import.DebugLineCreate = BotImport_DebugLineCreate;",
-		"botlib_import.DebugLineDelete = BotImport_DebugLineDelete;",
+		"botlib_import.DebugLineDelete = BotImport_DebugPolygonDelete;",
 		"botlib_import.DebugLineShow = BotImport_DebugLineShow;",
 		"botlib_import.DebugPolygonCreate = BotImport_DebugPolygonCreate;",
 		"botlib_import.DebugPolygonDelete = BotImport_DebugPolygonDelete;",

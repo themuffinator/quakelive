@@ -66,7 +66,7 @@ def test_botlib_precompiler_directives_match_retail_references() -> None:
 	server_imports = SERVER_QL_GAME_IMPORTS.read_text(encoding="utf-8")
 	ql_steam_hlil = QL_STEAM_HLIL_PART04.read_text(encoding="utf-8")
 	ghidra_functions = QL_STEAM_GHIDRA_FUNCTIONS.read_text(encoding="utf-8")
-	aliases = json.loads(SYMBOL_ALIASES.read_text(encoding="utf-8"))["quakelive_steam"]
+	aliases = json.loads(SYMBOL_ALIASES.read_text(encoding="utf-8"))["quakelive_steam_srp"]
 
 	include = _extract_function_block(l_precomp, "int PC_Directive_include(source_t *source)")
 	read_line = _extract_function_block(l_precomp, "int PC_ReadLine(source_t *source, token_t *token)")
