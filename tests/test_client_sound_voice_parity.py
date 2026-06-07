@@ -169,8 +169,10 @@ def test_client_steam_voice_frame_reconstructs_retail_transport_path() -> None:
 	assert "trackedSteamId = ( (uint64_t)serverIdHigh << 32 ) | serverIdLow;" in session_block
 	assert "if ( event->remoteId.value != trackedSteamId ) {" in session_block
 	assert "QL_Steamworks_AcceptP2PSession( &event->remoteId )" in session_block
+	assert "static qboolean SteamClient_IsInitialized( void ) {" in cl_main
 	assert "services = QL_RefreshPlatformServices();" in frame_block
-	assert "if ( !services || !services->matchmaking.initialised ) {" in frame_block
+	assert "SteamClient_SetInitializedState( services );" in frame_block
+	assert "if ( !SteamClient_IsInitialized() ) {" in frame_block
 	assert "QL_Steamworks_RunCallbacks();" in frame_block
 	assert "CL_Steam_SendVoicePacket();" in frame_block
 	assert "CL_Steam_ProcessStatsReportPackets();" in frame_block

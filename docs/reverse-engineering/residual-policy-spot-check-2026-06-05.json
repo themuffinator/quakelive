@@ -92,7 +92,7 @@
           "src/code/client/cl_main.c"
         ],
         "callsite": "SteamClient_Frame and SteamClient_Init own client Steam callbacks, voice, stats, lobby, and rich-presence bootstrap.",
-        "default_policy_guard": "SteamClient_Frame returns unless CL_SteamServicesEnabled and QL_Steamworks_Init succeed; SteamClient_Init logs compatibility fallback when services are disabled."
+        "default_policy_guard": "SteamClient_Frame returns unless CL_SteamServicesEnabled and the retained SteamClient_IsInitialized flag succeed; SteamClient_Init logs compatibility fallback when services are disabled."
       },
       {
         "lane_id": "windows_net_restart_steam_hooks",

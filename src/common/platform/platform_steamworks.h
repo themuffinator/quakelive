@@ -430,6 +430,8 @@ void QL_Steamworks_UnloadLibrary( void );
 
 qboolean QL_Steamworks_Init( void );
 
+qboolean QL_Steamworks_IsInitialized( void );
+
 void QL_Steamworks_Shutdown( void );
 
 void QL_Steamworks_RunCallbacks( void );
@@ -795,6 +797,15 @@ QL_Steamworks_Init
 =============
 */
 static inline qboolean QL_Steamworks_Init( void ) {
+	return qfalse;
+}
+
+/*
+=============
+QL_Steamworks_IsInitialized
+=============
+*/
+static inline qboolean QL_Steamworks_IsInitialized( void ) {
 	return qfalse;
 }
 

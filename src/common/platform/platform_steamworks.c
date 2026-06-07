@@ -1046,6 +1046,17 @@ qboolean QL_Steamworks_Init( void ) {
 
 /*
 =============
+QL_Steamworks_IsInitialized
+
+Returns the retained Steam API live flag set by QL_Steamworks_Init.
+=============
+*/
+qboolean QL_Steamworks_IsInitialized( void ) {
+	return state.initialised ? qtrue : qfalse;
+}
+
+/*
+=============
 QL_Steamworks_Shutdown
 
 Shuts down Steamworks and releases any loaded handles.

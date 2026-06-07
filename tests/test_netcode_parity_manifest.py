@@ -7727,7 +7727,7 @@ def test_residual_policy_spot_check_guardrails_remain_manifest_backed() -> None:
 			"lane_id": "client_steam_frame_and_init",
 			"paths": ["src/code/client/cl_main.c"],
 			"callsite": "SteamClient_Frame and SteamClient_Init own client Steam callbacks, voice, stats, lobby, and rich-presence bootstrap.",
-			"default_policy_guard": "SteamClient_Frame returns unless CL_SteamServicesEnabled and QL_Steamworks_Init succeed; SteamClient_Init logs compatibility fallback when services are disabled.",
+			"default_policy_guard": "SteamClient_Frame returns unless CL_SteamServicesEnabled and the retained SteamClient_IsInitialized flag succeed; SteamClient_Init logs compatibility fallback when services are disabled.",
 		},
 		"windows_net_restart_steam_hooks": {
 			"lane_id": "windows_net_restart_steam_hooks",
@@ -7807,18 +7807,21 @@ def test_residual_policy_spot_check_guardrails_remain_manifest_backed() -> None:
 	steam_client_frame = _function_block(cl_main, "void SteamClient_Frame( void )")
 	_assert_order(
 		steam_client_frame,
-		"if ( !CL_SteamServicesEnabled() || !QL_Steamworks_Init() ) {",
+		"services = QL_RefreshPlatformServices();",
+		"SteamClient_SetInitializedState( services );",
+		"if ( !SteamClient_IsInitialized() ) {",
 		"return;",
 		"QL_Steamworks_RunCallbacks();",
 	)
 	steam_client_init = _function_block(cl_main, "void SteamClient_Init( void )")
 	_assert_order(
 		steam_client_init,
-		"if ( !CL_SteamServicesEnabled() ) {",
+		"SteamClient_SetInitializedState( services );",
+		"if ( !SteamClient_IsInitialized() ) {",
 		"CL_LogClientCallbackBootstrapFallback( \"online services disabled; keeping compatibility-only browser event fallback\" );",
 		"} else {",
 		"SteamCallbacks_Init();",
-		"if ( CL_SteamServicesEnabled() ) {",
+		"if ( SteamClient_IsInitialized() ) {",
 		"QL_Steamworks_UnregisterClientCallbacks();",
 	)
 	net_restart = _function_block(win_net, "void NET_Restart( void )")

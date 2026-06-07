@@ -939,6 +939,35 @@ typedef struct {
 } clSteamCallbackState_t;
 
 static clSteamCallbackState_t cl_steamCallbackState;
+static qboolean cl_steamClientInitialized;
+
+/*
+=============
+SteamClient_IsInitialized
+
+Returns the retained client Steam API live flag used by the retail Steam
+callback, identity, and transport gates.
+=============
+*/
+static qboolean SteamClient_IsInitialized( void ) {
+	return cl_steamClientInitialized ? qtrue : qfalse;
+}
+
+/*
+=============
+SteamClient_SetInitializedState
+
+Latches the Steam API state after refreshing the platform-service descriptor.
+=============
+*/
+static void SteamClient_SetInitializedState( const ql_platform_service_table *services ) {
+	if ( !CL_SteamServicesEnabled() || !services || !services->matchmaking.initialised || !QL_Steamworks_IsInitialized() ) {
+		cl_steamClientInitialized = qfalse;
+		return;
+	}
+
+	cl_steamClientInitialized = qtrue;
+}
 
 typedef struct {
 	qboolean	refreshActive;
@@ -6178,7 +6207,7 @@ Seeds the retail main-menu Steam rich-presence value during client bootstrap.
 =============
 */
 static void CL_Steam_SetMainMenuRichPresence( void ) {
-	if ( !CL_SteamServicesEnabled() ) {
+	if ( !SteamClient_IsInitialized() ) {
 		CL_LogMatchmakingServiceIgnored( "steam_presence_main_menu", "matchmaking provider unavailable" );
 		return;
 	}
@@ -6225,6 +6254,7 @@ unavailability without re-registering console commands or lobby cvars.
 */
 static void SteamClient_RecoverCallbackBootstrap( void ) {
 	static int	nextRetryTime = 0;
+	const ql_platform_service_table *services;
 	const char	*workshopProvider;
 	const char	*workshopPolicy;
 	qboolean	clientCallbacksRegistered;
@@ -6240,10 +6270,11 @@ static void SteamClient_RecoverCallbackBootstrap( void ) {
 	}
 	nextRetryTime = cls.realtime + CL_STEAM_CALLBACK_RECOVERY_RETRY_MSEC;
 
-	QL_RefreshPlatformServices();
+	services = QL_RefreshPlatformServices();
 	CL_RefreshPlatformServiceCvars();
+	SteamClient_SetInitializedState( services );
 
-	if ( !CL_SteamServicesEnabled() || !QL_Steamworks_Init() ) {
+	if ( !SteamClient_IsInitialized() ) {
 		return;
 	}
 
@@ -6281,6 +6312,7 @@ static void CL_Steam_ShutdownCallbacks( void ) {
 	QL_Steamworks_UnregisterLobbyCallbacks();
 	QL_Steamworks_UnregisterClientCallbacks();
 	cl_steamCallbackState.callbackRegistrationActive = qfalse;
+	cl_steamClientInitialized = qfalse;
 	CL_Steam_ClearCurrentLobby();
 	CL_Steam_ClearBrowserEvents();
 }
@@ -6343,7 +6375,8 @@ void SteamClient_Frame( void ) {
 	}
 
 	services = QL_RefreshPlatformServices();
-	if ( !services || !services->matchmaking.initialised ) {
+	SteamClient_SetInitializedState( services );
+	if ( !SteamClient_IsInitialized() ) {
 		return;
 	}
 
@@ -6365,7 +6398,7 @@ static qboolean CL_Steam_ShouldRegisterStatsClear( void ) {
 		return qfalse;
 	}
 
-	if ( !QL_Steamworks_Init() ) {
+	if ( !SteamClient_IsInitialized() ) {
 		CL_LogStatsServiceRegistrationSkipped( "stats provider initialisation failed" );
 		return qfalse;
 	}
@@ -6411,7 +6444,7 @@ static qboolean SteamLobby_Init( void ) {
 	qboolean	callbacksRegistered;
 
 	callbacksRegistered = qfalse;
-	if ( CL_SteamServicesEnabled() ) {
+	if ( SteamClient_IsInitialized() ) {
 		callbacksRegistered = SteamLobbyCallbacks_Init();
 	}
 
@@ -6432,6 +6465,7 @@ presence write.
 =============
 */
 void SteamClient_Init( void ) {
+	const ql_platform_service_table *services;
 	const char	*workshopProvider;
 	const char	*workshopPolicy;
 	qboolean	clientCallbacksRegistered;
@@ -6439,18 +6473,20 @@ void SteamClient_Init( void ) {
 	qboolean	lobbyCallbacksRegistered;
 
 	cl_statsClearRegistered = qfalse;
+	cl_steamClientInitialized = qfalse;
 	cl_steamCallbackState.callbackRegistrationActive = qfalse;
 	CL_Steam_ClearCurrentLobby();
 	CL_Steam_ClearBrowserEvents();
-	QL_RefreshPlatformServices();
+	services = QL_RefreshPlatformServices();
 	CL_RefreshPlatformServiceCvars();
+	SteamClient_SetInitializedState( services );
 
 	workshopProvider = CL_GetWorkshopServiceProviderLabel();
 	workshopPolicy = CL_GetWorkshopServicePolicyLabel();
 	clientCallbacksRegistered = qfalse;
 	microCallbacksRegistered = qfalse;
 
-	if ( !CL_SteamServicesEnabled() ) {
+	if ( !SteamClient_IsInitialized() ) {
 		CL_LogClientCallbackBootstrapFallback( "online services disabled; keeping compatibility-only browser event fallback" );
 	} else {
 		clientCallbacksRegistered = SteamCallbacks_Init();
@@ -6460,7 +6496,7 @@ void SteamClient_Init( void ) {
 	}
 
 	lobbyCallbacksRegistered = SteamLobby_Init();
-	if ( CL_SteamServicesEnabled() ) {
+	if ( SteamClient_IsInitialized() ) {
 		if ( !clientCallbacksRegistered || !microCallbacksRegistered || !lobbyCallbacksRegistered ) {
 			CL_LogClientCallbackBootstrapFallback( "callback registration failed; keeping compatibility-only browser event fallback" );
 			QL_Steamworks_UnregisterMicroCallbacks();

@@ -1228,6 +1228,7 @@ def test_client_steam_callback_owner_reconstructs_retail_frame_pump_and_lifecycl
     frame_block = _extract_function_block(cl_main, "void CL_Frame ( int msec ) {")
     common_frame_block = _extract_function_block(common, "void Com_Frame( void )")
     steam_frame_block = _extract_function_block(cl_main, "void SteamClient_Frame( void )")
+    steam_is_initialized_block = _extract_function_block(cl_main, "static qboolean SteamClient_IsInitialized( void ) {")
     init_block = _extract_function_block(cl_main, "void CL_Init( void ) {")
     shutdown_block = _extract_function_block(cl_main, "void CL_Shutdown( void ) {")
     steam_callbacks_init_block = _extract_function_block(cl_main, "static qboolean SteamCallbacks_Init( void ) {")
@@ -1251,9 +1252,12 @@ def test_client_steam_callback_owner_reconstructs_retail_frame_pump_and_lifecycl
     assert "SteamClient_Frame();" in common_frame_block
     assert common_frame_block.index("CL_WebHost_Frame();") < common_frame_block.index("SteamClient_Frame();")
     assert common_frame_block.index("SteamClient_Frame();") < common_frame_block.index("CL_Frame( msec );")
+    assert "static qboolean cl_steamClientInitialized;" in cl_main
+    assert "return cl_steamClientInitialized ? qtrue : qfalse;" in steam_is_initialized_block
     assert "CL_Steam_ProcessStatsReportPackets();" in steam_frame_block
     assert "services = QL_RefreshPlatformServices();" in steam_frame_block
-    assert "if ( !services || !services->matchmaking.initialised ) {" in steam_frame_block
+    assert "SteamClient_SetInitializedState( services );" in steam_frame_block
+    assert "if ( !SteamClient_IsInitialized() ) {" in steam_frame_block
     assert "SteamClient_RecoverCallbackBootstrap();" in steam_frame_block
 
     assert "static const ql_platform_feature_descriptor *CL_GetMatchmakingServiceDescriptor( void ) {" in cl_main
@@ -1338,15 +1342,18 @@ def test_client_steam_callback_owner_reconstructs_retail_frame_pump_and_lifecycl
     assert "CL_GetSocialOverlayServicePolicyLabel()" in callback_bootstrap_log_block
     assert "workshopProvider = CL_GetWorkshopServiceProviderLabel();" in steam_client_init_block
     assert "workshopPolicy = CL_GetWorkshopServicePolicyLabel();" in steam_client_init_block
-    assert "QL_RefreshPlatformServices();" in steam_client_init_block
-    assert steam_client_init_block.index("CL_RefreshPlatformServiceCvars();") < steam_client_init_block.index("if ( !CL_SteamServicesEnabled() ) {")
+    assert "services = QL_RefreshPlatformServices();" in steam_client_init_block
+    assert "SteamClient_SetInitializedState( services );" in steam_client_init_block
+    assert steam_client_init_block.index("CL_RefreshPlatformServiceCvars();") < steam_client_init_block.index("if ( !SteamClient_IsInitialized() ) {")
     assert 'CL_LogClientCallbackBootstrapFallback( "online services disabled; keeping compatibility-only browser event fallback" );' in steam_client_init_block
     assert 'CL_LogClientCallbackBootstrapFallback( "callback registration failed; keeping compatibility-only browser event fallback" );' in steam_client_init_block
     assert 'Com_sprintf( detail, sizeof( detail ), "callbacks unavailable; keeping polling fallback (%s [%s])",' in workshop_callback_init_block
     assert 'CL_LogWorkshopLifecycle( "callback-bootstrap", detail );' in workshop_callback_init_block
     assert "cl_steamCallbackState.callbackRegistrationActive = qtrue;" in steam_client_init_block
-    assert "QL_RefreshPlatformServices();" in callback_recovery_block
+    assert "services = QL_RefreshPlatformServices();" in callback_recovery_block
     assert "CL_RefreshPlatformServiceCvars();" in callback_recovery_block
+    assert "SteamClient_SetInitializedState( services );" in callback_recovery_block
+    assert "if ( !SteamClient_IsInitialized() ) {" in callback_recovery_block
     assert "clientCallbacksRegistered = SteamCallbacks_Init();" in callback_recovery_block
     assert "microCallbacksRegistered = clientCallbacksRegistered ? SteamMicroCallbacks_Init() : qfalse;" in callback_recovery_block
     assert "lobbyCallbacksRegistered = SteamLobbyCallbacks_Init();" in callback_recovery_block
@@ -1358,6 +1365,7 @@ def test_client_steam_callback_owner_reconstructs_retail_frame_pump_and_lifecycl
     assert "QL_Steamworks_UnregisterMicroCallbacks();" in callback_shutdown_block
     assert "QL_Steamworks_UnregisterLobbyCallbacks();" in callback_shutdown_block
     assert "QL_Steamworks_UnregisterClientCallbacks();" in callback_shutdown_block
+    assert "cl_steamClientInitialized = qfalse;" in callback_shutdown_block
 
     assert 'CL_LogStatsServiceRegistrationSkipped( "stats provider unavailable" );' in stats_gate_block
     assert 'CL_LogStatsServiceRegistrationSkipped( "stats provider initialisation failed" );' in stats_gate_block
@@ -1371,7 +1379,12 @@ def test_client_steam_callback_owner_reconstructs_retail_frame_pump_and_lifecycl
 
 def test_platform_steamworks_reconstructs_retail_callback_bundle_registration_surface() -> None:
     steamworks = (REPO_ROOT / "src/common/platform/platform_steamworks.c").read_text(encoding="utf-8")
+    steamworks_h = (REPO_ROOT / "src/common/platform/platform_steamworks.h").read_text(encoding="utf-8")
 
+    init_state_block = _extract_function_block(steamworks, "qboolean QL_Steamworks_IsInitialized( void ) {")
+    init_state_stub_block = _extract_function_block(
+        steamworks_h, "static inline qboolean QL_Steamworks_IsInitialized( void ) {"
+    )
     register_client_block = _extract_function_block(
         steamworks, "qboolean QL_Steamworks_RegisterClientCallbacks( const ql_steam_client_callback_bindings_t *bindings ) {"
     )
@@ -1394,6 +1407,9 @@ def test_platform_steamworks_reconstructs_retail_callback_bundle_registration_su
     bind_ugc_block = _extract_function_block(steamworks, "qboolean QL_Steamworks_BindUGCQueryCallResult( SteamAPICall_t callHandle ) {")
     shutdown_block = _extract_function_block(steamworks, "void QL_Steamworks_Shutdown( void ) {")
 
+    assert "qboolean QL_Steamworks_IsInitialized( void );" in steamworks_h
+    assert "return state.initialised ? qtrue : qfalse;" in init_state_block
+    assert "return qfalse;" in init_state_stub_block
     for callback_define in (
         '#define QL_STEAM_CALLBACK_RICH_PRESENCE_JOIN_REQUESTED 0x151',
         '#define QL_STEAM_CALLBACK_USER_STATS_RECEIVED 0x44d',

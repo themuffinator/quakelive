@@ -48,7 +48,7 @@ Call-site/stub inventory:
 | Auth backend dispatch stubs | `src/common/auth_credentials.c`, `src/common/platform/platform_backend_auth.h` | `QL_Auth_ExecuteRequest` tries Open Steam and Steamworks backends, but `platform_backend_auth.h` returns `qfalse` inline when `QL_BUILD_OPEN_STEAM` or `QL_BUILD_STEAMWORKS` are disabled. |
 | Steamworks header default stubs | `src/common/platform/platform_steamworks.h` | Live declarations exist only under `#if QL_BUILD_STEAMWORKS`; the default `#else` surface returns `qfalse` for init/server-init calls and no-ops shutdown/callback calls. |
 | Common Steam GameServer bootstrap | `src/code/qcommon/common.c` | `Com_InitSteamGameServer` is called from startup/restart paths, but live Steam GameServer calls execute only inside `#if QL_BUILD_STEAMWORKS`. |
-| Client Steam frame/init | `src/code/client/cl_main.c` | `SteamClient_Frame` returns unless `CL_SteamServicesEnabled()` and `QL_Steamworks_Init()` succeed; `SteamClient_Init` logs a compatibility fallback when services are disabled. |
+| Client Steam frame/init | `src/code/client/cl_main.c` | `SteamClient_Frame` returns unless `CL_SteamServicesEnabled()` and the retained `SteamClient_IsInitialized()` flag succeed; `SteamClient_Init` logs a compatibility fallback when services are disabled. |
 | Windows net restart Steam hooks | `src/code/win32/win_net.c` | `NET_Restart` calls Steam shutdown/init hooks, which resolve to the Steamworks no-op stubs and the `Com_InitSteamGameServer` build gate in default builds. |
 
 Targeted source scan:
