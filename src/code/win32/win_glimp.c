@@ -82,7 +82,9 @@ glwstate_t glw_state;
 cvar_t	*r_allowSoftwareGL;		// don't abort out if the pixelformat claims software
 cvar_t	*r_maskMinidriver;		// allow a different dll name to be treated as if it were opengl32.dll
 
-
+static qboolean glw_skipAutoPFD = qfalse;
+static qboolean glw_autoPFDInvalid = qfalse;
+static qboolean glw_lastPFDWasAuto = qfalse;
 
 /*
 ** GLW_StartDriverAndSetMode
@@ -94,7 +96,17 @@ static qboolean GLW_StartDriverAndSetMode( const char *drivername,
 {
 	rserr_t err;
 
+	glw_autoPFDInvalid = qfalse;
 	err = GLW_SetMode( drivername, mode, colorbits, cdsFullscreen );
+
+	if ( err == RSERR_INVALID_MODE && glw_autoPFDInvalid && !glw_skipAutoPFD )
+	{
+		ri.Printf( PRINT_ALL, "...retrying mode %d with manual PFD selection\n", mode );
+		glw_skipAutoPFD = qtrue;
+		glw_autoPFDInvalid = qfalse;
+		err = GLW_SetMode( drivername, mode, colorbits, cdsFullscreen );
+		glw_skipAutoPFD = qfalse;
+	}
 
 	switch ( err )
 	{
@@ -194,9 +206,115 @@ static int GLW_ChoosePixelFormatSafe( HDC hDC, CONST PIXELFORMATDESCRIPTOR *pPFD
 	return result;
 }
 
+/*
+** GLW_PFDMatchesRequest
+*/
+static qboolean GLW_PFDMatchesRequest( const PIXELFORMATDESCRIPTOR *pFD, const PIXELFORMATDESCRIPTOR *requestedPFD )
+{
+	if ( ( pFD->dwFlags & PFD_GENERIC_FORMAT ) != 0 && !r_allowSoftwareGL->integer )
+	{
+		return qfalse;
+	}
+
+	if ( pFD->iPixelType != PFD_TYPE_RGBA )
+	{
+		return qfalse;
+	}
+
+	if ( ( ( pFD->dwFlags & requestedPFD->dwFlags ) & requestedPFD->dwFlags ) != requestedPFD->dwFlags )
+	{
+		return qfalse;
+	}
+
+	if ( pFD->cDepthBits < 15 )
+	{
+		return qfalse;
+	}
+
+	if ( ( pFD->cStencilBits < 4 ) && ( requestedPFD->cStencilBits > 0 ) )
+	{
+		return qfalse;
+	}
+
+	return qtrue;
+}
+
+/*
+** GLW_PFDCanCreateContext
+*/
+static qboolean GLW_PFDCanCreateContext( int pixelformat, const PIXELFORMATDESCRIPTOR *pFD, qboolean useQWGL )
+{
+	HWND hWnd;
+	HDC hDC;
+	HGLRC hGLRC;
+	DWORD error;
+	PIXELFORMATDESCRIPTOR testPFD;
+	qboolean result;
+
+	hWnd = CreateWindowExW( 0,
+			WINDOW_CLASS_NAME,
+			QL_PRODUCT_NAME_W,
+			WS_POPUP,
+			0, 0, 16, 16,
+			NULL,
+			NULL,
+			g_wv.hInstance,
+			NULL );
+	if ( !hWnd )
+	{
+		ri.Printf( PRINT_WARNING, "...temporary PFD probe window failed (err %lu)\n", GetLastError() );
+		return qtrue;
+	}
+
+	hDC = GetDC( hWnd );
+	if ( !hDC )
+	{
+		ri.Printf( PRINT_WARNING, "...temporary PFD probe DC failed (err %lu)\n", GetLastError() );
+		DestroyWindow( hWnd );
+		return qtrue;
+	}
+
+	testPFD = *pFD;
+	if ( useQWGL && qwglSetPixelFormat )
+	{
+		result = (qboolean)( qwglSetPixelFormat( hDC, pixelformat, &testPFD ) != FALSE );
+	}
+	else
+	{
+		result = (qboolean)( SetPixelFormat( hDC, pixelformat, &testPFD ) != FALSE );
+	}
+
+	if ( !result )
+	{
+		error = GetLastError();
+		ri.Printf( PRINT_ALL, "...PFD %d rejected, SetPixelFormat probe failed (err %lu)\n", pixelformat, error );
+		ReleaseDC( hWnd, hDC );
+		DestroyWindow( hWnd );
+		return qfalse;
+	}
+
+	SetLastError( NO_ERROR );
+	hGLRC = qwglCreateContext( hDC );
+	if ( !hGLRC )
+	{
+		error = GetLastError();
+		ri.Printf( PRINT_ALL, "...PFD %d rejected, GL context probe failed (err %lu)\n", pixelformat, error );
+		ReleaseDC( hWnd, hDC );
+		DestroyWindow( hWnd );
+		return qfalse;
+	}
+
+	qwglDeleteContext( hGLRC );
+	ReleaseDC( hWnd, hDC );
+	DestroyWindow( hWnd );
+	return qtrue;
+}
+
 static int GLW_ChoosePFD( HDC hDC, PIXELFORMATDESCRIPTOR *pPFD )
 {
 	PIXELFORMATDESCRIPTOR pfds[MAX_PFDS+1];
+	PIXELFORMATDESCRIPTOR autoPFDInfo;
+	qboolean rejectedPFDs[MAX_PFDS+1];
 	int maxPFD = 0;
 	int i;
 	int bestMatch = 0;
@@ -204,10 +322,15 @@ static int GLW_ChoosePFD( HDC hDC, PIXELFORMATDESCRIPTOR *pPFD )
 	qboolean useQWGL;
 
 	useQWGL = (qboolean)( glConfig.driverType > GLDRV_ICD );
+	glw_lastPFDWasAuto = qfalse;
 
 	ri.Printf( PRINT_ALL, "...GLW_AutoSelectPFD( %d, %d, %d )\n", ( int ) pPFD->cColorBits, ( int ) pPFD->cDepthBits, ( int ) pPFD->cStencilBits );
 
-	if ( useQWGL )
+	if ( glw_skipAutoPFD )
+	{
+		ri.Printf( PRINT_ALL, "...skipping auto PFD selection\n" );
+	}
+	else if ( useQWGL )
 	{
 		if ( qwglChoosePixelFormat )
 		{
@@ -225,11 +348,27 @@ static int GLW_ChoosePFD( HDC hDC, PIXELFORMATDESCRIPTOR *pPFD )
 
 	if ( autoPFD )
 	{
-		ri.Printf( PRINT_ALL, "... auto selected PFD %d", autoPFD );
-		return autoPFD;
+		memset( &autoPFDInfo, 0, sizeof( autoPFDInfo ) );
+		if ( GLW_DescribePixelFormatSafe( hDC, autoPFD, sizeof( autoPFDInfo ), &autoPFDInfo, useQWGL )
+			&& GLW_PFDMatchesRequest( &autoPFDInfo, pPFD )
+			&& GLW_PFDCanCreateContext( autoPFD, &autoPFDInfo, useQWGL ) )
+		{
+			ri.Printf( PRINT_ALL, "... auto selected PFD %d", autoPFD );
+			glw_lastPFDWasAuto = qtrue;
+			return autoPFD;
+		}
+
+		ri.Printf( PRINT_ALL,
+			"... auto selected PFD %d rejected (color %d depth %d stencil %d flags 0x%lx)\n",
+			autoPFD,
+			( int ) autoPFDInfo.cColorBits,
+			( int ) autoPFDInfo.cDepthBits,
+			( int ) autoPFDInfo.cStencilBits,
+			autoPFDInfo.dwFlags );
 	}
 
 	memset( pfds, 0, sizeof( pfds ) );
+	memset( rejectedPFDs, 0, sizeof( rejectedPFDs ) );
 	for ( i = 0; i <= MAX_PFDS; i++ )
 	{
 		pfds[i].nSize = sizeof( PIXELFORMATDESCRIPTOR );
@@ -263,137 +402,155 @@ static int GLW_ChoosePFD( HDC hDC, PIXELFORMATDESCRIPTOR *pPFD )
 	}
 
 	// look for a best match
-	for ( i = 1; i <= maxPFD; i++ )
+	for ( ;; )
 	{
-		//
-		// make sure this has hardware acceleration
-		//
-		if ( ( pfds[i].dwFlags & PFD_GENERIC_FORMAT ) != 0 ) 
+		bestMatch = 0;
+		for ( i = 1; i <= maxPFD; i++ )
 		{
-			if ( !r_allowSoftwareGL->integer )
+			if ( rejectedPFDs[i] )
+			{
+				continue;
+			}
+
+			//
+			// make sure this has hardware acceleration
+			//
+			if ( ( pfds[i].dwFlags & PFD_GENERIC_FORMAT ) != 0 )
+			{
+				if ( !r_allowSoftwareGL->integer )
+				{
+					if ( r_verbose->integer )
+					{
+						ri.Printf( PRINT_ALL, "...PFD %d rejected, software acceleration\n", i );
+					}
+					continue;
+				}
+			}
+
+			// verify pixel type
+			if ( pfds[i].iPixelType != PFD_TYPE_RGBA )
 			{
 				if ( r_verbose->integer )
 				{
-					ri.Printf( PRINT_ALL, "...PFD %d rejected, software acceleration\n", i );
+					ri.Printf( PRINT_ALL, "...PFD %d rejected, not RGBA\n", i );
 				}
 				continue;
 			}
-		}
 
-		// verify pixel type
-		if ( pfds[i].iPixelType != PFD_TYPE_RGBA )
-		{
-			if ( r_verbose->integer )
+			// verify proper flags
+			if ( ( ( pfds[i].dwFlags & pPFD->dwFlags ) & pPFD->dwFlags ) != pPFD->dwFlags )
 			{
-				ri.Printf( PRINT_ALL, "...PFD %d rejected, not RGBA\n", i );
+				if ( r_verbose->integer )
+				{
+					ri.Printf( PRINT_ALL, "...PFD %d rejected, improper flags (%x instead of %x)\n", i, pfds[i].dwFlags, pPFD->dwFlags );
+				}
+				continue;
 			}
-			continue;
-		}
 
-		// verify proper flags
-		if ( ( ( pfds[i].dwFlags & pPFD->dwFlags ) & pPFD->dwFlags ) != pPFD->dwFlags ) 
-		{
-			if ( r_verbose->integer )
+			// verify enough bits
+			if ( pfds[i].cDepthBits < 15 )
 			{
-				ri.Printf( PRINT_ALL, "...PFD %d rejected, improper flags (%x instead of %x)\n", i, pfds[i].dwFlags, pPFD->dwFlags );
+				continue;
 			}
-			continue;
-		}
+			if ( ( pfds[i].cStencilBits < 4 ) && ( pPFD->cStencilBits > 0 ) )
+			{
+				continue;
+			}
 
-		// verify enough bits
-		if ( pfds[i].cDepthBits < 15 )
-		{
-			continue;
-		}
-		if ( ( pfds[i].cStencilBits < 4 ) && ( pPFD->cStencilBits > 0 ) )
-		{
-			continue;
-		}
+			//
+			// selection criteria (in order of priority):
+			//
+			//  PFD_STEREO
+			//  colorBits
+			//  depthBits
+			//  stencilBits
+			//
+			if ( bestMatch )
+			{
+				// check stereo
+				if ( ( pfds[i].dwFlags & PFD_STEREO ) && ( !( pfds[bestMatch].dwFlags & PFD_STEREO ) ) && ( pPFD->dwFlags & PFD_STEREO ) )
+				{
+					bestMatch = i;
+					continue;
+				}
 
-		//
-		// selection criteria (in order of priority):
-		// 
-		//  PFD_STEREO
-		//  colorBits
-		//  depthBits
-		//  stencilBits
-		//
-		if ( bestMatch )
-		{
-			// check stereo
-			if ( ( pfds[i].dwFlags & PFD_STEREO ) && ( !( pfds[bestMatch].dwFlags & PFD_STEREO ) ) && ( pPFD->dwFlags & PFD_STEREO ) )
+				if ( !( pfds[i].dwFlags & PFD_STEREO ) && ( pfds[bestMatch].dwFlags & PFD_STEREO ) && ( pPFD->dwFlags & PFD_STEREO ) )
+				{
+					bestMatch = i;
+					continue;
+				}
+
+				// check color
+				if ( pfds[bestMatch].cColorBits != pPFD->cColorBits )
+				{
+					// prefer perfect match
+					if ( pfds[i].cColorBits == pPFD->cColorBits )
+					{
+						bestMatch = i;
+						continue;
+					}
+					// otherwise if this PFD has more bits than our best, use it
+					else if ( pfds[i].cColorBits > pfds[bestMatch].cColorBits )
+					{
+						bestMatch = i;
+						continue;
+					}
+				}
+
+				// check depth
+				if ( pfds[bestMatch].cDepthBits != pPFD->cDepthBits )
+				{
+					// prefer perfect match
+					if ( pfds[i].cDepthBits == pPFD->cDepthBits )
+					{
+						bestMatch = i;
+						continue;
+					}
+					// otherwise if this PFD has more bits than our best, use it
+					else if ( pfds[i].cDepthBits > pfds[bestMatch].cDepthBits )
+					{
+						bestMatch = i;
+						continue;
+					}
+				}
+
+				// check stencil
+				if ( pfds[bestMatch].cStencilBits != pPFD->cStencilBits )
+				{
+					// prefer perfect match
+					if ( pfds[i].cStencilBits == pPFD->cStencilBits )
+					{
+						bestMatch = i;
+						continue;
+					}
+					// otherwise if this PFD has more bits than our best, use it
+					else if ( ( pfds[i].cStencilBits > pfds[bestMatch].cStencilBits ) &&
+						 ( pPFD->cStencilBits > 0 ) )
+					{
+						bestMatch = i;
+						continue;
+					}
+				}
+			}
+			else
 			{
 				bestMatch = i;
-				continue;
-			}
-			
-			if ( !( pfds[i].dwFlags & PFD_STEREO ) && ( pfds[bestMatch].dwFlags & PFD_STEREO ) && ( pPFD->dwFlags & PFD_STEREO ) )
-			{
-				bestMatch = i;
-				continue;
-			}
-
-			// check color
-			if ( pfds[bestMatch].cColorBits != pPFD->cColorBits )
-			{
-				// prefer perfect match
-				if ( pfds[i].cColorBits == pPFD->cColorBits )
-				{
-					bestMatch = i;
-					continue;
-				}
-				// otherwise if this PFD has more bits than our best, use it
-				else if ( pfds[i].cColorBits > pfds[bestMatch].cColorBits )
-				{
-					bestMatch = i;
-					continue;
-				}
-			}
-
-			// check depth
-			if ( pfds[bestMatch].cDepthBits != pPFD->cDepthBits )
-			{
-				// prefer perfect match
-				if ( pfds[i].cDepthBits == pPFD->cDepthBits )
-				{
-					bestMatch = i;
-					continue;
-				}
-				// otherwise if this PFD has more bits than our best, use it
-				else if ( pfds[i].cDepthBits > pfds[bestMatch].cDepthBits )
-				{
-					bestMatch = i;
-					continue;
-				}
-			}
-
-			// check stencil
-			if ( pfds[bestMatch].cStencilBits != pPFD->cStencilBits )
-			{
-				// prefer perfect match
-				if ( pfds[i].cStencilBits == pPFD->cStencilBits )
-				{
-					bestMatch = i;
-					continue;
-				}
-				// otherwise if this PFD has more bits than our best, use it
-				else if ( ( pfds[i].cStencilBits > pfds[bestMatch].cStencilBits ) && 
-					 ( pPFD->cStencilBits > 0 ) )
-				{
-					bestMatch = i;
-					continue;
-				}
 			}
 		}
-		else
+
+		if ( !bestMatch )
 		{
-			bestMatch = i;
+			return 0;
 		}
+
+		if ( GLW_PFDCanCreateContext( bestMatch, &pfds[bestMatch], useQWGL ) )
+		{
+			break;
+		}
+
+		rejectedPFDs[bestMatch] = qtrue;
 	}
 	
-	if ( !bestMatch )
-		return 0;
-
 	if ( ( pfds[bestMatch].dwFlags & PFD_GENERIC_FORMAT ) != 0 )
 	{
 		if ( !r_allowSoftwareGL->integer )
@@ -521,21 +678,31 @@ static int GLW_MakeContext( PIXELFORMATDESCRIPTOR *pPFD )
 	//
 	if ( !glw_state.hGLRC )
 	{
+		DWORD error;
+
 		ri.Printf( PRINT_ALL, "...creating GL context: " );
+		SetLastError( NO_ERROR );
 		if ( ( glw_state.hGLRC = qwglCreateContext( glw_state.hDC ) ) == 0 )
 		{
-			ri.Printf (PRINT_ALL, "failed\n");
+			error = GetLastError();
+			if ( error == ERROR_INVALID_PIXEL_FORMAT && glw_lastPFDWasAuto )
+			{
+				glw_autoPFDInvalid = qtrue;
+			}
+			ri.Printf( PRINT_ALL, "failed (err %lu)\n", error );
 
 			return TRY_PFD_FAIL_HARD;
 		}
 		ri.Printf( PRINT_ALL, "succeeded\n" );
 
 		ri.Printf( PRINT_ALL, "...making context current: " );
+		SetLastError( NO_ERROR );
 		if ( !qwglMakeCurrent( glw_state.hDC, glw_state.hGLRC ) )
 		{
+			error = GetLastError();
 			qwglDeleteContext( glw_state.hGLRC );
 			glw_state.hGLRC = NULL;
-			ri.Printf (PRINT_ALL, "failed\n");
+			ri.Printf( PRINT_ALL, "failed (err %lu)\n", error );
 			return TRY_PFD_FAIL_HARD;
 		}
 		ri.Printf( PRINT_ALL, "succeeded\n" );
@@ -801,6 +968,24 @@ static qboolean GLW_CreateWindow( const char *drivername, int width, int height,
 
 	if ( !GLW_InitDriver( drivername, colorbits ) )
 	{
+		if ( glw_state.hGLRC )
+		{
+			if ( qwglMakeCurrent )
+			{
+				qwglMakeCurrent( NULL, NULL );
+			}
+			if ( qwglDeleteContext )
+			{
+				qwglDeleteContext( glw_state.hGLRC );
+			}
+			glw_state.hGLRC = NULL;
+		}
+		if ( glw_state.hDC )
+		{
+			ReleaseDC( g_wv.hWnd, glw_state.hDC );
+			glw_state.hDC = NULL;
+		}
+		glw_state.pixelFormatSet = qfalse;
 		ShowWindow( g_wv.hWnd, SW_HIDE );
 		DestroyWindow( g_wv.hWnd );
 		g_wv.hWnd = NULL;
@@ -1558,6 +1743,44 @@ static qboolean GLW_CheckOSVersion( void )
 }
 
 /*
+** GLW_StartWindowedFallback
+*/
+static qboolean GLW_StartWindowedFallback( const char *drivername )
+{
+	int mode;
+
+	ri.Printf( PRINT_ALL, "...falling back to windowed OpenGL\n" );
+
+	mode = r_windowedMode ? r_windowedMode->integer : 12;
+
+	if ( GLW_StartDriverAndSetMode( drivername, mode, 0, qfalse ) )
+	{
+		ri.Cvar_Set( "r_fullscreen", "0" );
+		r_fullscreen->modified = qfalse;
+		ri.Printf( PRINT_ALL, "...windowed OpenGL fallback succeeded\n" );
+		return qtrue;
+	}
+
+	if ( mode != 12 && GLW_StartDriverAndSetMode( drivername, 12, 0, qfalse ) )
+	{
+		ri.Cvar_Set( "r_fullscreen", "0" );
+		r_fullscreen->modified = qfalse;
+		ri.Printf( PRINT_ALL, "...windowed OpenGL fallback succeeded\n" );
+		return qtrue;
+	}
+
+	if ( mode != 3 && GLW_StartDriverAndSetMode( drivername, 3, 0, qfalse ) )
+	{
+		ri.Cvar_Set( "r_fullscreen", "0" );
+		r_fullscreen->modified = qfalse;
+		ri.Printf( PRINT_ALL, "...windowed OpenGL fallback succeeded\n" );
+		return qtrue;
+	}
+
+	return qfalse;
+}
+
+/*
 ** GLW_LoadOpenGL
 **
 ** GLimp_win.c internal function that attempts to load and use 
@@ -1614,6 +1837,11 @@ static qboolean GLW_LoadOpenGL( const char *drivername )
 			if ( !started )
 			{
 				started = GLW_StartDriverAndSetMode( drivername, 12, 16, qtrue );
+			}
+
+			if ( !started && cdsFullscreen )
+			{
+				started = GLW_StartWindowedFallback( drivername );
 			}
 		}
 
@@ -1748,6 +1976,10 @@ static void GLW_StartOpenGL( void )
 void GLimp_Init( void )
 {
 	char	buf[1024];
+	const GLubyte *glVendorString;
+	const GLubyte *glRendererString;
+	const GLubyte *glVersionString;
+	const GLubyte *glExtensionsString;
 	cvar_t *lastValidRenderer = ri.Cvar_Get( "r_lastValidRenderer", "(uninitialized)", CVAR_ARCHIVE );
 	cvar_t	*cv;
 
@@ -1775,10 +2007,23 @@ void GLimp_Init( void )
 	GLW_StartOpenGL();
 
 	// get our config strings
-	Q_strncpyz( glConfig.vendor_string, qglGetString (GL_VENDOR), sizeof( glConfig.vendor_string ) );
-	Q_strncpyz( glConfig.renderer_string, qglGetString (GL_RENDERER), sizeof( glConfig.renderer_string ) );
-	Q_strncpyz( glConfig.version_string, qglGetString (GL_VERSION), sizeof( glConfig.version_string ) );
-	Q_strncpyz( glConfig.extensions_string, qglGetString (GL_EXTENSIONS), sizeof( glConfig.extensions_string ) );
+	glVendorString = qglGetString( GL_VENDOR );
+	glRendererString = qglGetString( GL_RENDERER );
+	glVersionString = qglGetString( GL_VERSION );
+	glExtensionsString = qglGetString( GL_EXTENSIONS );
+	if ( !glVendorString || !glRendererString || !glVersionString )
+	{
+		ri.Error( ERR_FATAL, "GLimp_Init() - OpenGL context is not current\n" );
+	}
+	if ( !glExtensionsString )
+	{
+		ri.Printf( PRINT_WARNING, "WARNING: GL_EXTENSIONS unavailable; continuing without extension string\n" );
+		glExtensionsString = (const GLubyte *)"";
+	}
+	Q_strncpyz( glConfig.vendor_string, (const char *)glVendorString, sizeof( glConfig.vendor_string ) );
+	Q_strncpyz( glConfig.renderer_string, (const char *)glRendererString, sizeof( glConfig.renderer_string ) );
+	Q_strncpyz( glConfig.version_string, (const char *)glVersionString, sizeof( glConfig.version_string ) );
+	Q_strncpyz( glConfig.extensions_string, (const char *)glExtensionsString, sizeof( glConfig.extensions_string ) );
 	ri.Cvar_Set( "r_gl_vendor", glConfig.vendor_string );
 	ri.Cvar_Set( "r_gl_renderer", glConfig.renderer_string );
 

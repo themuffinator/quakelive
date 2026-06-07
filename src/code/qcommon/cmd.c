@@ -292,6 +292,74 @@ void Cbuf_Execute (void)
 
 /*
 ===============
+Cmd_ReadLooseHomeAutoexec
+
+Reads a loose profile autoexec before workshop packs can shadow user startup
+configuration.
+===============
+*/
+static int Cmd_ReadLooseHomeAutoexec( const char *filename, char **buffer ) {
+	const char	*homepath;
+	const char	*gamedir;
+	const char	*game;
+	char		path[MAX_OSPATH];
+	FILE		*file;
+	long		length;
+	char		*contents;
+
+	if ( !filename || Q_stricmp( filename, "autoexec.cfg" ) || !buffer ) {
+		return -1;
+	}
+
+	*buffer = NULL;
+	homepath = Cvar_VariableString( "fs_homepath" );
+	if ( !homepath || !homepath[0] ) {
+		return -1;
+	}
+
+	gamedir = Cvar_VariableString( "fs_game" );
+	game = ( gamedir && gamedir[0] ) ? gamedir : BASEGAME;
+	Q_strncpyz( path, FS_BuildOSPath( homepath, game, filename ), sizeof( path ) );
+
+	file = fopen( path, "rb" );
+	if ( !file ) {
+		return -1;
+	}
+
+	if ( fseek( file, 0, SEEK_END ) != 0 ) {
+		fclose( file );
+		return -1;
+	}
+	length = ftell( file );
+	if ( length < 0 ) {
+		fclose( file );
+		return -1;
+	}
+	if ( fseek( file, 0, SEEK_SET ) != 0 ) {
+		fclose( file );
+		return -1;
+	}
+
+	contents = Z_Malloc( length + 1 );
+	if ( !contents ) {
+		fclose( file );
+		return -1;
+	}
+
+	if ( length > 0 && fread( contents, 1, length, file ) != (size_t)length ) {
+		Z_Free( contents );
+		fclose( file );
+		return -1;
+	}
+	fclose( file );
+
+	contents[length] = '\0';
+	*buffer = contents;
+	return (int)length;
+}
+
+/*
+===============
 Cmd_Exec_f
 ===============
 */
@@ -299,6 +367,7 @@ void Cmd_Exec_f( void ) {
 	char	*f;
 	int		len;
 	char	filename[MAX_QPATH];
+	qboolean looseHomeAutoexec;
 
 	if (Cmd_Argc () != 2) {
 		Com_Printf ("exec <filename> : execute a script file\n");
@@ -307,7 +376,13 @@ void Cmd_Exec_f( void ) {
 
 	Q_strncpyz( filename, Cmd_Argv(1), sizeof( filename ) );
 	COM_DefaultExtension( filename, sizeof( filename ), ".cfg" ); 
-	len = FS_ReadFile( filename, (void **)&f);
+	looseHomeAutoexec = qfalse;
+	len = Cmd_ReadLooseHomeAutoexec( filename, &f );
+	if ( len >= 0 ) {
+		looseHomeAutoexec = qtrue;
+	} else {
+		len = FS_ReadFile( filename, (void **)&f);
+	}
 	if (!f) {
 		Com_Printf ("couldn't exec %s\n",Cmd_Argv(1));
 		return;
@@ -316,7 +391,11 @@ void Cmd_Exec_f( void ) {
 	
 	Cbuf_InsertText (f);
 
-	FS_FreeFile (f);
+	if ( looseHomeAutoexec ) {
+		Z_Free( f );
+	} else {
+		FS_FreeFile (f);
+	}
 }
 
 

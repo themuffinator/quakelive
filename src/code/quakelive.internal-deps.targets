@@ -6,14 +6,14 @@
   </PropertyGroup>
 
   <Target Name="QLBootstrapVorbis" BeforeTargets="ValidateVorbis" Condition="'$(QLEnableOgg)'=='1' and Exists('$(QLInternalDepsScript)')">
-    <Exec Command="powershell -NoProfile -ExecutionPolicy Bypass -File &quot;$(QLInternalDepsScript)&quot; -RepoRoot &quot;$(QLRepoRoot)&quot; -Dependency vorbis -PlatformToolset &quot;$(PlatformToolset)&quot;" />
+    <Exec Command="powershell -NoProfile -ExecutionPolicy Bypass -File &quot;$(QLInternalDepsScript)&quot; -RepoRoot &quot;$(QLRepoRoot)&quot; -Dependency vorbis -Configuration &quot;$(Configuration)&quot; -PlatformToolset &quot;$(PlatformToolset)&quot;" />
   </Target>
 
   <Target Name="QLBootstrapPng" BeforeTargets="ValidatePng" Condition="'$(QLEnablePng)'=='1' and Exists('$(QLInternalDepsScript)')">
-    <Exec Command="powershell -NoProfile -ExecutionPolicy Bypass -File &quot;$(QLInternalDepsScript)&quot; -RepoRoot &quot;$(QLRepoRoot)&quot; -Dependency png -PlatformToolset &quot;$(PlatformToolset)&quot;" />
+    <Exec Command="powershell -NoProfile -ExecutionPolicy Bypass -File &quot;$(QLInternalDepsScript)&quot; -RepoRoot &quot;$(QLRepoRoot)&quot; -Dependency png -Configuration &quot;$(Configuration)&quot; -PlatformToolset &quot;$(PlatformToolset)&quot;" />
   </Target>
 
   <Target Name="QLBootstrapFreeType" BeforeTargets="ValidateFreeType" Condition="'$(QLEnableFreeType)'=='1' and Exists('$(QLInternalDepsScript)')">
-    <Exec Command="powershell -NoProfile -ExecutionPolicy Bypass -File &quot;$(QLInternalDepsScript)&quot; -RepoRoot &quot;$(QLRepoRoot)&quot; -Dependency freetype -PlatformToolset &quot;$(PlatformToolset)&quot;" />
+    <Exec Command="powershell -NoProfile -ExecutionPolicy Bypass -File &quot;$(QLInternalDepsScript)&quot; -RepoRoot &quot;$(QLRepoRoot)&quot; -Dependency freetype -Configuration &quot;$(Configuration)&quot; -PlatformToolset &quot;$(PlatformToolset)&quot;" />
   </Target>
 </Project>

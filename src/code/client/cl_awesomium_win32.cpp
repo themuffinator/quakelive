@@ -921,8 +921,6 @@ CL_Awesomium_SelectChildProcessPath
 =============
 */
 static qboolean CL_Awesomium_SelectChildProcessPath( char *buffer, size_t bufferSize, const char *runtimePath, const char *basePath ) {
-	char baseCandidate[MAX_PATH];
-
 	if ( !buffer || bufferSize == 0 ) {
 		return qfalse;
 	}
@@ -932,9 +930,8 @@ static qboolean CL_Awesomium_SelectChildProcessPath( char *buffer, size_t buffer
 		return qtrue;
 	}
 
-	CL_Awesomium_AppendPath( baseCandidate, sizeof( baseCandidate ), basePath, "awesomium_process.exe" );
-	if ( CL_Awesomium_FileExists( baseCandidate ) && CL_Awesomium_HelperImportsChildProcessMain( baseCandidate ) ) {
-		Com_Printf( "Awesomium retail child helper found at %s but must be staged beside the executable for the legacy child launcher\n", baseCandidate );
+	if ( basePath && basePath[0] && CL_Awesomium_TryChildProcessPath( buffer, bufferSize, basePath ) ) {
+		return qtrue;
 	}
 
 	return qfalse;
@@ -1166,7 +1163,7 @@ static qboolean CL_Awesomium_PrepareConfig( const char *runtimePath, const char 
 		return qfalse;
 	}
 
-	CL_Awesomium_CopyPath( childProcessConfigPath, sizeof( childProcessConfigPath ), "awesomium_process.exe" );
+	CL_Awesomium_CopyPath( childProcessConfigPath, sizeof( childProcessConfigPath ), childProcessPath );
 	Com_Printf( "Awesomium startup phase: child process path %s (validated %s)\n", childProcessConfigPath, childProcessPath );
 	Com_Printf( "Awesomium startup phase: deferring bridge script to WebView ExecuteJavascript\n" );
 	Com_Printf( "Awesomium startup phase: applying WebConfig\n" );

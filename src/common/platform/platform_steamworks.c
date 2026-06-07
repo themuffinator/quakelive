@@ -9,11 +9,17 @@
 #include <time.h>
 
 void QDECL Com_DPrintf( const char *fmt, ... );
+void QDECL Com_Printf( const char *fmt, ... );
 
 #ifdef _WIN32
 #include <windows.h>
+#if defined( _M_IX86 ) || defined( __i386__ )
+#define QL_STEAMWORKS_LIB_PRIMARY "steam_api.dll"
+#define QL_STEAMWORKS_LIB_SECONDARY "steam_api64.dll"
+#else
 #define QL_STEAMWORKS_LIB_PRIMARY "steam_api64.dll"
 #define QL_STEAMWORKS_LIB_SECONDARY "steam_api.dll"
+#endif
 #define QL_STEAMWORKS_SYM( name ) GetProcAddress( (HMODULE)state.library, name )
 #define QL_STEAMWORKS_CLOSE() FreeLibrary( (HMODULE)state.library )
 #define QL_STEAMWORKS_OPEN( name ) LoadLibraryA( name )
@@ -276,8 +282,8 @@ typedef void (QL_STEAMWORKS_THISCALL *ql_steam_callback_run_call_result_fn)( ql_
 typedef int (QL_STEAMWORKS_THISCALL *ql_steam_callback_get_size_fn)( ql_steam_callback_base_t *self );
 
 typedef struct {
-	ql_steam_callback_run_fn run;
 	ql_steam_callback_run_call_result_fn runCallResult;
+	ql_steam_callback_run_fn run;
 	ql_steam_callback_get_size_fn getSize;
 } ql_steam_callback_vtable_t;
 
@@ -568,8 +574,8 @@ static int QL_STEAMWORKS_THISCALL QL_Steamworks_CallbackGetSize( ql_steam_callba
 #endif
 
 static const ql_steam_callback_vtable_t ql_steam_callback_vtable = {
-	QL_Steamworks_CallbackRun,
 	QL_Steamworks_CallbackRunCallResult,
+	QL_Steamworks_CallbackRun,
 	QL_Steamworks_CallbackGetSize
 };
 
@@ -841,12 +847,50 @@ static void QL_Steamworks_LoadOptionalSymbol( void **target, const char *name ) 
 
 /*
 =============
+QL_Steamworks_LoadSymbolAlias
+
+Resolves a required Steam export, trying the retail name before the newer SDK alias.
+=============
+*/
+static qboolean QL_Steamworks_LoadSymbolAlias( void **target, const char *retailName, const char *sdkName ) {
+	if ( QL_Steamworks_LoadSymbol( target, retailName ) ) {
+		return qtrue;
+	}
+
+	if ( sdkName && sdkName[0] && QL_Steamworks_LoadSymbol( target, sdkName ) ) {
+		return qtrue;
+	}
+
+	return qfalse;
+}
+
+/*
+=============
+QL_Steamworks_LoadOptionalSymbolAlias
+
+Resolves an optional Steam export, trying the retail name before the newer SDK alias.
+=============
+*/
+static void QL_Steamworks_LoadOptionalSymbolAlias( void **target, const char *retailName, const char *sdkName ) {
+	if ( QL_Steamworks_LoadSymbol( target, retailName ) ) {
+		return;
+	}
+
+	if ( sdkName && sdkName[0] ) {
+		QL_Steamworks_LoadOptionalSymbol( target, sdkName );
+	}
+}
+
+/*
+=============
 QL_Steamworks_LoadLibrary
 
 Dynamically loads the Steamworks runtime and resolves required exports.
 =============
 */
 qboolean QL_Steamworks_LoadLibrary( void ) {
+	const char *loadedName;
+
 	if ( state.library ) {
 		return qtrue;
 	}
@@ -856,9 +900,11 @@ qboolean QL_Steamworks_LoadLibrary( void ) {
 		QL_STEAMWORKS_LIB_SECONDARY
 	};
 
+	loadedName = NULL;
 	for ( size_t i = 0; i < sizeof( candidates ) / sizeof( candidates[0] ); ++i ) {
 		state.library = QL_STEAMWORKS_OPEN( candidates[i] );
 		if ( state.library ) {
+			loadedName = candidates[i];
 			break;
 		}
 	}
@@ -888,33 +934,33 @@ qboolean QL_Steamworks_LoadLibrary( void ) {
 	QL_Steamworks_LoadOptionalSymbol( (void **)&state.SteamAPI_RegisterCallResult, "SteamAPI_RegisterCallResult" );
 	QL_Steamworks_LoadOptionalSymbol( (void **)&state.SteamAPI_UnregisterCallResult, "SteamAPI_UnregisterCallResult" );
 
-	if ( !QL_Steamworks_LoadSymbol( (void **)&state.SteamUser, "SteamAPI_SteamUser" ) ) {
+	if ( !QL_Steamworks_LoadSymbolAlias( (void **)&state.SteamUser, "SteamUser", "SteamAPI_SteamUser" ) ) {
 		QL_Steamworks_UnloadLibrary();
 		return qfalse;
 	}
 
-	if ( !QL_Steamworks_LoadSymbol( (void **)&state.SteamFriends, "SteamAPI_SteamFriends" ) ) {
+	if ( !QL_Steamworks_LoadSymbolAlias( (void **)&state.SteamFriends, "SteamFriends", "SteamAPI_SteamFriends" ) ) {
 		QL_Steamworks_UnloadLibrary();
 		return qfalse;
 	}
 
-	QL_Steamworks_LoadOptionalSymbol( (void **)&state.SteamNetworking, "SteamAPI_SteamNetworking" );
-	QL_Steamworks_LoadOptionalSymbol( (void **)&state.SteamUtils, "SteamAPI_SteamUtils" );
-	QL_Steamworks_LoadOptionalSymbol( (void **)&state.SteamUserStats, "SteamAPI_SteamUserStats" );
+	QL_Steamworks_LoadOptionalSymbolAlias( (void **)&state.SteamNetworking, "SteamNetworking", "SteamAPI_SteamNetworking" );
+	QL_Steamworks_LoadOptionalSymbolAlias( (void **)&state.SteamUtils, "SteamUtils", "SteamAPI_SteamUtils" );
+	QL_Steamworks_LoadOptionalSymbolAlias( (void **)&state.SteamUserStats, "SteamUserStats", "SteamAPI_SteamUserStats" );
 
-	if ( !QL_Steamworks_LoadSymbol( (void **)&state.SteamMatchmaking, "SteamAPI_SteamMatchmaking" ) ) {
+	if ( !QL_Steamworks_LoadSymbolAlias( (void **)&state.SteamMatchmaking, "SteamMatchmaking", "SteamAPI_SteamMatchmaking" ) ) {
 		QL_Steamworks_UnloadLibrary();
 		return qfalse;
 	}
 
-	QL_Steamworks_LoadOptionalSymbol( (void **)&state.SteamMatchmakingServers, "SteamMatchmakingServers" );
+	QL_Steamworks_LoadOptionalSymbolAlias( (void **)&state.SteamMatchmakingServers, "SteamMatchmakingServers", "SteamAPI_SteamMatchmakingServers" );
 
-	if ( !QL_Steamworks_LoadSymbol( (void **)&state.SteamApps, "SteamAPI_SteamApps" ) ) {
+	if ( !QL_Steamworks_LoadSymbolAlias( (void **)&state.SteamApps, "SteamApps", "SteamAPI_SteamApps" ) ) {
 		QL_Steamworks_UnloadLibrary();
 		return qfalse;
 	}
 
-	if ( !QL_Steamworks_LoadSymbol( (void **)&state.SteamUGC, "SteamAPI_SteamUGC" ) ) {
+	if ( !QL_Steamworks_LoadSymbolAlias( (void **)&state.SteamUGC, "SteamUGC", "SteamAPI_SteamUGC" ) ) {
 		QL_Steamworks_UnloadLibrary();
 		return qfalse;
 	}
@@ -953,6 +999,7 @@ qboolean QL_Steamworks_LoadLibrary( void ) {
 	QL_Steamworks_LoadOptionalSymbol( (void **)&state.SteamGameServer_RunCallbacks, "SteamGameServer_RunCallbacks" );
 	QL_Steamworks_LoadOptionalSymbol( (void **)&state.SteamGameServerNetworking, "SteamGameServerNetworking" );
 
+	Com_Printf( "Steamworks: loaded %s with retail-compatible exports\n", loadedName ? loadedName : "Steam runtime" );
 	return qtrue;
 }
 
@@ -993,6 +1040,7 @@ qboolean QL_Steamworks_Init( void ) {
 	}
 
 	state.initialised = qtrue;
+	Com_Printf( "Steamworks: SteamAPI_Init succeeded, appid=%u\n", QL_Steamworks_GetAppID() );
 	return qtrue;
 }
 
@@ -1309,6 +1357,7 @@ qboolean QL_Steamworks_GetUserSteamID( uint32_t *outIdLow, uint32_t *outIdHigh )
 	void *user;
 	void **vtable;
 	CSteamID steamId;
+	static qboolean loggedSteamId;
 	typedef CSteamID *(__fastcall *QL_SteamUser_GetSteamIDFn)( void *self, void *unused, CSteamID *outSteamId );
 	QL_SteamUser_GetSteamIDFn fn;
 
@@ -1341,6 +1390,11 @@ qboolean QL_Steamworks_GetUserSteamID( uint32_t *outIdLow, uint32_t *outIdHigh )
 	}
 	if ( outIdHigh ) {
 		*outIdHigh = (uint32_t)( ( steamId.value >> 32 ) & 0xffffffffu );
+	}
+
+	if ( !loggedSteamId ) {
+		Com_Printf( "Steamworks: local SteamID64=%llu\n", (unsigned long long)steamId.value );
+		loggedSteamId = qtrue;
 	}
 
 	return qtrue;

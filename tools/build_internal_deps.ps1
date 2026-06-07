@@ -3,6 +3,7 @@ param(
 	[string]$RepoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path,
 	[ValidateSet('png', 'vorbis', 'freetype')]
 	[string[]]$Dependency,
+	[string]$Configuration = 'Release',
 	[string]$PlatformToolset = '',
 	[switch]$Force
 )
@@ -17,6 +18,7 @@ $RepoRoot = (Resolve-Path $RepoRoot).Path
 $libsRoot = Join-Path $RepoRoot 'src/libs'
 $depsRoot = Join-Path $libsRoot '_deps'
 $buildRoot = Join-Path $libsRoot '_build'
+$dependencyConfiguration = if ($Configuration -match '^Debug') { 'Debug' } else { 'Release' }
 
 function Get-CMakePath {
 	foreach ($name in @('cmake.exe', 'cmake')) {
@@ -128,6 +130,22 @@ function Test-RequiredPaths {
 	return $true
 }
 
+function Get-SafeBuildName {
+	param(
+		[string]$Name
+	)
+
+	return $Name -replace '[^A-Za-z0-9_.-]', '-'
+}
+
+function Get-StaticDependencyStampPath {
+	param(
+		[string]$InstallRoot
+	)
+
+	return Join-Path $InstallRoot ('.static-codec-build-' + (Get-SafeBuildName -Name $dependencyConfiguration))
+}
+
 function Assert-PathUnderRoot {
 	param(
 		[string]$Path,
@@ -148,6 +166,79 @@ function Assert-PathUnderRoot {
 	return $resolvedPath
 }
 
+function Reset-DependencyInstallRoot {
+	param(
+		[string]$InstallRoot,
+		[string]$Name
+	)
+
+	$validatedInstallRoot = Assert-PathUnderRoot -Path $InstallRoot -Root $libsRoot -Description "$Name install root"
+	if (Test-Path $validatedInstallRoot) {
+		Remove-Item -LiteralPath $validatedInstallRoot -Recurse -Force
+	}
+}
+
+function Remove-InstalledRuntimeDlls {
+	param(
+		[string]$InstallRoot,
+		[string]$Name
+	)
+
+	$validatedInstallRoot = Assert-PathUnderRoot -Path $InstallRoot -Root $libsRoot -Description "$Name install root"
+	if (-not (Test-Path $validatedInstallRoot)) {
+		return
+	}
+
+	Get-ChildItem -LiteralPath $validatedInstallRoot -Recurse -File -Filter *.dll -ErrorAction SilentlyContinue |
+		ForEach-Object { Remove-Item -LiteralPath $_.FullName -Force }
+}
+
+function Write-StaticDependencyStamp {
+	param(
+		[string]$InstallRoot,
+		[string]$Name
+	)
+
+	$stampPath = Get-StaticDependencyStampPath -InstallRoot $InstallRoot
+	@(
+		"Dependency=$Name",
+		"RequestedConfiguration=$Configuration",
+		"Configuration=$dependencyConfiguration",
+		"Linkage=static"
+	) | Set-Content -Path $stampPath -Encoding ASCII
+}
+
+function Reset-StaleCMakeBuildDir {
+	param(
+		[string]$BuildDir,
+		[string]$SourceDir,
+		[string]$Name
+	)
+
+	$cachePath = Join-Path $BuildDir 'CMakeCache.txt'
+	if (-not (Test-Path $cachePath)) {
+		return
+	}
+
+	$cachedSourceLine = Get-Content -Path $cachePath -ErrorAction SilentlyContinue |
+		Where-Object { $_ -like 'CMAKE_HOME_DIRECTORY:INTERNAL=*' } |
+		Select-Object -First 1
+	if (-not $cachedSourceLine) {
+		return
+	}
+
+	$cachedSource = $cachedSourceLine.Substring('CMAKE_HOME_DIRECTORY:INTERNAL='.Length)
+	$resolvedCachedSource = [System.IO.Path]::GetFullPath($cachedSource)
+	$resolvedSource = [System.IO.Path]::GetFullPath($SourceDir)
+	if ($resolvedCachedSource -eq $resolvedSource) {
+		return
+	}
+
+	$validatedBuildDir = Assert-PathUnderRoot -Path $BuildDir -Root $buildRoot -Description "$Name CMake build"
+	Write-Host "Removing stale $Name CMake build cache from $validatedBuildDir"
+	Remove-Item -LiteralPath $validatedBuildDir -Recurse -Force
+}
+
 function Invoke-CMakeConfigureAndInstall {
 	param(
 		[string]$Name,
@@ -160,6 +251,7 @@ function Invoke-CMakeConfigureAndInstall {
 	$cmakePath = Get-CMakePath
 	$generatorInfo = Get-VisualStudioGeneratorInfo
 
+	Reset-StaleCMakeBuildDir -BuildDir $BuildDir -SourceDir $SourceDir -Name $Name
 	New-Item -ItemType Directory -Force -Path $BuildDir | Out-Null
 	New-Item -ItemType Directory -Force -Path $InstallDir | Out-Null
 
@@ -167,6 +259,7 @@ function Invoke-CMakeConfigureAndInstall {
 		'-S', $SourceDir,
 		'-B', $BuildDir,
 		'-G', $generatorInfo.Generator,
+		'-DCMAKE_POLICY_VERSION_MINIMUM=3.5',
 		"-DCMAKE_INSTALL_PREFIX=$InstallDir"
 	)
 
@@ -189,7 +282,7 @@ function Invoke-CMakeConfigureAndInstall {
 	}
 
 	Write-Host "Building and installing $Name"
-	& $cmakePath --build $BuildDir --config Release --target INSTALL
+	& $cmakePath --build $BuildDir --config $dependencyConfiguration --target INSTALL
 	if ($LASTEXITCODE -ne 0) {
 		throw "CMake build/install failed for $Name."
 	}
@@ -265,12 +358,14 @@ function Ensure-GitDependencySource {
 
 function Ensure-Vorbis {
 	$installRoot = Join-Path $libsRoot 'vorbis'
+	$staticStamp = Get-StaticDependencyStampPath -InstallRoot $installRoot
 	$requiredOutputs = @(
 		(Join-Path $installRoot 'include\ogg\ogg.h'),
 		(Join-Path $installRoot 'include\vorbis\vorbisfile.h'),
 		(Join-Path $installRoot 'lib\Win32\ogg.lib'),
 		(Join-Path $installRoot 'lib\Win32\vorbis.lib'),
-		(Join-Path $installRoot 'lib\Win32\vorbisfile.lib')
+		(Join-Path $installRoot 'lib\Win32\vorbisfile.lib'),
+		$staticStamp
 	)
 
 	if (-not $Force -and (Test-RequiredPaths -Paths $requiredOutputs)) {
@@ -282,6 +377,8 @@ function Ensure-Vorbis {
 		if (-not $Force -and (Test-RequiredPaths -Paths $requiredOutputs)) {
 			return
 		}
+
+		Reset-DependencyInstallRoot -InstallRoot $installRoot -Name 'Vorbis'
 
 		$oggSourceDir = Join-Path $depsRoot 'libogg'
 		$vorbisSourceDir = Join-Path $depsRoot 'libvorbis'
@@ -299,7 +396,7 @@ function Ensure-Vorbis {
 			-BuildDir (Join-Path $buildRoot 'libogg') `
 			-InstallDir $installRoot `
 			-ExtraConfigureArgs @(
-				'-DBUILD_SHARED_LIBS=ON',
+				'-DBUILD_SHARED_LIBS=OFF',
 				'-DINSTALL_DOCS=OFF',
 				'-DINSTALL_PKG_CONFIG_MODULE=ON',
 				'-DINSTALL_CMAKE_PACKAGE_MODULE=ON',
@@ -313,14 +410,19 @@ function Ensure-Vorbis {
 			-BuildDir (Join-Path $buildRoot 'libvorbis') `
 			-InstallDir $installRoot `
 			-ExtraConfigureArgs @(
-				'-DBUILD_SHARED_LIBS=ON',
+				'-DBUILD_SHARED_LIBS=OFF',
 				'-DBUILD_TESTING=OFF',
-				'-DOgg_ROOT=' + $installRoot,
-				'-DCMAKE_PREFIX_PATH=' + $installRoot,
+				"-DOGG_ROOT=$installRoot",
+				"-DOGG_LIBRARY=$(Join-Path $installRoot 'lib\Win32\ogg.lib')",
+				"-DOGG_INCLUDE_DIR=$(Join-Path $installRoot 'include')",
+				"-DCMAKE_PREFIX_PATH=$installRoot",
 				'-DCMAKE_INSTALL_BINDIR=bin',
 				'-DCMAKE_INSTALL_LIBDIR=lib/Win32',
 				'-DCMAKE_INSTALL_INCLUDEDIR=include'
 			)
+
+		Remove-InstalledRuntimeDlls -InstallRoot $installRoot -Name 'Vorbis'
+		Write-StaticDependencyStamp -InstallRoot $installRoot -Name 'Vorbis'
 	} finally {
 		if ($lock) {
 			$lock.Dispose()
@@ -330,11 +432,16 @@ function Ensure-Vorbis {
 
 function Ensure-Png {
 	$installRoot = Join-Path $libsRoot 'libpng'
+	$staticStamp = Get-StaticDependencyStampPath -InstallRoot $installRoot
+	$pngDebugPostfix = if ($dependencyConfiguration -eq 'Debug') { 'd' } else { '' }
+	$pngStaticLibrary = "libpng16_static$pngDebugPostfix.lib"
+	$zlibStaticLibrary = "zlibstatic$pngDebugPostfix.lib"
 	$requiredOutputs = @(
 		(Join-Path $installRoot 'include\png.h'),
 		(Join-Path $installRoot 'include\zlib.h'),
-		(Join-Path $installRoot 'lib\Win32\libpng16.lib'),
-		(Join-Path $installRoot 'lib\Win32\zlib.lib')
+		(Join-Path $installRoot "lib\Win32\$pngStaticLibrary"),
+		(Join-Path $installRoot "lib\Win32\$zlibStaticLibrary"),
+		$staticStamp
 	)
 
 	if (-not $Force -and (Test-RequiredPaths -Paths $requiredOutputs)) {
@@ -346,6 +453,8 @@ function Ensure-Png {
 		if (-not $Force -and (Test-RequiredPaths -Paths $requiredOutputs)) {
 			return
 		}
+
+		Reset-DependencyInstallRoot -InstallRoot $installRoot -Name 'PNG'
 
 		$zlibSourceDir = Join-Path $depsRoot 'zlib'
 		$pngSourceDir = Join-Path $depsRoot 'libpng'
@@ -363,12 +472,13 @@ function Ensure-Png {
 			-BuildDir (Join-Path $buildRoot 'zlib') `
 			-InstallDir $installRoot `
 			-ExtraConfigureArgs @(
+				'-DBUILD_SHARED_LIBS=OFF',
 				'-DZLIB_BUILD_EXAMPLES=OFF',
-				'-DINSTALL_BIN_DIR=' + (Join-Path $installRoot 'bin'),
-				'-DINSTALL_LIB_DIR=' + (Join-Path $installRoot 'lib\Win32'),
-				'-DINSTALL_INC_DIR=' + (Join-Path $installRoot 'include'),
-				'-DINSTALL_MAN_DIR=' + (Join-Path $installRoot 'share\man'),
-				'-DINSTALL_PKGCONFIG_DIR=' + (Join-Path $installRoot 'share\pkgconfig')
+				"-DINSTALL_BIN_DIR=$(Join-Path $installRoot 'bin')",
+				"-DINSTALL_LIB_DIR=$(Join-Path $installRoot 'lib\Win32')",
+				"-DINSTALL_INC_DIR=$(Join-Path $installRoot 'include')",
+				"-DINSTALL_MAN_DIR=$(Join-Path $installRoot 'share\man')",
+				"-DINSTALL_PKGCONFIG_DIR=$(Join-Path $installRoot 'share\pkgconfig')"
 			)
 
 		Invoke-CMakeConfigureAndInstall -Name 'libpng' `
@@ -376,18 +486,21 @@ function Ensure-Png {
 			-BuildDir (Join-Path $buildRoot 'libpng') `
 			-InstallDir $installRoot `
 			-ExtraConfigureArgs @(
-				'-DPNG_SHARED=ON',
-				'-DPNG_STATIC=OFF',
+				'-DPNG_SHARED=OFF',
+				'-DPNG_STATIC=ON',
 				'-DPNG_TESTS=OFF',
 				'-DPNG_TOOLS=OFF',
-				'-DZLIB_ROOT=' + $installRoot,
-				'-DZLIB_INCLUDE_DIR=' + (Join-Path $installRoot 'include'),
-				'-DZLIB_LIBRARY=' + (Join-Path $installRoot 'lib\Win32\zlib.lib'),
-				'-DCMAKE_PREFIX_PATH=' + $installRoot,
+				"-DZLIB_ROOT=$installRoot",
+				"-DZLIB_INCLUDE_DIR=$(Join-Path $installRoot 'include')",
+				"-DZLIB_LIBRARY=$(Join-Path $installRoot "lib\Win32\$zlibStaticLibrary")",
+				"-DCMAKE_PREFIX_PATH=$installRoot",
 				'-DCMAKE_INSTALL_BINDIR=bin',
 				'-DCMAKE_INSTALL_LIBDIR=lib/Win32',
 				'-DCMAKE_INSTALL_INCLUDEDIR=include'
 			)
+
+		Remove-InstalledRuntimeDlls -InstallRoot $installRoot -Name 'PNG'
+		Write-StaticDependencyStamp -InstallRoot $installRoot -Name 'PNG'
 	} finally {
 		if ($lock) {
 			$lock.Dispose()

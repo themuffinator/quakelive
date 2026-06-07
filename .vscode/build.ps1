@@ -11,7 +11,10 @@ param(
 	[string]$OpenSteam = '',
 	[ValidateSet('0', '1')]
 	[string]$RequireAwesomiumSdk = '',
-	[string]$Targets = ''
+	[string]$Targets = '',
+	[string]$PlatformToolset = '',
+	[string]$WindowsTargetPlatformVersion = '',
+	[string]$BuildLogRoot = ''
 )
 
 $scriptRoot = $PSScriptRoot
@@ -132,11 +135,17 @@ if (Test-Path $vcPropsRoot) {
 	}
 }
 
-$toolset = $env:QLR_PLATFORM_TOOLSET
+$toolset = $PlatformToolset
+if (-not $toolset) {
+	$toolset = $env:QLR_PLATFORM_TOOLSET
+}
 if (-not $toolset) {
 	$toolset = $defaultToolset
 }
-$windowsTargetPlatformVersion = $env:QLR_WINDOWS_TARGET_PLATFORM_VERSION
+$windowsTargetPlatformVersion = $WindowsTargetPlatformVersion
+if (-not $windowsTargetPlatformVersion) {
+	$windowsTargetPlatformVersion = $env:QLR_WINDOWS_TARGET_PLATFORM_VERSION
+}
 if (-not $windowsTargetPlatformVersion -and $toolset -eq 'v141') {
 	$windowsTargetPlatformVersion = Get-LatestWindowsSdkVersion
 }
@@ -173,7 +182,8 @@ function Invoke-InternalDependencyBootstrap {
 		'-ExecutionPolicy', 'Bypass',
 		'-File', $internalDepsScript,
 		'-RepoRoot', $repoRoot,
-		'-Dependency', $DependencyName
+		'-Dependency', $DependencyName,
+		'-Configuration', $Configuration
 	)
 
 	if ($toolset) {
@@ -196,6 +206,9 @@ $pngInclude = Join-Path $pngSdkDir 'include'
 $pngLibDir = Join-Path $pngSdkDir 'lib\Win32'
 $pngHeader = Join-Path $pngInclude 'png.h'
 $pngSource = 'repo-managed libpng install root'
+$pngDebugPostfix = if ($Configuration -match '^Debug') { 'd' } else { '' }
+$pngStaticLibrary = "libpng16_static$pngDebugPostfix.lib"
+$zlibStaticLibrary = "zlibstatic$pngDebugPostfix.lib"
 
 $FreeTypeSdkDir = Join-Path $repoLibsDir 'freetype'
 $FreeTypeIncludeDir = ''
@@ -205,7 +218,8 @@ $FreeTypeSource = ''
 $FreeTypeLibraryCandidates = @('freetype.lib', 'libfreetype.lib')
 
 $enableOgg = $env:QLEnableOgg
-if (-not $enableOgg) {
+$bootstrapOgg = (-not $enableOgg) -or ([int]$enableOgg -ne 0)
+if ($bootstrapOgg) {
 	Invoke-InternalDependencyBootstrap -DependencyName 'vorbis'
 }
 
@@ -220,13 +234,14 @@ if (-not $enableOgg) {
 }
 
 $enablePng = $env:QLEnablePng
-if (-not $enablePng) {
+$bootstrapPng = (-not $enablePng) -or ([int]$enablePng -ne 0)
+if ($bootstrapPng) {
 	Invoke-InternalDependencyBootstrap -DependencyName 'png'
 }
 
 $pngAvailable = (Test-Path $pngHeader) -and
-	(Test-Path (Join-Path $pngLibDir 'libpng16.lib')) -and
-	(Test-Path (Join-Path $pngLibDir 'zlib.lib'))
+	(Test-Path (Join-Path $pngLibDir $pngStaticLibrary)) -and
+	(Test-Path (Join-Path $pngLibDir $zlibStaticLibrary))
 if (-not $enablePng) {
 	$enablePng = if ($pngAvailable) { 1 } else { 0 }
 } else {
@@ -307,11 +322,13 @@ $buildExplicitProjectTargets = $requestedBuildTargets.Count -gt 0 -and $unmapped
 $msbuildArgs = @(
 	$solutionPath,
 	'/m',
+	'/nr:false',
 	"/p:Configuration=$Configuration",
 	"/p:Platform=$platformNormalized"
 )
 $projectMsbuildArgs = @(
 	'/m',
+	'/nr:false',
 	"/p:Configuration=$Configuration",
 	"/p:Platform=$projectPlatformNormalized"
 )
@@ -355,6 +372,22 @@ if ($enableFreeType -ne $null) {
 	$projectMsbuildArgs += "/p:QLEnableFreeType=$enableFreeType"
 }
 
+if ($BuildLogRoot) {
+	New-Item -ItemType Directory -Force -Path $BuildLogRoot | Out-Null
+	$safeConfiguration = $Configuration -replace '[^A-Za-z0-9_.-]', '-'
+	$safePlatform = $platformNormalized -replace '[^A-Za-z0-9_.-]', '-'
+	$safeToolset = if ($toolset) { $toolset -replace '[^A-Za-z0-9_.-]', '-' } else { 'default' }
+	$msbuildLog = Join-Path $BuildLogRoot "msbuild-${safeConfiguration}-${safePlatform}-${safeToolset}.log"
+	$msbuildArgs += @(
+		'/clp:Summary;Verbosity=minimal',
+		"/flp:logfile=$msbuildLog;verbosity=normal;encoding=UTF-8"
+	)
+	$projectMsbuildArgs += @(
+		'/clp:Summary;Verbosity=minimal',
+		"/flp:logfile=$msbuildLog;verbosity=normal;encoding=UTF-8"
+	)
+}
+
 Write-Host "Using MSBuild: $msbuildPath"
 if ($toolset) {
 	Write-Host "Using PlatformToolset: $toolset"
@@ -390,6 +423,7 @@ if ($pngSource) {
 	Write-Host "PNG source: $pngSource"
 	Write-Host "PNG include: $pngInclude"
 	Write-Host "PNG library dir: $pngLibDir"
+	Write-Host "PNG static libraries: $pngStaticLibrary, $zlibStaticLibrary"
 }
 Write-Host "QLEnableFreeType: $enableFreeType (available: $freeTypeAvailable)"
 if ($freeTypeAvailable) {
@@ -462,6 +496,20 @@ if (-not (Test-Path $runtimeBinDir)) {
 	New-Item -ItemType Directory -Path $runtimeBinDir | Out-Null
 }
 
+foreach ($staleCodecDll in @(
+		'ogg.dll',
+		'vorbis.dll',
+		'vorbisenc.dll',
+		'vorbisfile.dll',
+		'libpng16.dll',
+		'zlib1.dll'
+	)) {
+	$staleCodecPath = Join-Path $runtimeBinDir $staleCodecDll
+	if (Test-Path -LiteralPath $staleCodecPath) {
+		Remove-Item -LiteralPath $staleCodecPath -Force
+	}
+}
+
 $buildSettingsPath = Join-Path $runtimeBinDir 'ql_build_settings.txt'
 $onlineServicesSetting = if ($OnlineServices -ne '') { $OnlineServices } else { '0' }
 $steamworksSetting = if ($Steamworks -ne '') { $Steamworks } else { '0' }
@@ -473,7 +521,10 @@ $requireAwesomiumSdkSetting = if ($RequireAwesomiumSdk -ne '') { $RequireAwesomi
 	"QLBuildOnlineServices=$onlineServicesSetting",
 	"QLBuildSteamworks=$steamworksSetting",
 	"QLBuildOpenSteam=$openSteamSetting",
-	"QLRequireAwesomiumSdk=$requireAwesomiumSdkSetting"
+	"QLRequireAwesomiumSdk=$requireAwesomiumSdkSetting",
+	"QLEnableOgg=$enableOgg",
+	"QLEnablePng=$enablePng",
+	"QLEnableFreeType=$enableFreeType"
 ) | Set-Content -Path $buildSettingsPath -Encoding ASCII
 
 function Sync-ModuleRuntimeArtifacts {

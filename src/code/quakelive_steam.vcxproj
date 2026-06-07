@@ -100,17 +100,14 @@
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
   </ImportGroup>
   <PropertyGroup Label="UserMacros">
-    <QLBuildOnlineServices Condition="'$(QLBuildOnlineServices)'=='' and ('$(Configuration)'=='Release' Or '$(Configuration)'=='Release TA' Or '$(Configuration)'=='Release TA DEMO')">1</QLBuildOnlineServices>
     <QLBuildOnlineServices Condition="'$(QLBuildOnlineServices)'==''">0</QLBuildOnlineServices>
-    <QLBuildSteamworks Condition="'$(QLBuildSteamworks)'=='' and ('$(Configuration)'=='Release' Or '$(Configuration)'=='Release TA' Or '$(Configuration)'=='Release TA DEMO')">1</QLBuildSteamworks>
     <QLBuildSteamworks Condition="'$(QLBuildSteamworks)'==''">0</QLBuildSteamworks>
     <QLBuildOpenSteam Condition="'$(QLBuildOpenSteam)'==''">0</QLBuildOpenSteam>
     <QLRequireSteamworksSdk Condition="'$(QLRequireSteamworksSdk)'==''">0</QLRequireSteamworksSdk>
     <QLUseAwesomiumSdk Condition="'$(QLUseAwesomiumSdk)'==''">0</QLUseAwesomiumSdk>
-    <QLRequireAwesomiumSdk Condition="'$(QLRequireAwesomiumSdk)'=='' and ('$(Configuration)'=='Release' Or '$(Configuration)'=='Release TA' Or '$(Configuration)'=='Release TA DEMO')">0</QLRequireAwesomiumSdk>
-    <QLRequireAwesomiumSdk Condition="'$(QLRequireAwesomiumSdk)'==''">1</QLRequireAwesomiumSdk>
+    <QLRequireAwesomiumSdk Condition="'$(QLRequireAwesomiumSdk)'==''">0</QLRequireAwesomiumSdk>
     <QLEnableOgg Condition="'$(QLEnableOgg)'==''">1</QLEnableOgg>
-    <QLEnablePng Condition="'$(QLEnablePng)'=='' and Exists('$(ProjectDir)..\libs\libpng\include\png.h') and Exists('$(ProjectDir)..\libs\libpng\lib\Win32\libpng16.lib') and Exists('$(ProjectDir)..\libs\libpng\lib\Win32\zlib.lib')">1</QLEnablePng>
+    <QLEnablePng Condition="'$(QLEnablePng)'=='' and Exists('$(ProjectDir)..\libs\libpng\include\png.h') and ((Exists('$(ProjectDir)..\libs\libpng\lib\Win32\libpng16_static.lib') and Exists('$(ProjectDir)..\libs\libpng\lib\Win32\zlibstatic.lib')) or (Exists('$(ProjectDir)..\libs\libpng\lib\Win32\libpng16_staticd.lib') and Exists('$(ProjectDir)..\libs\libpng\lib\Win32\zlibstaticd.lib')))">1</QLEnablePng>
     <QLEnablePng Condition="'$(QLEnablePng)'==''">0</QLEnablePng>
     <QLEnableFreeType Condition="'$(QLEnableFreeType)'==''">1</QLEnableFreeType>
   </PropertyGroup>
@@ -149,7 +146,9 @@
     <PngLibDir Condition="'$(QLEnablePng)'!='0' and Exists('$(PngSdkDir)\lib\Win32')">$(PngSdkDir)\lib\Win32</PngLibDir>
     <PngLibDir Condition="'$(QLEnablePng)'!='0' and '$(PngLibDir)'==''">$(PngSdkDir)\lib</PngLibDir>
     <PngLibDir Condition="'$(QLEnablePng)'=='0' and '$(PngLibDir)'==''"></PngLibDir>
-    <PngDependencies Condition="'$(QLEnablePng)'!='0'">libpng16.lib;zlib.lib</PngDependencies>
+    <PngDebugPostfix Condition="'$(Configuration)'=='Debug' Or '$(Configuration)'=='Debug TA' Or '$(Configuration)'=='Debug TA DEMO'">d</PngDebugPostfix>
+    <PngDebugPostfix Condition="'$(PngDebugPostfix)'==''"></PngDebugPostfix>
+    <PngDependencies Condition="'$(QLEnablePng)'!='0'">libpng16_static$(PngDebugPostfix).lib;zlibstatic$(PngDebugPostfix).lib</PngDependencies>
     <PngDependencies Condition="'$(QLEnablePng)'=='0'"></PngDependencies>
   </PropertyGroup>
   <PropertyGroup Label="FreeTypeSdk">
@@ -272,8 +271,8 @@
     <Error Condition="!Exists('$(PngIncludeDir)')" Text="Repo-managed PNG include path '$(PngIncludeDir)' was not found. Bootstrap the internal codec dependencies or set QLEnablePng=0 for renderer-only fallback builds." />
     <Error Condition="!Exists('$(PngIncludeDir)\\png.h')" Text="Repo-managed libpng headers are missing under $(PngIncludeDir). Bootstrap the internal codec dependencies or set QLEnablePng=0." />
     <Error Condition="!Exists('$(PngLibDir)')" Text="Repo-managed PNG library path '$(PngLibDir)' was not found. Bootstrap the internal codec dependencies or set QLEnablePng=0." />
-    <Error Condition="!Exists('$(PngLibDir)\\libpng16.lib') or !Exists('$(PngLibDir)\\zlib.lib')" Text="PNG support enabled but repo-managed libpng16.lib/zlib.lib were not found in $(PngLibDir). Bootstrap the internal codec dependencies or build with QLEnablePng=0." />
-    <Message Text="libpng decoding enabled from repo-managed libs (include: $(PngIncludeDir), lib: $(PngLibDir))" Importance="High" />
+    <Error Condition="!Exists('$(PngLibDir)\\libpng16_static$(PngDebugPostfix).lib') or !Exists('$(PngLibDir)\\zlibstatic$(PngDebugPostfix).lib')" Text="PNG support enabled but repo-managed static libpng16_static$(PngDebugPostfix).lib/zlibstatic$(PngDebugPostfix).lib were not found in $(PngLibDir). Bootstrap the internal codec dependencies or build with QLEnablePng=0." />
+    <Message Text="libpng decoding enabled from repo-managed static libs (include: $(PngIncludeDir), lib: $(PngLibDir))" Importance="High" />
   </Target>
   <Target Name="ValidateFreeType" BeforeTargets="Link" Condition="'$(QLEnableFreeType)'=='1'">
     <Error Condition="!Exists('$(FreeTypeIncludeDir)')" Text="Repo-managed FreeType include path '$(FreeTypeIncludeDir)' was not found. Provide an in-repo FreeType tree or set QLEnableFreeType=0." />
@@ -374,9 +373,7 @@
     </Midl>
     <PostBuildEvent>
       <Message>Post build processing..</Message>
-      <Command>rem bash -c "perl ./unix/cons -- debug"
-if exist "$(VorbisSdkDir)\bin\*.dll" xcopy /y /d /i "$(VorbisSdkDir)\bin\*.dll" "$(OutDir)" &gt;nul
-if exist "$(PngSdkDir)\bin\*.dll" xcopy /y /d /i "$(PngSdkDir)\bin\*.dll" "$(OutDir)" &gt;nul</Command>
+      <Command>rem bash -c "perl ./unix/cons -- debug"</Command>
     </PostBuildEvent>
     <ResourceCompile>
       <PreprocessorDefinitions>_DEBUG;QL_BUILD_STEAMWORKS=$(QLBuildSteamworks);QL_BUILD_OPEN_STEAM=$(QLBuildOpenSteam);%(PreprocessorDefinitions)</PreprocessorDefinitions>

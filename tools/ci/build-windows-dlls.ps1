@@ -3,8 +3,8 @@ param(
     [string]$RepoRoot = (Resolve-Path (Join-Path $PSScriptRoot '../..')).Path,
     [string]$Solution = 'src/code/quakelive.sln',
     [string]$Configuration = 'Release',
-    [string]$Platform = 'Win32',
-    [string]$PlatformToolset = 'v143',
+    [string]$Platform = 'x86',
+    [string]$PlatformToolset = '',
     [string]$WindowsTargetPlatformVersion = '',
     [string]$BuildLogRoot = '',
     [switch]$DisableOptionalCodecs
@@ -168,20 +168,16 @@ function Get-LatestWindowsSdkVersion {
     return $null
 }
 
-$solutionPath = Join-Path $RepoRoot $Solution
+$solutionPath = if ([System.IO.Path]::IsPathRooted($Solution)) {
+    $Solution
+}
+else {
+    Join-Path $RepoRoot $Solution
+}
 if (-not (Test-Path $solutionPath)) {
     throw "Solution file not found at '$solutionPath'."
 }
-
-$msbuildPlatform = $Platform
-if ([System.IO.Path]::GetExtension($solutionPath) -ieq '.sln' -and $Platform -eq 'Win32') {
-    $msbuildPlatform = 'x86'
-}
-
-$msbuild = Get-MSBuildPath
-if (-not $msbuild) {
-    throw 'msbuild.exe was not found. Install Visual Studio Build Tools or ensure MSBuild is available.'
-}
+$solutionPath = (Resolve-Path $solutionPath).Path
 
 if (-not $WindowsTargetPlatformVersion -and $PlatformToolset -in @('v141', 'v143')) {
     $WindowsTargetPlatformVersion = Get-LatestWindowsSdkVersion
@@ -190,54 +186,69 @@ if (-not $WindowsTargetPlatformVersion -and $PlatformToolset -in @('v141', 'v143
     }
 }
 
-Write-Host "Building '$Solution' ($Configuration|$msbuildPlatform) with toolset $PlatformToolset."
-$arguments = @(
-    $solutionPath,
-    '/m',
-    '/nologo',
-    "/p:Configuration=$Configuration",
-    "/p:Platform=$msbuildPlatform",
-    "/p:PlatformToolset=$PlatformToolset",
-    '/p:PreferredToolArchitecture=x86'
-)
-
-if ($WindowsTargetPlatformVersion) {
-    $arguments += "/p:WindowsTargetPlatformVersion=$WindowsTargetPlatformVersion"
-}
-
 if ($DisableOptionalCodecs) {
-    $arguments += @(
-        '/p:QLEnableOgg=0',
-        '/p:QLEnablePng=0',
-        '/p:QLEnableFreeType=0'
-    )
+    Write-Warning '-DisableOptionalCodecs is retained for compatibility but no longer disables OGG/PNG; the release build links repo-managed static codec libraries.'
 }
 
 if (-not $BuildLogRoot) {
     $BuildLogRoot = Join-Path $RepoRoot 'artifacts\build-logs'
 }
 
-New-Item -ItemType Directory -Force -Path $BuildLogRoot | Out-Null
-$safeConfiguration = $Configuration -replace '[^A-Za-z0-9_.-]', '-'
-$safePlatform = $msbuildPlatform -replace '[^A-Za-z0-9_.-]', '-'
-$safeToolset = $PlatformToolset -replace '[^A-Za-z0-9_.-]', '-'
-$msbuildLog = Join-Path $BuildLogRoot "msbuild-${safeConfiguration}-${safePlatform}-${safeToolset}.log"
-$arguments += @(
-    '/clp:Summary;Verbosity=minimal',
-    "/flp:logfile=$msbuildLog;verbosity=normal;encoding=UTF-8"
-)
-
-$process = Start-Process -FilePath $msbuild -ArgumentList $arguments -Wait -PassThru -NoNewWindow
-if ($process.ExitCode -ne 0) {
-    if (Test-Path $msbuildLog) {
-        Write-Error "msbuild.exe failed with exit code $($process.ExitCode). Last 160 log lines from '$msbuildLog':"
-        Get-Content -Path $msbuildLog -Tail 160 | ForEach-Object { Write-Error $_ }
-    }
-
-    throw "msbuild.exe failed with exit code $($process.ExitCode). See '$msbuildLog'."
+$buildScript = Join-Path $RepoRoot '.vscode\build.ps1'
+if (-not (Test-Path $buildScript)) {
+    throw "VS Code build helper was not found: $buildScript"
 }
 
-Write-Host "Native Windows solution build completed successfully. MSBuild log: $msbuildLog"
+$buildPlatform = $Platform
+if ($buildPlatform -ieq 'Win32') {
+    $buildPlatform = 'x86'
+}
+
+$buildArguments = @(
+    '-NoProfile',
+    '-ExecutionPolicy', 'Bypass',
+    '-File', $buildScript,
+    '-Solution', $solutionPath,
+    '-Configuration', $Configuration,
+    '-Platform', $buildPlatform,
+    '-OnlineServices', '0',
+    '-Steamworks', '0',
+    '-OpenSteam', '0',
+    '-RequireAwesomiumSdk', '0',
+    '-BuildLogRoot', $BuildLogRoot
+)
+
+if ($PlatformToolset) {
+    $buildArguments += @('-PlatformToolset', $PlatformToolset)
+}
+if ($WindowsTargetPlatformVersion) {
+    $buildArguments += @('-WindowsTargetPlatformVersion', $WindowsTargetPlatformVersion)
+}
+
+$powershellHost = Get-Command pwsh.exe -ErrorAction SilentlyContinue
+if (-not $powershellHost) {
+    $powershellHost = Get-Command powershell.exe -ErrorAction SilentlyContinue
+}
+if (-not $powershellHost) {
+    throw 'Neither pwsh.exe nor powershell.exe could be found to run the shared Windows build helper.'
+}
+
+$toolsetLabel = if ($PlatformToolset) { $PlatformToolset } else { 'helper default' }
+Write-Host "Building '$Solution' ($Configuration|$buildPlatform) through .vscode/build.ps1 with toolset $toolsetLabel."
+$process = Start-Process -FilePath $powershellHost.Source -ArgumentList $buildArguments -Wait -PassThru -NoNewWindow
+if ($process.ExitCode -ne 0) {
+    $logCandidates = Get-ChildItem -Path $BuildLogRoot -Filter 'msbuild-*.log' -File -ErrorAction SilentlyContinue |
+        Sort-Object LastWriteTimeUtc -Descending
+    $latestLog = $logCandidates | Select-Object -First 1
+    if ($latestLog) {
+        Write-Error "Shared Windows build helper failed with exit code $($process.ExitCode). Last 160 log lines from '$($latestLog.FullName)':"
+        Get-Content -Path $latestLog.FullName -Tail 160 | ForEach-Object { Write-Error $_ }
+    }
+
+    throw "Shared Windows build helper failed with exit code $($process.ExitCode)."
+}
+
+Write-Host "Native Windows solution build completed successfully via .vscode/build.ps1."
 
 $cl = Get-CLPath
 if (-not $cl) {

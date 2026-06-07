@@ -753,6 +753,292 @@ void Sys_UnloadDll( void *dllHandle ) {
 	}
 }
 
+typedef int (QDECL *sysVmMain_t)( int, ... );
+typedef void (QDECL *sysDllEntryVoid_t)( int (QDECL *syscallptr)(int, ...) );
+typedef sysVmMain_t (QDECL *sysDllEntryRet_t)( int (QDECL *syscallptr)(int, ...) );
+typedef void (QDECL *sysDllEntryQL_t)( void **exports, void *imports, int *apiVersion );
+
+extern char		*FS_BuildOSPath( const char *base, const char *game, const char *qpath );
+
+/*
+=================
+Sys_CreatePathForFile
+=================
+*/
+static qboolean Sys_CreatePathForFile( char *osPath ) {
+	char	*ofs;
+	char	separator;
+
+	if ( !osPath || !osPath[0] ) {
+		return qfalse;
+	}
+
+	if ( strstr( osPath, ".." ) || strstr( osPath, "::" ) ) {
+		Com_Printf( "WARNING: refusing to create relative path \"%s\"\n", osPath );
+		return qfalse;
+	}
+
+	for ( ofs = osPath + 1 ; *ofs ; ofs++ ) {
+		if ( *ofs == '/' || *ofs == '\\' ) {
+			if ( ofs > osPath && ofs[-1] == ':' ) {
+				continue;
+			}
+
+			separator = *ofs;
+			*ofs = 0;
+			Sys_Mkdir( osPath );
+			*ofs = separator;
+		}
+	}
+
+	return qtrue;
+}
+
+/*
+=================
+Sys_WriteFileToPath
+=================
+*/
+static qboolean Sys_WriteFileToPath( const char *path, const void *buffer, int size ) {
+	FILE	*file;
+	char	createPath[MAX_OSPATH];
+	size_t	written;
+
+	if ( !path || !path[0] || !buffer || size <= 0 ) {
+		return qfalse;
+	}
+
+	Q_strncpyz( createPath, path, sizeof( createPath ) );
+	if ( !Sys_CreatePathForFile( createPath ) ) {
+		return qfalse;
+	}
+
+	file = fopen( path, "wb" );
+	if ( !file ) {
+		Com_Printf( "Sys_LoadDll: failed to open native cache '%s'\n", path );
+		return qfalse;
+	}
+
+	written = fwrite( buffer, 1, size, file );
+	if ( written != (size_t)size ) {
+		fclose( file );
+		Com_Printf( "Sys_LoadDll: short write to native cache '%s'\n", path );
+		return qfalse;
+	}
+
+	if ( fclose( file ) == EOF ) {
+		Com_Printf( "Sys_LoadDll: failed to close native cache '%s'\n", path );
+		return qfalse;
+	}
+
+	return qtrue;
+}
+
+/*
+=================
+Sys_FileIsReadable
+=================
+*/
+static qboolean Sys_FileIsReadable( const char *path ) {
+	FILE	*file;
+
+	if ( !path || !path[0] ) {
+		return qfalse;
+	}
+
+	file = fopen( path, "rb" );
+	if ( !file ) {
+		return qfalse;
+	}
+
+	fclose( file );
+	return qtrue;
+}
+
+/*
+=================
+Sys_GetNativeDllCachePath
+=================
+*/
+static qboolean Sys_GetNativeDllCachePath( const char *filename, const char *preferredRoot, const char *gamedir, char *outPath, int outPathSize ) {
+	const char	*localAppData;
+	char		tempPath[MAX_OSPATH];
+	DWORD		tempPathLength;
+
+	if ( !filename || !filename[0] || !outPath || outPathSize <= 0 ) {
+		return qfalse;
+	}
+
+	if ( preferredRoot && preferredRoot[0] ) {
+		Q_strncpyz( outPath, FS_BuildOSPath( preferredRoot, ( gamedir && gamedir[0] ) ? gamedir : BASEGAME, filename ), outPathSize );
+		return qtrue;
+	}
+
+	localAppData = getenv( "LOCALAPPDATA" );
+	if ( localAppData && localAppData[0] ) {
+		Com_sprintf( outPath, outPathSize, "%s\\QuakeLive-SRP\\%s\\%s", localAppData, BASEGAME, filename );
+		return qtrue;
+	}
+
+	tempPathLength = GetTempPathA( sizeof( tempPath ), tempPath );
+	if ( tempPathLength == 0 || tempPathLength >= sizeof( tempPath ) ) {
+		return qfalse;
+	}
+
+	while ( tempPathLength > 0 && ( tempPath[tempPathLength - 1] == '\\' || tempPath[tempPathLength - 1] == '/' ) ) {
+		tempPath[--tempPathLength] = '\0';
+	}
+	if ( !tempPath[0] ) {
+		return qfalse;
+	}
+
+	Com_sprintf( outPath, outPathSize, "%s\\QuakeLive-SRP\\%s\\%s", tempPath, BASEGAME, filename );
+	return qtrue;
+}
+
+/*
+=================
+Sys_ShouldExtractNativeDllFromBinPak
+=================
+*/
+static qboolean Sys_ShouldExtractNativeDllFromBinPak( const char *name, const char *filename, const char *gamedir ) {
+	if ( gamedir && gamedir[0] && Q_stricmp( gamedir, BASEGAME ) ) {
+		return qfalse;
+	}
+
+	if ( !Q_stricmp( name, "ui" ) && !Q_stricmp( filename, "uix86.dll" ) ) {
+		return qtrue;
+	}
+	if ( !Q_stricmp( name, "cgame" ) && !Q_stricmp( filename, "cgamex86.dll" ) ) {
+		return qtrue;
+	}
+	if ( !Q_stricmp( name, "qagame" ) && !Q_stricmp( filename, "qagamex86.dll" ) ) {
+		return qtrue;
+	}
+
+	return qfalse;
+}
+
+/*
+=================
+Sys_MaterializeNativeDllFromBinPak
+=================
+*/
+static qboolean Sys_MaterializeNativeDllFromBinPak( const char *name, const char *filename, char **roots, int rootCount,
+	const char *gamedir, char *outPath, int outPathSize ) {
+	char	pakPath[MAX_OSPATH];
+	char	cachePath[MAX_OSPATH];
+	void	*buffer;
+	pack_t	*pack;
+	int		i;
+	int		length;
+
+	if ( !Sys_ShouldExtractNativeDllFromBinPak( name, filename, gamedir ) ) {
+		return qfalse;
+	}
+	if ( !Sys_GetNativeDllCachePath( filename, rootCount > 0 ? roots[0] : NULL, gamedir, cachePath, sizeof( cachePath ) ) ) {
+		return qfalse;
+	}
+
+	for ( i = 0; i < rootCount; i++ ) {
+		if ( !roots[i] || !roots[i][0] ) {
+			continue;
+		}
+
+		Q_strncpyz( pakPath, FS_BuildOSPath( roots[i], BASEGAME, "bin.pk3" ), sizeof( pakPath ) );
+		pack = FS_LoadPackExplicit( pakPath );
+		if ( !pack ) {
+			continue;
+		}
+
+		buffer = NULL;
+		length = FS_ReadFileFromPak( pack, filename, &buffer );
+		FS_FreePak( pack );
+		if ( length <= 0 || !buffer ) {
+			if ( buffer ) {
+				Z_Free( buffer );
+			}
+			continue;
+		}
+
+		if ( Sys_WriteFileToPath( cachePath, buffer, length ) && Sys_FileIsReadable( cachePath ) ) {
+			Z_Free( buffer );
+			Q_strncpyz( outPath, cachePath, outPathSize );
+			Com_Printf( "Sys_LoadDll: extracted %s from %s\n", filename, pakPath );
+			return qtrue;
+		}
+
+		Z_Free( buffer );
+	}
+
+	return qfalse;
+}
+
+/*
+=================
+Sys_TryLoadDllFromPath
+=================
+*/
+static void *Sys_TryLoadDllFromPath( const char *fn, char *fqpath, int (QDECL **entryPoint)(int, ...),
+				  void **dllExports, void *imports, int *apiVersion,
+				  int (QDECL *systemcalls)(int, ...) ) {
+	HINSTANCE	libHandle;
+	sysDllEntryVoid_t dllEntry;
+	sysDllEntryQL_t dllEntryQL;
+	sysVmMain_t vmMain;
+	sysDllEntryRet_t dllEntryRet;
+
+	libHandle = LoadLibrary( fn );
+	if ( !libHandle ) {
+		if ( Cvar_VariableIntegerValue( "developer" ) ) {
+			Com_Printf( "Sys_LoadDll: LoadLibrary '%s' failed (err %lu)\n", fn, GetLastError() );
+		}
+		return NULL;
+	}
+
+	dllEntry = ( sysDllEntryVoid_t )GetProcAddress( libHandle, "dllEntry" );
+	vmMain = ( sysVmMain_t )GetProcAddress( libHandle, "vmMain" );
+	if ( !dllEntry ) {
+		Com_Printf( "Sys_LoadDll: rejected '%s': missing dllEntry export\n", fn );
+		FreeLibrary( libHandle );
+		return NULL;
+	}
+	if ( dllExports && imports && apiVersion ) {
+		dllEntryQL = ( sysDllEntryQL_t )dllEntry;
+		dllEntryQL( dllExports, imports, apiVersion );
+		if ( dllExports && *dllExports ) {
+			Q_strncpyz( fqpath, fn, MAX_QPATH );
+			Com_Printf( "Sys_LoadDll: loaded '%s'\n", fn );
+			return libHandle;
+		}
+	}
+	if ( vmMain ) {
+		dllEntry( systemcalls );
+		*entryPoint = vmMain;
+		Q_strncpyz( fqpath, fn, MAX_QPATH );
+		Com_Printf( "Sys_LoadDll: loaded '%s'\n", fn );
+		return libHandle;
+	}
+	if ( systemcalls ) {
+		dllEntryRet = ( sysDllEntryRet_t )dllEntry;
+		*entryPoint = dllEntryRet( systemcalls );
+		if ( *entryPoint ) {
+			Q_strncpyz( fqpath, fn, MAX_QPATH );
+			Com_Printf( "Sys_LoadDll: loaded '%s'\n", fn );
+			return libHandle;
+		}
+	}
+
+	Com_Printf( "Sys_LoadDll: rejected '%s': missing compatible VM exports\n", fn );
+	if ( dllExports ) {
+		*dllExports = NULL;
+	}
+	*entryPoint = NULL;
+	FreeLibrary( libHandle );
+
+	return NULL;
+}
+
 /*
 =================
 Sys_LoadDll
@@ -762,38 +1048,27 @@ Used to load a development dll instead of a virtual machine
 TTimo: added some verbosity in debug
 =================
 */
-extern char		*FS_BuildOSPath( const char *base, const char *game, const char *qpath );
-
 // fqpath param added 7/20/02 by T.Ray - Sys_LoadDll is only called in vm.c at this time
 // fqpath will be empty if dll not loaded, otherwise will hold fully qualified path of dll module loaded
 // fqpath buffersize must be at least MAX_QPATH+1 bytes long
 void * QDECL Sys_LoadDll( const char *name, char *fqpath, int (QDECL **entryPoint)(int, ...),
 				  void **dllExports, void *imports, int *apiVersion,
 				  int (QDECL *systemcalls)(int, ...) ) {
-	static int	lastWarning = 0;
 	HINSTANCE	libHandle;
-	typedef int (QDECL *vmMain_t)( int, ... );
-	typedef void (QDECL *dllEntryVoid_t)( int (QDECL *syscallptr)(int, ...) );
-	typedef vmMain_t (QDECL *dllEntryRet_t)( int (QDECL *syscallptr)(int, ...) );
-	typedef void (QDECL *dllEntryQL_t)( void **exports, void *imports, int *apiVersion );
-	dllEntryVoid_t dllEntry;
-	dllEntryQL_t dllEntryQL;
-	vmMain_t vmMain;
-	dllEntryRet_t dllEntryRet;
 	char	*basepath;
 	char	*cdpath;
 	char	*cwdpath;
 	char	*homepath;
 	char	*gamedir;
+	const char *dllGamedir;
 	char	*searchRoots[4];
+	char	*binPakRoots[3];
 	char	*fn;
 	int		searchCount;
+	int		binPakRootCount;
 	int		i;
-#ifdef NDEBUG
-	int		timestamp;
-  int   ret;
-#endif
 	char	filename[MAX_QPATH];
+	char	extractedPath[MAX_OSPATH];
 
 	*fqpath = 0 ;		// added 7/20/02 by T.Ray
 	*entryPoint = NULL;
@@ -803,100 +1078,53 @@ void * QDECL Sys_LoadDll( const char *name, char *fqpath, int (QDECL **entryPoin
 
 	Com_sprintf( filename, sizeof( filename ), "%sx86.dll", name );
 
-#ifdef NDEBUG
-	timestamp = Sys_Milliseconds();
-	if( ((timestamp - lastWarning) > (5 * 60000)) && !Cvar_VariableIntegerValue( "dedicated" ) ) {
-		if (FS_FileExists(filename)) {
-			lastWarning = timestamp;
-			ret = MessageBoxEx( NULL, "You are about to load a .DLL executable that\n"
-				  "has not been verified for use with Quake Live.\n"
-				  "This type of file can compromise the security of\n"
-				  "your computer.\n\n"
-				  "Select 'OK' if you choose to load it anyway.",
-				  "Security Warning", MB_OKCANCEL | MB_ICONEXCLAMATION | MB_DEFBUTTON2 | MB_TOPMOST | MB_SETFOREGROUND,
-				  MAKELANGID( LANG_NEUTRAL, SUBLANG_DEFAULT ) );
-			if( ret != IDOK ) {
-				return NULL;
-			}
-		}
-	}
-#endif
-
 	basepath = Cvar_VariableString( "fs_basepath" );
 	cdpath = Cvar_VariableString( "fs_cdpath" );
 	homepath = Cvar_VariableString( "fs_homepath" );
 	gamedir = Cvar_VariableString( "fs_game" );
+	dllGamedir = ( gamedir && gamedir[0] ) ? gamedir : BASEGAME;
 	cwdpath = Sys_Cwd();
 
 	searchCount = 0;
+	binPakRootCount = 0;
 	if ( homepath && homepath[0] ) {
 		searchRoots[searchCount++] = homepath;
+		binPakRoots[binPakRootCount++] = homepath;
 	}
 	if ( basepath && basepath[0] ) {
 		searchRoots[searchCount++] = basepath;
+		binPakRoots[binPakRootCount++] = basepath;
 	}
 	if ( cdpath && cdpath[0] ) {
 		searchRoots[searchCount++] = cdpath;
+		binPakRoots[binPakRootCount++] = cdpath;
 	}
 	if ( cwdpath && cwdpath[0] ) {
 		searchRoots[searchCount++] = cwdpath;
 	}
 
-	for ( i = 0; i < searchCount; i++ ) {
-		fn = FS_BuildOSPath( searchRoots[i], gamedir, filename );
-		libHandle = LoadLibrary( fn );
-#ifndef NDEBUG
-		if (libHandle)
-			Com_Printf("LoadLibrary '%s' ok\n", fn);
-		else
-			Com_Printf("LoadLibrary '%s' failed\n", fn);
-#endif
-		if ( !libHandle ) {
-			continue;
-		}
+	Com_Printf( "Sys_LoadDll: %s search roots home='%s' base='%s' cd='%s' cwd='%s' game='%s'\n",
+		filename,
+		homepath ? homepath : "",
+		basepath ? basepath : "",
+		cdpath ? cdpath : "",
+		cwdpath ? cwdpath : "",
+		dllGamedir );
 
-		dllEntry = ( dllEntryVoid_t )GetProcAddress( libHandle, "dllEntry" );
-		vmMain = ( vmMain_t )GetProcAddress( libHandle, "vmMain" );
-		if ( !dllEntry ) {
-#ifndef NDEBUG
-			Com_Printf("Rejected DLL '%s': missing dllEntry export\n", fn);
-#endif
-			FreeLibrary( libHandle );
-			libHandle = NULL;
-			continue;
-		}
-		if ( dllExports && imports && apiVersion ) {
-			dllEntryQL = ( dllEntryQL_t )dllEntry;
-			dllEntryQL( dllExports, imports, apiVersion );
-			if ( dllExports && *dllExports ) {
-				Q_strncpyz( fqpath, fn, MAX_QPATH );
-				return libHandle;
-			}
-		}
-		if ( vmMain ) {
-			dllEntry( systemcalls );
-			*entryPoint = vmMain;
-			Q_strncpyz( fqpath, fn, MAX_QPATH );
+	for ( i = 0; i < searchCount; i++ ) {
+		fn = FS_BuildOSPath( searchRoots[i], dllGamedir, filename );
+		libHandle = Sys_TryLoadDllFromPath( fn, fqpath, entryPoint, dllExports, imports, apiVersion, systemcalls );
+		if ( libHandle ) {
 			return libHandle;
 		}
-		if ( systemcalls ) {
-			dllEntryRet = ( dllEntryRet_t )dllEntry;
-			*entryPoint = dllEntryRet( systemcalls );
-			if ( *entryPoint ) {
-				Q_strncpyz( fqpath, fn, MAX_QPATH );
-				return libHandle;
-			}
-		}
+	}
 
-#ifndef NDEBUG
-		Com_Printf("Rejected DLL '%s': missing compatible VM exports\n", fn);
-#endif
-		if ( dllExports ) {
-			*dllExports = NULL;
+	if ( Sys_MaterializeNativeDllFromBinPak( name, filename, binPakRoots, binPakRootCount, dllGamedir,
+		extractedPath, sizeof( extractedPath ) ) ) {
+		libHandle = Sys_TryLoadDllFromPath( extractedPath, fqpath, entryPoint, dllExports, imports, apiVersion, systemcalls );
+		if ( libHandle ) {
+			return libHandle;
 		}
-		*entryPoint = NULL;
-		FreeLibrary( libHandle );
-		libHandle = NULL;
 	}
 
 	return NULL;
