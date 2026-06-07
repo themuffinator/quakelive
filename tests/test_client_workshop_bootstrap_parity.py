@@ -147,7 +147,7 @@ def test_ui_item_download_import_uses_retained_client_workshop_state() -> None:
     )
 
     assert "CL_GetWorkshopDownloadInfo( itemIdLow, itemIdHigh, &downloaded, &total )" in download_info_block
-    assert "QL_Steamworks_GetItemDownloadInfo( itemIdLow, itemIdHigh, &downloaded, &total );" in download_info_block
+    assert "SteamUGC_GetItemDownloadInfo( itemIdLow, itemIdHigh, &downloaded, &total );" in download_info_block
     assert "clc.downloadCount" not in download_info_block
     assert "clc.downloadSize" not in download_info_block
 

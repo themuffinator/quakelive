@@ -1670,7 +1670,7 @@ def test_engine_cvar_thirtyseventh_client_lifecycle_workshop_tranche_matches_ret
 	assert 'Cvar_Get( "cl_downloadTime", "0", CVAR_TEMP );' in cl_main
 	assert 'Cvar_SetValue( "cl_downloadTime", cls.realtime );' in cl_main
 	assert 'CL_GetWorkshopDownloadInfo( itemIdLow, itemIdHigh, &downloaded, &total )' in cl_ui
-	assert 'QL_Steamworks_GetItemDownloadInfo( itemIdLow, itemIdHigh, &downloaded, &total );' in cl_ui
+	assert 'SteamUGC_GetItemDownloadInfo( itemIdLow, itemIdHigh, &downloaded, &total );' in cl_ui
 	assert '(*(data_106b40a8 + 0x28))("cl_downloadTime")' in ui_hlil
 	assert '(**(code **)(DAT_106b40a8 + 0x28))("cl_downloadTime");' in ui_ghidra
 	assert 'sub_4cd270("cl_downloadTime", fconvert.s(float.t(data_1528cc8)))' in retail_hlil

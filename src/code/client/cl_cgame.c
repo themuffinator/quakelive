@@ -942,16 +942,11 @@ and UGC data for the current session.
 =============
 */
 static qboolean CL_WebHost_HasSteamIdentity( void ) {
-	uint32_t steamIdLow;
-	uint32_t steamIdHigh;
-
 	if ( !CL_SteamServicesEnabled() ) {
 		return qfalse;
 	}
 
-	steamIdLow = 0u;
-	steamIdHigh = 0u;
-	return QL_Steamworks_GetUserSteamID( &steamIdLow, &steamIdHigh );
+	return SteamClient_GetSteamID() != 0ull ? qtrue : qfalse;
 }
 
 /*
@@ -960,12 +955,15 @@ CL_WebHost_RefreshBootstrapProperties
 =============
 */
 static void CL_WebHost_RefreshBootstrapProperties( void ) {
+	unsigned long long steamId;
 	char playerName[MAX_NAME_LENGTH];
 
 	cl_webHost.appId = QL_Steamworks_GetAppID();
 	cl_webHost.steamIdLow = 0u;
 	cl_webHost.steamIdHigh = 0u;
-	QL_Steamworks_GetUserSteamID( &cl_webHost.steamIdLow, &cl_webHost.steamIdHigh );
+	steamId = SteamClient_GetSteamID();
+	cl_webHost.steamIdLow = (uint32_t)( steamId & 0xffffffffull );
+	cl_webHost.steamIdHigh = (uint32_t)( steamId >> 32 );
 
 	playerName[0] = '\0';
 	if ( !QL_Steamworks_GetPersonaName( playerName, sizeof( playerName ) ) || !playerName[0] ) {
@@ -8911,7 +8909,7 @@ static int QDECL QL_CG_trap_IsSubscribedApp( int appId ) {
 		return 0;
 	}
 
-	return QL_Steamworks_IsSubscribedApp( (uint32_t)appId ) ? 1 : 0;
+	return SteamApps_BIsSubscribedApp( (uint32_t)appId ) ? 1 : 0;
 }
 
 /*

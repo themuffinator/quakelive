@@ -610,6 +610,7 @@ def _compile_and_run(
     workdir.mkdir(parents=True, exist_ok=True)
     c_path = workdir / "probe.c"
     c_path.write_text(source, encoding="utf-8")
+    extra_sources: list[str] = []
     exe_path = workdir / "probe"
     compiler = shutil.which("gcc") or shutil.which("clang") or shutil.which("cc")
 
@@ -628,6 +629,74 @@ def _compile_and_run(
 
     if include_client_stub:
         macro_args.append("-DQL_AUTH_HAS_CLIENT_BACKEND=1")
+        client_stub_path = workdir / "client_stub.c"
+        client_stub_path.write_text(
+            textwrap.dedent(
+                """
+                #include "client.h"
+                #include "platform/platform_steamworks.h"
+
+                static uint32_t client_stub_auth_ticket_handle;
+
+                /*
+                =============
+                SteamClient_GetSteamID
+                =============
+                */
+                unsigned long long SteamClient_GetSteamID( void ) {
+                    return 0ull;
+                }
+
+                /*
+                =============
+                SteamClient_GetAuthSessionTicket
+                =============
+                */
+                int SteamClient_GetAuthSessionTicket( char *ticketBuffer, int ticketBufferSize ) {
+                    int ticketLength = 0;
+                    uint32_t ticketHandle = 0u;
+
+                    if ( ticketBuffer && ticketBufferSize > 0 ) {
+                        ticketBuffer[0] = '\\0';
+                    }
+
+                    if ( !ticketBuffer || ticketBufferSize <= 0 ) {
+                        return 0;
+                    }
+
+                    if ( !QL_Steamworks_RequestAuthTicket( ticketBuffer, (size_t)ticketBufferSize, &ticketLength, &ticketHandle ) ) {
+                        return 0;
+                    }
+
+                    if ( client_stub_auth_ticket_handle && client_stub_auth_ticket_handle != ticketHandle ) {
+                        QL_Steamworks_CancelAuthTicket( client_stub_auth_ticket_handle );
+                    }
+
+                    client_stub_auth_ticket_handle = ticketHandle;
+                    return ticketLength;
+                }
+
+                /*
+                =============
+                SteamClient_CancelAuthTicket
+                =============
+                */
+                qboolean SteamClient_CancelAuthTicket( void ) {
+                    qboolean cancelled;
+
+                    if ( !client_stub_auth_ticket_handle ) {
+                        return qfalse;
+                    }
+
+                    cancelled = QL_Steamworks_CancelAuthTicket( client_stub_auth_ticket_handle );
+                    client_stub_auth_ticket_handle = 0u;
+                    return cancelled;
+                }
+                """
+            ),
+            encoding="utf-8",
+        )
+        extra_sources.append(str(client_stub_path))
 
     compile_cmd = [
         compiler,
@@ -638,6 +707,7 @@ def _compile_and_run(
         *include_args,
         *macro_args,
         str(c_path),
+        *extra_sources,
         "-o",
         str(exe_path),
     ]
@@ -1377,6 +1447,65 @@ def test_client_steam_callback_owner_reconstructs_retail_frame_pump_and_lifecycl
     assert 'CL_LogStatsServiceIgnored( "stats_clear", "clear request failed" );' in stats_clear_block
 
 
+def test_client_steam_id_owner_reconstructs_retail_homepath_and_identity_gate() -> None:
+    cl_main = (REPO_ROOT / "src/code/client/cl_main.c").read_text(encoding="utf-8")
+    cl_cgame = (REPO_ROOT / "src/code/client/cl_cgame.c").read_text(encoding="utf-8")
+    ql_auth = (REPO_ROOT / "src/code/client/ql_auth.c").read_text(encoding="utf-8")
+    files = (REPO_ROOT / "src/code/qcommon/files.c").read_text(encoding="utf-8")
+    qcommon_h = (REPO_ROOT / "src/code/qcommon/qcommon.h").read_text(encoding="utf-8")
+    null_client = (REPO_ROOT / "src/code/null/null_client.c").read_text(encoding="utf-8")
+    fs_harness = (REPO_ROOT / "tests/fs_searchpath_harness.c").read_text(encoding="utf-8")
+    hlil_part02 = (
+        REPO_ROOT
+        / "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part02.txt"
+    ).read_text(encoding="utf-8")
+    hlil_part04 = (
+        REPO_ROOT
+        / "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part04.txt"
+    ).read_text(encoding="utf-8")
+
+    steam_id_block = _extract_function_block(cl_main, "unsigned long long SteamClient_GetSteamID( void ) {")
+    homepath_block = _extract_function_block(files, "static const char *FS_ResolveHomePath( const char *basePath ) {")
+    null_steam_id_block = _extract_function_block(
+        null_client, "unsigned long long SteamClient_GetSteamID( void ) {"
+    )
+    harness_steam_id_block = _extract_function_block(
+        fs_harness, "unsigned long long SteamClient_GetSteamID( void ) {"
+    )
+    web_identity_block = _extract_function_block(cl_cgame, "static qboolean CL_WebHost_HasSteamIdentity( void )")
+    web_bootstrap_block = _extract_function_block(cl_cgame, "static void CL_WebHost_RefreshBootstrapProperties( void )")
+    auth_ticket_block = _extract_function_block(
+        ql_auth,
+        "qboolean QL_ClientAuth_RequestSteamChallengeTicket( byte *ticketBuffer, int ticketBufferSize, int *ticketLength, uint32_t *steamIdLow, uint32_t *steamIdHigh ) {",
+    )
+
+    assert "00460550    int32_t sub_460550()" in hlil_part02
+    assert "0046055d  if (data_e30218 == 0)" in hlil_part02
+    assert "00460578  void var_c" in hlil_part02
+    assert "int32_t* eax_2 = (*(*SteamUser() + 8))(&var_c)" in hlil_part02
+    assert "004d3202  if (sub_460510() == 0)" in hlil_part04
+    assert "eax_9, edx_1 = sub_460550()" in hlil_part04
+    assert 'eax_7 = sub_4d9220("%s/%llu")' in hlil_part04
+
+    assert "unsigned long long SteamClient_GetSteamID( void );" in qcommon_h
+    assert "if ( !SteamClient_IsInitialized() ) {" in steam_id_block
+    assert "services = QL_RefreshPlatformServices();" in steam_id_block
+    assert "SteamClient_SetInitializedState( services );" in steam_id_block
+    assert "return 0ull;" in steam_id_block
+    assert "QL_Steamworks_GetUserSteamID( &steamIdLow, &steamIdHigh )" in steam_id_block
+    assert "return ( (unsigned long long)steamIdHigh << 32 ) | steamIdLow;" in steam_id_block
+    assert "steamId = SteamClient_GetSteamID();" in homepath_block
+    assert "QL_Steamworks_GetUserSteamID" not in homepath_block
+    assert 'Com_sprintf( steamHome, sizeof( steamHome ), "%s/%llu", basePath, (unsigned long long)steamId );' in homepath_block
+    assert "return 0ull;" in null_steam_id_block
+    assert "return ( (unsigned long long)steamIdHigh << 32 ) | steamIdLow;" in harness_steam_id_block
+    assert "return SteamClient_GetSteamID() != 0ull ? qtrue : qfalse;" in web_identity_block
+    assert "steamId = SteamClient_GetSteamID();" in web_bootstrap_block
+    assert "cl_webHost.steamIdLow = (uint32_t)( steamId & 0xffffffffull );" in web_bootstrap_block
+    assert "steamId = SteamClient_GetSteamID();" in auth_ticket_block
+    assert "*steamIdLow = (uint32_t)( steamId & 0xffffffffull );" in auth_ticket_block
+
+
 def test_platform_steamworks_reconstructs_retail_callback_bundle_registration_surface() -> None:
     steamworks = (REPO_ROOT / "src/common/platform/platform_steamworks.c").read_text(encoding="utf-8")
     steamworks_h = (REPO_ROOT / "src/common/platform/platform_steamworks.h").read_text(encoding="utf-8")
@@ -1844,8 +1973,17 @@ def test_awesomium_launch_task_builds_with_in_process_overlay_provider() -> None
 def test_client_auth_ticket_lifetime_reconstructs_retail_disconnect_owner() -> None:
     steamworks = (REPO_ROOT / "src/common/platform/platform_steamworks.c").read_text(encoding="utf-8")
     steamworks_header = (REPO_ROOT / "src/common/platform/platform_steamworks.h").read_text(encoding="utf-8")
+    qcommon_h = (REPO_ROOT / "src/code/qcommon/qcommon.h").read_text(encoding="utf-8")
     ql_auth = (REPO_ROOT / "src/code/client/ql_auth.c").read_text(encoding="utf-8")
     cl_main = (REPO_ROOT / "src/code/client/cl_main.c").read_text(encoding="utf-8")
+    hlil_part02 = (
+        REPO_ROOT
+        / "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part02.txt"
+    ).read_text(encoding="utf-8")
+    hlil_part04 = (
+        REPO_ROOT
+        / "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part04.txt"
+    ).read_text(encoding="utf-8")
 
     cancel_platform_block = _extract_function_block(
         steamworks,
@@ -1863,34 +2001,130 @@ def test_client_auth_ticket_lifetime_reconstructs_retail_disconnect_owner() -> N
         ql_auth,
         "static qboolean QL_ClientAuth_RequestSteamTicket( ql_auth_credential_t *credential, char *logBuffer, size_t logBufferSize ) {",
     )
-    set_ticket_block = _extract_function_block(
+    challenge_ticket_block = _extract_function_block(
         ql_auth,
-        "static void QL_ClientAuth_SetSteamTicketHandle( uint32_t ticketHandle ) {",
+        "qboolean QL_ClientAuth_RequestSteamChallengeTicket( byte *ticketBuffer, int ticketBufferSize, int *ticketLength, uint32_t *steamIdLow, uint32_t *steamIdHigh ) {",
     )
     cancel_client_block = _extract_function_block(
         ql_auth,
         "void QL_ClientAuth_CancelSteamTicket( void ) {",
+    )
+    steam_ticket_block = _extract_function_block(
+        cl_main,
+        "int SteamClient_GetAuthSessionTicket( char *ticketBuffer, int ticketBufferSize ) {",
+    )
+    cancel_ticket_block = _extract_function_block(
+        cl_main,
+        "qboolean SteamClient_CancelAuthTicket( void ) {",
+    )
+    shutdown_callbacks_block = _extract_function_block(
+        cl_main,
+        "static void CL_Steam_ShutdownCallbacks( void ) {",
     )
     disconnect_block = _extract_function_block(
         cl_main,
         "void CL_Disconnect( qboolean showMainMenu ) {",
     )
 
+    assert "004605c0    int32_t __convention(\"regparm\") sub_4605c0" in hlil_part02
+    assert "data_e2c208 = (*(*SteamUser(result) + 0x34))(arg4, arg5, &result)" in hlil_part02
+    assert "004605f0    int32_t sub_4605f0()" in hlil_part02
+    assert "return (*(*result + 0x40))(data_e2c208)" in hlil_part02
+    assert "sub_4605c0(eax_12, &var_1808, ecx_11, &var_1808, 0x1000)" in hlil_part04
+    assert "004c9d1d  sub_4605f0()" in hlil_part04
+
     assert "qboolean QL_Steamworks_CancelAuthTicket( uint32_t ticketHandle );" in steamworks_header
     assert "const char *QL_Steamworks_GetAuthTicketApiLabel( void );" in steamworks_header
     assert "const char *QL_Steamworks_GetAuthTicketModernGapLabel( void );" in steamworks_header
+    assert "int SteamClient_GetAuthSessionTicket( char *ticketBuffer, int ticketBufferSize );" in qcommon_h
+    assert "qboolean SteamClient_CancelAuthTicket( void );" in qcommon_h
     assert 'return "retail GetAuthSessionTicket";' in api_label_block
     assert 'return "missing GetAuthTicketForWebApi adapter";' in modern_gap_label_block
     assert "if ( ticketHandle == 0 || !state.initialised || !state.SteamUser || !state.CancelAuthTicket ) {" in cancel_platform_block
     assert "state.CancelAuthTicket( user, (HAuthTicket)ticketHandle );" in cancel_platform_block
-    assert "static uint32_t cl_clientAuthSteamTicketHandle = 0;" in ql_auth
-    assert "uint32_t ticketHandle = 0;" in request_ticket_block
-    assert "QL_Steamworks_RequestAuthTicket( credential->value, sizeof( credential->value ), &ticketLength, &ticketHandle )" in request_ticket_block
-    assert "QL_ClientAuth_SetSteamTicketHandle( ticketHandle );" in request_ticket_block
-    assert "QL_Steamworks_CancelAuthTicket( cl_clientAuthSteamTicketHandle );" in set_ticket_block
-    assert "QL_Steamworks_CancelAuthTicket( cl_clientAuthSteamTicketHandle );" in cancel_client_block
-    assert "cl_clientAuthSteamTicketHandle = 0;" in cancel_client_block
+    assert "static uint32_t cl_steamAuthTicketHandle;" in cl_main
+    assert "QL_Steamworks_RequestAuthTicket( ticketBuffer, (size_t)ticketBufferSize, &ticketLength, &ticketHandle )" in steam_ticket_block
+    assert "QL_Steamworks_CancelAuthTicket( cl_steamAuthTicketHandle );" in steam_ticket_block
+    assert "cl_steamAuthTicketHandle = ticketHandle;" in steam_ticket_block
+    assert "cancelled = QL_Steamworks_CancelAuthTicket( cl_steamAuthTicketHandle );" in cancel_ticket_block
+    assert "cl_steamAuthTicketHandle = 0u;" in cancel_ticket_block
+    assert "ticketLength = SteamClient_GetAuthSessionTicket( credential->value, (int)sizeof( credential->value ) );" in request_ticket_block
+    assert "hexLength = SteamClient_GetAuthSessionTicket( hexTicket, (int)sizeof( hexTicket ) );" in challenge_ticket_block
+    assert "SteamClient_CancelAuthTicket();" in challenge_ticket_block
+    assert "SteamClient_CancelAuthTicket();" in cancel_client_block
+    assert "SteamClient_CancelAuthTicket();" in shutdown_callbacks_block
     assert "QL_ClientAuth_CancelSteamTicket();" in disconnect_block
+
+
+def test_client_steam_wrapper_cluster_reconstructs_retail_subscription_workshop_country_surface() -> None:
+    aliases = json.loads(
+        (REPO_ROOT / "references/analysis/quakelive_symbol_aliases.json").read_text(encoding="utf-8")
+    )["quakelive_steam_srp"]
+    functions_csv = (
+        REPO_ROOT / "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+    ).read_text(encoding="utf-8")
+    hlil_part02 = (
+        REPO_ROOT
+        / "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part02.txt"
+    ).read_text(encoding="utf-8")
+    qcommon_h = (REPO_ROOT / "src/code/qcommon/qcommon.h").read_text(encoding="utf-8")
+    null_client = (REPO_ROOT / "src/code/null/null_client.c").read_text(encoding="utf-8")
+    cl_main = (REPO_ROOT / "src/code/client/cl_main.c").read_text(encoding="utf-8")
+    cl_ui = (REPO_ROOT / "src/code/client/cl_ui.c").read_text(encoding="utf-8")
+    cl_cgame = (REPO_ROOT / "src/code/client/cl_cgame.c").read_text(encoding="utf-8")
+
+    apps_wrapper_block = _extract_function_block(
+        cl_main, "qboolean SteamApps_BIsSubscribedApp( unsigned int appId ) {"
+    )
+    ugc_wrapper_block = _extract_function_block(
+        cl_main, "qboolean SteamUGC_GetItemDownloadInfo( unsigned int itemIdLow, unsigned int itemIdHigh, unsigned long long *outDownloaded, unsigned long long *outTotal ) {"
+    )
+    country_wrapper_block = _extract_function_block(
+        cl_main, "qboolean SteamUtils_GetIPCountry( char *buffer, size_t bufferSize ) {"
+    )
+    ui_subscribed_block = _extract_function_block(
+        cl_ui, "static int QDECL QL_UI_trap_IsSubscribedApp( int arg1 ) {"
+    )
+    cgame_subscribed_block = _extract_function_block(
+        cl_cgame, "static int QDECL QL_CG_trap_IsSubscribedApp( int appId ) {"
+    )
+    ui_download_info_block = _extract_function_block(
+        cl_ui,
+        "static void QDECL QL_UI_trap_GetItemDownloadInfo( unsigned int itemIdLow, unsigned int itemIdHigh, unsigned long long *outDownloaded, unsigned long long *outTotal ) {",
+    )
+    country_seed_block = _extract_function_block(
+        cl_main, "static void CL_Steam_SeedCountryCvar( void )"
+    )
+
+    assert aliases["sub_460590"] == "SteamApps_BIsSubscribedApp"
+    assert aliases["sub_460660"] == "SteamUGC_GetItemDownloadInfo"
+    assert aliases["sub_460690"] == "SteamUtils_GetIPCountry"
+    assert "FUN_00460590,00460590,40,0,unknown" in functions_csv
+    assert "FUN_00460660,00460660,42,0,unknown" in functions_csv
+    assert "FUN_00460690,00460690,27,0,unknown" in functions_csv
+    assert "00460590    uint32_t sub_460590(int32_t arg1)" in hlil_part02
+    assert "return zx.d((*(*SteamApps() + 0x1c))(arg1))" in hlil_part02
+    assert "00460660    uint32_t sub_460660(int32_t arg1, int32_t arg2, int32_t arg3, int32_t arg4)" in hlil_part02
+    assert "return zx.d((*(*SteamUGC() + 0xd8))(arg1, arg2, arg3, arg4))" in hlil_part02
+    assert "00460690    int32_t sub_460690()" in hlil_part02
+    assert "jump(*(*SteamUtils() + 0x10))" in hlil_part02
+
+    assert "qboolean SteamApps_BIsSubscribedApp( unsigned int appId );" in qcommon_h
+    assert "qboolean SteamUGC_GetItemDownloadInfo( unsigned int itemIdLow, unsigned int itemIdHigh, unsigned long long *outDownloaded, unsigned long long *outTotal );" in qcommon_h
+    assert "qboolean SteamUtils_GetIPCountry( char *buffer, size_t bufferSize );" in qcommon_h
+    assert "qboolean SteamApps_BIsSubscribedApp( unsigned int appId ) {" in null_client
+    assert "qboolean SteamUGC_GetItemDownloadInfo( unsigned int itemIdLow, unsigned int itemIdHigh, unsigned long long *outDownloaded, unsigned long long *outTotal ) {" in null_client
+    assert "qboolean SteamUtils_GetIPCountry( char *buffer, size_t bufferSize ) {" in null_client
+    assert "SteamClient_SetInitializedState( services );" in apps_wrapper_block
+    assert "return QL_Steamworks_IsSubscribedApp( (uint32_t)appId );" in apps_wrapper_block
+    assert "SteamClient_SetInitializedState( services );" in ugc_wrapper_block
+    assert "return QL_Steamworks_GetItemDownloadInfo( (uint32_t)itemIdLow, (uint32_t)itemIdHigh, (uint64_t *)outDownloaded, (uint64_t *)outTotal );" in ugc_wrapper_block
+    assert "SteamClient_SetInitializedState( services );" in country_wrapper_block
+    assert "return QL_Steamworks_GetIPCountry( buffer, bufferSize );" in country_wrapper_block
+    assert "return SteamApps_BIsSubscribedApp( (uint32_t)arg1 ) ? 1 : 0;" in ui_subscribed_block
+    assert "return SteamApps_BIsSubscribedApp( (uint32_t)appId ) ? 1 : 0;" in cgame_subscribed_block
+    assert "SteamUGC_GetItemDownloadInfo( itemIdLow, itemIdHigh, &downloaded, &total );" in ui_download_info_block
+    assert "SteamUtils_GetIPCountry( country, sizeof( country ) )" in country_seed_block
 
 
 def test_steamworks_modern_adapter_gaps_stay_explicit_until_owned() -> None:
@@ -3160,7 +3394,7 @@ def test_client_web_host_exports_label_online_service_social_and_ugc_boundaries(
     assert "CL_GetWebHostWorkshopPolicyLabel()" in workshop_log_block
 
     assert "if ( !CL_SteamServicesEnabled() ) {" in steam_identity_block
-    assert "return QL_Steamworks_GetUserSteamID( &steamIdLow, &steamIdHigh );" in steam_identity_block
+    assert "return SteamClient_GetSteamID() != 0ull ? qtrue : qfalse;" in steam_identity_block
     assert friend_block.index("if ( !CL_WebHost_HasSteamIdentity() ) {") < friend_block.index(
         "friendCount = QL_Steamworks_GetFriendCount( CL_WEB_FRIEND_FLAGS );"
     )
@@ -4134,7 +4368,8 @@ def test_client_social_presence_and_ugc_callback_lanes_stay_explicit() -> None:
     assert 'CL_LogMatchmakingCallbackLifecycle( "persona_state_change", detail );' in persona_block
     assert '"persona changed for %s flags=%u"' in persona_block
     assert 'if ( ( event->changeFlags & 1u ) != 0 &&' in persona_block
-    assert "QL_Steamworks_GetUserSteamID( &localIdLow, &localIdHigh )" in persona_block
+    assert "localSteamId = SteamClient_GetSteamID();" in persona_block
+    assert "localSteamId == event->steamId.value" in persona_block
     assert "SteamClient_SyncPersonaNameCvar();" in persona_block
     assert 'Com_sprintf( eventName, sizeof( eventName ), "users.persona.%s.change", steamId );' in persona_block
     assert "CL_Steam_FormatPersonaChangeJson( event, payload, sizeof( payload ) );" in persona_block
@@ -4309,6 +4544,7 @@ def test_client_main_menu_presence_seed_reconstructs_retail_bootstrap_status() -
 
 
 def test_client_identity_bootstrap_and_ui_subscription_lanes_stay_explicit() -> None:
+    qcommon_h = (REPO_ROOT / "src/code/qcommon/qcommon.h").read_text(encoding="utf-8")
     cl_main = (REPO_ROOT / "src/code/client/cl_main.c").read_text(encoding="utf-8")
     cl_ui = (REPO_ROOT / "src/code/client/cl_ui.c").read_text(encoding="utf-8")
 
@@ -4318,11 +4554,23 @@ def test_client_identity_bootstrap_and_ui_subscription_lanes_stay_explicit() -> 
     init_block = _extract_function_block(cl_main, "void CL_Init( void )")
     persona_block = _extract_function_block(cl_main, "static void SteamClient_SyncPersonaNameCvar( void ) {")
     country_block = _extract_function_block(cl_main, "static void CL_Steam_SeedCountryCvar( void )")
+    steam_apps_wrapper_block = _extract_function_block(
+        cl_main, "qboolean SteamApps_BIsSubscribedApp( unsigned int appId ) {"
+    )
+    steam_ugc_wrapper_block = _extract_function_block(
+        cl_main, "qboolean SteamUGC_GetItemDownloadInfo( unsigned int itemIdLow, unsigned int itemIdHigh, unsigned long long *outDownloaded, unsigned long long *outTotal ) {"
+    )
+    steam_country_wrapper_block = _extract_function_block(
+        cl_main, "qboolean SteamUtils_GetIPCountry( char *buffer, size_t bufferSize ) {"
+    )
     subscribed_block = _extract_function_block(cl_ui, "static int QDECL QL_UI_trap_IsSubscribedApp( int arg1 )")
     subscription_log_block = _extract_function_block(
         cl_ui, "static void QL_UI_LogSubscriptionBridgeIgnored( int appId, const char *reason ) {"
     )
 
+    assert "qboolean SteamApps_BIsSubscribedApp( unsigned int appId );" in qcommon_h
+    assert "qboolean SteamUGC_GetItemDownloadInfo( unsigned int itemIdLow, unsigned int itemIdHigh, unsigned long long *outDownloaded, unsigned long long *outTotal );" in qcommon_h
+    assert "qboolean SteamUtils_GetIPCountry( char *buffer, size_t bufferSize );" in qcommon_h
     assert "static const char *CL_GetIdentityBootstrapModeLabel( void ) {" in cl_main
     assert "static const char *CL_GetIdentityBootstrapPolicyLabel( void ) {" in cl_main
     assert 'Com_DPrintf( "%s identity bootstrap: %s (%s [%s])\\n",' in identity_log_block
@@ -4336,15 +4584,21 @@ def test_client_identity_bootstrap_and_ui_subscription_lanes_stay_explicit() -> 
     assert 'CL_LogIdentityBootstrapFallback( "steam_country_seed", "identity bootstrap provider unavailable" );' in country_block
     assert 'CL_LogIdentityBootstrapFallback( "steam_country_seed", "identity bootstrap initialisation failed" );' in country_block
     assert 'CL_LogIdentityBootstrapFallback( "steam_country_seed", "country seed unavailable" );' in country_block
-    assert 'if ( QL_Steamworks_GetIPCountry( country, sizeof( country ) ) && country[0] ) {' in country_block
+    assert 'if ( SteamUtils_GetIPCountry( country, sizeof( country ) ) && country[0] ) {' in country_block
     assert 'Cvar_Set( "country", country );' in country_block
+    assert "SteamClient_SetInitializedState( services );" in steam_apps_wrapper_block
+    assert "return QL_Steamworks_IsSubscribedApp( (uint32_t)appId );" in steam_apps_wrapper_block
+    assert "SteamClient_SetInitializedState( services );" in steam_ugc_wrapper_block
+    assert "return QL_Steamworks_GetItemDownloadInfo( (uint32_t)itemIdLow, (uint32_t)itemIdHigh, (uint64_t *)outDownloaded, (uint64_t *)outTotal );" in steam_ugc_wrapper_block
+    assert "SteamClient_SetInitializedState( services );" in steam_country_wrapper_block
+    assert "return QL_Steamworks_GetIPCountry( buffer, bufferSize );" in steam_country_wrapper_block
 
     assert '#include "../../common/platform/platform_services.h"' in cl_ui
     assert "static const char *QL_UI_GetSubscriptionBridgeModeLabel( void ) {" in cl_ui
     assert "static const char *QL_UI_GetSubscriptionBridgePolicyLabel( void ) {" in cl_ui
     assert 'Com_DPrintf( "UI subscription bridge ignored for app %d: %s (%s [%s])\\n",' in subscription_log_block
     assert 'QL_UI_LogSubscriptionBridgeIgnored( arg1, "subscription bridge provider unavailable" );' in subscribed_block
-    assert "return QL_Steamworks_IsSubscribedApp( (uint32_t)arg1 ) ? 1 : 0;" in subscribed_block
+    assert "return SteamApps_BIsSubscribedApp( (uint32_t)arg1 ) ? 1 : 0;" in subscribed_block
 
 
 def test_game_start_publisher_reconstructs_retail_match_presence_and_connect_handoff() -> None:

@@ -283,7 +283,7 @@ Observed retail facts after the HLIL re-check:
 Observed current-source facts after `QC-P3`:
 
 1. `FS_Startup()` now calls `FS_ResolveHomePath( fs_basepath->string )` instead of falling back to the source-owned `FS_DetectSteamHomePath()` directory scan.
-2. `FS_ResolveHomePath()` mirrors the retail Win32 contract: it keeps `fs_homepath == fs_basepath` until `QL_Steamworks_GetUserSteamID()` returns a non-zero Steam ID, then pivots to `fs_basepath/<steamid>`.
+2. `FS_ResolveHomePath()` mirrors the retail Win32 contract: it keeps `fs_homepath == fs_basepath` until `SteamClient_GetSteamID()` returns a non-zero Steam ID, then pivots to `fs_basepath/<steamid>`.
 3. `tests/test_fs_search_paths.py` now directly guards the Win32 basepath default, the retail Steam-ID suffix, mapped `fs_webpath` fallback reads, and screenshot/homepath fallback routing.
 4. While landing those probes, `FS_FOpenFileReadForRoot()` also stopped truncating the final character of resolved filenames, which restored correct fallback reads for mapped local web resources.
 
@@ -492,7 +492,7 @@ Validation:
 Completed work:
 
 1. Re-checked the retail startup/root-selection path against the committed alias ledger and HLIL corpus, confirming that retail Win32 `FS_Startup()` does not scan the filesystem for profile directories and instead pivots from `fs_basepath` to `fs_basepath/<steamid>` only when Steam exposes an active user.
-2. Replaced the source-owned `FS_DetectSteamHomePath()` heuristic in `src/code/qcommon/files.c` with `FS_ResolveHomePath()`, which now uses `QL_Steamworks_GetUserSteamID()` to mirror the retail Win32 homepath contract while leaving the non-Windows `Sys_DefaultHomePath()` compatibility path explicit.
+2. Replaced the source-owned `FS_DetectSteamHomePath()` heuristic in `src/code/qcommon/files.c` with `FS_ResolveHomePath()`, which now uses `SteamClient_GetSteamID()` to mirror the retail Win32 homepath contract while leaving the non-Windows `Sys_DefaultHomePath()` compatibility path explicit.
 3. Extended `tests/fs_searchpath_harness.c` and `tests/test_fs_search_paths.py` so qcommon now has focused regression coverage for the basepath default, the retail Steam-ID suffix, mapped `fs_webpath` fallback reads, and screenshot/homepath fallback routing.
 4. Fixed a real fallback-read bug discovered by the new harness coverage: `FS_FOpenFileReadForRoot()` no longer truncates the final character of the resolved filename before opening the file.
 

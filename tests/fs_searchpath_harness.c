@@ -825,6 +825,24 @@ qboolean QL_Steamworks_GetUserSteamID( uint32_t *outIdLow, uint32_t *outIdHigh )
 	return qtrue;
 }
 
+/*
+=============
+SteamClient_GetSteamID
+=============
+*/
+unsigned long long SteamClient_GetSteamID( void ) {
+	uint32_t steamIdLow;
+	uint32_t steamIdHigh;
+
+	steamIdLow = 0u;
+	steamIdHigh = 0u;
+	if ( !QL_Steamworks_GetUserSteamID( &steamIdLow, &steamIdHigh ) ) {
+		return 0ull;
+	}
+
+	return ( (unsigned long long)steamIdHigh << 32 ) | steamIdLow;
+}
+
 static cvar_t fs_stub_debug = { .name = "fs_debug", .string = "0", .resetString = "0", .flags = 0, .value = 0.0f, .integer = 0 };
 static cvar_t fs_stub_basepath = { .name = "fs_basepath", .string = "", .resetString = "", .flags = 0, .value = 0.0f, .integer = 0 };
 static cvar_t fs_stub_homepath = { .name = "fs_homepath", .string = "", .resetString = "", .flags = 0, .value = 0.0f, .integer = 0 };

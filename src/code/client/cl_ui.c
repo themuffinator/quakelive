@@ -1596,7 +1596,7 @@ static int QDECL QL_UI_trap_IsSubscribedApp( int arg1 ) {
 		return 0;
 	}
 
-	return QL_Steamworks_IsSubscribedApp( (uint32_t)arg1 ) ? 1 : 0;
+	return SteamApps_BIsSubscribedApp( (uint32_t)arg1 ) ? 1 : 0;
 }
 
 /*
@@ -1636,7 +1636,7 @@ static void QDECL QL_UI_trap_GetItemDownloadInfo( unsigned int itemIdLow, unsign
 	// Companion uix86 reconstruction shows import[96] receiving the parsed
 	// cl_downloadItem low/high words before it reads cl_downloadTime.
 	if ( !CL_GetWorkshopDownloadInfo( itemIdLow, itemIdHigh, &downloaded, &total ) ) {
-		QL_Steamworks_GetItemDownloadInfo( itemIdLow, itemIdHigh, &downloaded, &total );
+		SteamUGC_GetItemDownloadInfo( itemIdLow, itemIdHigh, &downloaded, &total );
 	}
 
 	if ( outDownloaded ) {

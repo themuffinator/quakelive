@@ -3846,19 +3846,13 @@ retain the traditional Sys_DefaultHomePath fallback.
 static const char *FS_ResolveHomePath( const char *basePath ) {
 #if defined( _WIN32 )
 	static char steamHome[MAX_OSPATH];
-	uint32_t steamIdLow;
-	uint32_t steamIdHigh;
 	uint64_t steamId;
 
 	if ( !basePath || !basePath[0] ) {
 		return "";
 	}
 
-	if ( !QL_Steamworks_GetUserSteamID( &steamIdLow, &steamIdHigh ) ) {
-		return basePath;
-	}
-
-	steamId = ( (uint64_t)steamIdHigh << 32 ) | steamIdLow;
+	steamId = SteamClient_GetSteamID();
 	if ( steamId == 0ull ) {
 		return basePath;
 	}

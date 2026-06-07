@@ -16,8 +16,6 @@ typedef struct {
 	const char *policyLabel;
 } ql_client_auth_transport_t;
 
-static uint32_t cl_clientAuthSteamTicketHandle = 0;
-
 /*
 =============
 QL_ClientAuth_MapOutcome
@@ -241,30 +239,13 @@ static qboolean QL_ClientAuth_InvokeBackend( qboolean (*backend)( const ql_auth_
 
 /*
 =============
-QL_ClientAuth_SetSteamTicketHandle
-
-Retains the most recent Steam auth-ticket handle so disconnect cleanup can
-mirror the retail lifetime owner.
-=============
-*/
-static void QL_ClientAuth_SetSteamTicketHandle( uint32_t ticketHandle ) {
-	if ( cl_clientAuthSteamTicketHandle && cl_clientAuthSteamTicketHandle != ticketHandle ) {
-		QL_Steamworks_CancelAuthTicket( cl_clientAuthSteamTicketHandle );
-	}
-
-	cl_clientAuthSteamTicketHandle = ticketHandle;
-}
-
-/*
-=============
 QL_ClientAuth_RequestSteamTicket
 
-Fetches a Steam auth ticket via the Steamworks wrapper for dispatch.
+Fetches a Steam auth ticket through the retail client Steam owner for dispatch.
 =============
 */
 static qboolean QL_ClientAuth_RequestSteamTicket( ql_auth_credential_t *credential, char *logBuffer, size_t logBufferSize ) {
 	int ticketLength = 0;
-	uint32_t ticketHandle = 0;
 
 	if ( logBuffer && logBufferSize > 0 ) {
 		logBuffer[0] = '\0';
@@ -280,14 +261,14 @@ static qboolean QL_ClientAuth_RequestSteamTicket( ql_auth_credential_t *credenti
 
 	QL_Steamworks_RunCallbacks();
 
-	if ( !QL_Steamworks_RequestAuthTicket( credential->value, sizeof( credential->value ), &ticketLength, &ticketHandle ) ) {
+	ticketLength = SteamClient_GetAuthSessionTicket( credential->value, (int)sizeof( credential->value ) );
+	if ( ticketLength <= 0 ) {
 		return qfalse;
 	}
 
 	QL_Steamworks_RunCallbacks();
 
 	credential->length = (size_t)ticketLength;
-	QL_ClientAuth_SetSteamTicketHandle( ticketHandle );
 
 	if ( logBuffer && logBufferSize > 0 ) {
 		Q_strncpyz( logBuffer, credential->value, logBufferSize );
@@ -308,7 +289,7 @@ qboolean QL_ClientAuth_RequestSteamChallengeTicket( byte *ticketBuffer, int tick
 	char		hexTicket[QL_STEAM_AUTH_TICKET_HEX_LENGTH];
 	int			hexLength;
 	uint32_t	rawLength;
-	uint32_t	ticketHandle;
+	unsigned long long steamId;
 
 	if ( ticketLength ) {
 		*ticketLength = 0;
@@ -334,23 +315,24 @@ qboolean QL_ClientAuth_RequestSteamChallengeTicket( byte *ticketBuffer, int tick
 
 	QL_Steamworks_RunCallbacks();
 
-	if ( !QL_Steamworks_GetUserSteamID( steamIdLow, steamIdHigh ) || !( *steamIdLow | *steamIdHigh ) ) {
+	steamId = SteamClient_GetSteamID();
+	if ( steamId == 0ull ) {
 		return qfalse;
 	}
+	*steamIdLow = (uint32_t)( steamId & 0xffffffffull );
+	*steamIdHigh = (uint32_t)( steamId >> 32 );
 
-	hexLength = 0;
-	ticketHandle = 0;
-	if ( !QL_Steamworks_RequestAuthTicket( hexTicket, sizeof( hexTicket ), &hexLength, &ticketHandle ) ) {
+	hexLength = SteamClient_GetAuthSessionTicket( hexTicket, (int)sizeof( hexTicket ) );
+	if ( hexLength <= 0 ) {
 		return qfalse;
 	}
 
 	rawLength = 0u;
 	if ( !QL_Steamworks_HexDecode( hexTicket, ticketBuffer, (size_t)ticketBufferSize, &rawLength ) || rawLength == 0u ) {
-		QL_Steamworks_CancelAuthTicket( ticketHandle );
+		SteamClient_CancelAuthTicket();
 		return qfalse;
 	}
 
-	QL_ClientAuth_SetSteamTicketHandle( ticketHandle );
 	QL_Steamworks_RunCallbacks();
 
 	*ticketLength = (int)rawLength;
@@ -365,12 +347,7 @@ Cancels the retained Steam auth ticket during disconnect/error cleanup.
 =============
 */
 void QL_ClientAuth_CancelSteamTicket( void ) {
-	if ( !cl_clientAuthSteamTicketHandle ) {
-		return;
-	}
-
-	QL_Steamworks_CancelAuthTicket( cl_clientAuthSteamTicketHandle );
-	cl_clientAuthSteamTicketHandle = 0;
+	SteamClient_CancelAuthTicket();
 }
 
 /*

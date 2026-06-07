@@ -254,7 +254,7 @@ def test_native_cgame_import_enum_covers_full_retail_slab() -> None:
 	assert "Cvar_SetValue( varName, value );" in set_value_block
 	assert "return 0;" in reserved_block
 	assert "if ( !CL_SteamServicesEnabled() ) {" in subscribed_block
-	assert "return QL_Steamworks_IsSubscribedApp( (uint32_t)appId ) ? 1 : 0;" in subscribed_block
+	assert "return SteamApps_BIsSubscribedApp( (uint32_t)appId ) ? 1 : 0;" in subscribed_block
 	assert "void\t\ttrap_QL_Cvar_SetValue( const char *varName, float value );" in cgame_local
 	assert "qboolean\ttrap_QL_IsSubscribedApp( int appId );" in cgame_local
 	assert "static ID_INLINE void trap_QL_Cvar_SetValue( const char *varName, float value )" in cgame_local

@@ -940,6 +940,7 @@ typedef struct {
 
 static clSteamCallbackState_t cl_steamCallbackState;
 static qboolean cl_steamClientInitialized;
+static uint32_t cl_steamAuthTicketHandle;
 
 /*
 =============
@@ -967,6 +968,185 @@ static void SteamClient_SetInitializedState( const ql_platform_service_table *se
 	}
 
 	cl_steamClientInitialized = qtrue;
+}
+
+/*
+=============
+SteamClient_GetSteamID
+
+Mirrors the retail SteamUser()->GetSteamID wrapper behind the retained Steam
+client initialisation flag.
+=============
+*/
+unsigned long long SteamClient_GetSteamID( void ) {
+	const ql_platform_service_table *services;
+	uint32_t steamIdLow;
+	uint32_t steamIdHigh;
+
+	if ( !SteamClient_IsInitialized() ) {
+		services = QL_RefreshPlatformServices();
+		SteamClient_SetInitializedState( services );
+	}
+
+	if ( !SteamClient_IsInitialized() ) {
+		return 0ull;
+	}
+
+	steamIdLow = 0u;
+	steamIdHigh = 0u;
+	if ( !QL_Steamworks_GetUserSteamID( &steamIdLow, &steamIdHigh ) ) {
+		return 0ull;
+	}
+
+	return ( (unsigned long long)steamIdHigh << 32 ) | steamIdLow;
+}
+
+/*
+=============
+SteamClient_GetAuthSessionTicket
+
+Mirrors the retail SteamUser()->GetAuthSessionTicket wrapper by retaining the
+issued auth-ticket handle in the client Steam owner.
+=============
+*/
+int SteamClient_GetAuthSessionTicket( char *ticketBuffer, int ticketBufferSize ) {
+	const ql_platform_service_table *services;
+	int ticketLength;
+	uint32_t ticketHandle;
+
+	if ( ticketBuffer && ticketBufferSize > 0 ) {
+		ticketBuffer[0] = '\0';
+	}
+
+	if ( !ticketBuffer || ticketBufferSize <= 0 ) {
+		return 0;
+	}
+
+	if ( !SteamClient_IsInitialized() ) {
+		services = QL_RefreshPlatformServices();
+		SteamClient_SetInitializedState( services );
+	}
+
+	if ( !SteamClient_IsInitialized() ) {
+		return 0;
+	}
+
+	ticketLength = 0;
+	ticketHandle = 0u;
+	if ( !QL_Steamworks_RequestAuthTicket( ticketBuffer, (size_t)ticketBufferSize, &ticketLength, &ticketHandle ) ||
+		ticketLength <= 0 || ticketHandle == 0u ) {
+		return 0;
+	}
+
+	if ( cl_steamAuthTicketHandle && cl_steamAuthTicketHandle != ticketHandle ) {
+		QL_Steamworks_CancelAuthTicket( cl_steamAuthTicketHandle );
+	}
+
+	cl_steamAuthTicketHandle = ticketHandle;
+	return ticketLength;
+}
+
+/*
+=============
+SteamClient_CancelAuthTicket
+
+Cancels the retained client Steam auth-ticket handle.
+=============
+*/
+qboolean SteamClient_CancelAuthTicket( void ) {
+	qboolean cancelled;
+
+	if ( !cl_steamAuthTicketHandle ) {
+		return qfalse;
+	}
+
+	cancelled = QL_Steamworks_CancelAuthTicket( cl_steamAuthTicketHandle );
+	cl_steamAuthTicketHandle = 0u;
+	return cancelled;
+}
+
+/*
+=============
+SteamApps_BIsSubscribedApp
+
+Mirrors the retail SteamApps()->BIsSubscribedApp wrapper behind the retained
+client Steam initialisation flag.
+=============
+*/
+qboolean SteamApps_BIsSubscribedApp( unsigned int appId ) {
+	const ql_platform_service_table *services;
+
+	if ( !SteamClient_IsInitialized() ) {
+		services = QL_RefreshPlatformServices();
+		SteamClient_SetInitializedState( services );
+	}
+
+	if ( !SteamClient_IsInitialized() ) {
+		return qfalse;
+	}
+
+	return QL_Steamworks_IsSubscribedApp( (uint32_t)appId );
+}
+
+/*
+=============
+SteamUGC_GetItemDownloadInfo
+
+Mirrors the retail SteamUGC()->GetItemDownloadInfo wrapper while keeping the
+compatibility-owned output fallback deterministic.
+=============
+*/
+qboolean SteamUGC_GetItemDownloadInfo( unsigned int itemIdLow, unsigned int itemIdHigh, unsigned long long *outDownloaded, unsigned long long *outTotal ) {
+	const ql_platform_service_table *services;
+
+	if ( outDownloaded ) {
+		*outDownloaded = 0ull;
+	}
+	if ( outTotal ) {
+		*outTotal = 0ull;
+	}
+
+	if ( !SteamClient_IsInitialized() ) {
+		services = QL_RefreshPlatformServices();
+		SteamClient_SetInitializedState( services );
+	}
+
+	if ( !SteamClient_IsInitialized() ) {
+		return qfalse;
+	}
+
+	return QL_Steamworks_GetItemDownloadInfo( (uint32_t)itemIdLow, (uint32_t)itemIdHigh, (uint64_t *)outDownloaded, (uint64_t *)outTotal );
+}
+
+/*
+=============
+SteamUtils_GetIPCountry
+
+Mirrors the retail SteamUtils()->GetIPCountry wrapper behind the retained Steam
+client initialisation flag.
+=============
+*/
+qboolean SteamUtils_GetIPCountry( char *buffer, size_t bufferSize ) {
+	const ql_platform_service_table *services;
+
+	if ( buffer && bufferSize > 0 ) {
+		buffer[0] = '\0';
+	}
+
+	if ( !buffer || bufferSize == 0 ) {
+		return qfalse;
+	}
+
+	if ( !SteamClient_IsInitialized() ) {
+		services = QL_RefreshPlatformServices();
+		SteamClient_SetInitializedState( services );
+	}
+
+	if ( !SteamClient_IsInitialized() ) {
+		return qfalse;
+	}
+
+	return QL_Steamworks_GetIPCountry( buffer, bufferSize );
 }
 
 typedef struct {
@@ -1134,6 +1314,7 @@ bridge as the current fallback when live voice services are unavailable.
 static void CL_VoiceStartRecording_f( void ) {
 	uint32_t steamIdLow;
 	uint32_t steamIdHigh;
+	unsigned long long steamId;
 
 	if ( cl_voiceRecordingActive ) {
 		return;
@@ -1143,7 +1324,10 @@ static void CL_VoiceStartRecording_f( void ) {
 	if ( !CL_SteamServicesEnabled() ) {
 		CL_LogVoiceServiceFallback( "+voice", "local speaking-state fallback active" );
 	} else {
-		if ( QL_Steamworks_GetUserSteamID( &steamIdLow, &steamIdHigh ) ) {
+		steamId = SteamClient_GetSteamID();
+		if ( steamId != 0ull ) {
+			steamIdLow = (uint32_t)( steamId & 0xffffffffull );
+			steamIdHigh = (uint32_t)( steamId >> 32 );
 			QL_Steamworks_SetInGameVoiceSpeaking( steamIdLow, steamIdHigh, qtrue );
 		}
 		QL_Steamworks_StartVoiceRecording();
@@ -1164,6 +1348,7 @@ fallback when the key is released.
 static void CL_VoiceStopRecording_f( void ) {
 	uint32_t steamIdLow;
 	uint32_t steamIdHigh;
+	unsigned long long steamId;
 
 	if ( !cl_voiceRecordingActive ) {
 		return;
@@ -1173,7 +1358,10 @@ static void CL_VoiceStopRecording_f( void ) {
 		CL_LogVoiceServiceFallback( "-voice", "local speaking-state fallback active" );
 	} else {
 		QL_Steamworks_StopVoiceRecording();
-		if ( QL_Steamworks_GetUserSteamID( &steamIdLow, &steamIdHigh ) ) {
+		steamId = SteamClient_GetSteamID();
+		if ( steamId != 0ull ) {
+			steamIdLow = (uint32_t)( steamId & 0xffffffffull );
+			steamIdHigh = (uint32_t)( steamId >> 32 );
 			QL_Steamworks_SetInGameVoiceSpeaking( steamIdLow, steamIdHigh, qfalse );
 		}
 	}
@@ -1341,7 +1529,7 @@ static qboolean CL_Workshop_RefreshProgress( int itemIndex ) {
 	downloaded = cl_steamWorkshopDownloadState.downloadedBytes;
 	total = cl_steamWorkshopDownloadState.totalBytes;
 
-	if ( !QL_Steamworks_GetItemDownloadInfo( item->itemIdLow, item->itemIdHigh, &downloaded, &total ) ) {
+	if ( !SteamUGC_GetItemDownloadInfo( item->itemIdLow, item->itemIdHigh, &downloaded, &total ) ) {
 		return qfalse;
 	}
 
@@ -5501,8 +5689,7 @@ static void CL_Steam_Client_OnPersonaStateChange( void *context, const ql_steam_
 	char steamId[32];
 	char payload[CL_STEAM_BROWSER_EVENT_PAYLOAD_LENGTH];
 	char detail[128];
-	uint32_t localIdLow;
-	uint32_t localIdHigh;
+	unsigned long long localSteamId;
 
 	(void)context;
 
@@ -5515,12 +5702,9 @@ static void CL_Steam_Client_OnPersonaStateChange( void *context, const ql_steam_
 	Com_sprintf( detail, sizeof( detail ), "persona changed for %s flags=%u",
 		steamId, event->changeFlags );
 	CL_LogMatchmakingCallbackLifecycle( "persona_state_change", detail );
-	localIdLow = 0u;
-	localIdHigh = 0u;
+	localSteamId = SteamClient_GetSteamID();
 	if ( ( event->changeFlags & 1u ) != 0 &&
-		QL_Steamworks_GetUserSteamID( &localIdLow, &localIdHigh ) &&
-		localIdLow == (uint32_t)( event->steamId.value & 0xffffffffu ) &&
-		localIdHigh == (uint32_t)( event->steamId.value >> 32 ) ) {
+		localSteamId == event->steamId.value ) {
 		SteamClient_SyncPersonaNameCvar();
 	}
 	Com_sprintf( eventName, sizeof( eventName ), "users.persona.%s.change", steamId );
@@ -5713,10 +5897,10 @@ static void CL_Steam_Lobby_OnLobbyEnter( void *context, const ql_steam_lobby_ent
 	uint32_t lobbyIdHigh;
 	uint32_t ownerIdLow;
 	uint32_t ownerIdHigh;
-	uint32_t localIdLow;
-	uint32_t localIdHigh;
 	uint32_t memberIdLow;
 	uint32_t memberIdHigh;
+	unsigned long long ownerSteamId;
+	unsigned long long localSteamId;
 	int numPlayers;
 	int maxPlayers;
 	int i;
@@ -5751,13 +5935,13 @@ static void CL_Steam_Lobby_OnLobbyEnter( void *context, const ql_steam_lobby_ent
 	lobbyIdHigh = (uint32_t)( event->lobbyId.value >> 32 );
 	ownerIdLow = 0u;
 	ownerIdHigh = 0u;
-	localIdLow = 0u;
-	localIdHigh = 0u;
 	isOwner = qfalse;
-	if ( QL_Steamworks_GetLobbyOwner( lobbyIdLow, lobbyIdHigh, &ownerIdLow, &ownerIdHigh ) &&
-		QL_Steamworks_GetUserSteamID( &localIdLow, &localIdHigh ) &&
-		localIdLow == ownerIdLow && localIdHigh == ownerIdHigh ) {
-		isOwner = qtrue;
+	if ( QL_Steamworks_GetLobbyOwner( lobbyIdLow, lobbyIdHigh, &ownerIdLow, &ownerIdHigh ) ) {
+		ownerSteamId = ( (unsigned long long)ownerIdHigh << 32 ) | ownerIdLow;
+		localSteamId = SteamClient_GetSteamID();
+		if ( localSteamId != 0ull && localSteamId == ownerSteamId ) {
+			isOwner = qtrue;
+		}
 	}
 	CL_Steam_FormatSteamId( ( (uint64_t)ownerIdHigh << 32 ) | ownerIdLow, ownerId, sizeof( ownerId ) );
 	isOwnerLiteral = isOwner ? "true" : "false";
@@ -6311,6 +6495,7 @@ static void CL_Steam_ShutdownCallbacks( void ) {
 	QL_Steamworks_UnregisterMicroCallbacks();
 	QL_Steamworks_UnregisterLobbyCallbacks();
 	QL_Steamworks_UnregisterClientCallbacks();
+	SteamClient_CancelAuthTicket();
 	cl_steamCallbackState.callbackRegistrationActive = qfalse;
 	cl_steamClientInitialized = qfalse;
 	CL_Steam_ClearCurrentLobby();
@@ -6474,6 +6659,7 @@ void SteamClient_Init( void ) {
 
 	cl_statsClearRegistered = qfalse;
 	cl_steamClientInitialized = qfalse;
+	SteamClient_CancelAuthTicket();
 	cl_steamCallbackState.callbackRegistrationActive = qfalse;
 	CL_Steam_ClearCurrentLobby();
 	CL_Steam_ClearBrowserEvents();
@@ -6575,7 +6761,7 @@ static void CL_Steam_SeedCountryCvar( void ) {
 		return;
 	}
 
-	if ( QL_Steamworks_GetIPCountry( country, sizeof( country ) ) && country[0] ) {
+	if ( SteamUtils_GetIPCountry( country, sizeof( country ) ) && country[0] ) {
 		Cvar_Set( "country", country );
 		return;
 	}

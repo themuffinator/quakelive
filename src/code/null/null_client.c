@@ -146,6 +146,80 @@ void SteamClient_Frame( void ) {
 
 /*
 ================
+SteamClient_GetSteamID
+================
+*/
+unsigned long long SteamClient_GetSteamID( void ) {
+	return 0ull;
+}
+
+/*
+================
+SteamClient_GetAuthSessionTicket
+================
+*/
+int SteamClient_GetAuthSessionTicket( char *ticketBuffer, int ticketBufferSize ) {
+	if ( ticketBuffer && ticketBufferSize > 0 ) {
+		ticketBuffer[0] = '\0';
+	}
+
+	return 0;
+}
+
+/*
+================
+SteamClient_CancelAuthTicket
+================
+*/
+qboolean SteamClient_CancelAuthTicket( void ) {
+	return qfalse;
+}
+
+/*
+================
+SteamApps_BIsSubscribedApp
+================
+*/
+qboolean SteamApps_BIsSubscribedApp( unsigned int appId ) {
+	(void)appId;
+
+	return qfalse;
+}
+
+/*
+================
+SteamUGC_GetItemDownloadInfo
+================
+*/
+qboolean SteamUGC_GetItemDownloadInfo( unsigned int itemIdLow, unsigned int itemIdHigh, unsigned long long *outDownloaded, unsigned long long *outTotal ) {
+	(void)itemIdLow;
+	(void)itemIdHigh;
+
+	if ( outDownloaded ) {
+		*outDownloaded = 0ull;
+	}
+	if ( outTotal ) {
+		*outTotal = 0ull;
+	}
+
+	return qfalse;
+}
+
+/*
+================
+SteamUtils_GetIPCountry
+================
+*/
+qboolean SteamUtils_GetIPCountry( char *buffer, size_t bufferSize ) {
+	if ( buffer && bufferSize > 0 ) {
+		buffer[0] = '\0';
+	}
+
+	return qfalse;
+}
+
+/*
+================
 CL_PacketEvent
 ================
 */

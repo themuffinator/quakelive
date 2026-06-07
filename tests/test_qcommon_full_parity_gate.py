@@ -181,7 +181,7 @@ def _build_qcommon_full_parity_gate_report() -> dict[str, Any]:
 		qc_g01_closed
 		and "FS_DetectSteamHomePath" not in files_c
 		and "static const char *FS_ResolveHomePath( const char *basePath ) {" in files_c
-		and "QL_Steamworks_GetUserSteamID" in files_c
+		and "SteamClient_GetSteamID" in files_c
 		and "test_homepath_resolution_defaults_to_basepath_without_steam_user" in fs_search_tests
 		and "test_homepath_resolution_appends_retail_steamid_suffix_when_available" in fs_search_tests
 		and "test_web_fallback_reads_mapped_fs_webpath_content_and_reports_resolution" in fs_search_tests
@@ -201,7 +201,7 @@ def _build_qcommon_full_parity_gate_report() -> dict[str, Any]:
 			"plan_marks_closed": qc_g01_closed,
 			"heuristic_helper_present": "FS_DetectSteamHomePath" in files_c,
 			"homepath_helper_present": "static const char *FS_ResolveHomePath( const char *basePath ) {" in files_c,
-			"steam_user_lookup_present": "QL_Steamworks_GetUserSteamID" in files_c,
+			"steam_user_lookup_present": "SteamClient_GetSteamID" in files_c,
 			"focused_homepath_tests_present": (
 				"test_homepath_resolution_defaults_to_basepath_without_steam_user" in fs_search_tests
 				and "test_homepath_resolution_appends_retail_steamid_suffix_when_available" in fs_search_tests

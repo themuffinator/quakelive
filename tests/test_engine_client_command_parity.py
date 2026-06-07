@@ -645,7 +645,9 @@ def test_client_steam_command_handlers_match_retail_voice_stats_and_model_contra
 	assert 'if ( !QL_Steamworks_ClearStats( qtrue ) ) {' in stats_block
 	assert "Com_DPrintf" not in stats_block
 
-	assert "QL_Steamworks_GetUserSteamID( &steamIdLow, &steamIdHigh )" in voice_start_block
+	assert "steamId = SteamClient_GetSteamID();" in voice_start_block
+	assert "steamIdLow = (uint32_t)( steamId & 0xffffffffull );" in voice_start_block
+	assert "steamIdHigh = (uint32_t)( steamId >> 32 );" in voice_start_block
 	assert "QL_Steamworks_SetInGameVoiceSpeaking( steamIdLow, steamIdHigh, qtrue );" in voice_start_block
 	assert "QL_Steamworks_StartVoiceRecording();" in voice_start_block
 	assert 'Com_DPrintf( "Started recording - optimal sample rate %d\\n",' in voice_start_block
