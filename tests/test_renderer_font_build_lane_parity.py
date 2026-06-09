@@ -54,6 +54,10 @@ def test_renderer_build_lane_uses_repo_managed_dependencies() -> None:
 	assert "Ensure-Vorbis" in internal_deps_script
 	assert "Ensure-Png" in internal_deps_script
 	assert "Ensure-FreeType" in internal_deps_script
+	assert "Ensure-GitDependencySource -Name 'libogg'" in internal_deps_script
+	assert "Ensure-GitDependencySource -Name 'libvorbis'" in internal_deps_script
+	assert "Ensure-GitDependencySource -Name 'zlib'" in internal_deps_script
+	assert "Ensure-GitDependencySource -Name 'libpng'" in internal_deps_script
 
 	assert "QL_ENABLE_FREETYPE ?= 0" in unix_makefile
 	assert "pkg-config --cflags freetype2" in unix_makefile

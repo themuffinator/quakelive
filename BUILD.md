@@ -20,9 +20,10 @@ Requirements:
   Visual Studio 2017 `v141` toolset available
 - MSBuild on `PATH`
 - CMake on `PATH` for the repo-managed codec bootstrap
-- Repo-managed third-party codec sources under `src/libs/_deps/`
-  The Windows projects now bootstrap `libogg`, `libvorbis`, `zlib`, and
-  `libpng` from that tree instead of probing system SDK or Vcpkg installs.
+- Git on `PATH` so repo-managed codec source mirrors can be cloned into
+  `src/libs/_deps/` when missing
+  The Windows projects bootstrap `libogg`, `libvorbis`, `zlib`, and `libpng`
+  from that cache instead of probing system SDK or Vcpkg installs.
 
 Build the recovered native gameplay modules and helper executable with the
 retail-default toolset:
