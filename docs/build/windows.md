@@ -130,11 +130,10 @@ repo-managed `libogg`, `libvorbis`, `zlib`, and `libpng` trees through
 `tools/build_internal_deps.ps1`, staging the resulting headers and import
 libraries under `src/libs/vorbis/` and `src/libs/libpng/`.
 
-That bootstrap expects the corresponding source trees to exist under
-`src/libs/_deps/` and expects `cmake` to be available on `PATH`. Once those
-repo-managed sources are present, solution or project builds can invoke MSBuild
-directly and the codec prerequisites will be prepared automatically before the
-normal validation steps run.
+That bootstrap expects `cmake` and `git` on `PATH`. Missing dependency sources
+under `src/libs/_deps/` are cloned automatically into that cache before MSBuild
+continues, so solution or project builds can prepare codec prerequisites
+without a manual pre-sync step.
 
 These staged codec trees are still build-time conveniences, not part of the
 retail runtime surface: the Steam install does not ship `vorbisfile.dll`,

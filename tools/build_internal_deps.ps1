@@ -39,7 +39,7 @@ function Get-GitPath {
 		}
 	}
 
-	throw 'git was not found on PATH. Install Git to bootstrap the repo-managed FreeType source cache.'
+	throw 'git was not found on PATH. Install Git to bootstrap the repo-managed dependency source cache.'
 }
 
 function Get-VswherePath {
@@ -382,11 +382,19 @@ function Ensure-Vorbis {
 
 		$oggSourceDir = Join-Path $depsRoot 'libogg'
 		$vorbisSourceDir = Join-Path $depsRoot 'libvorbis'
-		Ensure-DependencySources -Name 'libogg' -RequiredPaths @(
+		Ensure-GitDependencySource -Name 'libogg' `
+			-SourceDir $oggSourceDir `
+			-RepositoryUrl 'https://github.com/xiph/ogg.git' `
+			-Tag 'v1.3.5' `
+			-RequiredPaths @(
 			(Join-Path $oggSourceDir 'CMakeLists.txt'),
 			(Join-Path $oggSourceDir 'include\ogg\ogg.h')
 		)
-		Ensure-DependencySources -Name 'libvorbis' -RequiredPaths @(
+		Ensure-GitDependencySource -Name 'libvorbis' `
+			-SourceDir $vorbisSourceDir `
+			-RepositoryUrl 'https://github.com/xiph/vorbis.git' `
+			-Tag 'v1.3.7' `
+			-RequiredPaths @(
 			(Join-Path $vorbisSourceDir 'CMakeLists.txt'),
 			(Join-Path $vorbisSourceDir 'lib\CMakeLists.txt')
 		)
@@ -458,11 +466,19 @@ function Ensure-Png {
 
 		$zlibSourceDir = Join-Path $depsRoot 'zlib'
 		$pngSourceDir = Join-Path $depsRoot 'libpng'
-		Ensure-DependencySources -Name 'zlib' -RequiredPaths @(
+		Ensure-GitDependencySource -Name 'zlib' `
+			-SourceDir $zlibSourceDir `
+			-RepositoryUrl 'https://github.com/madler/zlib.git' `
+			-Tag 'v1.3.1' `
+			-RequiredPaths @(
 			(Join-Path $zlibSourceDir 'CMakeLists.txt'),
 			(Join-Path $zlibSourceDir 'zlib.h')
 		)
-		Ensure-DependencySources -Name 'libpng' -RequiredPaths @(
+		Ensure-GitDependencySource -Name 'libpng' `
+			-SourceDir $pngSourceDir `
+			-RepositoryUrl 'https://github.com/glennrp/libpng.git' `
+			-Tag 'v1.6.43' `
+			-RequiredPaths @(
 			(Join-Path $pngSourceDir 'CMakeLists.txt'),
 			(Join-Path $pngSourceDir 'png.h')
 		)
