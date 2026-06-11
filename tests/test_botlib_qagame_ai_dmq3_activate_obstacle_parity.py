@@ -229,6 +229,7 @@ SOURCE_HELPERS = {
 		"void BotCheckEvents(bot_state_t *bs, entityState_t *state)",
 		(
 			"bs->entityeventTime[state->number] == g_entities[state->number].eventTime",
+			"bs->heardClientMask = 0;",
 			"event = (state->eType - ET_EVENTS) & ~EV_EVENT_BITS;",
 			"case EV_OBITUARY:",
 			"if (gametype == GT_1FCTF)",
@@ -240,6 +241,7 @@ SOURCE_HELPERS = {
 			"lastteleport_time = FloatTime();",
 			"case EV_GENERAL_SOUND:",
 			"trap_EA_Use(bs->client);",
+			"BotRememberHeardClient(bs, state);",
 		),
 	),
 	"BotCheckSnapshot": (

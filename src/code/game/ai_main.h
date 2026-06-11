@@ -59,6 +59,12 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #define LTG_ATTACKENEMYBASE			13	//attack the enemy base
 #define LTG_MAKELOVE_UNDER			14
 #define LTG_MAKELOVE_ONTOP			15
+#define LTG_FOLLOWING				16	//retail tutorial follow state
+#define LTG_TRAINING				17	//retail tutorial training state
+#define LTG_TOURING					18	//retail tutorial tour state
+#define LTG_TORMENT_HUMAN			19	//retail tutorial torment-human state
+#define LTG_TARGET					20	//retail tutorial target state
+#define LTG_INSTAGIB				21	//instant rail tutorial target mode
 //some goal dedication times
 #define TEAM_HELP_TIME				60	//1 minute teamplay help time
 #define TEAM_ACCOMPANY_TIME			600	//10 minutes teamplay accompany time
@@ -119,6 +125,15 @@ typedef struct bot_activategoal_s
 	struct bot_activategoal_s *next;		//next activate goal on stack
 } bot_activategoal_t;
 
+#define BOT_DYNAMIC_SKILL_MAX_SAMPLES	32
+
+typedef struct bot_dynamic_skill_sample_s
+{
+	int scoreDelta;
+	float skill;
+	int time;
+} bot_dynamic_skill_sample_t;
+
 //bot state
 typedef struct bot_state_s
 {
@@ -161,6 +176,12 @@ typedef struct bot_state_s
 	int lasthitcount;								//number of hits last frame
 	int chatto;										//chat to all or team
 	float walker;									//walker charactertic
+	float dynamicSkillAdjustment;					//retail training skill nudge in progress
+	int dynamicSkillReferenceScoreDelta;			//score delta used while evaluating a nudge
+	int dynamicSkillLastScoreDelta;					//last local-player to bot score delta
+	int dynamicSkillLastScoreTime;					//elapsed level seconds for last score-delta change
+	bot_dynamic_skill_sample_t dynamicSkillSamples[BOT_DYNAMIC_SKILL_MAX_SAMPLES];
+	int numDynamicSkillSamples;
 	float ltime;									//local bot time
 	float entergame_time;							//time the bot entered the game
 	float ltg_time;									//long term goal time
@@ -216,6 +237,8 @@ typedef struct bot_state_s
 	int ws;											//weapon state of the bot
 	//
 	int enemy;										//enemy entity number
+	unsigned int heardClientMask;					//clients heard through recent entity events
+	int enemyFromGoalStack;							//enemy accepted through the offscreen goal-stack path
 	int lastenemyareanum;							//last reachability area the enemy was in
 	vec3_t lastenemyorigin;							//last origin of the enemy in the reachability area
 	int weaponnum;									//current weapon number
@@ -287,6 +310,8 @@ void BotResetState(bot_state_t *bs);
 int NumBots(void);
 //returns info about the entity
 void BotEntityInfo(int entnum, aas_entityinfo_t *info);
+float BotEntityBoundsGap(int ent1, int ent2);
+void BotSetTrainingBotState(bot_state_t *bs, qboolean enabled);
 
 extern float floattime;
 #define FloatTime() floattime
@@ -299,3 +324,4 @@ int		BotAI_GetClientState( int clientNum, playerState_t *state );
 int		BotAI_GetEntityState( int entityNum, entityState_t *state );
 int		BotAI_GetSnapshotEntity( int clientNum, int sequence, entityState_t *state );
 int		BotTeamLeader(bot_state_t *bs);
+void	BotSetIdealViewAnglesToPoint(bot_state_t *bs, vec3_t target);

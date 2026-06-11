@@ -8,10 +8,17 @@ retail binary is `qagamex86.dll`; the primary mapped ranges are
 `0x10020F00..0x10022E40`, `0x10023400..0x100243D0`, and
 `0x10024530..0x10024FA0`.
 
-No C behavior was changed. The work promotes missing `FUN_...` and `sub_...`
-aliases and adds a parity regression that pins source anchors, Ghidra rows,
-Binary Ninja HLIL anchors, retail-only helper boundaries, and the native botlib
-import wiring used by the band.
+Follow-up reconstruction now includes two narrow C helpers in the training
+helper island: `BotEntityBoundsGap` and `BotSetIdealViewAnglesToPoint`. The
+rest of the work promotes missing `FUN_...` and `sub_...` aliases and adds a
+parity regression that pins source anchors, Ghidra rows, Binary Ninja HLIL
+anchors, retail-only helper boundaries, and the native botlib import wiring
+used by the band.
+
+Update 2026-06-11: `BotUpdateItemDelayTime` now matches the retail helper
+signature and frame-tail wiring. `BotAIStartFrame` calls it with the frame time
+immediately before `BotUpdateDynamicSkill(time)` and `BotUpdateTrainingState()`,
+and the helper computes elapsed training seconds from that explicit time input.
 
 ## Evidence
 
@@ -62,14 +69,14 @@ import wiring used by the band.
 | Address | Promoted name | Function size | Source status |
 | --- | --- | ---: | --- |
 | `0x10022EE0` | `BotPublishDebugInfoString` | 1228 | Reconstructed telemetry shim exists |
-| `0x100243D0` | `BotEntityBoundsGap` | 350 | Mapped-only retail helper |
-| `0x10024530` | `BotSetIdealViewAnglesToPoint` | 82 | Mapped-only retail helper |
+| `0x100243D0` | `BotEntityBoundsGap` | 350 | Reconstructed retail helper exists |
+| `0x10024530` | `BotSetIdealViewAnglesToPoint` | 82 | Reconstructed retail leaf exists |
 | `0x10024590` | `BotSetPredictItemPickupDisabled` | 40 | Reconstructed training shim exists |
-| `0x100245C0` | `BotSetTrainingBotState` | 124 | Mapped-only retail helper |
-| `0x10024640` | `BotUpdateItemDelayTime` | 183 | Reconstructed training shim exists, retail takes a time input |
-| `0x10024700` | `BotAppendDynamicSkillSample` | 177 | Mapped-only retail helper |
-| `0x100247C0` | `BotUpdateDynamicSkill` | 1596 | Mapped-only retail helper |
-| `0x10024E10` | `BotApplyBeyondRealityTravelFlags` | 136 | Mapped-only retail helper |
+| `0x100245C0` | `BotSetTrainingBotState` | 124 | Reconstructed training-state helper exists |
+| `0x10024640` | `BotUpdateItemDelayTime` | 183 | Reconstructed retail time-input helper exists |
+| `0x10024700` | `BotAppendDynamicSkillSample` | 177 | Reconstructed dynamic-skill history helper exists |
+| `0x100247C0` | `BotUpdateDynamicSkill` | 1596 | Reconstructed dynamic-skill update helper exists |
+| `0x10024E10` | `BotApplyBeyondRealityTravelFlags` | 136 | Reconstructed map-specific travel helper exists |
 | `0x10024EA0` | `BotGetLocalClient` | 56 | Reconstructed training selector exists |
 | `0x10024EE0` | `BotGetFirstBotClient` | 59 | Reconstructed training selector exists |
 | `0x10024F20` | `BotSetTrainingCvarIfChanged` | 127 | Reconstructed training shim exists |
@@ -90,6 +97,26 @@ Observed source anchors now pinned by tests:
   challenge versus overreaction view control, `trap_EA_View`,
   `ACTION_*` to button-bit mapping, angle delta conversion, movement vector
   projection, respawn-button filtering, and `trap_EA_GetInput`.
+- `BotEntityBoundsGap` preserves the retail double `AAS_EntityInfo` snapshot,
+  absolute bbox construction from `origin + mins/maxs`, the horizontal
+  `4.0f` spacing cushion, and a positive-gap versus zero-overlap return.
+- `BotSetIdealViewAnglesToPoint` preserves the retail target-minus-origin
+  direction calculation, `vectoangles` conversion into `bs->ideal_viewangles`,
+  and post-conversion roll halving.
+- `BotApplyBeyondRealityTravelFlags` preserves the retail serverinfo map-name
+  lookup and clears `TFL_FUNCBOB` on the `beyondreality` map-specific branch.
+- `BotSetTrainingBotState` preserves the retail trainer entity flag groups,
+  rocket-launcher ammo grant, weapon-bit updates, and disable-path shotgun ammo
+  reset used by the late tutorial nodes.
+- `BotUpdateItemDelayTime` preserves the retail `g_training` guard,
+  `g_spSkill > 3.0` gate, explicit frame-time elapsed-seconds calculation, and
+  staged `bot_itemDelayTime` values `10/15/20/25` after 60/120/180/240 seconds.
+- `BotAppendDynamicSkillSample` preserves the retail capped 32-entry
+  score-delta, skill, and timestamp sample ring.
+- `BotUpdateDynamicSkill` preserves the retail `bot_dynamicSkill`,
+  `cl_running`, warmup, five-second throttle, local-client activity, score-delta
+  feedback, character reload, item/weapon-weight reload, userinfo refresh,
+  walker update, and `g_spSkill` mirror path.
 - `BotAI` preserves input reset, client-state refresh, server-command parsing,
   color escape stripping, print/chat/tchat console-message queuing, voice chat
   dispatch, delta-angle normalization, deathmatch AI dispatch, weapon
@@ -107,18 +134,12 @@ Observed source anchors now pinned by tests:
 
 ## Retail-Only Boundaries
 
-The following names are mapped but not reconstructed as exact C in this pass:
+The following names are mapped but not fully exact C in this pass:
 
-- `BotEntityBoundsGap`, `BotSetIdealViewAnglesToPoint`,
-  `BotSetTrainingBotState`, and `BotApplyBeyondRealityTravelFlags` are helper
-  sidecars used by the late tutorial nodes.
-- `BotAppendDynamicSkillSample` and `BotUpdateDynamicSkill` preserve the retail
-  dynamic-skill history and skill-refresh island in HLIL/Ghidra evidence, but
-  the current source does not yet reconstruct those exact bodies.
-- `BotUpdateItemDelayTime` and `BotUpdateTrainingState` have current source
-  shims that cover the visible training behavior. The retail rows take broader
-  inputs and include additional dynamic-skill and tutorial state transitions,
-  so their exact source parity remains a follow-up reconstruction target.
+- `BotUpdateTrainingState` has a current source tail that covers the visible
+  training behavior. The retail row includes additional tutorial state
+  transitions, so its exact source parity remains a follow-up reconstruction
+  target.
 
 ## Botlib Wiring
 
@@ -146,11 +167,10 @@ No runtime launch was needed; the pass is static evidence and regression work.
 - Focused source-owned lifecycle reconstruction confidence:
   **before 92% -> after 98%** after pinning source bodies to HLIL, Ghidra
   metadata, and symbol-map signatures.
-- Focused retail-only training/dynamic-skill helper mapping confidence:
-  **before 58% -> after 87%**. Names, sizes, call sites, and comments are now
-  pinned, while exact source reconstruction remains open for the dynamic-skill
-  island.
+- Focused training/dynamic-skill helper source confidence:
+  **before 98% -> after 98.5%**. Names, sizes, call sites, source anchors, and
+  comments are now pinned for the dynamic-skill history/update island.
 - Overall botlib plus qagame AI execution wiring confidence:
-  **before 97.1% -> after 97.6%**. Remaining uncertainty is concentrated in
-  exact Quake Live tutorial/dynamic-skill bodies and fresh runtime validation,
-  not the source-owned lifecycle and import wiring closed here.
+  **before 98.2% -> after 98.3%**. Remaining uncertainty is concentrated in
+  exact Quake Live tutorial tail parity and fresh runtime validation, not the
+  source-owned lifecycle, dynamic-skill, and import wiring closed here.

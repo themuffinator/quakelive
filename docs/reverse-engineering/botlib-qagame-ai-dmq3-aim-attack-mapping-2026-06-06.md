@@ -50,6 +50,11 @@ Applied reconstruction: the fallback branch now checks `beyondreality` and the
 comment was updated to match. This preserves the same behavior shape, but
 aligns the map identity with retail Quake Live evidence.
 
+Follow-up reconstruction: the `beyondreality` branch now routes through
+`BotApplyBeyondRealityTravelFlags`, matching the retail helper at
+`qagamex86.dll:0x10024E10` while preserving the q3tourney6 crusher-button
+script inline in `BotMapScripts`.
+
 ## Source Mapping Notes
 
 Observed source anchors now pinned by tests:
@@ -68,7 +73,7 @@ Observed source anchors now pinned by tests:
 - `BotMapScripts` preserves the `q3tourney6` crusher-button special case,
   team-safe target selection, aim jitter from `CHARACTERISTIC_AIM_ACCURACY`,
   `InFieldOfVision` before firing, and the retail `beyondreality`
-  `TFL_FUNCBOB` suppression branch.
+  `TFL_FUNCBOB` suppression branch through `BotApplyBeyondRealityTravelFlags`.
 - `BotSetMovedir` preserves the `VEC_UP` and `VEC_DOWN` special cases before
   falling back to `AngleVectors`.
 - `BotModelMinsMaxs` preserves the live `g_entities` scan, optional `eType`
@@ -116,6 +121,8 @@ The new gate pins the legacy and native import paths consumed by this band:
 - direct `ai_dmq3.c` source anchors for every promoted helper;
 - the reconstructed `beyondreality` map-script branch and absence of the old
   `mpq3tourney6` branch inside `BotMapScripts`;
+- the source helper that re-reads serverinfo and clears `TFL_FUNCBOB` for
+  `beyondreality`;
 - Binary Ninja HLIL entry signatures and flow/cross-call anchors across aim,
   attack, map-script, movedir, and model-bounds helpers;
 - predictive movement, weapon-info, visible-position, EA attack/view, and

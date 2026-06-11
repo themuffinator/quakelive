@@ -63,6 +63,9 @@ int numnodeswitches;
 char nodeswitch[MAX_NODESWITCHES+1][144];
 
 #define LOOKAHEAD_DISTANCE			300
+#define BOT_INSTAGIB_TRAVEL_FLAGS	0x011C0FBE
+#define BOT_INSTAGIB_CLOSE_RANGE	50
+#define BOT_INSTAGIB_INVALID_TRAVELTYPE	0x3ff
 
 /*
 ==================
@@ -107,6 +110,18 @@ void BotRecordNodeSwitch(bot_state_t *bs, char *node, char *str, char *s) {
 	}
 #endif //DEBUG
 	numnodeswitches++;
+}
+
+/*
+==================
+BotSetLeadTeamGoal
+==================
+*/
+void BotSetLeadTeamGoal(bot_state_t *bs) {
+	VectorCopy(bs->origin, bs->lead_teamgoal.origin);
+	bs->lead_teamgoal.areanum = bs->areanum;
+	VectorSet(bs->lead_teamgoal.mins, -16, -16, -24);
+	VectorSet(bs->lead_teamgoal.maxs, 16, 16, 32);
 }
 
 /*
@@ -2591,6 +2606,151 @@ int AINode_Battle_NBG(bot_state_t *bs) {
 	if (moveresult.flags & MOVERESULT_MOVEMENTWEAPON) bs->weaponnum = moveresult.weapon;
 	//attack the enemy if possible
 	BotCheckAttack(bs);
+	//
+	return qtrue;
+}
+
+/*
+==================
+AIEnter_InstaGib
+==================
+*/
+void AIEnter_InstaGib(bot_state_t *bs) {
+	bs->ltg_time = FloatTime() + 99999.0f;
+	bs->ltgtype = LTG_INSTAGIB;
+	BotRecordNodeSwitch(bs, "insta gib!", "", "");
+	bs->ainode = AINode_InstaGib;
+}
+
+/*
+==================
+AINode_InstaGib
+==================
+*/
+int AINode_InstaGib(bot_state_t *bs) {
+	int targetnum;
+	bot_goal_t goal;
+	aas_entityinfo_t entinfo;
+	bot_moveresult_t moveresult;
+	vec3_t target, dir;
+
+	targetnum = BotFindInstaGibTarget(bs);
+	if (BotIsObserver(bs)) {
+		bs->ltgtype = 0;
+		AIEnter_Observer(bs, "insta gib!: observer");
+		bs->ltgtype = 0;
+		return qfalse;
+	}
+	//if in the intermission
+	if (BotIntermission(bs)) {
+		bs->ltgtype = 0;
+		AIEnter_Intermission(bs, "insta gib!: intermission");
+		return qfalse;
+	}
+	//respawn if dead
+	if (BotIsDead(bs)) {
+		bs->ltgtype = 0;
+		AIEnter_Respawn(bs, "insta gib!: bot dead");
+		return qfalse;
+	}
+	//if the retail instagib mode flag was cleared
+	if (!g_instaGib.integer) {
+		bs->ltgtype = 0;
+		AIEnter_Seek_LTG(bs, "insta gib!: no ai node");
+		return qfalse;
+	}
+	//if there is an enemy
+	if (BotFindEnemy(bs, -1)) {
+		bs->ltgtype = 0;
+		trap_BotResetLastAvoidReach(bs->ms);
+		//empty the goal stack
+		trap_BotEmptyGoalStack(bs->gs);
+		//go fight
+		AIEnter_Battle_Fight(bs, "insta gib!: found enemy");
+		return qfalse;
+	}
+	//if there is no instagib target, look around
+	if (targetnum == -1) {
+		if (random() < bs->thinktime * 0.8f) {
+			BotRoamGoal(bs, target);
+			BotSetIdealViewAnglesToPoint(bs, target);
+		}
+		return qtrue;
+	}
+
+	bs->tfl = BOT_INSTAGIB_TRAVEL_FLAGS;
+	BotEntityInfo(targetnum, &entinfo);
+	//empty the goal stack
+	trap_BotEmptyGoalStack(bs->gs);
+	memset(&goal, 0, sizeof(bot_goal_t));
+	VectorCopy(entinfo.origin, goal.origin);
+	goal.areanum = BotPointAreaNum(entinfo.origin);
+	VectorSet(goal.mins, -8, -8, -8);
+	VectorSet(goal.maxs, 8, 8, 8);
+	goal.entitynum = targetnum;
+	trap_BotPushGoal(bs->gs, &goal);
+
+	VectorSubtract(bs->origin, entinfo.origin, dir);
+	if (VectorLength(dir) < BOT_INSTAGIB_CLOSE_RANGE &&
+			random() < bs->thinktime * 0.8f) {
+		BotRoamGoal(bs, target);
+		BotSetIdealViewAnglesToPoint(bs, target);
+		return qtrue;
+	}
+	//if in lava or slime the bot should be able to get out
+	if (BotInLavaOrSlime(bs)) bs->tfl |= TFL_LAVA|TFL_SLIME;
+	//
+	if (BotCanAndWantsToRocketJump(bs)) {
+		bs->tfl |= TFL_ROCKETJUMP;
+	}
+	BotApplyBeyondRealityTravelFlags(&bs->tfl);
+	//predict obstacles
+	if (BotAIPredictObstacles(bs, &goal)) {
+		bs->ltgtype = 0;
+		return qfalse;
+	}
+	//initialize the movement state
+	BotSetupForMovement(bs);
+	//move towards the goal
+	trap_BotMoveToGoal(&moveresult, bs->ms, &goal, bs->tfl);
+	//if the movement failed
+	if (moveresult.failure) {
+		//reset the avoid reach, otherwise bot is stuck in current area
+		trap_BotResetAvoidReach(bs->ms);
+		if (moveresult.traveltype == BOT_INSTAGIB_INVALID_TRAVELTYPE) {
+			BotSetIdealViewAnglesToPoint(bs, goal.origin);
+			return qtrue;
+		}
+	}
+	//
+	BotAIBlocked(bs, &moveresult, qtrue);
+	//
+	BotClearPath(bs, &moveresult);
+	//if the viewangles are used for the movement
+	if (moveresult.flags & (MOVERESULT_MOVEMENTVIEWSET|MOVERESULT_MOVEMENTVIEW|MOVERESULT_SWIMVIEW)) {
+		VectorCopy(moveresult.ideal_viewangles, bs->ideal_viewangles);
+	}
+	//if waiting for something
+	else if (moveresult.flags & MOVERESULT_WAITING) {
+		if (random() < bs->thinktime * 0.8f) {
+			BotRoamGoal(bs, target);
+			BotSetIdealViewAnglesToPoint(bs, target);
+		}
+	}
+	else if (!(bs->flags & BFL_IDEALVIEWSET)) {
+		if (trap_BotMovementViewTarget(bs->ms, &goal, bs->tfl, 300, target)) {
+			BotSetIdealViewAnglesToPoint(bs, target);
+		}
+		else if (VectorLengthSquared(moveresult.movedir)) {
+			vectoangles(moveresult.movedir, bs->ideal_viewangles);
+		}
+		else if (random() < bs->thinktime * 0.8f) {
+			BotRoamGoal(bs, target);
+			BotSetIdealViewAnglesToPoint(bs, target);
+		}
+	}
+	//if the weapon is used for the bot movement
+	if (moveresult.flags & MOVERESULT_MOVEMENTWEAPON) bs->weaponnum = moveresult.weapon;
 	//
 	return qtrue;
 }

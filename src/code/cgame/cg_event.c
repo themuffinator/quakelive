@@ -1610,7 +1610,7 @@ static void CG_UseItem( centity_t *cent ) {
 	
 	itemNum = (es->event & ~EV_EVENT_BITS) - EV_USE_ITEM0;
 	if ( itemNum < 0 || itemNum > HI_NUM_HOLDABLE ) {
-		itemNum = 0;
+		CG_Error( "CG_UseItem: invalid item %d", itemNum );
 	}
 
 	// print a message if the local player
@@ -1629,6 +1629,8 @@ static void CG_UseItem( centity_t *cent ) {
 
 	switch ( itemNum ) {
 	default:
+		break;
+
 	case HI_NONE:
 		trap_S_StartSound (NULL, es->number, CHAN_BODY, cgs.media.useNothingSound );
 		break;

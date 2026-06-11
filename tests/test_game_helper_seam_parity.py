@@ -1664,7 +1664,7 @@ def test_bot_training_state_tail_is_wired_to_bot_frame() -> None:
 	start_frame = _block_from_marker(ai_main, "int BotAIStartFrame")
 
 	assert "static void BotSetPredictItemPickupDisabled( int clientNum, qboolean disabled ) {" in ai_main
-	assert "static void BotUpdateItemDelayTime( void ) {" in ai_main
+	assert "static void BotUpdateItemDelayTime( int time ) {" in ai_main
 	assert "static void BotUpdateTrainingBotSkill( int botClient ) {" in ai_main
 	assert "static void BotUpdateTrainingReadyState( int localClient, int botClient ) {" in ai_main
 	assert "static void BotUpdateTrainingMusic( int localClient ) {" in ai_main
@@ -1684,6 +1684,8 @@ def test_bot_training_state_tail_is_wired_to_bot_frame() -> None:
 	assert 'trap_SendServerCommand( localClient, "playMusic music/loss" );' in ai_main
 	assert "BotUpdateTrainingState();" in start_frame
 	assert start_frame.index("trap_BotUserCommand(botstates[i]->client, &botstates[i]->lastucmd);") < start_frame.index("BotUpdateTrainingState();")
+	assert start_frame.index("BotUpdateItemDelayTime( time );") < start_frame.index("BotUpdateDynamicSkill( time );")
+	assert start_frame.index("BotUpdateDynamicSkill( time );") < start_frame.index("BotUpdateTrainingState();")
 	assert start_frame.index("BotUpdateTrainingState();") < start_frame.index("RETAIL_SELECTED_BOT_INFO_CONFIGSTRING")
 
 

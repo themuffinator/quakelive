@@ -111,6 +111,10 @@ Observed facts:
   - `sub_49C480 -> BotFreeChatState`
   - `sub_49C560 -> BotSetupChatAI`
   - `sub_49C5F0 -> BotShutdownChatAI`
+- The 2026-06-11 Ghidra bridge recheck also promotes matching `FUN_*`
+  aliases for the chat corridor entries that have committed Ghidra rows, from
+  `FUN_00497b00 -> InitConsoleMessageHeap` through
+  `FUN_0049c5f0 -> BotShutdownChatAI`.
 - Ghidra `functions.csv` includes raw rows for the two standalone string
   search bodies: `FUN_00498020,00498020,222,0,unknown` and
   `FUN_00498100,00498100,272,0,unknown`.
@@ -129,6 +133,9 @@ Observed facts:
   `FUN_0049c480,0049c480,213,0,unknown`,
   `FUN_0049c560,0049c560,144,0,unknown`, and
   `FUN_0049c5f0,0049c5f0,196,0,unknown`.
+- `BotAllocChatState` remains a Binary Ninja-only owner in this committed
+  evidence set: HLIL shows `0049c440    int32_t sub_49c440()`, but
+  `functions.csv` has no `0049c440` row.
 - Binary Ninja HLIL for `0x00498020` returns `0xffffffff` for null inputs,
   walks candidate start indices, and uses case-sensitive or `toupper` compare
   behavior matching source `StringContains`.
@@ -269,6 +276,10 @@ The checked-in source matches the recovered retail shape:
   - export-table source wiring,
   - direct native import slots for the qagame-proven chat bridge, and
   - compatibility-only treatment for `BotChatLength` and `StringContains`.
+- The 2026-06-11 bridge recheck added a central alias-row gate for the full
+  chat corridor, proving each promoted Ghidra `FUN_*` alias matches the
+  Binary Ninja `sub_*` owner and preserving the no-row boundary for
+  `BotAllocChatState`.
 - Added this mapping note as the selected non-overlapping forward botlib
   section.
 - No C source body change was needed.
@@ -277,9 +288,8 @@ The checked-in source matches the recovered retail shape:
 
 Good next slices inside this same section:
 
-- Promote stable analyst names for the lower helper callees observed in this
-  pass (`BotLoadChatMessage`, match-piece loaders/free routines, and console
-  message heap helpers) once their own body shapes are mapped.
+- Keep `BotAllocChatState` as a no-Ghidra-row exception unless a refreshed
+  committed Ghidra export produces a stable `0049c440` function row.
 - Add a tiny native harness for `StringContains`, `StringContainsWord`, and
   `UnifyWhiteSpaces`, if future source changes touch bot command matching.
 - Deepen `BotReplyChat` scoring and key-evaluation coverage by naming the main

@@ -37,6 +37,8 @@ static char	sv_gameClientConnectDenied[MAX_STRING_CHARS];
 static char	*s_svEntityStringOverride;
 static char	s_svEntityStringSource[MAX_QPATH];
 
+#define SV_STEAM_MATCH_REPORT_BUFFER_CHARS MAX_MSGLEN
+
 void SV_GameError( const char *string ) {
 	Com_Error( ERR_DROP, "%s", string );
 }
@@ -1532,7 +1534,11 @@ SV_SubmitMatchReport
 =================
 */
 static void SV_SubmitMatchReport( void *report ) {
-	Zmq_SubmitMatchReport( report );
+	char steamMatchReport[SV_STEAM_MATCH_REPORT_BUFFER_CHARS];
+	const void *preparedReport;
+
+	preparedReport = SV_SteamStats_ProcessMatchReport( report, steamMatchReport, (int)sizeof( steamMatchReport ) );
+	Zmq_SubmitMatchReport( preparedReport );
 }
 
 /*
@@ -1540,11 +1546,13 @@ static void SV_SubmitMatchReport( void *report ) {
 SV_ReportPlayerEvent
 
  Observed HLIL calls pass a SteamID pair, the client's retail stats block, an
- event label, and a JSON-like payload object, all forwarded through the
- retained server-owned `idZMQ` event publisher path.
+ event label, and a JSON-like payload object. Retail first gives the payload to
+ the Steam stats event owner, then forwards it through the retained server-owned
+ `idZMQ` event publisher path.
 =================
 */
 static void SV_ReportPlayerEvent( uint32_t steamIdLow, uint32_t steamIdHigh, const void *clientStats, const char *eventName, void *payload ) {
+	SV_SteamStats_ProcessEvent( steamIdLow, steamIdHigh, clientStats, eventName, payload );
 	Zmq_ReportPlayerEvent( steamIdLow, steamIdHigh, clientStats, eventName, payload );
 }
 

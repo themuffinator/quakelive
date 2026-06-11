@@ -8,11 +8,25 @@ binding helper, adjacent `ai_main.c` wrappers, and tutorial support helpers.
 The owning retail binary is `qagamex86.dll`; the primary mapped ranges are
 `0x1001F050..0x1001FEC0` and `0x10020980..0x10020EC0`.
 
-No C behavior was changed. One analysis correction was made: the
-`BotSetEntityNumForGoal` symbol-map comment now reflects the retail-preserved
-classname guard actually present in both HLIL and source, where exact classname
-matches are skipped and absent or non-matching classnames fall through to the
-distance check.
+Update 2026-06-11: `BotAcceptOffscreenEnemyCandidate` is no longer a
+mapped-only retail helper. It is reconstructed in source and wired through
+`BotFindEnemy`, `BotCheckEvents`, and selected-bot telemetry. One analysis
+correction from the original pass remains: the `BotSetEntityNumForGoal`
+symbol-map comment reflects the retail-preserved classname guard actually
+present in both HLIL and source, where exact classname matches are skipped and
+absent or non-matching classnames fall through to the distance check.
+
+Second update 2026-06-11: `BotResolveTourPoint` and `BotCanSpawnTourPoint` are
+also source-backed. The resolver preserves the retail current-tour-point and
+fallback-start-point branches, the 8192-unit floor trace, the 16-unit origin
+lift, and linked `info_notnull` target-origin resolution. The spawn gate
+preserves the retail raw entity-slab scan for free slots whose `freetime + 2000`
+has expired against `level.time`.
+
+Third update 2026-06-11: `BotSelectTormentTarget` is now source-backed. The
+reconstruction preserves the cached enemy revalidation, the first human-only
+`PM_NORMAL` reachability scan, the trace-assisted reachability fallback, and
+the nearest-human final fallback used by the retail tutorial torment node.
 
 ## Evidence
 
@@ -37,25 +51,20 @@ distance check.
 | `0x1001F050` | `BotDeathmatchAI` | `ai_dmq3.c` | 1129 |
 | `0x1001F4C0` | `BotSetEntityNumForGoal` | `ai_dmq3.c` | 185 |
 | `0x1001F580` | `BotSetupDeathmatchAI` | `ai_dmq3.c` | 1079 |
+| `0x1001F9C0` | `BotSelectTormentTarget` | `ai_dmq3.c` | 1262 |
+| `0x1001FEC0` | `BotResolveTourPoint` | `ai_dmq3.c` | 825 |
 | `0x10020980` | `BotAI_Print` | `ai_main.c` | 298 |
 | `0x10020AC0` | `BotAI_Trace` | `ai_main.c` | 219 |
 | `0x10020BA0` | `BotAI_GetClientState` | `ai_main.c` | 54 |
 | `0x10020BE0` | `BotClientHasNoTargetFlag` | `ai_dmq3.c` | 46 |
+| `0x10020C10` | `BotAcceptOffscreenEnemyCandidate` | `ai_dmq3.c` | 341 |
 | `0x10020D70` | `BotAI_GetEntityState` | `ai_main.c` | 79 |
 | `0x10020DC0` | `BotAI_BotInitialChat` | `ai_main.c` | 255 |
+| `0x10020EC0` | `BotCanSpawnTourPoint` | `ai_dmq3.c` | 61 |
 
-### Mapped-Only Retail Helpers
-
-| Address | Promoted name | Function size |
-| --- | --- | ---: |
-| `0x1001F9C0` | `BotSelectTormentTarget` | 1262 |
-| `0x1001FEC0` | `BotResolveTourPoint` | 825 |
-| `0x10020C10` | `BotAcceptOffscreenEnemyCandidate` | 341 |
-| `0x10020EC0` | `BotCanSpawnTourPoint` | 61 |
-
-These four helpers have strong HLIL, size, and symbol-map evidence, but their
-retail-only bodies have not been reconstructed into source in this pass. The
-test intentionally treats them as mapped-only rows.
+There are no mapped-only helpers left in this focused deathmatch/setup helper
+band. The larger tutorial nodes that call into these helpers are still tracked
+in the adjacent `ai_dmnet.c` tutorial-tail mapping.
 
 ## Source Mapping Notes
 
@@ -82,19 +91,32 @@ Observed source anchors now pinned by tests:
   vararg packing.
 - `BotClientHasNoTargetFlag` preserves the Quake Live enemy-filter guard for
   live client entities carrying `FL_NOTARGET`.
+- `BotAcceptOffscreenEnemyCandidate` preserves the retail offscreen enemy
+  side path reached only after `BotFindEnemy` receives a non-positive
+  `BotEntityVisible` score. The reconstructed helper requires no current
+  enemy, no retreat decision, a positive chase decision, no blocking top or
+  second goal-stack entity, skill at least `4.0`, and a matching heard-client
+  event bit before accepting the unseen candidate.
+- `BotSelectTormentTarget` preserves the retail torment-human target selector:
+  revalidate `bs->enemy` only when it remains 360-degree visible and reachable
+  inside the caller's `maxDist`, scan all 64 client slots for non-bot
+  `PM_NORMAL` humans reachable through `BotPointAreaNum`, fall back to
+  `trap_AAS_PointReachabilityAreaIndex` plus a 24-unit `trap_AAS_TraceAreas`
+  probe, then choose the nearest valid non-bot human when no reachable target
+  was found. All travel checks use the retail `0x011C0FBE` mask.
+- `BotResolveTourPoint` preserves the retail tutorial tour-point resolver:
+  valid current entities search by the current entity's `target` into
+  `info_tour_point` `targetname`s, invalid/currentless calls select the first
+  spawnflag-1 `info_tour_point`, the chosen point is traced down 8192 units and
+  lifted 16 units, and the optional target vector comes from the linked
+  `info_notnull` entity.
+- `BotCanSpawnTourPoint` preserves the retail tutorial marker spawn gate:
+  scan non-client entity slots from `MAX_CLIENTS` to `ENTITYNUM_MAX_NORMAL`,
+  require `!ent->inuse`, and accept only once `ent->freetime + 2000 <=
+  level.time`.
 
-Observed retail-only helper anchors:
-
-- `BotSelectTormentTarget` is called by `AINode_Torment_Human`, revalidates a
-  cached target with 360-degree visibility, and scans client/entity candidates
-  by distance and AAS reachability.
-- `BotResolveTourPoint` resolves `info_tour_point` to a floor-traced origin
-  and linked `info_notnull` target origin.
-- `BotAcceptOffscreenEnemyCandidate` is a retail-only sidecar for hidden enemy
-  candidate acceptance.
-- `BotCanSpawnTourPoint` scans the tutorial marker entity slab for a free or
-  expired slot and is called from the retail-expanded AAS debug/tour-point
-  path.
+Retail-only coverage that still remains outside this file is concentrated in
+the larger `AINode_Torment_Human` caller and neighboring tutorial nodes.
 
 ## Botlib Wiring
 
@@ -110,19 +132,26 @@ The new regression pins wrapper and import-table wiring used by this band:
 
 ## Tests
 
-- `python -m pytest tests/test_botlib_qagame_ai_dmq3_deathmatch_setup_parity.py -q --tb=short`
+```text
+python -m pytest tests/test_botlib_qagame_ai_dmq3_deathmatch_setup_parity.py tests/test_botlib_qagame_ai_dmnet_tutorial_tail_parity.py -q --tb=short
+5 passed in 0.20s
+
+python -m pytest tests -k botlib -q --tb=short
+205 passed, 1861 deselected in 20.79s
+```
 
 ## Parity Estimate
 
 - Focused qagame deathmatch/setup and adjacent ai_main alias coverage:
   **before 0% -> after 100%** for the newly guarded rows in this pass.
 - Focused source-owned deathmatch/setup/wrapper parity confidence:
-  **before 91% -> after 98%** after pinning source bodies to HLIL and
+  **before 91% -> after 99%** after pinning source bodies to HLIL and
   symbol-map metadata.
-- Focused retail-only tutorial helper mapping confidence:
-  **before 45% -> after 82%**. These names are now pinned, but source
-  reconstruction remains a separate task.
+- Focused torment target selector source reconstruction confidence:
+  **before 0% -> after 89%**. Remaining uncertainty is limited to exact retail
+  stack-local artifacts and live training-node behavior, not the documented
+  branch structure.
 - Overall botlib plus qagame AI execution wiring confidence:
-  **before 96.7% -> after 97.1%**. Remaining uncertainty is concentrated in
-  retail-only tutorial helper bodies and broader live validation, not this
+  **before 97.1% -> after 97.4%**. Remaining uncertainty is concentrated in
+  retail-only tutorial node bodies and broader live validation, not this
   source-owned deathmatch setup slice.

@@ -62,6 +62,7 @@ def test_client_run_loop_round_292_maps_host_and_client_frame_wiring() -> None:
 	steam_aliases = aliases["quakelive_steam_srp"]
 	expected_aliases = {
 		"sub_4CC6C0": "Com_Frame",
+		"FUN_004cc6c0": "Com_Frame",
 		"sub_4BC3E0": "CL_Frame",
 		"sub_4F2590": "QLWebCore_Update",
 		"sub_461D40": "SteamClient_Frame",

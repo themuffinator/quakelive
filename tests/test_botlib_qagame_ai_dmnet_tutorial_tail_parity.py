@@ -7,8 +7,10 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 GAME_AI_DMNET = REPO_ROOT / "src" / "code" / "game" / "ai_dmnet.c"
+GAME_AI_DMNET_H = REPO_ROOT / "src" / "code" / "game" / "ai_dmnet.h"
 GAME_AI_DMQ3 = REPO_ROOT / "src" / "code" / "game" / "ai_dmq3.c"
 GAME_AI_MAIN = REPO_ROOT / "src" / "code" / "game" / "ai_main.c"
+GAME_AI_MAIN_H = REPO_ROOT / "src" / "code" / "game" / "ai_main.h"
 GAME_CMDS = REPO_ROOT / "src" / "code" / "game" / "g_cmds.c"
 GAME_PUBLIC = REPO_ROOT / "src" / "code" / "game" / "g_public.h"
 GAME_SYSCALLS = REPO_ROOT / "src" / "code" / "game" / "g_syscalls.c"
@@ -61,6 +63,52 @@ AI_DMNET_TUTORIAL_TAIL_FUNCTIONS = (
 
 
 SOURCE_OWNED_HELPERS = {
+	"BotSetLeadTeamGoal": (
+		GAME_AI_DMNET,
+		"void BotSetLeadTeamGoal(bot_state_t *bs)",
+		(
+			"VectorCopy(bs->origin, bs->lead_teamgoal.origin);",
+			"bs->lead_teamgoal.areanum = bs->areanum;",
+			"VectorSet(bs->lead_teamgoal.mins, -16, -16, -24);",
+			"VectorSet(bs->lead_teamgoal.maxs, 16, 16, 32);",
+		),
+	),
+	"AIEnter_InstaGib": (
+		GAME_AI_DMNET,
+		"void AIEnter_InstaGib(bot_state_t *bs)",
+		(
+			"bs->ltg_time = FloatTime() + 99999.0f;",
+			"bs->ltgtype = LTG_INSTAGIB;",
+			'BotRecordNodeSwitch(bs, "insta gib!", "", "");',
+			"bs->ainode = AINode_InstaGib;",
+		),
+	),
+	"AINode_InstaGib": (
+		GAME_AI_DMNET,
+		"int AINode_InstaGib(bot_state_t *bs)",
+		(
+			"targetnum = BotFindInstaGibTarget(bs);",
+			'AIEnter_Observer(bs, "insta gib!: observer");',
+			'AIEnter_Intermission(bs, "insta gib!: intermission");',
+			'AIEnter_Respawn(bs, "insta gib!: bot dead");',
+			"if (!g_instaGib.integer) {",
+			'AIEnter_Seek_LTG(bs, "insta gib!: no ai node");',
+			'AIEnter_Battle_Fight(bs, "insta gib!: found enemy");',
+			"bs->tfl = BOT_INSTAGIB_TRAVEL_FLAGS;",
+			"trap_BotEmptyGoalStack(bs->gs);",
+			"goal.areanum = BotPointAreaNum(entinfo.origin);",
+			"VectorSet(goal.mins, -8, -8, -8);",
+			"trap_BotPushGoal(bs->gs, &goal);",
+			"BotApplyBeyondRealityTravelFlags(&bs->tfl);",
+			"if (BotAIPredictObstacles(bs, &goal))",
+			"trap_BotMoveToGoal(&moveresult, bs->ms, &goal, bs->tfl);",
+			"moveresult.traveltype == BOT_INSTAGIB_INVALID_TRAVELTYPE",
+			"BotAIBlocked(bs, &moveresult, qtrue);",
+			"BotClearPath(bs, &moveresult);",
+			"trap_BotMovementViewTarget(bs->ms, &goal, bs->tfl, 300, target)",
+			"bs->weaponnum = moveresult.weapon;",
+		),
+	),
 	"BotCTFCarryingFlag": (
 		GAME_AI_DMQ3,
 		"int BotCTFCarryingFlag(bot_state_t *bs)",
@@ -108,14 +156,30 @@ HLIL_ENTRY_ANCHORS = (
 HLIL_CALL_ANCHORS = (
 	'1000ed9b  return sub_10008460(arg2, "seek teammate", &data_1007c414, &data_1007c414)',
 	'1000efe1      (*(eax_25 + 0x3c))("bot_followMe", &data_1007d0a8)',
+	'1000f8b1  *(arg1 + 0x19a8) = 0x12',
 	'1000f910  *(arg1 + 0x1304) = sub_1000fa00',
+	'1000f995  *(arg1 + 0x2430) = sub_1001fec0(eax_4, arg1 + 0x2474, arg1 + 0x2438, eax_4, arg1 + 0x2474)',
 	'100118da          sub_1000ecc0((*(data_104b13ac + 0x3c))("bot_followMe", &data_1007d1d8), esi)',
+	'10011931  *(arg1 + 0x19a8) = 0x13',
+	'1001193b  *(arg1 + 0x1304) = sub_10011980',
+	'10011945  *(arg1 + 0x196c) = 0xffffffff',
+	'1001194f  *(arg1 + 0x2498) = 0',
+	'10011959  *(ecx_1 + 0x104b41f0) |= 0x10000',
 	'1001196d  return sub_10008460(arg1, "torment human", &data_1007c414, &data_1007c414)',
+	'10012488  *(arg1 + 0x2444) = fconvert.s(x87_r7 + fconvert.t(10.0))',
+	'10012494  *(arg1 + 0x241c) = 0x43480000',
+	'100124a5  *(arg1 + 0x19a8) = 0x14',
 	'100124af  *(arg1 + 0x1304) = sub_10012560',
+	'100124b9  *(arg1 + 0x2490) = 0',
 	"say Well done! Let's get back to",
 	"say Kill me if you can - fragbai",
 	'100133ed  *(arg1 + 0x1304) = sub_10013410',
 	'10013601      sub_1000d250("insta gib!: found enemy", arg1)',
+	'10013682      arg1[0x5ce] = 0x11c0fbe',
+	'10013878          sub_10024e10(&arg1[0x5ce])',
+	'1001391e              st0_3, eax_39, edx_14 = sub_1001d960(arg1, &var_13c, 1)',
+	'1001392b              sub_1000bab0(eax_39, edx_14, &var_13c, arg1)',
+	'10013a99              if ((var_128 & 0x10) != 0)',
 	"10013ace  if (ecx_1 != 5 && ecx_1 != 0xb)",
 	"10013b4a  (*(data_104b13ac + 0x68))(eax_3 + 0x211, &var_404, 0x400)",
 )
@@ -209,6 +273,30 @@ def test_qagame_ai_dmnet_tutorial_tail_source_owned_helpers_are_pinned() -> None
 		block = _extract_function_block(_read(path), signature)
 		for anchor in anchors:
 			assert anchor in block
+
+	ai_dmnet_h = _read(GAME_AI_DMNET_H)
+	ai_main_h = _read(GAME_AI_MAIN_H)
+	ai_main = _read(GAME_AI_MAIN)
+	assert "void BotSetLeadTeamGoal(bot_state_t *bs);" in ai_dmnet_h
+	assert "void AIEnter_InstaGib(bot_state_t *bs);" in ai_dmnet_h
+	assert "int AINode_InstaGib(bot_state_t *bs);" in ai_dmnet_h
+	for expected in (
+		"#define LTG_FOLLOWING",
+		"#define LTG_TRAINING",
+		"#define LTG_TOURING",
+		"#define LTG_TORMENT_HUMAN",
+		"#define LTG_TARGET",
+	):
+		assert expected in ai_main_h
+	assert "LTG_INSTAGIB" in ai_main_h
+	for expected in (
+		"case LTG_FOLLOWING:",
+		"case LTG_TRAINING:",
+		"case LTG_TOURING:",
+		"case LTG_TORMENT_HUMAN:",
+		"case LTG_TARGET:",
+	):
+		assert expected in ai_main
 
 
 def test_qagame_ai_dmnet_tutorial_tail_training_and_import_wiring_is_pinned() -> None:

@@ -49,6 +49,8 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #define DEFAULT_FLAG_DROPPED_TIMEOUT_MS	30000
 #define DEFAULT_REDTEAM_NAME		"Stroggs"
 #define DEFAULT_BLUETEAM_NAME		"Pagans"
+#define RANK_POWERUPS_FIRST_RETAIL	PW_INVIS
+#define RANK_POWERUPS_LAST_RETAIL	MAX_POWERUPS
 
 #define AUTO_RECORD_STATE_RECORDING	( 1 << 0 )
 #define AUTO_RECORD_STATE_SCREENSHOT	( 1 << 1 )
@@ -5795,6 +5797,47 @@ static qboolean G_RankBuildWeaponsObject( const gclient_t *client, char *buffer,
 
 /*
 ================
+G_RankBuildPlayerPowerupsArray
+
+Builds the retail POWERUPS array used by the PLAYER_KILL and PLAYER_DEATH
+per-player payload objects.
+================
+*/
+static qboolean G_RankBuildPlayerPowerupsArray( const playerState_t *ps, char *buffer, size_t bufferSize ) {
+	size_t length;
+	qboolean firstPowerup;
+	int powerup;
+
+	if ( !ps || !buffer || bufferSize == 0 ) {
+		return qfalse;
+	}
+
+	buffer[0] = '\0';
+	length = 0;
+	firstPowerup = qtrue;
+
+	if ( !G_RankAppendPayload( buffer, bufferSize, &length, "[" ) ) {
+		return qfalse;
+	}
+
+	for ( powerup = RANK_POWERUPS_FIRST_RETAIL; powerup < RANK_POWERUPS_LAST_RETAIL; powerup++ ) {
+		if ( ps->powerups[powerup] == 0 ) {
+			continue;
+		}
+		if ( !firstPowerup && !G_RankAppendPayload( buffer, bufferSize, &length, "," ) ) {
+			return qfalse;
+		}
+		firstPowerup = qfalse;
+		if ( !G_RankAppendPayload( buffer, bufferSize, &length, "%i", powerup ) ) {
+			return qfalse;
+		}
+	}
+
+	return G_RankAppendPayload( buffer, bufferSize, &length, "]" );
+}
+
+/*
+================
 G_RankBuildPlayerSummaryObject
 
 Builds the reduced per-player object reused by the PLAYER_KILL and PLAYER_DEATH
@@ -5804,6 +5847,7 @@ payloads.
 static qboolean G_RankBuildPlayerSummaryObject( const gentity_t *ent, char *buffer, size_t bufferSize ) {
 	char steamId[32];
 	char positionPayload[128];
+	char powerupsPayload[128];
 	size_t length;
 	qboolean firstField;
 	vec3_t planarVelocity;
@@ -5818,6 +5862,9 @@ static qboolean G_RankBuildPlayerSummaryObject( const gentity_t *ent, char *buff
 	speed = VectorLength( planarVelocity );
 
 	if ( !G_RankBuildVectorObject( ent->r.currentOrigin, positionPayload, sizeof( positionPayload ) ) ) {
+		return qfalse;
+	}
+	if ( !G_RankBuildPlayerPowerupsArray( &ent->client->ps, powerupsPayload, sizeof( powerupsPayload ) ) ) {
 		return qfalse;
 	}
 
@@ -5860,6 +5907,9 @@ static qboolean G_RankBuildPlayerSummaryObject( const gentity_t *ent, char *buff
 		return qfalse;
 	}
 	if ( !G_RankAppendJsonRawField( buffer, bufferSize, &length, &firstField, "POSITION", positionPayload ) ) {
+		return qfalse;
+	}
+	if ( !G_RankAppendJsonRawField( buffer, bufferSize, &length, &firstField, "POWERUPS", powerupsPayload ) ) {
 		return qfalse;
 	}
 
@@ -6738,7 +6788,7 @@ void G_RankSendPlayerDeath( gentity_t *victim, gentity_t *killer, int meansOfDea
 		suicide ) ) {
 		return;
 	}
-	if ( !G_RankAppendJsonStringField( payload, sizeof( payload ), &length, &firstField, "WEAPON",
+	if ( !G_RankAppendJsonStringField( payload, sizeof( payload ), &length, &firstField, "MOD",
 		weaponName ) ) {
 		return;
 	}

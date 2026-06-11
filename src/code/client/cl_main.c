@@ -6757,6 +6757,11 @@ void SteamClient_Init( void ) {
 	microCallbacksRegistered = qfalse;
 
 	if ( !SteamClient_IsInitialized() ) {
+#if QL_PLATFORM_HAS_STEAMWORKS
+		if ( CL_SteamServicesEnabled() ) {
+			Com_Printf( "Steam API not present.\n" );
+		}
+#endif
 		CL_LogClientCallbackBootstrapFallback( "online services disabled; keeping compatibility-only browser event fallback" );
 		return;
 	}

@@ -234,7 +234,6 @@ static int GetWavinfo( fileHandle_t file, wavinfo_t *info ) {
 	if ( !S_FindWavChunk( file, "RIFF" ) || S_ReadWavBytes( file, waveTag, sizeof( waveTag ) ) != sizeof( waveTag )
 		|| strncmp( waveTag, "WAVE", sizeof( waveTag ) ) )
 	{
-		Com_Printf("Missing RIFF/WAVE chunks\n");
 		return 0;
 	}
 
@@ -243,7 +242,6 @@ static int GetWavinfo( fileHandle_t file, wavinfo_t *info ) {
 
 	if ( !S_FindWavChunk( file, "fmt " ) )
 	{
-		Com_Printf("Missing fmt chunk\n");
 		return 0;
 	}
 	info->format = GetLittleShort( file );
@@ -255,7 +253,6 @@ static int GetWavinfo( fileHandle_t file, wavinfo_t *info ) {
 
 	if (info->format != 1)
 	{
-		Com_Printf("Microsoft PCM format only\n");
 		return 0;
 	}
 
@@ -264,7 +261,6 @@ static int GetWavinfo( fileHandle_t file, wavinfo_t *info ) {
 	dataLength = S_FindWavChunk( file, "data" );
 	if ( !dataLength )
 	{
-		Com_Printf("Missing data chunk\n");
 		return 0;
 	}
 

@@ -1071,6 +1071,12 @@ tutorial flow. On the source side, `src/code/game/ai_main.c` now drops the
 stale GPL-era `bot_report` info-configstring publish branch that no longer
 appears in the retail `BotAIStartFrame` body.
 
+Follow-up on 2026-06-11: the instagib cluster is now source-backed through
+`ai_dmnet.c::AIEnter_InstaGib`, `ai_dmnet.c::AINode_InstaGib`, and the
+`BotDeathmatchAI` retail instagib-mode callsite. The target-goal helpers remain
+the chooser/cache seam, while the node body now owns the transient target goal,
+botlib movement path, and `LTG_INSTAGIB` state.
+
 ## Previous Coverage Update
 
 - Reference totals: `1027` functions in `functions.csv`, `180` entries in `decompile_top_functions.c`.

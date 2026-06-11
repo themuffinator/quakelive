@@ -7,6 +7,9 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 GAME_AI_MAIN = REPO_ROOT / "src" / "code" / "game" / "ai_main.c"
+GAME_AI_MAIN_H = REPO_ROOT / "src" / "code" / "game" / "ai_main.h"
+GAME_AI_DMQ3 = REPO_ROOT / "src" / "code" / "game" / "ai_dmq3.c"
+GAME_AI_DMQ3_H = REPO_ROOT / "src" / "code" / "game" / "ai_dmq3.h"
 GAME_PUBLIC = REPO_ROOT / "src" / "code" / "game" / "g_public.h"
 GAME_SYSCALLS = REPO_ROOT / "src" / "code" / "game" / "g_syscalls.c"
 SERVER_GAME = REPO_ROOT / "src" / "code" / "server" / "sv_game.c"
@@ -135,6 +138,33 @@ SOURCE_HELPERS = {
 		(
 			"leader = ClientFromName(bs->teamleader);",
 			"if (!botstates[leader] || !botstates[leader]->inuse) return qfalse;",
+		),
+	),
+	"BotEntityBoundsGap": (
+		"float BotEntityBoundsGap(int ent1, int ent2)",
+		(
+			"BotEntityInfo(ent1, &info1);",
+			"BotEntityInfo(ent2, &info2);",
+			"mins1[axis] = info1.origin[axis] + info1.mins[axis];",
+			"maxs2[axis] + padding <= mins1[axis]",
+			"padding = 4.0f;",
+			"return 0.0f;",
+		),
+	),
+	"BotPublishDebugInfoString": (
+		"static int BotPublishDebugInfoString( bot_state_t *bs )",
+		(
+			"heardEnemy = bs->enemyFromGoalStack;",
+			"eh\\\\%i\\\\",
+			"trap_SetConfigstring( RETAIL_SELECTED_BOT_INFO_CONFIGSTRING,",
+		),
+	),
+	"BotSetIdealViewAnglesToPoint": (
+		"void BotSetIdealViewAnglesToPoint(bot_state_t *bs, vec3_t target)",
+		(
+			"VectorSubtract(target, bs->origin, dir);",
+			"vectoangles(dir, bs->ideal_viewangles);",
+			"bs->ideal_viewangles[ROLL] *= 0.5f;",
 		),
 	),
 	"BotChangeViewAngle": (
@@ -287,6 +317,8 @@ SOURCE_HELPERS = {
 			"BotAI(i, (float) thinktime / 1000);",
 			"BotUpdateInput(botstates[i], time, elapsed_time);",
 			"trap_BotUserCommand(botstates[i]->client, &botstates[i]->lastucmd);",
+			"BotUpdateItemDelayTime( time );",
+			"BotUpdateDynamicSkill( time );",
 			"BotUpdateTrainingState();",
 		),
 	),
@@ -354,13 +386,55 @@ SOURCE_HELPERS = {
 			"level.clients[clientNum].ps.eFlags &= ~EF_AWARD_DENIED;",
 		),
 	),
-	"BotUpdateItemDelayTime": (
-		"static void BotUpdateItemDelayTime( void )",
+	"BotSetTrainingBotState": (
+		"void BotSetTrainingBotState(bot_state_t *bs, qboolean enabled)",
 		(
+			"ent = &g_entities[bs->client];",
+			"ent->flags |= BOT_TRAINING_ENTITY_GODMODE_FLAGS;",
+			"client->ps.ammo[WP_ROCKET_LAUNCHER] = 9999;",
+			"client->ps.stats[STAT_WEAPONS] |= 1 << WP_ROCKET_LAUNCHER;",
+			"ent->flags |= BOT_TRAINING_ENTITY_NO_KNOCKBACK_FLAGS;",
+			"client->ps.stats[STAT_WEAPONS] |= BOT_TRAINING_EXTRA_WEAPON_BIT;",
+			"ent->flags &= ~BOT_TRAINING_ENTITY_GODMODE_FLAGS;",
+			"client->ps.ammo[WP_SHOTGUN] = 10;",
+			"ent->flags &= ~BOT_TRAINING_ENTITY_NO_KNOCKBACK_FLAGS;",
+		),
+	),
+	"BotUpdateItemDelayTime": (
+		"static void BotUpdateItemDelayTime( int time )",
+		(
+			"if ( !g_training.integer )",
 			'delayValue = "0";',
 			'skill = trap_Cvar_VariableValue( "g_spSkill" );',
-			"elapsedSeconds = ( level.time - level.startTime ) / 1000;",
+			"elapsedSeconds = ( time - level.startTime ) / 1000;",
 			'BotSetTrainingCvarIfChanged( "bot_itemDelayTime", delayValue );',
+		),
+	),
+	"BotAppendDynamicSkillSample": (
+		"void BotAppendDynamicSkillSample(bot_state_t *bs, int scoreDelta, float skill, int time)",
+		(
+			"if ( bs->numDynamicSkillSamples >= BOT_DYNAMIC_SKILL_MAX_SAMPLES )",
+			"bs->dynamicSkillSamples[i] = bs->dynamicSkillSamples[i + 1];",
+			"sampleIndex = BOT_DYNAMIC_SKILL_MAX_SAMPLES - 1;",
+			"bs->dynamicSkillSamples[sampleIndex].scoreDelta = scoreDelta;",
+			"bs->dynamicSkillSamples[sampleIndex].skill = skill;",
+			"bs->dynamicSkillSamples[sampleIndex].time = time;",
+		),
+	),
+	"BotUpdateDynamicSkill": (
+		"void BotUpdateDynamicSkill(int time)",
+		(
+			'if ( !trap_Cvar_VariableIntegerValue( "bot_dynamicSkill" ) )',
+			'if ( !trap_Cvar_VariableIntegerValue( "cl_running" ) )',
+			"elapsedSeconds = ( time - level.startTime ) / 1000;",
+			"bot_dynamicSkillNextUpdateTime = elapsedSeconds + BOT_DYNAMIC_SKILL_UPDATE_SECONDS;",
+			"localClient = BotGetLocalClient();",
+			"if ( time > level.clients[localClient].lastCmdTime + 10000 )",
+			"localScore = G_GetClientScore( localClient );",
+			"scoreDelta = localScore - G_GetClientScore( clientNum );",
+			"BotAppendDynamicSkillSample( bs, scoreDelta, newSkill, elapsedSeconds );",
+			"newSkill = BotClampTrainingSkill( newSkill );",
+			"BotRefreshDynamicSkillCharacter( bs, newSkill, forceRefresh ? oldSkill : newSkill )",
 		),
 	),
 	"BotUpdateTrainingState": (
@@ -372,20 +446,27 @@ SOURCE_HELPERS = {
 			"G_AddTrainerBot();",
 			'BotSetTrainingCvarIfChanged( "g_training", "1" );',
 			"BotSetPredictItemPickupDisabled( botClient, qtrue );",
-			"BotUpdateItemDelayTime();",
 			"BotUpdateTrainingMusic( localClient );",
 		),
 	),
 }
 
 
+SOURCE_HELPERS_IN_OTHER_FILES = {
+	"BotApplyBeyondRealityTravelFlags": (
+		GAME_AI_DMQ3,
+		"void BotApplyBeyondRealityTravelFlags(int *travelFlags)",
+		(
+			"trap_GetServerinfo(info, sizeof(info));",
+			"SERVERINFO_KEY_MAPNAME",
+			'if (!Q_stricmp(mapname, "beyondreality"))',
+			"*travelFlags &= ~TFL_FUNCBOB;",
+		),
+	),
+}
+
+
 RETAIL_ONLY_NAMES = {
-	"BotEntityBoundsGap",
-	"BotSetIdealViewAnglesToPoint",
-	"BotSetTrainingBotState",
-	"BotAppendDynamicSkillSample",
-	"BotUpdateDynamicSkill",
-	"BotApplyBeyondRealityTravelFlags",
 }
 
 
@@ -449,7 +530,13 @@ HLIL_FLOW_ANCHORS = (
 	'10023c61  (*(data_104b13ac + 0xcc))("maxclients", &var_94)',
 	"10024369  int32_t eax_9 = sub_10023c00()",
 	"10024578  *(ebx + 0x1998) = fconvert.s(fconvert.t(*(ebx + 0x1998)) * fconvert.t(0.5))",
+	"10024648  if (data_10595d2c != 0)",
+	'1002465b      (*(data_104b13ac + 0x2c))("g_spSkill", arg1)',
 	'10024674      (*(data_104b13ac + 0x3c))("bot_itemDelayTime", &data_1007d0a8)',
+	"1002468c          if (arg2 s<= 0x3c)",
+	"10024698              if (arg2 s> 0x78)",
+	"100246b9              if (arg2 s> 0xb4)",
+	"100246db              if (arg2 s> 0xf0)",
 	"1002470f  if (*(*((arg3 << 2) + &data_105e2f00) + 0x2694) s>= 0x20)",
 	'10024e73      sub_10070a40("beyondreality", strncpy(&var_484, sub_10070cf0(), 0x7f), &var_484)',
 	'10025018          sub_10024f20("125")',
@@ -541,6 +628,41 @@ def test_qagame_ai_main_lifecycle_aliases_metadata_and_source_are_pinned() -> No
 		block = _extract_function_block(ai_main, source_signature)
 		for anchor in source_anchors:
 			assert anchor in block, normalized_name
+
+	for expected in (
+		"#define BOT_TRAINING_ENTITY_GODMODE_FLAGS\t\t(FL_GODMODE | 0x00010000)",
+		"#define BOT_TRAINING_ENTITY_NO_KNOCKBACK_FLAGS\t(FL_NO_KNOCKBACK | 0x00020000)",
+		"#define BOT_TRAINING_EXTRA_WEAPON_BIT\t\t\t0x00008000",
+		"#define BOT_DYNAMIC_SKILL_UPDATE_SECONDS\t\t5",
+		"#define BOT_DYNAMIC_SKILL_STALL_SECONDS\t\t\t30",
+		"#define BOT_DYNAMIC_SKILL_DECREASE_SCORE_DELTA\t-1",
+		"#define BOT_DYNAMIC_SKILL_INCREASE_SCORE_DELTA\t2",
+		"#define BOT_DYNAMIC_SKILL_ADJUSTMENT_STEP\t\t0.083333336f",
+	):
+		assert expected in ai_main
+
+	for normalized_name, (path, source_signature, source_anchors) in SOURCE_HELPERS_IN_OTHER_FILES.items():
+		block = _extract_function_block(_read(path), source_signature)
+		for anchor in source_anchors:
+			assert anchor in block, normalized_name
+
+	assert "float BotEntityBoundsGap(int ent1, int ent2);" in _read(GAME_AI_MAIN_H)
+	assert "void BotSetTrainingBotState(bot_state_t *bs, qboolean enabled);" in _read(GAME_AI_MAIN_H)
+	assert "BotSetIdealViewAnglesToPoint(bot_state_t *bs, vec3_t target);" in _read(GAME_AI_MAIN_H)
+	assert "void BotApplyBeyondRealityTravelFlags(int *travelFlags);" in _read(GAME_AI_DMQ3_H)
+
+	for expected in (
+		"#define BOT_DYNAMIC_SKILL_MAX_SAMPLES\t32",
+		"bot_dynamic_skill_sample_t dynamicSkillSamples[BOT_DYNAMIC_SKILL_MAX_SAMPLES];",
+		"float dynamicSkillAdjustment;",
+		"int dynamicSkillReferenceScoreDelta;",
+		"int dynamicSkillLastScoreDelta;",
+		"int dynamicSkillLastScoreTime;",
+		"int numDynamicSkillSamples;",
+		"unsigned int heardClientMask;",
+		"int enemyFromGoalStack;",
+	):
+		assert expected in _read(GAME_AI_MAIN_H)
 
 
 def test_qagame_ai_main_lifecycle_hlil_and_ghidra_are_pinned() -> None:

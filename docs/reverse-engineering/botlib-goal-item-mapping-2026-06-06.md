@@ -45,6 +45,11 @@ The existing aliases for `BotLoadItemConfig`, `BotInitInfoEntities`,
 `BotUpdateEntityItems`, `BotChooseLTGItem`, and `BotChooseNBGItem` were
 rechecked in the same evidence band.
 
+The 2026-06-11 goal/fuzzy bridge recheck promotes matching Ghidra `FUN_*`
+aliases for every committed row in the surrounding `0x0049C6C0..0x0049F920`
+goal band, including genetic selection, goal fuzzy-logic interbreed/save/mutate
+helpers, goal-stack helpers, item weights, and goal-state lifecycle owners.
+
 ## Observed Retail Shape
 
 Ghidra rows pin the main goal-item band:
@@ -60,6 +65,10 @@ Ghidra rows pin the main goal-item band:
 - `FUN_0049e070,0049e070,1292,0,unknown` -> `BotUpdateEntityItems`
 - `FUN_0049e870,0049e870,1315,0,unknown` -> `BotChooseLTGItem`
 - `FUN_0049eda0,0049eda0,1562,0,unknown` -> `BotChooseNBGItem`
+- The bridge recheck additionally pins rows from
+  `FUN_0049c6c0,0049c6c0,321,0,unknown` through
+  `FUN_0049f920,0049f920,153,0,unknown`, with each `FUN_*` alias resolving to
+  the same owner as the already-promoted Binary Ninja `sub_*` name.
 
 Binary Ninja HLIL confirms the following ownership and ordering facts:
 
@@ -142,6 +151,10 @@ Added `tests/test_botlib_goal_item_parity.py` to pin:
    import IDs, server VM dispatch, native import slab entries, and direct
    native wrappers.
 4. Qagame consumer loops that use level-item and camp-spot goal APIs.
+
+The 2026-06-11 bridge recheck extends the first parity gate to cover all 39
+committed Ghidra rows in the goal/fuzzy/item band and requires both `sub_*` and
+`FUN_*` aliases for each row.
 
 Focused validation:
 

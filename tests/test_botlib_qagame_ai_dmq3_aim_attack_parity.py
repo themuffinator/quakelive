@@ -88,6 +88,16 @@ SOURCE_HELPERS = {
 			"if (InFieldOfVision(bs->viewangles, 20, bs->ideal_viewangles))",
 			"trap_EA_Attack(bs->client);",
 			'else if (!Q_stricmp(mapname, "beyondreality"))',
+			"BotApplyBeyondRealityTravelFlags(&bs->tfl);",
+		),
+	),
+	"BotApplyBeyondRealityTravelFlags": (
+		"void BotApplyBeyondRealityTravelFlags(int *travelFlags)",
+		(
+			"trap_GetServerinfo(info, sizeof(info));",
+			"SERVERINFO_KEY_MAPNAME",
+			'if (!Q_stricmp(mapname, "beyondreality"))',
+			"*travelFlags &= ~TFL_FUNCBOB;",
 		),
 	),
 	"BotSetMovedir": (

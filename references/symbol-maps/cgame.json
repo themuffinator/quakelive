@@ -2529,7 +2529,7 @@
       "signature": "static void CG_EntityEffects(centity_t *cent)",
       "string_refs": [],
       "relocation_refs": [],
-      "comment": "Continuous entity-effects helper reached from both packet-entity and predicted-player rendering. The body calls `CG_SetEntitySoundPosition`, routes speaker versus non-speaker loop sounds through the correct sound syscall, and decodes `constantLight` into the same scene-light submission path as src/code/cgame/cg_ents.c::CG_EntityEffects."
+      "comment": "Continuous entity-effects helper reached from both packet-entity and predicted-player rendering. The body calls `CG_SetEntitySoundPosition`, routes every `loopSound` through the native `trap_S_AddLoopingSound` import at table offset `+0xac`, and decodes `constantLight` into the same scene-light submission path as src/code/cgame/cg_ents.c::CG_EntityEffects."
     },
     {
       "address": "0x100155D0",

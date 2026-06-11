@@ -31,6 +31,17 @@ SND_PUBLIC = REPO_ROOT / "src" / "code" / "client" / "snd_public.h"
 # `sub_4DB810` -> `S_Music_f`
 
 
+SOUND_CONSOLE_ALIASES = {
+	"sub_4D9B60": ("S_SoundInfo_f", "FUN_004d9b60", "237"),
+	"sub_4DAFD0": ("S_SoundList_f", None, None),
+	"sub_4DB710": ("S_Play_f", "FUN_004db710", "246"),
+	"sub_4DB810": ("S_Music_f", None, None),
+}
+
+SHARED_SOUND_HASH_ALIASES = {
+	"sub_4D8990": ("generateHashValue", "FUN_004d8990", "75"),
+}
+
 SOUND_HELPER_ALIASES = {
 	"sub_4D9B20": ("S_SoundFileTypeForPath", "FUN_004d9b20", "63"),
 	"sub_4DAB00": ("S_AddVoiceSamples", "FUN_004dab00", "373"),
@@ -70,6 +81,13 @@ SOUND_BACKGROUND_ALIASES = {
 	"sub_4DCA50": ("S_OggUpdateBackgroundTrack", "FUN_004dca50", "114"),
 }
 
+SOUND_MIXER_ALIASES = {
+	"sub_4DBDF0": ("S_TransferStereo16", "FUN_004dbdf0", "214"),
+	"sub_4DBED0": ("S_TransferPaintBuffer", "FUN_004dbed0", "351"),
+	"sub_4DC030": ("S_PaintChannelFrom16", "FUN_004dc030", "775"),
+	"sub_4DC350": ("S_PaintChannels", "FUN_004dc350", "781"),
+}
+
 
 def _extract_function_block(source: str, marker: str) -> str:
 	start = source.rindex(marker)
@@ -88,6 +106,14 @@ def _extract_function_block(source: str, marker: str) -> str:
 	raise AssertionError(f"Unbalanced block for marker: {marker}")
 
 
+def _assert_order(text: str, *needles: str) -> None:
+	cursor = -1
+	for needle in needles:
+		index = text.find(needle, cursor + 1)
+		assert index != -1, f"missing ordered text: {needle}"
+		cursor = index
+
+
 def test_sound_helper_aliases_cover_retail_ogg_wav_voice_cluster() -> None:
 	aliases = json.loads(ALIASES.read_text(encoding="utf-8"))["quakelive_steam_srp"]
 	function_rows = {
@@ -100,6 +126,7 @@ def test_sound_helper_aliases_cover_retail_ogg_wav_voice_cluster() -> None:
 
 	for alias, (name, ghidra_name, size) in SOUND_HELPER_ALIASES.items():
 		assert aliases[alias] == name
+		assert aliases[ghidra_name] == name
 		assert function_rows[ghidra_name]["size"] == size
 
 	for expected in (
@@ -173,6 +200,14 @@ def test_sound_helper_aliases_cover_retail_ogg_wav_voice_cluster() -> None:
 	assert "static int S_FindWavChunk" not in snd_dma
 	assert "FGetLittleShort" not in snd_dma
 	assert "FGetLittleLong" not in snd_dma
+	for legacy_parser_message in (
+		"Missing RIFF/WAVE chunks",
+		"Missing fmt chunk",
+		"Microsoft PCM format only",
+		"Missing data chunk",
+	):
+		assert legacy_parser_message not in hlil
+		assert legacy_parser_message not in snd_mem
 
 
 def test_sound_registration_cache_helpers_match_retail_diagnostics_and_reset_path() -> None:
@@ -184,22 +219,37 @@ def test_sound_registration_cache_helpers_match_retail_diagnostics_and_reset_pat
 	hlil = QL_STEAM_HLIL.read_text(encoding="utf-8")
 	snd_dma = SND_DMA.read_text(encoding="utf-8")
 
+	hash_block = _extract_function_block(snd_dma, "static long S_HashSFXName")
 	find_block = _extract_function_block(snd_dma, "static sfx_t *S_FindName")
 	register_block = _extract_function_block(snd_dma, "sfxHandle_t\tS_RegisterSound")
 	memory_load_block = _extract_function_block(snd_dma, "void S_memoryLoad")
 	begin_block = _extract_function_block(snd_dma, "void S_BeginRegistration( void )")
 	free_oldest_block = _extract_function_block(snd_dma, "void S_FreeOldestSound")
 
+	for alias, (name, ghidra_name, size) in SHARED_SOUND_HASH_ALIASES.items():
+		assert aliases[alias] == name
+		assert aliases[ghidra_name] == name
+		assert function_rows[ghidra_name]["size"] == size
+
 	for alias, (name, ghidra_name, size) in SOUND_REGISTRATION_ALIASES.items():
 		assert aliases[alias] == name
+		assert aliases[ghidra_name] == name
 		assert function_rows[ghidra_name]["size"] == size
 
 	for expected in (
+		"004d8990    int32_t sub_4d8990(char* arg1, int32_t arg2)",
+		"004d8998  int32_t ebx = 0",
+		"004d89aa          int32_t eax_2 = tolower(sx.d(*esi))",
+		"004d89b6          if (eax_2 == 0x2e)",
+		"004d89bb          if (eax_2 == 0x5c)",
+		"004d89bd              eax_2 = 0x2f",
+		"004d89c5          int32_t ecx_2 = (edi_1 + esi) * eax_2",
+		"004d89da  return (arg2 - 1) & ebx",
 		"004d9d00    char* sub_4d9d00(char* arg1 @ edi)",
 		'sub_4c9b60(arg1, "S_FindName: NULL")',
 		'sub_4c9b60(0, "S_FindName: empty name")',
 		'sub_4c9b60(0, "S_FindName: name too long: %s")',
-		"sub_4d8990(arg1, 0x80)",
+		"004d9d56  int32_t eax_2 = sub_4d8990(arg1, 0x80)",
 		"004d9e10    int32_t sub_4d9e10(int32_t* arg1 @ esi)",
 		'char const data_543f98[0x24] = "^3WARNING: couldn\\\'t load sound: %s\\n", 0',
 		"004d9e50    int32_t sub_4d9e50(char* arg1)",
@@ -211,13 +261,33 @@ def test_sound_registration_cache_helpers_match_retail_diagnostics_and_reset_pat
 	):
 		assert expected in hlil
 
+	assert "#define\t\tLOOP_HASH\t\t128" in snd_dma
+	assert "static\tsfx_t\t\t*sfxHash[LOOP_HASH];" in snd_dma
+
+	for expected in (
+		"hash = 0;",
+		"i = 0;",
+		"while (name[i] != '\\0') {",
+		"letter = tolower(name[i]);",
+		"if (letter =='.') break;",
+		"if (letter =='\\\\') letter = '/';",
+		"hash+=(long)(letter)*(i+119);",
+		"hash &= (LOOP_HASH-1);",
+		"return hash;",
+	):
+		assert expected in hash_block
+
 	for expected in (
 		'Com_Error (ERR_FATAL, "S_FindName: NULL");',
 		'Com_Error (ERR_FATAL, "S_FindName: empty name");',
 		'Com_Error (ERR_FATAL, "S_FindName: name too long: %s", name);',
 		"hash = S_HashSFXName(name);",
+		"sfx = sfxHash[hash];",
+		"sfx = sfx->next;",
 		"if (s_numSfx == MAX_SFX) {",
 		'Com_Error (ERR_FATAL, "S_FindName: out of sfx_t");',
+		"sfx->next = sfxHash[hash];",
+		"sfxHash[hash] = sfx;",
 	):
 		assert expected in find_block
 
@@ -262,6 +332,12 @@ def test_sound_registration_cache_helpers_match_retail_diagnostics_and_reset_pat
 
 
 def test_sound_console_commands_match_retail_registration_and_output_contracts() -> None:
+	aliases = json.loads(ALIASES.read_text(encoding="utf-8"))["quakelive_steam_srp"]
+	function_rows = {
+		row["name"]: row
+		for row in csv.DictReader(FUNCTIONS_CSV.read_text(encoding="utf-8").splitlines())
+	}
+	hlil = QL_STEAM_HLIL.read_text(encoding="utf-8")
 	snd_dma = SND_DMA.read_text(encoding="utf-8")
 
 	init_block = _extract_function_block(snd_dma, "void S_Init( void ) {")
@@ -270,6 +346,54 @@ def test_sound_console_commands_match_retail_registration_and_output_contracts()
 	play_block = _extract_function_block(snd_dma, "void S_Play_f( void ) {")
 	music_block = _extract_function_block(snd_dma, "void S_Music_f( void ) {")
 	list_block = _extract_function_block(snd_dma, "void S_SoundList_f( void ) {")
+
+	for alias, (name, ghidra_name, size) in SOUND_CONSOLE_ALIASES.items():
+		assert aliases[alias] == name
+		if ghidra_name is not None:
+			assert aliases[ghidra_name] == name
+			assert function_rows[ghidra_name]["size"] == size
+
+	for expected in (
+		"004d9b60    int32_t sub_4d9b60()",
+		'sub_4c9860(esi, "----- Sound Info -----\\n")',
+		'sub_4c9860(esi, "sound system not started\\n")',
+		'sub_4c9860(esi, "sound system is muted\\n")',
+		'sub_4c9860(esi, "%5d stereo\\n")',
+		'sub_4c9860(esi, "Background file: %s\\n")',
+		'sub_4c9860(esi, "No background file.\\n")',
+		'sub_4c9860(esi, "----------------------\\n")',
+		"004dafd0    int32_t sub_4dafd0()",
+		"void* const eax = &data_5442c4",
+		"if (*(esi_1 - 8) == 0)",
+		"eax = &data_5442c0",
+		'sub_4c9860(esi_1, "%6i [%s] : %s\\n")',
+		'char const data_54429c[0x12] = "%i sounds loaded\\n", 0',
+		'char const data_5442b0[0xf] = "%6i [%s] : %s\\n", 0',
+		"005442c0  50 47 44 00",
+		"PGD.",
+		"005442c4              4d 45 4d 00",
+		"MEM.",
+		"004db022  return sub_4dbbe0() __tailcall",
+		"004db710    int32_t sub_4db710()",
+		"result = sub_4c7ed0()",
+		"if (sub_4d8f10(sub_4c7ee0(esi), 0x2e) != 0)",
+		"int32_t var_114_3 = sub_4c7ee0(1)",
+		'sub_4d9160(&var_108, 0x100, "%s.wav")',
+		"eax_6, ecx_1 = sub_4d9e50(&var_108)",
+		"sub_4da050(nullptr, data_1260948, 6, eax_6, fconvert.s(float.t(1)))",
+		"004db810    int32_t sub_4db810()",
+		"if (eax_6 == 2)",
+		"int32_t result = sub_4db060(sub_4c7ee0(1), eax)",
+		"data_12608d0 = 0",
+		'return sub_4c9860(esi, "music <musicfile> [loopfile]\\n")',
+		"return sub_4db060(sub_4c7ee0(1), eax_2)",
+		'004dba07  sub_4c81d0("play", sub_4db710)',
+		'004dba16  sub_4c81d0("music", sub_4db810)',
+		'004dba25  sub_4c81d0("s_list", sub_4dafd0)',
+		'004dba34  sub_4c81d0("s_info", sub_4d9b60)',
+		'004dba43  sub_4c81d0("s_stop", sub_4db450)',
+	):
+		assert expected in hlil
 
 	assert 'Cmd_AddCommand("play", S_Play_f);' in init_block
 	assert 'Cmd_AddCommand("music", S_Music_f);' in init_block
@@ -285,6 +409,15 @@ def test_sound_console_commands_match_retail_registration_and_output_contracts()
 
 	assert 'Com_Printf("----- Sound Info -----\\n" );' in info_block
 	assert 'Com_Printf ("sound system not started\\n");' in info_block
+	assert 'Com_Printf ("sound system is muted\\n");' in info_block
+	assert 'Com_Printf("%5d stereo\\n", dma.channels - 1);' in info_block
+	assert 'Com_Printf("%5d samples\\n", dma.samples);' in info_block
+	assert 'Com_Printf("%5d samplebits\\n", dma.samplebits);' in info_block
+	assert 'Com_Printf("%5d submission_chunk\\n", dma.submission_chunk);' in info_block
+	assert 'Com_Printf("%5d speed\\n", dma.speed);' in info_block
+	assert 'Com_Printf("0x%x dma buffer\\n", dma.buffer);' in info_block
+	assert "if ( s_backgroundFile || S_OggStreamActive( &s_backgroundOgg ) ) {" in info_block
+	assert 'Com_Printf("Background file: %s\\n", s_backgroundLoop );' in info_block
 	assert 'Com_Printf("No background file.\\n" );' in info_block
 	assert 'Com_Printf("----------------------\\n" );' in info_block
 
@@ -347,6 +480,11 @@ def test_voice_mixer_reconstructs_retail_lane_shape_and_cvars() -> None:
 		'004dac0a      sub_4c9ab0("voice channel %d: %d samples alr…")',
 		'004dac2b      sub_4c9ab0("voice channel %d: overflow %d vo…")',
 		'004dac41  sub_4c9ab0("voice channel %d: add %d samples…")',
+		"004dc3b3              if (esi_1 != 0)",
+		"004dc3bc                  long double temp2_1 = fconvert.t(*(data_13e1854 + 0x2c))",
+		'004dc3cb                      sub_4c9ab0("background sound underrun\\n")',
+		"004dc3e9              sub_4c95e0(&data_12c5ba0, 0, (ebx - edi) * 8)",
+		'char const data_5445c8[0x1b] = "background sound underrun\\n", 0',
 		'char const data_544158[0x32] = "voice channel %d: add %d samples to voice buffer\\n", 0',
 		'char const data_544190[0x43] = "voice channel %d: overflow %d voice samples with room for only %d\\n", 0',
 		'char const data_5441d4[0x30] = "voice channel %d: %d samples already in buffer\\n", 0',
@@ -365,6 +503,7 @@ def test_voice_mixer_reconstructs_retail_lane_shape_and_cvars() -> None:
 	assert "typedef struct {" in snd_local
 	assert "short\tsamples[VOICE_BUFFER_SAMPLES];" in snd_local
 	assert "voiceChannel_t\ts_voiceChannels[MAX_VOICE_CHANNELS];" in snd_dma
+	assert "extern cvar_t\t*s_musicVolume;" in snd_local
 	assert 's_pvs = Cvar_GetBounded( "s_pvs", "0", "0", "1", CVAR_ARCHIVE | CVAR_PROTECTED | CVAR_VM_CREATED | CVAR_CLOUD );' in snd_dma
 	assert 's_voiceStep = Cvar_Get( "s_voiceStep", "0.02", CVAR_ARCHIVE | CVAR_PROTECTED );' in snd_dma
 	assert "Com_Memset( s_voiceChannels, 0, sizeof( s_voiceChannels ) );" in snd_dma
@@ -383,9 +522,195 @@ def test_voice_mixer_reconstructs_retail_lane_shape_and_cvars() -> None:
 	assert "s_voiceChannels[i].endSample - s_paintedtime < (int)( dma.speed * 0.5f )" not in add_voice_block
 	assert "voiceScale = (int)( Com_Clamp( 0.0f, 2.0f, s_voiceVolume->value ) * 256.0f );" in snd_mix
 	assert "voice->samples[sampleTime & ( VOICE_BUFFER_SAMPLES - 1 )] * voiceScale" in snd_mix
+	assert "if ( s_musicVolume && s_musicVolume->value > 0.0f ) {" in snd_mix
+	assert 'Com_DPrintf( "background sound underrun\\n" );' in snd_mix
 	assert 'Com_DPrintf( "voice channel %d: no data in the paint window\\n", voiceIndex );' in snd_mix
 	assert 'Com_DPrintf( "voice channel %d: consumed all buffered voice samples\\n", voiceIndex );' in snd_mix
 	assert "if ( s_pvs && s_pvs->integer && !S_OriginInPVS( listener_origin, origin ) ) {" in snd_dma
+
+
+def test_sound_mixer_paint_channels_preserves_retail_stage_order_and_transfer_helpers() -> None:
+	aliases = json.loads(ALIASES.read_text(encoding="utf-8"))["quakelive_steam_srp"]
+	function_rows = {
+		row["name"]: row
+		for row in csv.DictReader(FUNCTIONS_CSV.read_text(encoding="utf-8").splitlines())
+	}
+	hlil = QL_STEAM_HLIL.read_text(encoding="utf-8")
+	snd_mix = SND_MIX.read_text(encoding="utf-8")
+
+	stereo_block = _extract_function_block(snd_mix, "void S_TransferStereo16")
+	transfer_block = _extract_function_block(snd_mix, "void S_TransferPaintBuffer")
+	paint16_block = _extract_function_block(snd_mix, "static void S_PaintChannelFrom16")
+	paint_block = _extract_function_block(snd_mix, "void S_PaintChannels( int endtime )")
+	dynamic_block = paint_block[
+		paint_block.index("// paint in the channels."):paint_block.index("// paint in the looped channels.")
+	]
+	loop_block = paint_block[
+		paint_block.index("// paint in the looped channels."):paint_block.index("// transfer out according to DMA format")
+	]
+
+	for alias, (name, ghidra_name, size) in SOUND_MIXER_ALIASES.items():
+		assert aliases[alias] == name
+		assert aliases[ghidra_name] == name
+		assert function_rows[ghidra_name]["size"] == size
+
+	_assert_order(
+		hlil,
+		"004dbdf0    void sub_4dbdf0(int32_t arg1, int32_t arg2)",
+		"004dbed0    char* __convention(\"regparm\") sub_4dbed0(int32_t arg1)",
+		"004dc030    void sub_4dc030(void* arg1, int32_t* arg2, int32_t arg3, int32_t arg4, int32_t arg5)",
+		"004dc350    int32_t sub_4dc350(void* arg1)",
+	)
+
+	for expected in (
+		"004dc366  int32_t result = sub_526000(fconvert.t(*(data_13e185c + 0x2c)) * fconvert.t(255.0))",
+		"004dc39a          if (ebx - edi s> 0x1000)",
+		"004dc412                      void* eax_3 = ecx_3 & 0x3fff",
+		"004dc425                      *edx_4 = *((eax_3 << 3) + &data_14098a0)",
+		'004dc3cb                      sub_4c9ab0("background sound underrun\\n")',
+		"004dc3e9              sub_4c95e0(&data_12c5ba0, 0, (ebx - edi) * 8)",
+		"004dc46a          long double temp3_1 = fconvert.t(*(data_14298a0 + 0x2c))",
+		"004dc47d              void* ebx_6 = &data_13e1864",
+		"004dc4e2                                  sx.d(*(ebx_6 + ((esi_2 & 0x3fff) << 1) + 8)) * eax_7",
+		"004dc4e6                              *(ecx_6 - 4) += edx_13",
+		"004dc4e9                              *ecx_6 += edx_13",
+		"004dc522              while (i_1 s< 5)",
+		"004dc528          void* esi_3 = &data_14298e8",
+		"004dc52d          int32_t i_8 = 0x60",
+		"004dc5a0                          st0, eax_6 = sub_4dc030(esi_3 - 0x28, ebx_7, eax_6, ecx_8, 0)",
+		"004dc5c8          if (data_142c2f0 s> 0)",
+		"004dc5ce              void* eax_9 = &data_142ae08",
+		"004dc5f9                              int32_t temp1_1 = mods.dp.d(sx.q(edi), ecx_10)",
+		"004dc622                                  st0 = sub_4dc030(var_c_1 - 0x28, ebx_8, esi_5, temp1_1,",
+		"004dc654          result = sub_4dbed0(var_8_1)",
+		"004dc659          data_142c2ec = var_8_1",
+		'char const data_544560[0x2f] = "voice channel %d: no data in the paint window\\n", 0',
+		'char const data_544590[0x37] = "voice channel %d: consumed all buffered voice samples\\n", 0',
+		'char const data_5445c8[0x1b] = "background sound underrun\\n", 0',
+	):
+		assert expected in hlil
+
+	_assert_order(
+		hlil,
+		"004dc350    int32_t sub_4dc350(void* arg1)",
+		"004dc3af          if (esi_1 s>= edi)",
+		"004dc46a          long double temp3_1 = fconvert.t(*(data_14298a0 + 0x2c))",
+		"004dc528          void* esi_3 = &data_14298e8",
+		"004dc5c8          if (data_142c2f0 s> 0)",
+		"004dc654          result = sub_4dbed0(var_8_1)",
+		"004dc659          data_142c2ec = var_8_1",
+	)
+
+	for expected in (
+		"lpos = ls_paintedtime & ((dma.samples>>1)-1);",
+		"snd_out = (short *) pbuf + (lpos<<1);",
+		"snd_linear_count = (dma.samples>>1) - lpos;",
+		"if (ls_paintedtime + snd_linear_count > endtime)",
+		"snd_linear_count = endtime - ls_paintedtime;",
+		"S_WriteLinearBlastStereo16 ();",
+	):
+		assert expected in stereo_block
+
+	for expected in (
+		"if ( s_testsound->integer ) {",
+		"count = (endtime - s_paintedtime);",
+		"if (dma.samplebits == 16 && dma.channels == 2)",
+		"S_TransferStereo16 (pbuf, endtime);",
+		"count = (endtime - s_paintedtime) * dma.channels;",
+		"out_mask = dma.samples - 1;",
+		"out_idx = s_paintedtime * dma.channels & out_mask;",
+		"step = 3 - dma.channels;",
+		"if (dma.samplebits == 16)",
+		"else if (dma.samplebits == 8)",
+	):
+		assert expected in transfer_block
+
+	for expected in (
+		"if (ch->doppler) {",
+		"sampleOffset = sampleOffset*ch->oldDopplerScale;",
+		"while (sampleOffset>=SND_CHUNK_SIZE) {",
+		"if (!chunk) {",
+		"chunk = sc->soundData;",
+		"leftvol = ch->leftvol*snd_vol;",
+		"rightvol = ch->rightvol*snd_vol;",
+		"samp[i].left += (data * leftvol)>>8;",
+		"samp[i].right += (data * rightvol)>>8;",
+	):
+		assert expected in paint16_block
+
+	_assert_order(
+		paint_block,
+		"snd_vol = s_volume->value*255;",
+		"while ( s_paintedtime < endtime ) {",
+		"if ( endtime - s_paintedtime > PAINTBUFFER_SIZE ) {",
+		"if ( s_rawend < s_paintedtime ) {",
+		"if ( s_voiceVolume && s_voiceVolume->value > 0.0f ) {",
+		"// paint in the channels.",
+		"// paint in the looped channels.",
+		"S_TransferPaintBuffer( end );",
+		"s_paintedtime = end;",
+	)
+
+	for expected in (
+		"if ( s_musicVolume && s_musicVolume->value > 0.0f ) {",
+		'Com_DPrintf( "background sound underrun\\n" );',
+		"Com_Memset(paintbuffer, 0, (end - s_paintedtime) * sizeof(portable_samplepair_t));",
+		"stop = (end < s_rawend) ? end : s_rawend;",
+		"s = i&(MAX_RAW_SAMPLES-1);",
+		"paintbuffer[i-s_paintedtime] = s_rawsamples[s];",
+		"paintbuffer[i-s_paintedtime].left =",
+		"paintbuffer[i-s_paintedtime].right = 0;",
+		"voiceScale = (int)( Com_Clamp( 0.0f, 2.0f, s_voiceVolume->value ) * 256.0f );",
+		"for ( voiceIndex = 0; voiceIndex < MAX_VOICE_CHANNELS; ++voiceIndex ) {",
+		"voice = &s_voiceChannels[voiceIndex];",
+		"if ( voiceStart < s_paintedtime ) {",
+		"if ( voiceEnd > end ) {",
+		'Com_DPrintf( "voice channel %d: no data in the paint window\\n", voiceIndex );',
+		"voice->samples[sampleTime & ( VOICE_BUFFER_SAMPLES - 1 )] * voiceScale;",
+		"samp->left += data;",
+		"samp->right += data;",
+		"voice->startSample = end;",
+		'Com_DPrintf( "voice channel %d: consumed all buffered voice samples\\n", voiceIndex );',
+	):
+		assert expected in paint_block
+
+	for expected in (
+		"ch = s_channels;",
+		"for ( i = 0; i < MAX_CHANNELS ; i++, ch++ ) {",
+		"if ( !ch->thesfx || (ch->leftvol<0.25 && ch->rightvol<0.25 )) {",
+		"sampleOffset = ltime - ch->startSample;",
+		"if ( sampleOffset + count > sc->soundLength ) {",
+		"if( sc->soundCompressionMethod == 1) {",
+		"S_PaintChannelFromADPCM",
+		"} else if( sc->soundCompressionMethod == 2) {",
+		"S_PaintChannelFromWavelet",
+		"} else if( sc->soundCompressionMethod == 3) {",
+		"S_PaintChannelFromMuLaw",
+		"} else {",
+		"S_PaintChannelFrom16",
+	):
+		assert expected in dynamic_block
+
+	for expected in (
+		"ch = loop_channels;",
+		"for ( i = 0; i < numLoopChannels ; i++, ch++ ) {",
+		"if ( !ch->thesfx || (!ch->leftvol && !ch->rightvol )) {",
+		"if (sc->soundData==NULL || sc->soundLength==0) {",
+		"do {",
+		"sampleOffset = (ltime % sc->soundLength);",
+		"if ( sampleOffset + count > sc->soundLength ) {",
+		"if( sc->soundCompressionMethod == 1) {",
+		"S_PaintChannelFromADPCM",
+		"} else if( sc->soundCompressionMethod == 2) {",
+		"S_PaintChannelFromWavelet",
+		"} else if( sc->soundCompressionMethod == 3) {",
+		"S_PaintChannelFromMuLaw",
+		"} else {",
+		"S_PaintChannelFrom16",
+		"ltime += count;",
+		"} while ( ltime < end);",
+	):
+		assert expected in loop_block
 
 
 def test_client_steam_voice_frame_reconstructs_retail_transport_path() -> None:
@@ -640,10 +965,15 @@ def test_background_track_ogg_update_matches_retail_restart_path() -> None:
 
 	for alias, (name, ghidra_name, size) in SOUND_BACKGROUND_ALIASES.items():
 		assert aliases[alias] == name
+		assert aliases[ghidra_name] == name
 		assert function_rows[ghidra_name]["size"] == size
 
 	for expected in (
 		"004db030    void sub_4db030()",
+		"004db037  if (data_12c5b74 != 0)",
+		"004db039      sub_4dca40()",
+		"004db03e      data_12c5b74 = 0",
+		"004db048      data_13e1850 = 0",
 		"004db060    int32_t sub_4db060(char* arg1, char* arg2)",
 		'004db0a0      sub_4c9ab0("S_StartBackgroundTrack( %s, %s )…")',
 		'char const data_5442f0[0x39] = "S_StartBackgroundTrack: %s should have an OGG extension\\n", 0',
@@ -674,6 +1004,17 @@ def test_background_track_ogg_update_matches_retail_restart_path() -> None:
 		"s_rawend = 0;",
 	):
 		assert expected in stop_block
+	_assert_order(
+		stop_block,
+		"stopped = qfalse;",
+		"if ( s_backgroundFile ) {",
+		"stopped = qtrue;",
+		"if ( S_OggStreamActive( &s_backgroundOgg ) ) {",
+		"stopped = qtrue;",
+		"s_backgroundIsOgg = qfalse;",
+		"if ( stopped ) {",
+		"s_rawend = 0;",
+	)
 
 	for expected in (
 		"if ( !intro || !intro[0] ) {",
@@ -688,6 +1029,16 @@ def test_background_track_ogg_update_matches_retail_restart_path() -> None:
 		'Com_Printf( S_COLOR_YELLOW "WARNING: couldn\'t open music file %s\\n", introPath );',
 	):
 		assert expected in start_block
+	_assert_order(
+		start_block,
+		"S_SetOggTrackPath( loop, s_backgroundLoop, sizeof( s_backgroundLoop ) );",
+		"S_SetOggTrackPath( intro, introPath, sizeof( introPath ) );",
+		"if ( s_backgroundFile ) {",
+		"if ( S_OggStreamActive( &s_backgroundOgg ) ) {",
+		"s_backgroundIsOgg = qfalse;",
+		"if ( !S_OpenBackgroundOgg( introPath ) ) {",
+	)
+	assert "s_rawend = 0;" not in start_block
 
 	assert 'result = S_OggStreamRead( &s_backgroundOgg, buffer, bytesToRead );' in update_helper
 	assert 'Com_Printf( S_COLOR_YELLOW "OGG_UpdateBackgroundTrack: %i\\n", result );' in update_helper

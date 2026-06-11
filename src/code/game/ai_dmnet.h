@@ -44,6 +44,7 @@ void AIEnter_Battle_Fight(bot_state_t *bs, char *s);
 void AIEnter_Battle_Chase(bot_state_t *bs, char *s);
 void AIEnter_Battle_Retreat(bot_state_t *bs, char *s);
 void AIEnter_Battle_NBG(bot_state_t *bs, char *s);
+void AIEnter_InstaGib(bot_state_t *bs);
 int AINode_Intermission(bot_state_t *bs);
 int AINode_Observer(bot_state_t *bs);
 int AINode_Respawn(bot_state_t *bs);
@@ -55,7 +56,8 @@ int AINode_Battle_Fight(bot_state_t *bs);
 int AINode_Battle_Chase(bot_state_t *bs);
 int AINode_Battle_Retreat(bot_state_t *bs);
 int AINode_Battle_NBG(bot_state_t *bs);
+int AINode_InstaGib(bot_state_t *bs);
 
 void BotResetNodeSwitches(void);
 void BotDumpNodeSwitches(bot_state_t *bs);
-
+void BotSetLeadTeamGoal(bot_state_t *bs);

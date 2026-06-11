@@ -81,6 +81,11 @@ def test_goal_item_aliases_and_retail_function_rows_are_pinned() -> None:
 	hlil = _read(QL_STEAM_HLIL_PART03)
 
 	expected_aliases = {
+		"49C6C0": "GeneticSelection",
+		"49C810": "GeneticParentsAndChildSelection",
+		"49CC30": "BotInterbreedGoalFuzzyLogic",
+		"49CCF0": "BotSaveGoalFuzzyLogic",
+		"49CD30": "BotMutateGoalFuzzyLogic",
 		"49CD80": "BotLoadItemConfig",
 		"49D010": "ItemWeightIndex",
 		"49D080": "InitLevelItemHeap",
@@ -99,10 +104,29 @@ def test_goal_item_aliases_and_retail_function_rows_are_pinned() -> None:
 		"49E000": "BotGetNextCampSpotGoal",
 		"49E070": "BotUpdateEntityItems",
 		"49E590": "BotDumpGoalStack",
+		"49E650": "BotPushGoal",
+		"49E6E0": "BotPopGoal",
+		"49E740": "BotEmptyGoalStack",
+		"49E790": "BotGetTopGoal",
+		"49E800": "BotGetSecondGoal",
 		"49E870": "BotChooseLTGItem",
 		"49EDA0": "BotChooseNBGItem",
+		"49F3C0": "BotTouchingGoal",
+		"49F560": "BotItemGoalInVisButNotVisible",
+		"49F680": "BotResetGoalState",
+		"49F6F0": "BotLoadItemWeights",
+		"49F780": "BotFreeItemWeights",
+		"49F7F0": "BotAllocGoalState",
+		"49F840": "BotFreeGoalState",
+		"49F8B0": "BotSetupGoalAI",
+		"49F920": "BotShutdownGoalAI",
 	}
 	expected_sizes = {
+		"49C6C0": 321,
+		"49C810": 1047,
+		"49CC30": 181,
+		"49CCF0": 62,
+		"49CD30": 80,
 		"49CD80": 646,
 		"49D010": 102,
 		"49D080": 141,
@@ -121,12 +145,27 @@ def test_goal_item_aliases_and_retail_function_rows_are_pinned() -> None:
 		"49E000": 110,
 		"49E070": 1292,
 		"49E590": 181,
+		"49E650": 134,
+		"49E6E0": 82,
+		"49E740": 75,
+		"49E790": 106,
+		"49E800": 107,
 		"49E870": 1315,
 		"49EDA0": 1562,
+		"49F3C0": 412,
+		"49F560": 286,
+		"49F680": 107,
+		"49F6F0": 129,
+		"49F780": 99,
+		"49F7F0": 68,
+		"49F840": 99,
+		"49F8B0": 106,
+		"49F920": 153,
 	}
 
 	for address, name in expected_aliases.items():
 		assert aliases[f"sub_{address}"] == name
+		assert aliases[f"FUN_00{address.lower()}"] == name
 		_assert_function_row(functions, address, expected_sizes[address])
 
 	for evidence in (

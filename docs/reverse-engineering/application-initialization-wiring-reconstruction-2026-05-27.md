@@ -45,10 +45,11 @@ calls:
 9. opens `asset://ql/index.html` when Steam/browser service state allows it
 10. loops through input frame work and `Com_Frame()`
 
-The checked-in source already mirrored the high-level host sequence but was
-missing the explicit Windows-key hook and its shutdown unhook. This round
-reconstructs that host-owned hook as `Sys_WinkeyHookProc`,
-`Sys_InitWinkeyHook`, and `Sys_ShutdownWinkeyHook`.
+The checked-in source already mirrored the high-level host sequence. Earlier
+rounds reconstructed the explicit Windows-key hook and its shutdown unhook as
+`Sys_WinkeyHookProc`, `Sys_InitWinkeyHook`, and `Sys_ShutdownWinkeyHook`.
+Mapping round 487 reconstructs the adjacent native tooltip common-control shell
+observed immediately after the hook and before the Steam web-menu URL launch.
 
 ## Reconstructed Source Behavior
 
@@ -63,6 +64,13 @@ reconstructs that host-owned hook as `Sys_WinkeyHookProc`,
 - `Sys_Error` and `Sys_Quit` now both call `Sys_ShutdownWinkeyHook()` after
   input shutdown and before the error message loop or console destruction,
   matching the retail unhook sites at `0x004EC755` and `0x004EC7C0`.
+- `WinMain` now initializes a `tooltips_class32` common-control shell after
+  the Windows-key hook, using the observed `ICC_BAR_CLASSES`, popup tooltip
+  style, `HWND_NOTOPMOST` placement, desktop tool rectangle, `TTM_ADDTOOLA`,
+  and inactive `TTM_ACTIVATE` message.
+- `Sys_Error` and `Sys_Quit` destroy the tooltip shell after unhooking the
+  Windows-key hook and before entering the fatal message loop or destroying the
+  console.
 - `references/analysis/quakelive_symbol_aliases.json` now promotes
   `sub_4EC580` to `Sys_WinkeyHookProc`.
 
@@ -81,13 +89,10 @@ These are observed retail behaviors that remain deliberately source-adjusted:
   server policy cvars and server-owned service fallbacks are established
   together before botlib startup.
 - Retail `WinMain` opens `asset://ql/index.html` directly after the native
-  tooltip shell. The source opens the same URL through
+  tooltip shell. The source now reconstructs the native tooltip shell but still
+  opens the same URL through
   `CL_WebHost_BootstrapAwesomiumMenu()` after `SCR_Init()` so renderer
   dimensions exist, and keeps the path behind `QL_PLATFORM_HAS_ONLINE_SERVICES`.
-- The retail tooltip common-control shell is mapped but not reconstructed in
-  this pass. The only observed `data_12D34B0` use in the committed HLIL is
-  creation plus `TTM_ADDTOOLA`/`TTM_ACTIVATE`; current source tooltip state is
-  owned by the retained browser bridge via `web.tooltip` publication.
 
 ## Confidence
 
@@ -97,19 +102,22 @@ shutdown unhook sites, and `WinMain` call order all agree.
 High for the startup owner map: aliases, `functions.csv`, HLIL call order, and
 checked-in source owners align.
 
-Medium for the tooltip shell's eventual reconstruction value: creation is
-observed directly, but no committed evidence yet shows downstream tooltip text
-mutation outside the existing browser bridge callback.
+Medium for any later tooltip text-mutation work: shell creation is observed
+directly, but no committed evidence yet shows downstream tooltip text mutation
+outside the existing browser bridge callback. Round 487 therefore reconstructs
+the shell and its empty desktop tool without changing browser tooltip
+publication.
 
 ## Parity Estimate
 
-Before this round, the scoped application-initialization wiring lane was about
-`96.5%`: the main host/common/client/server spine was already mapped, but the
-WinMain-owned keyboard hook and shutdown unhook were absent.
+Before the keyboard-hook reconstruction round, the scoped application-
+initialization wiring lane was about `96.5%`: the main
+host/common/client/server spine was already mapped, but the WinMain-owned
+keyboard hook and shutdown unhook were absent.
 
-After this round, the scoped lane is about `98.0%`: the executable-owned hook is
-reconstructed and statically guarded. Remaining gaps are the native tooltip
-common-control shell and any later decision to move ZMQ/browser calls closer to
-retail without violating the disabled-by-default online-services policy.
+After round 487, the scoped lane is about `98.4%`: the executable-owned hook
+and native tooltip shell are reconstructed and statically guarded. Remaining
+gaps are any later decision to move ZMQ/browser calls closer to retail without
+violating the disabled-by-default online-services policy.
 
 The repo-wide parity estimate remains **98%**.

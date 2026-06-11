@@ -582,7 +582,9 @@ void S_PaintChannels( int endtime ) {
 		// clear the paint buffer to either music or zeros
 		if ( s_rawend < s_paintedtime ) {
 			if ( s_rawend ) {
-				//Com_DPrintf ("background sound underrun\n");
+				if ( s_musicVolume && s_musicVolume->value > 0.0f ) {
+					Com_DPrintf( "background sound underrun\n" );
+				}
 			}
 			Com_Memset(paintbuffer, 0, (end - s_paintedtime) * sizeof(portable_samplepair_t));
 		} else {

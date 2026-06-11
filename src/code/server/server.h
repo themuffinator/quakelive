@@ -354,6 +354,7 @@ void SV_DirectConnect( netadr_t from );
 void SV_AuthorizeIpPacket( netadr_t from );
 
 void SV_SteamServerInitCallbacks( void );
+void SV_SteamServerEndOrphanedAuthSessions( void );
 void Zmq_RegisterCvarsAndInitRcon( void );
 void Zmq_UpdatePasswords( void );
 void Zmq_InitStatsPublisher( void );
@@ -386,10 +387,13 @@ const char *SV_GetRankingsProviderLabel( void );
 const char *SV_GetRankingsPolicyLabel( void );
 void SV_RefreshRankingsPolicyCvars( void );
 void SV_SteamServerPublishIdentity( void );
+void SV_SteamServerNetworkingFrame( void );
 void SV_SteamServerUpdatePublishedState( qboolean fullUpdate );
 void SV_SteamStats_AddFieldValue( int clientNum, int statIndex, int delta );
 void SV_SteamStats_UnlockAchievement( int clientNum, int achievementId );
 qboolean SV_SteamStats_HasAchievement( int clientNum, int achievementId );
+const void *SV_SteamStats_ProcessMatchReport( const void *report, char *buffer, int bufferSize );
+void SV_SteamStats_ProcessEvent( uint32_t steamIdLow, uint32_t steamIdHigh, const void *clientStats, const char *eventName, const void *payload );
 
 //
 // sv_ccmds.c

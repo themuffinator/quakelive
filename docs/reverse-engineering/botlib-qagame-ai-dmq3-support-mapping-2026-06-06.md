@@ -11,6 +11,11 @@ matches the retail evidence for this band, including the newer
 `BotNormalizeAmmoInventory` helper that preserves retail `-1` ammo sentinels as
 infinite ammo before inventory and pickup logic runs.
 
+Update 2026-06-11: `BotWantsToChase` now preserves the retail invalid-enemy
+guard before CTF and 1FCTF flag-carrier probing. The guard matters for the
+offscreen enemy acceptance helper, which calls `BotWantsToChase` while
+`bs->enemy` is still unset.
+
 ## Evidence
 
 - `references/analysis/quakelive_symbol_aliases.json`
@@ -87,7 +92,9 @@ Observed source anchors now pinned by tests:
 - `BotAggression`, `BotFeelingBad`, `BotWantsToRetreat`,
   `BotWantsToChase`, `BotCanAndWantsToRocketJump`, and
   `BotHasPersistantPowerupAndWeapon` preserve the combat decision ladder used
-  by the DMNet battle, chase, and retreat nodes.
+  by the DMNet battle, chase, and retreat nodes. `BotWantsToChase` also keeps
+  the retail guard that skips flag-carrier entity inspection when no enemy is
+  currently assigned.
 - `BotGoCamp`, `BotWantsToCamp`, `BotDontAvoid`, and `BotGoForPowerups`
   preserve the camp-goal setup, camper-characteristic throttling, nearest camp
   spot travel-time search, avoid-goal clearing, and powerup LTG reset flow.

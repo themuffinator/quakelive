@@ -1162,6 +1162,7 @@ void SV_Shutdown( char *finalmsg );
 void SV_ClearIdleServerExit( void );
 qboolean SV_ShouldErrorExit( errorParm_t code );
 qboolean SV_CheckIdleServerExit( int currentTime );
+void SV_SteamServerNetworkingFrame( void );
 void SV_Frame( int msec );
 void SV_PacketEvent( netadr_t from, msg_t *msg );
 qboolean SV_GameCommand( void );

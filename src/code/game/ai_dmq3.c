@@ -66,6 +66,18 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 #define IDEAL_ATTACKDIST			140
 
+#define BOT_OFFSCREEN_ENEMY_MIN_SKILL	4.0f
+#define BOT_OFFSCREEN_CLIENT_MASK_BITS	32
+#define BOT_OFFSCREEN_GOAL_MIN_MODEL	25
+#define BOT_TOUR_POINT_FLOOR_DROP		8192.0f
+#define BOT_TOUR_POINT_ORIGIN_Z_OFFSET	16.0f
+#define BOT_TOUR_POINT_START_FLAG		1
+#define BOT_TOUR_POINT_REUSE_DELAY		2000
+#define BOT_TORMENT_TARGET_MAX_DISTANCE	100000000.0f
+#define BOT_TORMENT_TARGET_TRACE_UP		24.0f
+#define BOT_TORMENT_TARGET_MAX_AREAS	10
+#define BOT_TORMENT_TRAVEL_FLAGS		0x011C0FBE
+
 #define MAX_WAYPOINTS		128
 //
 bot_waypoint_t botai_waypoints[MAX_WAYPOINTS];
@@ -2338,18 +2350,22 @@ int BotWantsToChase(bot_state_t *bs) {
 		if (BotCTFCarryingFlag(bs))
 			return qfalse;
 		//always chase if the enemy is carrying a flag
-		BotEntityInfo(bs->enemy, &entinfo);
-		if (EntityCarriesFlag(&entinfo))
-			return qtrue;
+		if (bs->enemy >= 0) {
+			BotEntityInfo(bs->enemy, &entinfo);
+			if (EntityCarriesFlag(&entinfo))
+				return qtrue;
+		}
 	}
 	else if (gametype == GT_1FCTF) {
 		//never chase if carrying the flag
 		if (Bot1FCTFCarryingFlag(bs))
 			return qfalse;
 		//always chase if the enemy is carrying a flag
-		BotEntityInfo(bs->enemy, &entinfo);
-		if (EntityCarriesFlag(&entinfo))
-			return qtrue;
+		if (bs->enemy >= 0) {
+			BotEntityInfo(bs->enemy, &entinfo);
+			if (EntityCarriesFlag(&entinfo))
+				return qtrue;
+		}
 	}
 	else if (gametype == GT_OBELISK) {
 		//the bots should be dedicated to attacking the enemy obelisk
@@ -2931,11 +2947,90 @@ float BotEntityVisible(int viewer, vec3_t eye, vec3_t viewangles, float fov, int
 
 /*
 ==================
+BotGoalBlocksOffscreenEnemyCandidate
+==================
+*/
+static qboolean BotGoalBlocksOffscreenEnemyCandidate( bot_goal_t *goal ) {
+	aas_entityinfo_t entinfo;
+
+	if ( goal->entitynum < 0 ) {
+		return qfalse;
+	}
+
+	BotEntityInfo( goal->entitynum, &entinfo );
+	if ( !entinfo.valid ) {
+		return qfalse;
+	}
+
+	if ( entinfo.type == ET_BEAM ) {
+		return qtrue;
+	}
+
+	if ( ( entinfo.type == ET_MISSILE || entinfo.type == ET_MOVER ) &&
+			entinfo.modelindex >= BOT_OFFSCREEN_GOAL_MIN_MODEL ) {
+		return qtrue;
+	}
+
+	return qfalse;
+}
+
+/*
+==================
+BotHasBlockingOffscreenGoal
+==================
+*/
+static qboolean BotHasBlockingOffscreenGoal( bot_state_t *bs ) {
+	bot_goal_t goal;
+
+	if ( trap_BotGetTopGoal( bs->gs, &goal ) &&
+			BotGoalBlocksOffscreenEnemyCandidate( &goal ) ) {
+		return qtrue;
+	}
+
+	if ( trap_BotGetSecondGoal( bs->gs, &goal ) &&
+			BotGoalBlocksOffscreenEnemyCandidate( &goal ) ) {
+		return qtrue;
+	}
+
+	return qfalse;
+}
+
+/*
+==================
+BotAcceptOffscreenEnemyCandidate
+==================
+*/
+static qboolean BotAcceptOffscreenEnemyCandidate( bot_state_t *bs, int clientNum ) {
+	if ( clientNum < 0 || clientNum >= MAX_CLIENTS ||
+			clientNum >= BOT_OFFSCREEN_CLIENT_MASK_BITS ) {
+		return qfalse;
+	}
+	if ( bs->enemy != -1 ) {
+		return qfalse;
+	}
+	if ( BotWantsToRetreat( bs ) ) {
+		return qfalse;
+	}
+	if ( !BotWantsToChase( bs ) ) {
+		return qfalse;
+	}
+	if ( BotHasBlockingOffscreenGoal( bs ) ) {
+		return qfalse;
+	}
+	if ( bs->settings.skill < BOT_OFFSCREEN_ENEMY_MIN_SKILL ) {
+		return qfalse;
+	}
+
+	return ( bs->heardClientMask & ( 1u << clientNum ) ) != 0;
+}
+
+/*
+==================
 BotFindEnemy
 ==================
 */
 int BotFindEnemy(bot_state_t *bs, int curenemy) {
-	int i, healthdecrease;
+	int i, healthdecrease, offscreenEnemy;
 	float f, alertness, easyfragger, vis;
 	float squaredist, cursquaredist;
 	aas_entityinfo_t entinfo, curenemyinfo;
@@ -2975,6 +3070,7 @@ int BotFindEnemy(bot_state_t *bs, int curenemy) {
 				return qfalse;
 			}
 			bs->enemy = goal->entitynum;
+			bs->enemyFromGoalStack = qfalse;
 			bs->enemysight_time = FloatTime();
 			bs->enemysuicide = qfalse;
 			bs->enemydeath_time = 0;
@@ -3025,8 +3121,14 @@ int BotFindEnemy(bot_state_t *bs, int curenemy) {
 		else
 			f = 90 + 90 - (90 - (squaredist > Square(810) ? Square(810) : squaredist) / (810 * 9));
 		//check if the enemy is visible
+		offscreenEnemy = qfalse;
 		vis = BotEntityVisible(bs->entitynum, bs->eye, bs->viewangles, f, i);
-		if (vis <= 0) continue;
+		if (vis <= 0) {
+			if (!BotAcceptOffscreenEnemyCandidate(bs, i)) {
+				continue;
+			}
+			offscreenEnemy = qtrue;
+		}
 		//if the enemy is quite far away, not shooting and the bot is not damaged
 		if (curenemy < 0 && squaredist > Square(100) && !healthdecrease && !EntityIsShooting(&entinfo))
 		{
@@ -3043,6 +3145,7 @@ int BotFindEnemy(bot_state_t *bs, int curenemy) {
 		}
 		//found an enemy
 		bs->enemy = entinfo.number;
+		bs->enemyFromGoalStack = offscreenEnemy;
 		if (curenemy >= 0) bs->enemysight_time = FloatTime() - 2;
 		else bs->enemysight_time = FloatTime();
 		bs->enemysuicide = qfalse;
@@ -3051,6 +3154,177 @@ int BotFindEnemy(bot_state_t *bs, int curenemy) {
 		return qtrue;
 	}
 	return qfalse;
+}
+
+/*
+==================
+BotFindInstaGibTarget
+==================
+*/
+int BotFindInstaGibTarget(bot_state_t *bs) {
+	int i, areanum, numareas, target, areas[10];
+	float bestdist, dist;
+	aas_entityinfo_t entinfo;
+	vec3_t dir, end;
+
+	target = -1;
+	bestdist = 100000000.0f;
+
+	if (bs->enemy != -1 && BotEntityVisible(bs->entitynum, bs->eye, bs->viewangles, 360, bs->enemy) > 0) {
+		BotEntityInfo(bs->enemy, &entinfo);
+		VectorSubtract(bs->origin, entinfo.origin, dir);
+		areanum = BotPointAreaNum(entinfo.origin);
+		if (areanum > 0 &&
+			trap_AAS_AreaTravelTimeToGoalArea(bs->areanum, bs->origin, areanum, TFL_DEFAULT) > 0) {
+			bestdist = VectorLength(dir);
+			target = bs->enemy;
+		}
+	}
+
+	for (i = 0; i < maxclients && i < MAX_CLIENTS; i++) {
+		if (i == bs->client) {
+			continue;
+		}
+		BotEntityInfo(i, &entinfo);
+		if (!entinfo.valid) {
+			continue;
+		}
+		if (EntityIsDead(&entinfo)) {
+			continue;
+		}
+		VectorSubtract(bs->origin, entinfo.origin, dir);
+		dist = VectorLength(dir);
+		if (dist >= bestdist) {
+			continue;
+		}
+		areanum = BotPointAreaNum(entinfo.origin);
+		if (!areanum) {
+			continue;
+		}
+		if (!trap_AAS_AreaTravelTimeToGoalArea(bs->areanum, bs->origin, areanum, TFL_DEFAULT)) {
+			continue;
+		}
+		bestdist = dist;
+		target = i;
+	}
+
+	if (target != -1) {
+		return target;
+	}
+
+	for (i = 0; i < maxclients && i < MAX_CLIENTS; i++) {
+		if (i == bs->client) {
+			continue;
+		}
+		BotEntityInfo(i, &entinfo);
+		if (!entinfo.valid) {
+			continue;
+		}
+		if (EntityIsDead(&entinfo)) {
+			continue;
+		}
+		VectorSubtract(bs->origin, entinfo.origin, dir);
+		dist = VectorLength(dir);
+		if (dist >= bestdist) {
+			continue;
+		}
+		areanum = trap_AAS_PointReachabilityAreaIndex(entinfo.origin);
+		if (!areanum) {
+			VectorCopy(entinfo.origin, end);
+			end[2] += 10;
+			numareas = trap_AAS_TraceAreas(entinfo.origin, end, areas, NULL, 10);
+			if (numareas <= 0 || !areas[0]) {
+				continue;
+			}
+			areanum = areas[0];
+		}
+		if (!trap_AAS_AreaTravelTimeToGoalArea(bs->areanum, bs->origin, areanum, TFL_DEFAULT)) {
+			continue;
+		}
+		bestdist = dist;
+		target = i;
+	}
+
+	return target;
+}
+
+/*
+==================
+BotRefreshInstaGibTargetGoal
+==================
+*/
+int BotRefreshInstaGibTargetGoal(bot_state_t *bs) {
+	aas_entityinfo_t entinfo;
+
+	if (bs->ltg_time < FloatTime()) {
+		return qfalse;
+	}
+
+	BotEntityInfo(bs->teamgoal.entitynum, &entinfo);
+	if (!entinfo.valid) {
+		return qtrue;
+	}
+	if (EntityIsDead(&entinfo)) {
+		bs->ltg_time = 0;
+		return qfalse;
+	}
+
+	bs->ltg_time = FloatTime() + 5.0f;
+	VectorCopy(entinfo.origin, bs->teamgoal.origin);
+	bs->teamgoal.areanum = BotPointAreaNum(entinfo.origin);
+	VectorSet(bs->teamgoal.mins, -8, -8, -8);
+	VectorSet(bs->teamgoal.maxs, 8, 8, 8);
+	bs->teamgoal.flags = 0;
+	return qtrue;
+}
+
+/*
+==================
+BotGetInstaGibTargetGoal
+==================
+*/
+void BotGetInstaGibTargetGoal(bot_state_t *bs, bot_goal_t *goal) {
+	int i, target;
+	float bestdist, dist;
+	aas_entityinfo_t entinfo;
+	vec3_t dir;
+
+	if (!BotRefreshInstaGibTargetGoal(bs)) {
+		target = -1;
+		bestdist = 100000000.0f;
+
+		for (i = 0; i < maxclients && i < MAX_CLIENTS; i++) {
+			if (BotSameTeam(bs, i)) {
+				continue;
+			}
+			BotEntityInfo(i, &entinfo);
+			if (!entinfo.valid) {
+				continue;
+			}
+			if (EntityIsDead(&entinfo)) {
+				continue;
+			}
+			VectorSubtract(bs->origin, entinfo.origin, dir);
+			dist = VectorLength(dir);
+			if (dist >= bestdist) {
+				continue;
+			}
+			bestdist = dist;
+			target = i;
+		}
+
+		if (target == -1) {
+			return;
+		}
+
+		bs->ltgtype = LTG_KILL;
+		bs->ltg_time = FloatTime() + 5.0f;
+		bs->teamgoal_time = FloatTime() + 60.0f;
+		bs->teamgoal.entitynum = target;
+		BotRefreshInstaGibTargetGoal(bs);
+	}
+
+	memcpy(goal, &bs->teamgoal, sizeof(bot_goal_t));
 }
 
 /*
@@ -3670,6 +3944,26 @@ void BotCheckAttack(bot_state_t *bs) {
 
 /*
 ==================
+BotApplyBeyondRealityTravelFlags
+==================
+*/
+void BotApplyBeyondRealityTravelFlags(int *travelFlags) {
+	char info[1024];
+	char mapname[128];
+
+	trap_GetServerinfo(info, sizeof(info));
+
+	strncpy(mapname, Info_ValueForKey( info, SERVERINFO_KEY_MAPNAME ), sizeof(mapname)-1);
+	mapname[sizeof(mapname)-1] = '\0';
+
+	if (!Q_stricmp(mapname, "beyondreality")) {
+		//NOTE: NEVER use the func_bobbing in beyondreality
+		*travelFlags &= ~TFL_FUNCBOB;
+	}
+}
+
+/*
+==================
 BotMapScripts
 ==================
 */
@@ -3742,8 +4036,7 @@ void BotMapScripts(bot_state_t *bs) {
 		}
 	}
 	else if (!Q_stricmp(mapname, "beyondreality")) {
-		//NOTE: NEVER use the func_bobbing in beyondreality
-		bs->tfl &= ~TFL_FUNCBOB;
+		BotApplyBeyondRealityTravelFlags(&bs->tfl);
 	}
 }
 
@@ -4746,6 +5039,26 @@ void BotCheckForKamikazeBody(bot_state_t *bs, entityState_t *state) {
 
 /*
 ==================
+BotRememberHeardClient
+==================
+*/
+static void BotRememberHeardClient( bot_state_t *bs, entityState_t *state ) {
+	int clientNum;
+
+	clientNum = state->clientNum;
+	if ( clientNum < 0 || clientNum >= MAX_CLIENTS ) {
+		clientNum = state->number;
+	}
+	if ( clientNum < 0 || clientNum >= MAX_CLIENTS ||
+			clientNum >= BOT_OFFSCREEN_CLIENT_MASK_BITS || clientNum == bs->client ) {
+		return;
+	}
+
+	bs->heardClientMask |= 1u << clientNum;
+}
+
+/*
+==================
 BotCheckEvents
 ==================
 */
@@ -4760,6 +5073,7 @@ void BotCheckEvents(bot_state_t *bs, entityState_t *state) {
 		return;
 	}
 	bs->entityeventTime[state->number] = g_entities[state->number].eventTime;
+	bs->heardClientMask = 0;
 	//if it's an event only entity
 	if (state->eType > ET_EVENTS) {
 		event = (state->eType - ET_EVENTS) & ~EV_EVENT_BITS;
@@ -4958,7 +5272,7 @@ void BotCheckEvents(bot_state_t *bs, entityState_t *state) {
 		case EV_NOAMMO:
 		case EV_CHANGE_WEAPON:
 		case EV_FIRE_WEAPON:
-			//FIXME: either add to sound queue or mark player as someone making noise
+			BotRememberHeardClient(bs, state);
 			break;
 		case EV_USE_ITEM0:
 		case EV_USE_ITEM1:
@@ -5232,6 +5546,12 @@ void BotDeathmatchAI(bot_state_t *bs, float thinktime) {
 		//do team AI
 		BotTeamAI(bs);
 	}
+	//if the retail instagib mode flag is active, use the instant-rail target node
+	if (!BotIntermission(bs) && !BotIsObserver(bs) && !BotIsDead(bs) &&
+			g_instaGib.integer && bs->ltgtype != LTG_INSTAGIB &&
+			!bs->ordered && bs->enemy == -1) {
+		AIEnter_InstaGib(bs);
+	}
 	//if the bot has no ai node
 	if (!bs->ainode) {
 		AIEnter_Seek_LTG(bs, "BotDeathmatchAI: no ai node");
@@ -5321,6 +5641,359 @@ void BotSetEntityNumForGoal(bot_goal_t *goal, char *classname) {
 			return;
 		}
 	}
+}
+
+/*
+==================
+BotTormentCandidateClientActive
+==================
+*/
+static qboolean BotTormentCandidateClientActive( int clientNum ) {
+	playerState_t ps;
+
+	if ( clientNum < 0 || clientNum >= MAX_CLIENTS ) {
+		return qfalse;
+	}
+	if ( !BotAI_GetClientState( clientNum, &ps ) ) {
+		return qfalse;
+	}
+
+	return ps.pm_type == PM_NORMAL;
+}
+
+/*
+==================
+BotTormentCandidateAllowed
+==================
+*/
+static qboolean BotTormentCandidateAllowed( bot_state_t *bs, int clientNum, aas_entityinfo_t *entinfo ) {
+	if ( clientNum < 0 || clientNum >= MAX_CLIENTS ) {
+		return qfalse;
+	}
+	if ( clientNum == bs->client ) {
+		return qfalse;
+	}
+
+	BotEntityInfo( clientNum, entinfo );
+	if ( !entinfo->valid ) {
+		return qfalse;
+	}
+	if ( g_entities[clientNum].r.svFlags & SVF_BOT ) {
+		return qfalse;
+	}
+
+	return qtrue;
+}
+
+/*
+==================
+BotTormentCandidateDistance
+==================
+*/
+static float BotTormentCandidateDistance( bot_state_t *bs, vec3_t origin ) {
+	vec3_t dir;
+
+	VectorSubtract( bs->origin, origin, dir );
+	return VectorLength( dir );
+}
+
+/*
+==================
+BotTormentCandidateReachableArea
+==================
+*/
+static qboolean BotTormentCandidateReachableArea( bot_state_t *bs, int areanum ) {
+	if ( areanum <= 0 ) {
+		return qfalse;
+	}
+
+	return trap_AAS_AreaTravelTimeToGoalArea( bs->areanum, bs->origin, areanum,
+		BOT_TORMENT_TRAVEL_FLAGS ) > 0;
+}
+
+/*
+==================
+BotTormentCandidateTraceArea
+==================
+*/
+static int BotTormentCandidateTraceArea( vec3_t origin ) {
+	int areanum;
+	int numareas;
+	int areas[BOT_TORMENT_TARGET_MAX_AREAS];
+	vec3_t end;
+
+	areanum = trap_AAS_PointReachabilityAreaIndex( origin );
+	if ( areanum ) {
+		return areanum;
+	}
+
+	VectorCopy( origin, end );
+	end[2] += BOT_TORMENT_TARGET_TRACE_UP;
+	numareas = trap_AAS_TraceAreas( origin, end, areas, NULL, BOT_TORMENT_TARGET_MAX_AREAS );
+	if ( numareas <= 0 || !areas[0] ) {
+		return 0;
+	}
+
+	return areas[0];
+}
+
+/*
+==================
+BotAcceptTormentCandidateWithArea
+==================
+*/
+static qboolean BotAcceptTormentCandidateWithArea( bot_state_t *bs, int target,
+		vec3_t origin, int areanum, float maxDist, float *bestDist, int *bestTarget ) {
+	float dist;
+
+	dist = BotTormentCandidateDistance( bs, origin );
+	if ( dist >= maxDist ) {
+		return qfalse;
+	}
+	if ( dist >= *bestDist ) {
+		return qfalse;
+	}
+	if ( !BotTormentCandidateReachableArea( bs, areanum ) ) {
+		return qfalse;
+	}
+
+	*bestDist = dist;
+	*bestTarget = target;
+	return qtrue;
+}
+
+/*
+==================
+BotAcceptReachableTormentCandidate
+==================
+*/
+static qboolean BotAcceptReachableTormentCandidate( bot_state_t *bs, int target,
+		aas_entityinfo_t *entinfo, float maxDist, float *bestDist, int *bestTarget ) {
+	int areanum;
+
+	areanum = BotPointAreaNum( entinfo->origin );
+	return BotAcceptTormentCandidateWithArea( bs, target, entinfo->origin, areanum,
+		maxDist, bestDist, bestTarget );
+}
+
+/*
+==================
+BotAcceptTracedTormentCandidate
+==================
+*/
+static qboolean BotAcceptTracedTormentCandidate( bot_state_t *bs, int target,
+		aas_entityinfo_t *entinfo, float maxDist, float *bestDist, int *bestTarget ) {
+	int areanum;
+
+	areanum = BotTormentCandidateTraceArea( entinfo->origin );
+	return BotAcceptTormentCandidateWithArea( bs, target, entinfo->origin, areanum,
+		maxDist, bestDist, bestTarget );
+}
+
+/*
+==================
+BotAcceptNearestTormentCandidate
+==================
+*/
+static qboolean BotAcceptNearestTormentCandidate( bot_state_t *bs, int target,
+		aas_entityinfo_t *entinfo, float maxDist, float *bestDist, int *bestTarget ) {
+	float dist;
+
+	dist = BotTormentCandidateDistance( bs, entinfo->origin );
+	if ( dist >= maxDist ) {
+		return qfalse;
+	}
+	if ( dist >= *bestDist ) {
+		return qfalse;
+	}
+
+	*bestDist = dist;
+	*bestTarget = target;
+	return qtrue;
+}
+
+/*
+==================
+BotSelectTormentTarget
+==================
+*/
+int BotSelectTormentTarget( bot_state_t *bs, float maxDist ) {
+	int i;
+	int bestTarget;
+	float bestDist;
+	aas_entityinfo_t entinfo;
+
+	bestTarget = -1;
+	bestDist = BOT_TORMENT_TARGET_MAX_DISTANCE;
+
+	if ( bs->enemy != -1 &&
+			BotEntityVisible( bs->entitynum, bs->eye, bs->viewangles, 360, bs->enemy ) > 0 ) {
+		BotEntityInfo( bs->enemy, &entinfo );
+		if ( entinfo.valid ) {
+			BotAcceptReachableTormentCandidate( bs, bs->enemy, &entinfo, maxDist,
+				&bestDist, &bestTarget );
+		}
+	}
+
+	for ( i = 0; i < MAX_CLIENTS; i++ ) {
+		if ( !BotTormentCandidateAllowed( bs, i, &entinfo ) ) {
+			continue;
+		}
+		if ( entinfo.number < MAX_CLIENTS && !BotTormentCandidateClientActive( entinfo.number ) ) {
+			continue;
+		}
+
+		BotAcceptReachableTormentCandidate( bs, i, &entinfo, bestDist,
+			&bestDist, &bestTarget );
+	}
+
+	if ( bestTarget == -1 ) {
+		for ( i = 0; i < MAX_CLIENTS; i++ ) {
+			if ( !BotTormentCandidateAllowed( bs, i, &entinfo ) ) {
+				continue;
+			}
+
+			BotAcceptTracedTormentCandidate( bs, i, &entinfo, bestDist,
+				&bestDist, &bestTarget );
+		}
+
+		if ( bestTarget == -1 ) {
+			for ( i = 0; i < MAX_CLIENTS; i++ ) {
+				if ( !BotTormentCandidateAllowed( bs, i, &entinfo ) ) {
+					continue;
+				}
+
+				BotAcceptNearestTormentCandidate( bs, i, &entinfo, bestDist,
+					&bestDist, &bestTarget );
+			}
+		}
+	}
+
+	return bestTarget;
+}
+
+/*
+==================
+BotIsTourPointEntity
+==================
+*/
+static qboolean BotIsTourPointEntity( gentity_t *ent ) {
+	return ent && ent->inuse && ent->classname &&
+		!Q_stricmp( ent->classname, "info_tour_point" );
+}
+
+/*
+==================
+BotIsTourPointTargetEntity
+==================
+*/
+static qboolean BotIsTourPointTargetEntity( gentity_t *ent ) {
+	return ent && ent->inuse && ent->classname &&
+		!Q_stricmp( ent->classname, "info_notnull" );
+}
+
+/*
+==================
+BotSetTourPointFloorOrigin
+==================
+*/
+static void BotSetTourPointFloorOrigin( gentity_t *tourPoint, vec3_t origin ) {
+	bsp_trace_t trace;
+	vec3_t end;
+
+	VectorCopy( tourPoint->s.origin, end );
+	end[2] -= BOT_TOUR_POINT_FLOOR_DROP;
+	BotAI_Trace( &trace, tourPoint->s.origin, NULL, NULL, end, 0, CONTENTS_SOLID );
+	VectorCopy( trace.endpos, origin );
+	origin[2] += BOT_TOUR_POINT_ORIGIN_Z_OFFSET;
+}
+
+/*
+==================
+BotSetTourPointTargetOrigin
+==================
+*/
+static void BotSetTourPointTargetOrigin( gentity_t *tourPoint, vec3_t targetOrigin ) {
+	gentity_t *target;
+
+	if ( !tourPoint->target ) {
+		return;
+	}
+
+	target = NULL;
+	while ( ( target = G_Find( target, FOFS( targetname ), tourPoint->target ) ) != NULL ) {
+		if ( BotIsTourPointTargetEntity( target ) ) {
+			VectorCopy( target->s.origin, targetOrigin );
+			return;
+		}
+	}
+}
+
+/*
+==================
+BotResolveTourPoint
+==================
+*/
+int BotResolveTourPoint( int currentEntnum, vec3_t origin, vec3_t targetOrigin ) {
+	gentity_t *current;
+	gentity_t *tourPoint;
+
+	VectorClear( targetOrigin );
+
+	if ( currentEntnum >= MAX_CLIENTS && currentEntnum < MAX_GENTITIES ) {
+		current = &g_entities[currentEntnum];
+		if ( !current->inuse || !current->target ) {
+			return -1;
+		}
+
+		tourPoint = NULL;
+		while ( ( tourPoint = G_Find( tourPoint, FOFS( targetname ), current->target ) ) != NULL ) {
+			if ( !BotIsTourPointEntity( tourPoint ) ) {
+				continue;
+			}
+			if ( tourPoint == current ) {
+				return -1;
+			}
+
+			BotSetTourPointFloorOrigin( tourPoint, origin );
+			BotSetTourPointTargetOrigin( tourPoint, targetOrigin );
+			return tourPoint->s.number;
+		}
+
+		return -1;
+	}
+
+	tourPoint = NULL;
+	while ( ( tourPoint = G_Find( tourPoint, FOFS( classname ), "info_tour_point" ) ) != NULL ) {
+		if ( !( tourPoint->spawnflags & BOT_TOUR_POINT_START_FLAG ) ) {
+			continue;
+		}
+
+		BotSetTourPointFloorOrigin( tourPoint, origin );
+		BotSetTourPointTargetOrigin( tourPoint, targetOrigin );
+		return tourPoint->s.number;
+	}
+
+	return -1;
+}
+
+/*
+==================
+BotCanSpawnTourPoint
+==================
+*/
+int BotCanSpawnTourPoint( void ) {
+	int i;
+	gentity_t *ent;
+
+	ent = &g_entities[MAX_CLIENTS];
+	for ( i = MAX_CLIENTS; i < ENTITYNUM_MAX_NORMAL; i++, ent++ ) {
+		if ( !ent->inuse && ent->freetime + BOT_TOUR_POINT_REUSE_DELAY <= level.time ) {
+			return qtrue;
+		}
+	}
+
+	return qfalse;
 }
 
 /*

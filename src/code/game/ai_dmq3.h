@@ -114,6 +114,18 @@ void BotVisibleTeamMatesAndEnemies(bot_state_t *bs, int *teammates, int *enemies
 qboolean InFieldOfVision(vec3_t viewangles, float fov, vec3_t angles);
 //returns true and sets the .enemy field when an enemy is found
 int BotFindEnemy(bot_state_t *bs, int curenemy);
+//returns the best retail instagib target entity, or -1 if none is reachable
+int BotFindInstaGibTarget(bot_state_t *bs);
+//returns the best retail torment-human tutorial target entity, or -1 if none is available
+int BotSelectTormentTarget(bot_state_t *bs, float maxDist);
+//resolves a retail tutorial tour point and linked target origin
+int BotResolveTourPoint(int currentEntnum, vec3_t origin, vec3_t targetOrigin);
+//returns true if a retail tutorial tour point entity slot can be reused
+int BotCanSpawnTourPoint(void);
+//refreshes the cached instagib target goal
+int BotRefreshInstaGibTargetGoal(bot_state_t *bs);
+//returns a cached or freshly selected instagib target goal
+void BotGetInstaGibTargetGoal(bot_state_t *bs, bot_goal_t *goal);
 //returns a roam goal
 void BotRoamGoal(bot_state_t *bs, vec3_t goal);
 //returns entity visibility in the range [0, 1]
@@ -173,6 +185,7 @@ int ClientOnSameTeamFromName(bot_state_t *bs, char *name);
 int BotPointAreaNum(vec3_t origin);
 //
 void BotMapScripts(bot_state_t *bs);
+void BotApplyBeyondRealityTravelFlags(int *travelFlags);
 
 //ctf flags
 #define CTF_FLAG_NONE		0

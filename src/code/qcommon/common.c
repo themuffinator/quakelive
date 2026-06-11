@@ -4164,11 +4164,11 @@ Returns the observational source label for the Steam GameServer version string.
 */
 static const char *Com_GetSteamGameServerVersionSourceLabel( const cvar_t *steamServerVersion ) {
 	if ( !steamServerVersion || !steamServerVersion->string || !steamServerVersion->string[0] ) {
-		return "retail observed default";
+		return "retail data_5674d4 default";
 	}
 
 	if ( !Q_stricmp( steamServerVersion->string, QL_STEAM_GAMESERVER_DEFAULT_VERSION ) ) {
-		return "retail observed default";
+		return "retail data_5674d4 default";
 	}
 
 	return "sv_steamServerVersion override";
@@ -4176,14 +4176,14 @@ static const char *Com_GetSteamGameServerVersionSourceLabel( const cvar_t *steam
 
 /*
 =================
-Com_GetSteamGameServerVersionOwnerGapLabel
+Com_GetSteamGameServerVersionOwnerLabel
 
-Returns the unresolved retail owner label for the retained default Steam
+Returns the recovered retail owner label for the retained default Steam
 GameServer init version string.
 =================
 */
-static const char *Com_GetSteamGameServerVersionOwnerGapLabel( void ) {
-	return "unpromoted retail default version owner";
+static const char *Com_GetSteamGameServerVersionOwnerLabel( void ) {
+	return "retail data_5674d4 version literal";
 }
 #endif
 
@@ -4218,7 +4218,7 @@ void Com_InitSteamGameServer( void ) {
 	Com_DPrintf( "Steam GameServer bootstrap version %s (%s; retailDefaultOwner=%s) via %s [%s]\n",
 		versionString,
 		Com_GetSteamGameServerVersionSourceLabel( steamServerVersion ),
-		Com_GetSteamGameServerVersionOwnerGapLabel(),
+		Com_GetSteamGameServerVersionOwnerLabel(),
 		Com_GetSteamGameServerProviderLabel(), Com_GetSteamGameServerPolicyLabel() );
 
 	if ( !QL_Steamworks_ServerInitWithVersion( steamIp, (uint16_t)netPort->integer, steamVac && steamVac->integer ? qtrue : qfalse, dedicated, versionString ) ) {
@@ -4233,6 +4233,7 @@ void Com_InitSteamGameServer( void ) {
 	QL_Steamworks_ServerEnableHeartbeats( qfalse );
 	QL_Steamworks_ServerSetProduct( QL_PRODUCT_NAME );
 	QL_Steamworks_ServerSetGameDir( QL_BASEGAME );
+	Com_Printf( "Steam Gameserver initialized.\n" );
 #elif QL_PLATFORM_HAS_STEAM_SERVICES
 	Com_Printf( "Steam GameServer bootstrap unavailable for %s [%s]; keeping compatibility-only dedicated-server publication fallback.\n",
 		Com_GetSteamGameServerProviderLabel(), Com_GetSteamGameServerPolicyLabel() );
@@ -4724,6 +4725,8 @@ void Com_Frame( void ) {
 	if ( com_speeds->integer ) {
 		timeBeforeFirstEvents = Sys_Milliseconds ();
 	}
+
+	SV_SteamServerNetworkingFrame();
 
 	// we may want to spin here if things are going too fast
 	if ( !com_dedicated->integer && com_maxfps->integer > 0 && !com_timedemo->integer ) {

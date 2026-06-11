@@ -58,6 +58,14 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #define MAX_PATH		144
 #define RETAIL_SELECTED_BOT_INFO_CONFIGSTRING	0x10
 #define RETAIL_BOTLIB_GENTITY_FLAG_BIT18	0x00040000
+#define BOT_TRAINING_ENTITY_GODMODE_FLAGS		(FL_GODMODE | 0x00010000)
+#define BOT_TRAINING_ENTITY_NO_KNOCKBACK_FLAGS	(FL_NO_KNOCKBACK | 0x00020000)
+#define BOT_TRAINING_EXTRA_WEAPON_BIT			0x00008000
+#define BOT_DYNAMIC_SKILL_UPDATE_SECONDS		5
+#define BOT_DYNAMIC_SKILL_STALL_SECONDS			30
+#define BOT_DYNAMIC_SKILL_DECREASE_SCORE_DELTA	-1
+#define BOT_DYNAMIC_SKILL_INCREASE_SCORE_DELTA	2
+#define BOT_DYNAMIC_SKILL_ADJUSTMENT_STEP		0.083333336f
 
 
 //bot states
@@ -75,6 +83,7 @@ static qboolean bot_trainingTrainerQueued;
 static qboolean bot_trainingWarmupMusicStopped;
 static qboolean bot_trainingLoopMusicStarted;
 static qboolean bot_trainingExitMusicPlayed;
+static int bot_dynamicSkillNextUpdateTime;
 //
 vmCvar_t bot_thinktime;
 vmCvar_t bot_memorydump;
@@ -128,17 +137,17 @@ static const char *BotDebugLTGTypeName( int ltgtype ) {
 			return "harvest";
 		case LTG_ATTACKENEMYBASE:
 			return "attack base";
-		case 0x10:
+		case LTG_FOLLOWING:
 			return "following";
-		case 0x11:
+		case LTG_TRAINING:
 			return "training";
-		case 0x12:
+		case LTG_TOURING:
 			return "touring";
-		case 0x13:
+		case LTG_TORMENT_HUMAN:
 			return "tormenting";
-		case 0x14:
+		case LTG_TARGET:
 			return "target";
-		case 0x15:
+		case LTG_INSTAGIB:
 			return "insta-gibbing";
 		default:
 			return "roaming";
@@ -174,7 +183,7 @@ static int BotPublishDebugInfoString( bot_state_t *bs ) {
 	topGoalDistance = 0.0f;
 	secondGoalDistance = 0.0f;
 	goalAreaNum = -1;
-	heardEnemy = 0;
+	heardEnemy = bs->enemyFromGoalStack;
 
 	if ( trap_BotGetTopGoal( bs->gs, &topGoal ) ) {
 		trap_BotGoalName( topGoal.number, topGoalName, sizeof( topGoalName ) );
@@ -195,9 +204,6 @@ static int BotPublishDebugInfoString( bot_state_t *bs ) {
 		VectorSubtract( g_entities[bs->enemy].r.currentOrigin, bs->origin, delta );
 		enemyDistance = VectorLength( delta );
 		goalAreaNum = BotPointAreaNum( g_entities[bs->enemy].r.currentOrigin );
-		if ( BotEntityVisible( bs->entitynum, bs->eye, bs->viewangles, 360.0f, bs->enemy ) <= 0.0f ) {
-			heardEnemy = 1;
-		}
 	}
 
 	Q_strncpyz( ltgTypeName, BotDebugLTGTypeName( bs->ltgtype ), sizeof( ltgTypeName ) );
@@ -490,6 +496,7 @@ static void BotResetTrainingRuntimeFlags( void ) {
 	bot_trainingWarmupMusicStopped = qfalse;
 	bot_trainingLoopMusicStarted = qfalse;
 	bot_trainingExitMusicPlayed = qfalse;
+	bot_dynamicSkillNextUpdateTime = 0;
 }
 
 /*
@@ -506,6 +513,31 @@ static void BotSetPredictItemPickupDisabled( int clientNum, qboolean disabled ) 
 		level.clients[clientNum].ps.eFlags |= EF_AWARD_DENIED;
 	} else {
 		level.clients[clientNum].ps.eFlags &= ~EF_AWARD_DENIED;
+	}
+}
+
+/*
+==================
+BotSetTrainingBotState
+==================
+*/
+void BotSetTrainingBotState(bot_state_t *bs, qboolean enabled) {
+	gentity_t	*ent;
+	gclient_t	*client;
+
+	ent = &g_entities[bs->client];
+	client = ent->client;
+
+	if ( enabled ) {
+		ent->flags |= BOT_TRAINING_ENTITY_GODMODE_FLAGS;
+		client->ps.ammo[WP_ROCKET_LAUNCHER] = 9999;
+		client->ps.stats[STAT_WEAPONS] |= 1 << WP_ROCKET_LAUNCHER;
+		ent->flags |= BOT_TRAINING_ENTITY_NO_KNOCKBACK_FLAGS;
+		client->ps.stats[STAT_WEAPONS] |= BOT_TRAINING_EXTRA_WEAPON_BIT;
+	} else {
+		ent->flags &= ~BOT_TRAINING_ENTITY_GODMODE_FLAGS;
+		client->ps.ammo[WP_SHOTGUN] = 10;
+		ent->flags &= ~BOT_TRAINING_ENTITY_NO_KNOCKBACK_FLAGS;
 	}
 }
 
@@ -556,15 +588,19 @@ static const char *BotFormatTrainingSkill( float skill ) {
 BotUpdateItemDelayTime
 ==================
 */
-static void BotUpdateItemDelayTime( void ) {
+static void BotUpdateItemDelayTime( int time ) {
 	const char	*delayValue;
 	int			elapsedSeconds;
 	float		skill;
 
+	if ( !g_training.integer ) {
+		return;
+	}
+
 	delayValue = "0";
 	skill = trap_Cvar_VariableValue( "g_spSkill" );
 	if ( skill > 3.0f ) {
-		elapsedSeconds = ( level.time - level.startTime ) / 1000;
+		elapsedSeconds = ( time - level.startTime ) / 1000;
 		if ( elapsedSeconds > 240 ) {
 			delayValue = "25";
 		} else if ( elapsedSeconds > 180 ) {
@@ -577,6 +613,206 @@ static void BotUpdateItemDelayTime( void ) {
 	}
 
 	BotSetTrainingCvarIfChanged( "bot_itemDelayTime", delayValue );
+}
+
+/*
+==================
+BotAppendDynamicSkillSample
+==================
+*/
+void BotAppendDynamicSkillSample(bot_state_t *bs, int scoreDelta, float skill, int time) {
+	int i;
+	int sampleIndex;
+
+	if ( bs->numDynamicSkillSamples >= BOT_DYNAMIC_SKILL_MAX_SAMPLES ) {
+		for ( i = 0; i < BOT_DYNAMIC_SKILL_MAX_SAMPLES - 1; i++ ) {
+			bs->dynamicSkillSamples[i] = bs->dynamicSkillSamples[i + 1];
+		}
+		sampleIndex = BOT_DYNAMIC_SKILL_MAX_SAMPLES - 1;
+	} else {
+		sampleIndex = bs->numDynamicSkillSamples;
+		bs->numDynamicSkillSamples++;
+	}
+
+	bs->dynamicSkillSamples[sampleIndex].scoreDelta = scoreDelta;
+	bs->dynamicSkillSamples[sampleIndex].skill = skill;
+	bs->dynamicSkillSamples[sampleIndex].time = time;
+}
+
+/*
+==================
+BotRefreshDynamicSkillCharacter
+==================
+*/
+static qboolean BotRefreshDynamicSkillCharacter(bot_state_t *bs, float skill, float walkerSkill) {
+	char	userinfo[MAX_INFO_STRING];
+	char	characterfile[MAX_PATH];
+	char	filename[MAX_PATH];
+	int		character;
+	int		errnum;
+
+	trap_GetUserinfo( bs->client, userinfo, sizeof( userinfo ) );
+	Info_SetValueForKey( userinfo, "skill", va( "%1.2f", skill ) );
+
+	if ( skill >= 1.0f && skill < 2.0f ) {
+		Info_SetValueForKey( userinfo, "handicap", "50" );
+	} else if ( skill >= 2.0f && skill < 3.0f ) {
+		Info_SetValueForKey( userinfo, "handicap", "70" );
+	} else if ( skill >= 3.0f && skill < 4.0f ) {
+		Info_SetValueForKey( userinfo, "handicap", "90" );
+	}
+
+	Q_strncpyz( characterfile, Info_ValueForKey( userinfo, "characterfile" ), sizeof( characterfile ) );
+	if ( !characterfile[0] ) {
+		Q_strncpyz( characterfile, bs->settings.characterfile, sizeof( characterfile ) );
+	}
+
+	character = trap_BotLoadCharacter( characterfile, skill );
+	if ( !character ) {
+		BotAI_Print( PRT_FATAL, "couldn't load skill %f from %s\n", skill, characterfile );
+		return qfalse;
+	}
+
+	trap_Characteristic_String( character, CHARACTERISTIC_ITEMWEIGHTS, filename, sizeof( filename ) );
+	errnum = trap_BotLoadItemWeights( bs->gs, filename );
+	if ( errnum != BLERR_NOERROR ) {
+		return qfalse;
+	}
+
+	trap_Characteristic_String( character, CHARACTERISTIC_WEAPONWEIGHTS, filename, sizeof( filename ) );
+	errnum = trap_BotLoadWeaponWeights( bs->ws, filename );
+	if ( errnum != BLERR_NOERROR ) {
+		return qfalse;
+	}
+
+	BotSetPredictItemPickupDisabled( bs->client, skill < 3.0f ? qtrue : qfalse );
+	trap_SetUserinfo( bs->client, userinfo );
+	bs->character = character;
+	bs->settings.skill = skill;
+	Q_strncpyz( bs->settings.characterfile, characterfile, sizeof( bs->settings.characterfile ) );
+	bs->walker = ( walkerSkill < 2.0f ) ? 1.0f : 0.0f;
+	ClientUserinfoChanged( bs->client );
+	BotSetTrainingCvarIfChanged( "g_spSkill", BotFormatTrainingSkill( skill ) );
+
+	return qtrue;
+}
+
+/*
+==================
+BotUpdateDynamicSkill
+==================
+*/
+void BotUpdateDynamicSkill(int time) {
+	bot_state_t	*bs;
+	int			elapsedSeconds;
+	int			localClient;
+	int			localScore;
+	int			clientNum;
+	int			scoreDelta;
+	float		oldSkill;
+	float		newSkill;
+	qboolean	forceRefresh;
+
+	if ( !trap_Cvar_VariableIntegerValue( "bot_dynamicSkill" ) ) {
+		return;
+	}
+	if ( !trap_Cvar_VariableIntegerValue( "cl_running" ) ) {
+		return;
+	}
+	if ( level.warmupTime != 0 ) {
+		return;
+	}
+
+	elapsedSeconds = ( time - level.startTime ) / 1000;
+	if ( elapsedSeconds >= bot_dynamicSkillNextUpdateTime - BOT_DYNAMIC_SKILL_UPDATE_SECONDS
+		&& elapsedSeconds < bot_dynamicSkillNextUpdateTime ) {
+		return;
+	}
+	bot_dynamicSkillNextUpdateTime = elapsedSeconds + BOT_DYNAMIC_SKILL_UPDATE_SECONDS;
+
+	localClient = BotGetLocalClient();
+	if ( localClient == -1 ) {
+		return;
+	}
+	if ( time > level.clients[localClient].lastCmdTime + 10000 ) {
+		return;
+	}
+
+	localScore = G_GetClientScore( localClient );
+
+	for ( clientNum = 0; clientNum < MAX_CLIENTS; clientNum++ ) {
+		bs = botstates[clientNum];
+		if ( !bs || !bs->inuse ) {
+			continue;
+		}
+		if ( level.clients[clientNum].pers.connected != CON_CONNECTED ) {
+			continue;
+		}
+
+		oldSkill = bs->settings.skill;
+		newSkill = oldSkill;
+		scoreDelta = localScore - G_GetClientScore( clientNum );
+		forceRefresh = qfalse;
+
+		if ( oldSkill < 2.0f ) {
+			if ( bs->walker != 1.0f ) {
+				forceRefresh = qtrue;
+			}
+		} else if ( bs->walker != 0.0f ) {
+			forceRefresh = qtrue;
+		}
+
+		if ( scoreDelta != bs->dynamicSkillLastScoreDelta ) {
+			bs->dynamicSkillLastScoreDelta = scoreDelta;
+			bs->dynamicSkillLastScoreTime = elapsedSeconds;
+		}
+
+		if ( !forceRefresh ) {
+			if ( bs->dynamicSkillAdjustment != 0.0f ) {
+				if ( elapsedSeconds - bs->dynamicSkillLastScoreTime > BOT_DYNAMIC_SKILL_STALL_SECONDS ) {
+					bs->dynamicSkillAdjustment = 0.0f;
+					BotAppendDynamicSkillSample( bs, scoreDelta, oldSkill, elapsedSeconds );
+				}
+
+				if ( bs->dynamicSkillAdjustment > 0.0f ) {
+					if ( scoreDelta < bs->dynamicSkillReferenceScoreDelta ) {
+						bs->dynamicSkillAdjustment = 0.0f;
+						BotAppendDynamicSkillSample( bs, scoreDelta, oldSkill, elapsedSeconds );
+					} else if ( scoreDelta > bs->dynamicSkillReferenceScoreDelta ) {
+						bs->dynamicSkillReferenceScoreDelta = scoreDelta;
+					}
+				} else if ( bs->dynamicSkillAdjustment < 0.0f ) {
+					if ( scoreDelta > bs->dynamicSkillReferenceScoreDelta ) {
+						bs->dynamicSkillAdjustment = 0.0f;
+						BotAppendDynamicSkillSample( bs, scoreDelta, oldSkill, elapsedSeconds );
+					} else if ( scoreDelta < bs->dynamicSkillReferenceScoreDelta ) {
+						bs->dynamicSkillReferenceScoreDelta = scoreDelta;
+					}
+				}
+
+				newSkill = oldSkill + bs->dynamicSkillAdjustment;
+			} else if ( scoreDelta < 0 ) {
+				if ( scoreDelta < BOT_DYNAMIC_SKILL_DECREASE_SCORE_DELTA
+					&& scoreDelta < bs->dynamicSkillReferenceScoreDelta ) {
+					bs->dynamicSkillAdjustment = -BOT_DYNAMIC_SKILL_ADJUSTMENT_STEP;
+					newSkill = oldSkill + bs->dynamicSkillAdjustment;
+					BotAppendDynamicSkillSample( bs, scoreDelta, newSkill, elapsedSeconds );
+				}
+			} else if ( scoreDelta > BOT_DYNAMIC_SKILL_INCREASE_SCORE_DELTA
+				&& scoreDelta > bs->dynamicSkillReferenceScoreDelta ) {
+				bs->dynamicSkillAdjustment = BOT_DYNAMIC_SKILL_ADJUSTMENT_STEP;
+				newSkill = oldSkill + bs->dynamicSkillAdjustment;
+				BotAppendDynamicSkillSample( bs, scoreDelta, newSkill, elapsedSeconds );
+			}
+		}
+
+		newSkill = BotClampTrainingSkill( newSkill );
+		if ( forceRefresh || oldSkill != newSkill ) {
+			if ( !BotRefreshDynamicSkillCharacter( bs, newSkill, forceRefresh ? oldSkill : newSkill ) ) {
+				return;
+			}
+		}
+	}
 }
 
 /*
@@ -746,7 +982,6 @@ static void BotUpdateTrainingState( void ) {
 
 	if ( botClient != -1 && level.warmupTime == 0 ) {
 		BotSetPredictItemPickupDisabled( botClient, qtrue );
-		BotUpdateItemDelayTime();
 		BotUpdateTrainingBotSkill( botClient );
 	}
 
@@ -885,6 +1120,50 @@ void BotEntityInfo(int entnum, aas_entityinfo_t *info) {
 
 /*
 ==============
+BotEntityBoundsGap
+==============
+*/
+float BotEntityBoundsGap(int ent1, int ent2) {
+	aas_entityinfo_t info1;
+	aas_entityinfo_t info2;
+	vec3_t mins1, maxs1;
+	vec3_t mins2, maxs2;
+	int axis;
+	float padding;
+
+	BotEntityInfo(ent1, &info1);
+	BotEntityInfo(ent2, &info2);
+
+	for (axis = 0; axis < 3; axis++) {
+		mins1[axis] = info1.origin[axis] + info1.mins[axis];
+		maxs1[axis] = info1.origin[axis] + info1.maxs[axis];
+		mins2[axis] = info2.origin[axis] + info2.mins[axis];
+		maxs2[axis] = info2.origin[axis] + info2.maxs[axis];
+	}
+
+	if (maxs1[2] <= mins2[2]) {
+		return mins2[2] - maxs1[2];
+	}
+
+	for (axis = 0; axis < 2; axis++) {
+		padding = 4.0f;
+		if (maxs1[axis] <= mins2[axis] - padding) {
+			return mins2[axis] - maxs1[axis];
+		}
+		if (maxs2[axis] + padding <= mins1[axis]) {
+			return mins1[axis] - maxs2[axis];
+		}
+	}
+
+	if (maxs2[2] <= mins1[2]) {
+		return mins1[2] - maxs2[2];
+	}
+
+	return 0.0f;
+}
+
+/*
+==============
 NumBots
 ==============
 */
@@ -904,6 +1183,19 @@ int BotTeamLeader(bot_state_t *bs) {
 	if (leader < 0) return qfalse;
 	if (!botstates[leader] || !botstates[leader]->inuse) return qfalse;
 	return qtrue;
+}
+
+/*
+==============
+BotSetIdealViewAnglesToPoint
+==============
+*/
+void BotSetIdealViewAnglesToPoint(bot_state_t *bs, vec3_t target) {
+	vec3_t dir;
+
+	VectorSubtract(target, bs->origin, dir);
+	vectoangles(dir, bs->ideal_viewangles);
+	bs->ideal_viewangles[ROLL] *= 0.5f;
 }
 
 /*
@@ -1777,6 +2069,8 @@ int BotAIStartFrame(int time) {
 		trap_BotUserCommand(botstates[i]->client, &botstates[i]->lastucmd);
 	}
 
+	BotUpdateItemDelayTime( time );
+	BotUpdateDynamicSkill( time );
 	BotUpdateTrainingState();
 
 	if ( !bot_developer.integer || bot_report.integer < 0 ) {

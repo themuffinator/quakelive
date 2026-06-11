@@ -122,6 +122,78 @@ def _function_rows_by_entry(path: Path) -> dict[str, dict[str, str]]:
 		return {row["entry"].lower(): row for row in csv.DictReader(file)}
 
 
+CHAT_GHIDRA_ALIAS_ROWS = (
+	("497B00", "InitConsoleMessageHeap", 208),
+	("497BD0", "BotRemoveConsoleMessage", 221),
+	("497CB0", "BotQueueConsoleMessage", 289),
+	("497DE0", "BotNextConsoleMessage", 121),
+	("497E60", "BotNumConsoleMessages", 75),
+	("497EB0", "BotRemoveTildes", 71),
+	("497F00", "UnifyWhiteSpaces", 283),
+	("498020", "StringContains", 222),
+	("498100", "StringContainsWord", 272),
+	("498210", "BotLoadSynonyms", 1272),
+	("498710", "BotReplaceSynonyms", 376),
+	("498890", "BotReplaceWeightedSynonyms", 480),
+	("498A70", "BotReplaceReplySynonyms", 316),
+	("498BB0", "BotLoadChatMessage", 526),
+	("498DD0", "BotLoadRandomStrings", 742),
+	("4990D0", "RandomString", 153),
+	("499170", "BotFreeMatchPieces", 70),
+	("4991C0", "BotLoadMatchPieces", 847),
+	("499510", "BotFreeMatchTemplates", 110),
+	("499580", "BotLoadMatchTemplates", 753),
+	("499880", "StringsMatch", 303),
+	("4999C0", "BotFindMatch", 541),
+	("499BF0", "BotMatchVariable", 108),
+	("499C60", "BotCheckInitialChatIntegrety", 507),
+	("499E70", "BotCheckReplyChatIntegrety", 504),
+	("49A080", "BotFreeReplyChat", 208),
+	("49A160", "BotCheckValidReplyChatKeySet", 553),
+	("49A3A0", "BotLoadReplyChat", 1438),
+	("49A960", "BotLoadInitialChat", 1487),
+	("49AF40", "BotFreeChatFile", 97),
+	("49AFB0", "BotLoadChatFile", 437),
+	("49B170", "BotConstructChatMessage", 858),
+	("49B4D0", "BotChooseInitialChatMessage", 307),
+	("49B610", "BotNumInitialChats", 176),
+	("49B6C0", "BotInitialChat", 1044),
+	("49BAE0", "BotReplyChat", 1732),
+	("49C1B0", "BotChatLength", 91),
+	("49C210", "BotEnterChat", 229),
+	("49C300", "BotGetChatMessage", 109),
+	("49C370", "BotSetChatGender", 96),
+	("49C3D0", "BotSetChatName", 109),
+	("49C480", "BotFreeChatState", 213),
+	("49C560", "BotSetupChatAI", 144),
+	("49C5F0", "BotShutdownChatAI", 196),
+)
+
+
+def test_botlib_chat_ghidra_alias_bridge_rows_are_pinned() -> None:
+	aliases = json.loads(_read(SYMBOL_ALIASES))["quakelive_steam_srp"]
+	function_rows = _function_rows_by_entry(QL_STEAM_FUNCTIONS)
+	hlil = _read(QL_STEAM_HLIL_PART03)
+
+	for address, name, size in CHAT_GHIDRA_ALIAS_ROWS:
+		entry = f"00{address.lower()}"
+		fun_key = f"FUN_{entry}"
+		row = function_rows[entry]
+
+		assert aliases[f"sub_{address}"] == name
+		assert aliases[fun_key] == name
+		assert row["name"] == fun_key
+		assert int(row["size"]) == size
+		assert row["thunk"] == "0"
+		assert row["calling_convention"] == "unknown"
+
+	assert aliases["sub_49C440"] == "BotAllocChatState"
+	assert "FUN_0049c440" not in aliases
+	assert "0049c440" not in function_rows
+	assert "0049c440    int32_t sub_49c440()" in hlil
+	assert "004a8140  arg1[7] = sub_49c440" in hlil
+
+
 def test_qagame_bot_chat_prologue_aliases_source_and_hlil_are_pinned() -> None:
 	game_chat = _read(GAME_AI_CHAT)
 	hlil = _read(QAGAME_HLIL_PART01)

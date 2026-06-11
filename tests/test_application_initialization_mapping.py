@@ -86,7 +86,14 @@ def test_retail_application_startup_chain_maps_primary_owners() -> None:
 		'_getcwd(&var_108, 0x100)',
 		"SetWindowsHookExA(idHook: WH_KEYBOARD_LL, lpfn: sub_4ec580",
 		'"winkey_disable"',
+		"picce.dwSize = 8",
+		"picce.dwICC = 4",
+		"InitCommonControlsEx(&picce)",
 		'"tooltips_class32"',
+		"dwStyle: 0x80000003",
+		"SetWindowPos(hWnd, hWndInsertAfter: 0xfffffffe",
+		"SendMessageA(hWnd: data_12d34b0, Msg: 0x404",
+		"SendMessageA(hWnd: data_12d34b0, Msg: 0x401",
 		'sub_4f2d30("asset://ql/index.html")',
 	]:
 		assert snippet in retail_winmain
@@ -115,6 +122,7 @@ def test_retail_application_startup_chain_maps_primary_owners() -> None:
 		"NET_Init();",
 		"_getcwd (cwd, sizeof(cwd));",
 		"Sys_InitWinkeyHook();",
+		"Sys_InitTooltipShell();",
 		"IN_Frame();",
 		"Com_Frame();",
 	]:
@@ -129,9 +137,45 @@ def test_retail_application_startup_chain_maps_primary_owners() -> None:
 		"Sys_InitWinkeyHook();"
 	)
 	assert source_winmain.index("Sys_InitWinkeyHook();") < source_winmain.index(
+		"Sys_InitTooltipShell();"
+	)
+	assert source_winmain.index("Sys_InitTooltipShell();") < source_winmain.index(
 		"IN_Frame();"
 	)
 	assert source_winmain.index("IN_Frame();") < source_winmain.index("Com_Frame();")
+
+	common_controls = _extract_function_block(
+		win_main, "static qboolean Sys_InitCommonControls"
+	)
+	for snippet in [
+		'GetModuleHandleA( "comctl32.dll" )',
+		'LoadLibraryA( "comctl32.dll" )',
+		'GetProcAddress( library, "InitCommonControlsEx" )',
+		"sys_commonControlsLibrary = library;",
+	]:
+		assert snippet in common_controls
+
+	tooltip_shell = _extract_function_block(win_main, "static void Sys_InitTooltipShell")
+	for snippet in [
+		"controls.dwSize = sizeof( controls );",
+		"controls.dwICC = ICC_BAR_CLASSES;",
+		"Sys_InitCommonControls( &controls )",
+		"CreateWindowExA( 0, TOOLTIPS_CLASSA, NULL,",
+		"WS_POPUP | TTS_ALWAYSTIP | TTS_NOPREFIX",
+		"CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT",
+		"SetWindowPos( sys_tooltipWindow, HWND_NOTOPMOST",
+		"SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE",
+		"tool.cbSize = sizeof( tool );",
+		"tool.uFlags = TTF_SUBCLASS;",
+		"tool.hwnd = g_wv.hWnd;",
+		"tool.hinst = g_wv.hInstance;",
+		'tool.lpszText = "";',
+		"GetWindowRect( GetDesktopWindow(), &desktopRect );",
+		"tool.rect = desktopRect;",
+		"SendMessageA( sys_tooltipWindow, TTM_ADDTOOLA, 0, (LPARAM)&tool );",
+		"SendMessageA( sys_tooltipWindow, TTM_ACTIVATE, 0, 0 );",
+	]:
+		assert snippet in tooltip_shell
 
 	assert "Zmq_RegisterCvarsAndInitRcon();" not in win_main
 	assert "Zmq_RegisterCvarsAndInitRcon();" in _extract_function_block(
@@ -187,12 +231,29 @@ def test_winkey_hook_reconstructs_retail_keyboard_filter_and_shutdown() -> None:
 	assert "UnhookWindowsHookEx( sys_winkeyHook );" in shutdown_hook
 	assert "sys_winkeyHook = NULL;" in shutdown_hook
 
+	shutdown_tooltip = _extract_function_block(
+		win_main, "static void Sys_ShutdownTooltipShell"
+	)
+	for snippet in [
+		"DestroyWindow( sys_tooltipWindow );",
+		"sys_tooltipWindow = NULL;",
+		"FreeLibrary( sys_commonControlsLibrary );",
+		"sys_commonControlsLibrary = NULL;",
+	]:
+		assert snippet in shutdown_tooltip
+
 	sys_error = _extract_function_block(win_main, "void QDECL Sys_Error")
 	sys_quit = _extract_function_block(win_main, "void Sys_Quit")
 	assert sys_error.index("IN_Shutdown();") < sys_error.index("Sys_ShutdownWinkeyHook();")
-	assert sys_error.index("Sys_ShutdownWinkeyHook();") < sys_error.index("while ( 1 )")
+	assert sys_error.index("Sys_ShutdownWinkeyHook();") < sys_error.index(
+		"Sys_ShutdownTooltipShell();"
+	)
+	assert sys_error.index("Sys_ShutdownTooltipShell();") < sys_error.index("while ( 1 )")
 	assert sys_quit.index("IN_Shutdown();") < sys_quit.index("Sys_ShutdownWinkeyHook();")
 	assert sys_quit.index("Sys_ShutdownWinkeyHook();") < sys_quit.index(
+		"Sys_ShutdownTooltipShell();"
+	)
+	assert sys_quit.index("Sys_ShutdownTooltipShell();") < sys_quit.index(
 		"Sys_DestroyConsole();"
 	)
 
@@ -266,6 +327,26 @@ def test_policy_adjusted_common_client_server_wiring_matches_mapped_retail_chain
 	assert retail_common_init.index("sub_4e3ad0()") < retail_common_init.index(
 		"sub_4bc690"
 	)
+	for snippet in [
+		'004cc146      void** eax_7 = sub_4ce0d0(x87_r6, "dedicated", U"0", 0x10)',
+		"004cc16e          sub_461500()",
+		'004cc47f      data_145b948 = sub_4ce0d0(x87_r1, "com_build", U"0", 0)',
+		'004cc5fd      if (sub_460510() == 0 && sub_4ccd80("com_build") == 0 && sub_4ccd80("dedicated") == 0)',
+		'004cc626          sub_4ec6e0("Failed to initialize Steam.")',
+	]:
+		assert snippet in retail_common_init
+	assert retail_common_init.index('004cc146      void** eax_7 = sub_4ce0d0(x87_r6, "dedicated", U"0", 0x10)') < retail_common_init.index(
+		"004cc16e          sub_461500()"
+	)
+	assert retail_common_init.index("004cc16e          sub_461500()") < retail_common_init.index(
+		'004cc47f      data_145b948 = sub_4ce0d0(x87_r1, "com_build", U"0", 0)'
+	)
+	assert retail_common_init.index("sub_4bc690") < retail_common_init.index(
+		'004cc5fd      if (sub_460510() == 0 && sub_4ccd80("com_build") == 0 && sub_4ccd80("dedicated") == 0)'
+	)
+	assert retail_common_init.index(
+		'004cc5fd      if (sub_460510() == 0 && sub_4ccd80("com_build") == 0 && sub_4ccd80("dedicated") == 0)'
+	) < retail_common_init.index('004cc626          sub_4ec6e0("Failed to initialize Steam.")')
 	assert 'sub_4ec6e0("Failed to initialize Steam.")' in retail_common_init
 
 	common_init = _extract_function_block(common, "void Com_Init( char *commandLine )")
@@ -323,6 +404,19 @@ def test_policy_adjusted_common_client_server_wiring_matches_mapped_retail_chain
 	assert "com_buildScript && com_buildScript->integer" in steam_startup_guard
 	assert 'Cvar_VariableIntegerValue( "dedicated" )' in steam_startup_guard
 	assert 'retail would abort with \\"Failed to initialize Steam.\\" here' in steam_startup_guard
+	assert "Com_Error" not in steam_startup_guard
+	assert "Sys_Error" not in steam_startup_guard
+	assert steam_startup_guard.index("SteamClient_IsInitialized()") < steam_startup_guard.index(
+		"com_buildScript && com_buildScript->integer"
+	)
+	assert steam_startup_guard.index("com_buildScript && com_buildScript->integer") < steam_startup_guard.index(
+		'Cvar_VariableIntegerValue( "dedicated" )'
+	)
+	assert steam_startup_guard.index('Cvar_VariableIntegerValue( "dedicated" )') < steam_startup_guard.index(
+		'retail would abort with \\"Failed to initialize Steam.\\" here'
+	)
+	assert "QL_GetOnlineServicesModeLabel()" in steam_startup_guard
+	assert "QL_GetOnlineServicesPolicyLabel()" in steam_startup_guard
 
 	client_init = _extract_function_block(cl_main, "void CL_Init( void ) {")
 	for snippet in [
@@ -382,6 +476,10 @@ def test_policy_adjusted_steamid_native_dll_root_precedes_retail_basepath() -> N
 		REPO_ROOT
 		/ "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part05.txt"
 	).read_text(encoding="utf-8")
+	hlil_part04 = (
+		REPO_ROOT
+		/ "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part04.txt"
+	).read_text(encoding="utf-8")
 	files_c = (REPO_ROOT / "src/code/qcommon/files.c").read_text(encoding="utf-8")
 	win_main = (REPO_ROOT / "src/code/win32/win_main.c").read_text(encoding="utf-8")
 
@@ -401,9 +499,26 @@ def test_policy_adjusted_steamid_native_dll_root_precedes_retail_basepath() -> N
 		win_main,
 		"static qboolean Sys_MaterializeNativeDllFromBinPak( const char *name, const char *filename, char **roots, int rootCount,",
 	)
+	should_extract_block = _extract_function_block(
+		win_main,
+		"static qboolean Sys_ShouldExtractNativeDllFromBinPak( const char *name, const char *filename, const char *gamedir ) {",
+	)
 
 	assert aliases["sub_4ECEB0"] == "Sys_LoadDll"
 	assert "FUN_004eceb0,004eceb0,358" in functions_csv
+	assert "004d3202  if (sub_460510() == 0)" in hlil_part04
+	assert "004d3204      eax_9, edx_1 = sub_460550()" in hlil_part04
+	assert '004d3219      eax_7 = sub_4d9220("%s/%llu")' in hlil_part04
+	assert '004d3245  data_1227bc8 = sub_4ce0d0(x87_r6, "fs_homepath", eax_7, 0x10)' in hlil_part04
+	assert hlil_part04.index("004d3202  if (sub_460510() == 0)") < hlil_part04.index(
+		"004d3204      eax_9, edx_1 = sub_460550()"
+	)
+	assert hlil_part04.index("004d3204      eax_9, edx_1 = sub_460550()") < hlil_part04.index(
+		'004d3219      eax_7 = sub_4d9220("%s/%llu")'
+	)
+	assert hlil_part04.index('004d3219      eax_7 = sub_4d9220("%s/%llu")') < hlil_part04.index(
+		'004d3245  data_1227bc8 = sub_4ce0d0(x87_r6, "fs_homepath", eax_7, 0x10)'
+	)
 	assert "004ecf6f      result = LoadLibraryA(lpLibFileName: sub_4cec90(eax_6, eax_8, &var_48))" in retail_load_dll
 	assert "004ecf89          result = LoadLibraryA(lpLibFileName: sub_4cec90(eax_5, eax_8, &var_48))" in retail_load_dll
 	assert "004ecfac              result = LoadLibraryA(lpLibFileName: sub_4cec90(eax_7, eax_8, &var_48))" in retail_load_dll
@@ -437,8 +552,25 @@ def test_policy_adjusted_steamid_native_dll_root_precedes_retail_basepath() -> N
 	assert load_dll_block.index("binPakRoots[binPakRootCount++] = basepath;") < load_dll_block.index(
 		"binPakRoots[binPakRootCount++] = cdpath;"
 	)
+	assert 'if ( gamedir && gamedir[0] && Q_stricmp( gamedir, BASEGAME ) ) {' in should_extract_block
+	assert 'if ( !Q_stricmp( name, "ui" ) && !Q_stricmp( filename, "uix86.dll" ) ) {' in should_extract_block
+	assert 'if ( !Q_stricmp( name, "cgame" ) && !Q_stricmp( filename, "cgamex86.dll" ) ) {' in should_extract_block
+	assert 'if ( !Q_stricmp( name, "qagame" ) && !Q_stricmp( filename, "qagamex86.dll" ) ) {' in should_extract_block
+	assert should_extract_block.count("return qtrue;") == 3
+	assert should_extract_block.rstrip().endswith("}")
+	assert should_extract_block.index('Q_stricmp( gamedir, BASEGAME )') < should_extract_block.index(
+		'!Q_stricmp( name, "ui" )'
+	)
 	assert "Sys_MaterializeNativeDllFromBinPak( name, filename, binPakRoots, binPakRootCount, dllGamedir," in load_dll_block
 	assert 'FS_BuildOSPath( roots[i], BASEGAME, "bin.pk3" )' in materialize_block
+	assert "pack = FS_LoadPackExplicit( pakPath );" in materialize_block
+	assert "length = FS_ReadFileFromPak( pack, filename, &buffer );" in materialize_block
+	assert "FS_FreePak( pack );" in materialize_block
 	assert "Sys_GetNativeDllCachePath( filename, rootCount > 0 ? roots[0] : NULL, gamedir, cachePath, sizeof( cachePath ) )" in materialize_block
 	assert "Sys_WriteFileToPath( cachePath, buffer, length )" in materialize_block
+	assert "Sys_FileIsReadable( cachePath )" in materialize_block
+	assert 'Com_Printf( "Sys_LoadDll: extracted %s from %s\\n", filename, pakPath );' in materialize_block
+	assert load_dll_block.index("for ( i = 0; i < searchCount; i++ ) {") < load_dll_block.index(
+		"Sys_MaterializeNativeDllFromBinPak( name, filename, binPakRoots, binPakRootCount, dllGamedir,"
+	)
 	assert "Sys_TryLoadDllFromPath( extractedPath, fqpath, entryPoint, dllExports, imports, apiVersion, systemcalls )" in load_dll_block

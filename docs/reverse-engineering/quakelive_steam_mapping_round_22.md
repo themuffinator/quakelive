@@ -143,7 +143,7 @@ That closes `sub_4AFEA0` / `sub_4DAC80` as `S_UpdateEntityPosition` and `sub_4AF
 
 This pass also closes the exact retail engine-side helpers surrounding the raw import band:
 
-- `sub_4DB3F0` is the exact `S_StartLocalSound` helper. It range-checks the handle, emits `^3S_StartLocalSound: handle %i out of range`, and starts the sound at the current listener with a fixed volume.
+- `sub_4DB3F0` is the exact `S_StartLocalSound` helper. It first returns silently unless the sound system is started and unmuted, then range-checks the handle, emits `^3S_StartLocalSound: handle %i out of range`, and starts the sound at the current listener with a fixed volume.
 - `sub_4DA3E0` is the exact `S_ClearSoundBuffer` helper. It clears the looping-sound bank, clears loop channels, resets counters, clears the raw sample buffer, zeroes the DMA buffer, and tailcalls the device submit / reset path.
 - `sub_4DB450` is the exact `S_StopAllSounds` helper. It bails if sound is not started, conditionally shuts down the background-track state, then tailcalls `sub_4DA3E0`.
 

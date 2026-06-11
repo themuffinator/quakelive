@@ -811,8 +811,10 @@ def test_ql_server_browser_and_master_heartbeat_related_wiring_parity_recheck() 
 	compute_counts = _function_block(sv_main, "static void SV_ComputeDisplayedCounts( int *clientCount, int *botCount ) {")
 	status_response = _function_block(sv_main, "void SVC_Status( netadr_t from )")
 	info_response = _function_block(sv_main, "void SVC_Info( netadr_t from )")
+	steam_server_frame = _function_block(sv_main, "void SV_SteamServerNetworkingFrame( void )")
 	published_state = _function_block(sv_main, "void SV_SteamServerUpdatePublishedState( qboolean fullUpdate )")
 	server_frame = _function_block(sv_main, "void SV_Frame( int msec )")
+	common_frame = _function_block(common_c, "void Com_Frame( void )")
 	spawn_server = _function_block(sv_init, "void SV_SpawnServer( char *server, qboolean killBots )")
 	shutdown_server = _function_block(sv_init, "void SV_Shutdown( char *finalmsg )")
 	steam_masters = _function_block(sv_init, "static qboolean SV_SteamServerHasConfiguredMasters( void )")
@@ -974,11 +976,18 @@ def test_ql_server_browser_and_master_heartbeat_related_wiring_parity_recheck() 
 		"QL_Steamworks_ServerSetBotPlayerCount",
 	):
 		assert expected in published_state
-	assert "SV_SteamServerNetworkingFrame();" in server_frame
+	assert "SV_SteamServerNetworkingFrame();" in common_frame
+	assert common_frame.index("SV_SteamServerNetworkingFrame();") < common_frame.index("SV_Frame( msec );")
+	assert "SV_SteamServerNetworkingFrame();" not in server_frame
 	assert "QL_Steamworks_ServerSetKeyValuesFromInfoString( serverInfo );" in server_frame
-	assert "SV_SteamServerUpdatePublishedState( qfalse );" in server_frame
+	assert "SV_SteamServerUpdatePublishedState( qfalse );" in steam_server_frame
 	assert "SV_MasterHeartbeat();" in server_frame
 	assert "SV_RefreshPlatformServiceCvars();" in spawn_server
+	assert "SV_SteamServerEndOrphanedAuthSessions();" in spawn_server
+	assert spawn_server.index('Com_Printf ("Server: %s\\n",server);') < spawn_server.index(
+		"SV_SteamServerEndOrphanedAuthSessions();"
+	)
+	assert spawn_server.index("SV_SteamServerEndOrphanedAuthSessions();") < spawn_server.index("CL_MapLoading();")
 	assert "SV_SteamServerPublishIdentity();" in spawn_server
 	assert "QL_Steamworks_ServerEnableHeartbeats( SV_SteamServerHasConfiguredMasters() );" in spawn_server
 	assert "SV_SteamServerUpdatePublishedState( qtrue );" in spawn_server
@@ -1009,6 +1018,13 @@ def test_ql_server_browser_and_master_heartbeat_related_wiring_parity_recheck() 
 	assert "QL_Steamworks_ServerEnableHeartbeats( qfalse );" in steam_bootstrap
 	assert "QL_Steamworks_ServerSetProduct( QL_PRODUCT_NAME );" in steam_bootstrap
 	assert "QL_Steamworks_ServerSetGameDir( QL_BASEGAME );" in steam_bootstrap
+	assert 'Com_Printf( "Steam Gameserver initialized.\\n" );' in steam_bootstrap
+	assert steam_bootstrap.index("QL_Steamworks_ServerSetProduct( QL_PRODUCT_NAME );") < steam_bootstrap.index(
+		"QL_Steamworks_ServerSetGameDir( QL_BASEGAME );"
+	)
+	assert steam_bootstrap.index("QL_Steamworks_ServerSetGameDir( QL_BASEGAME );") < steam_bootstrap.index(
+		'Com_Printf( "Steam Gameserver initialized.\\n" );'
+	)
 
 	for expected in (
 		"ql_steam_server_browser_owner_t",

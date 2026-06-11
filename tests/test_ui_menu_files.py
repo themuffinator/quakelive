@@ -1944,6 +1944,10 @@ def test_ui_native_import_table_matches_recovered_retail_slots() -> None:
     }.items():
         assert function_rows[entry]["name"] == name
         assert function_rows[entry]["size"] == size
+    assert "004b02f0" not in function_rows
+    assert "sub_4B02F0" not in aliases
+    assert "QLCGImport_S_StopBackgroundTrack" not in aliases.values()
+    assert "QLUIImport_S_StopBackgroundTrack" not in aliases.values()
 
     for expected in (
         "004befb0    int32_t sub_4befb0()",
@@ -1960,14 +1964,140 @@ def test_ui_native_import_table_matches_recovered_retail_slots() -> None:
     for expected in (
         "005673c0  void* data_5673c0 = sub_4befb0",
         "005673c4  void* data_5673c4 = sub_4afec0",
+        "00567450  void* data_567450 = sub_4afff0",
         "00567454  void* data_567454 = 0x4b02f0",
         "00567458  void* data_567458 = sub_4afed0",
+        "0056745c  void* data_56745c = sub_4bf290",
     ):
         assert expected in steam_table_hlil
 
     assert "ql_ui_imports[85] = (ql_import_f)QL_UI_trap_S_StopBackgroundTrack;" not in cl_ui
     assert "UI_QL_IMPORT_MEMORY_REMAINING = 101" not in cl_ui
     assert "UI_QL_IMPORT_R_REMAP_SHADER = 104" not in cl_ui
+
+
+def test_ui_sound_import_wiring_matches_retail_native_and_vm_paths() -> None:
+    cl_ui = (REPO_ROOT / "src/code/client/cl_ui.c").read_text(encoding="utf-8")
+    ql_ui_imports = (REPO_ROOT / "src/code/client/ql_ui_imports.inc").read_text(encoding="utf-8")
+    ui_main = (REPO_ROOT / "src/code/ui/ui_main.c").read_text(encoding="utf-8")
+    ui_public = (REPO_ROOT / "src/code/ui/ui_public.h").read_text(encoding="utf-8")
+    ui_syscalls = (REPO_ROOT / "src/code/ui/ui_syscalls.c").read_text(encoding="utf-8")
+    steam_hlil = QL_STEAM_HLIL_PART04.read_text(encoding="utf-8")
+    steam_table_hlil = QL_STEAM_HLIL_PART07.read_text(encoding="utf-8")
+    aliases = json.loads(SYMBOL_ALIASES.read_text(encoding="utf-8"))["quakelive_steam_srp"]
+    function_rows = {
+        row["entry"].lower(): row
+        for row in csv.DictReader(QL_STEAM_FUNCTIONS.read_text(encoding="utf-8").splitlines())
+    }
+
+    ui_import_values = _extract_enum_values(ui_public, "uiImport_t")
+    ql_import_values = _extract_enum_values(ui_public, "uiQlImport_t")
+    native_import_map = _extract_ui_native_import_map(ui_syscalls)
+
+    expected_sound_slots = {
+        "UI_S_STARTLOCALSOUND": ("UI_QL_IMPORT_S_STARTLOCALSOUND", 32, 34),
+        "UI_S_STOPBACKGROUNDTRACK": ("UI_QL_IMPORT_S_STOPBACKGROUNDTRACK", 62, 71),
+        "UI_S_STARTBACKGROUNDTRACK": ("UI_QL_IMPORT_S_STARTBACKGROUNDTRACK", 63, 72),
+    }
+    for legacy_name, (native_name, legacy_slot, native_slot) in expected_sound_slots.items():
+        assert ui_import_values[legacy_name] == legacy_slot
+        assert native_import_map[legacy_name] == native_name
+        assert ql_import_values[native_name] == native_slot
+
+    for expected in (
+        "case UI_S_STARTLOCALSOUND: return UI_QL_IMPORT_S_STARTLOCALSOUND;",
+        "case UI_S_STOPBACKGROUNDTRACK: return UI_QL_IMPORT_S_STOPBACKGROUNDTRACK;",
+        "case UI_S_STARTBACKGROUNDTRACK: return UI_QL_IMPORT_S_STARTBACKGROUNDTRACK;",
+        "void trap_S_StartLocalSound( sfxHandle_t sfx, int channelNum ) {",
+        "syscall( UI_S_STARTLOCALSOUND, sfx, channelNum );",
+        "void trap_S_StopBackgroundTrack( void ) {",
+        "syscall( UI_S_STOPBACKGROUNDTRACK );",
+        "void trap_S_StartBackgroundTrack( const char *intro, const char *loop) {",
+        "syscall( UI_S_STARTBACKGROUNDTRACK, intro, loop );",
+    ):
+        assert expected in ui_syscalls
+
+    for expected in (
+        "case UI_S_STARTLOCALSOUND:",
+        "S_StartLocalSound( args[1], args[2] );",
+        "case UI_S_STOPBACKGROUNDTRACK:",
+        "S_StopBackgroundTrack();",
+        "case UI_S_STARTBACKGROUNDTRACK:",
+        "S_StartBackgroundTrack( VMA(1), VMA(2));",
+        "ql_ui_imports[UI_QL_IMPORT_S_STARTLOCALSOUND] = (ql_import_f)QL_UI_trap_S_StartLocalSound;",
+        "ql_ui_imports[UI_QL_IMPORT_S_STOPBACKGROUNDTRACK] = (ql_import_f)QL_UI_trap_S_StopBackgroundTrack;",
+        "ql_ui_imports[UI_QL_IMPORT_S_STARTBACKGROUNDTRACK] = (ql_import_f)QL_UI_trap_S_StartBackgroundTrack;",
+    ):
+        assert expected in cl_ui
+
+    for expected in (
+        "static void QDECL QL_UI_trap_S_StartLocalSound( sfxHandle_t sfx, int channelNum ) {",
+        "UI_Import_Syscall( UI_S_STARTLOCALSOUND, sfx, channelNum );",
+        "static void QDECL QL_UI_trap_S_StopBackgroundTrack( void ) {",
+        "UI_Import_Syscall( UI_S_STOPBACKGROUNDTRACK );",
+        "static void QDECL QL_UI_trap_S_StartBackgroundTrack( const char *intro, const char *loop ) {",
+        "UI_Import_Syscall( UI_S_STARTBACKGROUNDTRACK, intro, loop );",
+    ):
+        assert expected in ql_ui_imports
+
+    for expected in (
+        "uiInfo.uiDC.startLocalSound = &trap_S_StartLocalSound;",
+        "uiInfo.uiDC.startBackgroundTrack = &trap_S_StartBackgroundTrack;",
+        "uiInfo.uiDC.stopBackgroundTrack = &trap_S_StopBackgroundTrack;",
+    ):
+        assert expected in ui_main
+
+    assert ui_main.index("uiInfo.uiDC.startLocalSound = &trap_S_StartLocalSound;") < ui_main.index(
+        "uiInfo.uiDC.startBackgroundTrack = &trap_S_StartBackgroundTrack;"
+    )
+    assert ui_main.index("uiInfo.uiDC.startBackgroundTrack = &trap_S_StartBackgroundTrack;") < ui_main.index(
+        "uiInfo.uiDC.stopBackgroundTrack = &trap_S_StopBackgroundTrack;"
+    )
+
+    for alias, name in {
+        "sub_4BEFB0": "QLCGImport_S_StartLocalSound",
+        "sub_4AFED0": "QLCGImport_S_StartBackgroundTrack",
+        "sub_4DB030": "S_StopBackgroundTrack",
+        "sub_4DB060": "S_StartBackgroundTrack",
+    }.items():
+        assert aliases[alias] == name
+
+    for entry, (name, size) in {
+        "004befb0": ("FUN_004befb0", "9"),
+        "004afed0": ("FUN_004afed0", "9"),
+        "004db030": ("FUN_004db030", "35"),
+        "004db060": ("FUN_004db060", "351"),
+    }.items():
+        assert function_rows[entry]["name"] == name
+        assert function_rows[entry]["size"] == size
+    assert "004b02f0" not in function_rows
+    assert "sub_4B02F0" not in aliases
+    assert "QLCGImport_S_StopBackgroundTrack" not in aliases.values()
+    assert "QLUIImport_S_StopBackgroundTrack" not in aliases.values()
+
+    for expected in (
+        "004befb0    int32_t sub_4befb0()",
+        "004befb4  return sub_4db3f0() __tailcall",
+        "004afed0    int32_t sub_4afed0()",
+        "004afed4  return sub_4db060() __tailcall",
+        "004bd978      sub_4db030()",
+        "004db030    void sub_4db030()",
+        "004db060    int32_t sub_4db060(char* arg1, char* arg2)",
+    ):
+        assert expected in steam_hlil
+
+    for expected in (
+        "005673c0  void* data_5673c0 = sub_4befb0",
+        "00567450  void* data_567450 = sub_4afff0",
+        "00567454  void* data_567454 = 0x4b02f0",
+        "00567458  void* data_567458 = sub_4afed0",
+        "0056745c  void* data_56745c = sub_4bf290",
+    ):
+        assert expected in steam_table_hlil
+
+    assert "case UI_S_STARTLOCALSOUND: return UI_QL_IMPORT_S_REGISTERSOUND;" not in ui_syscalls
+    assert "case UI_S_STOPBACKGROUNDTRACK: return UI_QL_IMPORT_UNUSED_85;" not in ui_syscalls
+    assert "ql_ui_imports[85] = (ql_import_f)QL_UI_trap_S_StopBackgroundTrack;" not in cl_ui
 
 
 def test_ui_import_t_legacy_surface_has_complete_retail_native_remap() -> None:

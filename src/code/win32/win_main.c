@@ -38,6 +38,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include <dbghelp.h>
 #include <signal.h>
 #include <tlhelp32.h>
+#include <commctrl.h>
 
 #define	CD_BASEDIR	"quake3"
 #define	CD_EXE		"quake3.exe"
@@ -50,6 +51,8 @@ static char		sys_dumpPath[MAX_OSPATH];
 static LONG		sys_crashHandled;
 static LPTOP_LEVEL_EXCEPTION_FILTER	sys_previousExceptionFilter;
 static HHOOK	sys_winkeyHook;
+static HWND		sys_tooltipWindow;
+static HMODULE	sys_commonControlsLibrary;
 static cvar_t	*sys_winkeyDisable;
 
 #define SYS_CRASH_DIALOG_TITLE	QL_PRODUCT_NAME " Debug Crash"
@@ -60,6 +63,7 @@ static cvar_t	*sys_winkeyDisable;
 
 typedef BOOL (WINAPI *SetProcessDpiAwarenessContextProc)( HANDLE value );
 typedef BOOL (WINAPI *SetProcessDPIAwareProc)( void );
+typedef BOOL (WINAPI *Sys_InitCommonControlsExProc)( const INITCOMMONCONTROLSEX *picce );
 
 /*
 ==================
@@ -156,6 +160,115 @@ static void Sys_ShutdownWinkeyHook( void ) {
 	}
 }
 
+/*
+==================
+Sys_InitCommonControls
+==================
+*/
+static qboolean Sys_InitCommonControls( INITCOMMONCONTROLSEX *controls ) {
+	HMODULE							library;
+	qboolean						loadedCommonControls;
+	Sys_InitCommonControlsExProc	initCommonControlsEx;
+
+	library = GetModuleHandleA( "comctl32.dll" );
+	loadedCommonControls = qfalse;
+	if ( !library ) {
+		library = LoadLibraryA( "comctl32.dll" );
+		loadedCommonControls = (qboolean)( library != NULL );
+	}
+	if ( !library ) {
+		return qfalse;
+	}
+
+	initCommonControlsEx = (Sys_InitCommonControlsExProc)GetProcAddress( library, "InitCommonControlsEx" );
+	if ( !initCommonControlsEx ) {
+		if ( loadedCommonControls ) {
+			FreeLibrary( library );
+		}
+		return qfalse;
+	}
+
+	if ( !initCommonControlsEx( controls ) ) {
+		if ( loadedCommonControls ) {
+			FreeLibrary( library );
+		}
+		return qfalse;
+	}
+
+	if ( loadedCommonControls ) {
+		sys_commonControlsLibrary = library;
+	}
+
+	return qtrue;
+}
+
+/*
+==================
+Sys_ShutdownTooltipShell
+==================
+*/
+static void Sys_ShutdownTooltipShell( void ) {
+	if ( sys_tooltipWindow ) {
+		DestroyWindow( sys_tooltipWindow );
+		sys_tooltipWindow = NULL;
+	}
+
+	if ( sys_commonControlsLibrary ) {
+		FreeLibrary( sys_commonControlsLibrary );
+		sys_commonControlsLibrary = NULL;
+	}
+}
+
+/*
+==================
+Sys_InitTooltipShell
+==================
+*/
+static void Sys_InitTooltipShell( void ) {
+	INITCOMMONCONTROLSEX	controls;
+	TOOLINFOA			tool;
+	RECT				desktopRect;
+
+	Sys_ShutdownTooltipShell();
+
+	if ( !g_wv.hWnd ) {
+		return;
+	}
+
+	memset( &controls, 0, sizeof( controls ) );
+	controls.dwSize = sizeof( controls );
+	controls.dwICC = ICC_BAR_CLASSES;
+
+	if ( !Sys_InitCommonControls( &controls ) ) {
+		return;
+	}
+
+	sys_tooltipWindow = CreateWindowExA( 0, TOOLTIPS_CLASSA, NULL,
+			WS_POPUP | TTS_ALWAYSTIP | TTS_NOPREFIX,
+			CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT,
+			g_wv.hWnd, NULL, g_wv.hInstance, NULL );
+	if ( !sys_tooltipWindow ) {
+		Sys_ShutdownTooltipShell();
+		return;
+	}
+
+	SetWindowPos( sys_tooltipWindow, HWND_NOTOPMOST, 0, 0, 0, 0,
+			SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE );
+
+	memset( &tool, 0, sizeof( tool ) );
+	tool.cbSize = sizeof( tool );
+	tool.uFlags = TTF_SUBCLASS;
+	tool.hwnd = g_wv.hWnd;
+	tool.hinst = g_wv.hInstance;
+	tool.lpszText = "";
+
+	GetWindowRect( GetDesktopWindow(), &desktopRect );
+	tool.rect = desktopRect;
+
+	SendMessageA( sys_tooltipWindow, TTM_ADDTOOLA, 0, (LPARAM)&tool );
+	SendMessageA( sys_tooltipWindow, TTM_ACTIVATE, 0, 0 );
+}
+
 // define this to use alternate spanking method
 // I found out that the regular way doesn't work on my box for some reason
 // see the associated spank.sh script
@@ -244,6 +357,7 @@ void QDECL Sys_Error( const char *error, ... ) {
 
 	IN_Shutdown();
 	Sys_ShutdownWinkeyHook();
+	Sys_ShutdownTooltipShell();
 
 	// wait for the user to quit
 	while ( 1 ) {
@@ -267,6 +381,7 @@ void Sys_Quit( void ) {
 	timeEndPeriod( 1 );
 	IN_Shutdown();
 	Sys_ShutdownWinkeyHook();
+	Sys_ShutdownTooltipShell();
 	Sys_DestroyConsole();
 
 	exit (0);
@@ -2291,6 +2406,7 @@ int WINAPI WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLin
 	}
 
 	Sys_InitWinkeyHook();
+	Sys_InitTooltipShell();
 
     // main game loop
 	while( 1 ) {

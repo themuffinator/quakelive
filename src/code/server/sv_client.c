@@ -25,6 +25,8 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "../../common/platform/platform_steamworks.h"
 
 #include <limits.h>
+#include <stdarg.h>
+#include <stdlib.h>
 
 static void SV_CloseDownload( client_t *cl );
 
@@ -33,9 +35,51 @@ static qboolean sv_steamServerConnected;
 
 #define SV_STEAM_STATS_FIELD_COUNT 88
 #define SV_STEAM_ACHIEVEMENT_COUNT 59
+#define SV_STEAM_STAT_MEDAL_FIRSTFRAG 0x41
+#define SV_STEAM_STAT_MEDAL_GAUNTLET 0x42
+#define SV_STEAM_STAT_MEDAL_EXCELLENT 0x43
+#define SV_STEAM_STAT_MEDAL_REVENGE 0x44
+#define SV_STEAM_STAT_MEDAL_COMBOKILL 0x45
+#define SV_STEAM_STAT_MEDAL_MIDAIR 0x46
+#define SV_STEAM_STAT_MEDAL_PERFORATED 0x47
+#define SV_STEAM_STAT_MEDAL_RAMPAGE 0x48
+#define SV_STEAM_STAT_MEDAL_IMPRESSIVE 0x49
+#define SV_STEAM_STAT_MEDAL_CAPTURE 0x4a
+#define SV_STEAM_STAT_MEDAL_ASSIST 0x4b
+#define SV_STEAM_STAT_MEDAL_DEFENSE 0x4c
+#define SV_STEAM_STAT_MEDAL_HEADSHOT 0x4d
+#define SV_STEAM_STAT_MEDAL_QUADGOD 0x4e
+#define SV_STEAM_STAT_MEDAL_PERFECT 0x4f
+#define SV_STEAM_STAT_MEDAL_ACCURACY 0x50
+#define SV_STEAM_STAT_WINS 0x51
+#define SV_STEAM_STAT_LOSSES 0x52
+#define SV_STEAM_STAT_PLAYED 0x53
+#define SV_STEAM_ACHIEVEMENT_SPEED_KILLS 1
+#define SV_STEAM_ACHIEVEMENT_TRAINING_3_2 9
+#define SV_STEAM_ACHIEVEMENT_WICKED 0x0e
+#define SV_STEAM_ACHIEVEMENT_MVP 0x2e
+#define SV_STEAM_PLAYER_STATS_TRAINING_MAP "qztraining"
+#define SV_STEAM_PLAYER_KILL_SPEED_THRESHOLD 500.0f
+#define SV_STEAM_PLAYER_MEDAL_MVP_TOTAL 0x3e8
+#define SV_STEAM_PLAYER_DEATH_EVENT_LIMIT 0x3e8
+#define SV_STEAM_PLAYER_DEATH_TOKEN_CHARS 64
+#define SV_STEAM_PLAYER_DEATH_STEAMID_CHARS 32
+#define SV_STEAM_PLAYER_DEATH_POWERUPS_CHARS 128
+#define SV_STEAM_PLAYER_DEATH_RAW_PAYLOAD_CHARS 1024
+#define SV_STEAM_PLAYER_STATS_WICKED_SCORE 0x29a
+#define SV_STEAM_PLAYER_STATS_WICKED_GAMETYPE 5
+#define SV_STEAM_JSON_OBJECT_OPEN 0x7b
+#define SV_STEAM_JSON_OBJECT_CLOSE 0x7d
+#define SV_STEAM_JSON_ARRAY_OPEN 0x5b
+#define SV_STEAM_JSON_ARRAY_CLOSE 0x5d
+#define SV_STEAM_JSON_STRING_QUOTE 0x22
+#define SV_STEAM_JSON_ESCAPE 0x5c
 #define SV_STEAM_STATS_P2P_HELLO "hello"
 #define SV_STEAM_STATS_P2P_SEND_RELIABLE 2
 #define SV_STEAM_STATS_P2P_CHANNEL 16
+#define SV_STEAM_STATS_SUMMARY_PEER_LIMIT MAX_CLIENTS
+#define SV_STEAM_STATS_SUMMARY_SEND_RELIABLE 2
+#define SV_STEAM_STATS_SUMMARY_CHANNEL 0
 
 typedef enum {
 	SV_STEAM_STAT_INT = 0,
@@ -47,6 +91,25 @@ typedef struct {
 	const char *name;
 	sv_steam_stat_type_t type;
 } sv_steam_stat_descriptor_t;
+
+typedef struct {
+	const char *medalName;
+	int statIndex;
+} sv_steam_medal_stat_map_t;
+
+typedef struct {
+	int time;
+	int killerTeam;
+	int victimTeam;
+	char modName[SV_STEAM_PLAYER_DEATH_TOKEN_CHARS];
+	char killerName[MAX_NAME_LENGTH];
+	char killerSteamId[SV_STEAM_PLAYER_DEATH_STEAMID_CHARS];
+	char killerPowerups[SV_STEAM_PLAYER_DEATH_POWERUPS_CHARS];
+	char victimName[MAX_NAME_LENGTH];
+	char victimSteamId[SV_STEAM_PLAYER_DEATH_STEAMID_CHARS];
+	char victimPowerups[SV_STEAM_PLAYER_DEATH_POWERUPS_CHARS];
+	char rawPayload[SV_STEAM_PLAYER_DEATH_RAW_PAYLOAD_CHARS];
+} sv_steam_player_death_event_t;
 
 typedef struct {
 	qboolean active;
@@ -69,7 +132,16 @@ typedef struct {
 	qboolean achievementDirty[SV_STEAM_ACHIEVEMENT_COUNT];
 } sv_steam_stats_session_t;
 
+typedef struct {
+	qboolean active;
+	CSteamID steamId;
+} sv_steam_stats_summary_peer_t;
+
 static sv_steam_stats_session_t sv_steamStatsSessions[MAX_CLIENTS];
+static sv_steam_stats_summary_peer_t s_svSteamSummaryPeers[SV_STEAM_STATS_SUMMARY_PEER_LIMIT];
+static int s_svSteamSummaryPeerCount;
+static sv_steam_player_death_event_t s_svSteamPlayerDeathEvents[SV_STEAM_PLAYER_DEATH_EVENT_LIMIT];
+static int s_svSteamPlayerDeathEventCount;
 
 #define SV_STEAM_STAT_DESCRIPTOR( name, type ) { name, type }
 
@@ -165,6 +237,25 @@ static const sv_steam_stat_descriptor_t s_svSteamStatDescriptors[SV_STEAM_STATS_
 };
 
 #undef SV_STEAM_STAT_DESCRIPTOR
+
+static const sv_steam_medal_stat_map_t s_svSteamMedalStatMap[] = {
+	{ "FIRSTFRAG", SV_STEAM_STAT_MEDAL_FIRSTFRAG },
+	{ "GAUNTLET", SV_STEAM_STAT_MEDAL_GAUNTLET },
+	{ "EXCELLENT", SV_STEAM_STAT_MEDAL_EXCELLENT },
+	{ "REVENGE", SV_STEAM_STAT_MEDAL_REVENGE },
+	{ "COMBOKILL", SV_STEAM_STAT_MEDAL_COMBOKILL },
+	{ "MIDAIR", SV_STEAM_STAT_MEDAL_MIDAIR },
+	{ "PERFORATED", SV_STEAM_STAT_MEDAL_PERFORATED },
+	{ "RAMPAGE", SV_STEAM_STAT_MEDAL_RAMPAGE },
+	{ "IMPRESSIVE", SV_STEAM_STAT_MEDAL_IMPRESSIVE },
+	{ "CAPTURE", SV_STEAM_STAT_MEDAL_CAPTURE },
+	{ "ASSIST", SV_STEAM_STAT_MEDAL_ASSIST },
+	{ "DEFENSE", SV_STEAM_STAT_MEDAL_DEFENSE },
+	{ "HEADSHOT", SV_STEAM_STAT_MEDAL_HEADSHOT },
+	{ "QUADGOD", SV_STEAM_STAT_MEDAL_QUADGOD },
+	{ "PERFECT", SV_STEAM_STAT_MEDAL_PERFECT },
+	{ "ACCURACY", SV_STEAM_STAT_MEDAL_ACCURACY }
+};
 
 static const char *s_svSteamAchievementNames[SV_STEAM_ACHIEVEMENT_COUNT] = {
 	"AW_MIDAIR",
@@ -812,6 +903,43 @@ static const char *SV_SteamStats_GetFieldName( int statIndex, const char *stage 
 
 /*
 =================
+SV_SteamStats_GetMedalStatIndex
+
+Maps a recovered `PLAYER_MEDAL` token to the retail medal stat index table at
+`data_561b80`/`data_561b84`, with narrow aliases for source-side medal names.
+=================
+*/
+static int SV_SteamStats_GetMedalStatIndex( const char *medalName ) {
+	int i;
+
+	if ( !medalName || !medalName[0] ) {
+		return -1;
+	}
+
+	for ( i = 0; i < (int)( sizeof( s_svSteamMedalStatMap ) / sizeof( s_svSteamMedalStatMap[0] ) ); i++ ) {
+		if ( !strcmp( medalName, s_svSteamMedalStatMap[i].medalName ) ) {
+			return s_svSteamMedalStatMap[i].statIndex;
+		}
+	}
+
+	if ( !Q_stricmp( medalName, "HUMILIATION" ) ) {
+		return SV_STEAM_STAT_MEDAL_GAUNTLET;
+	}
+	if ( !Q_stricmp( medalName, "DEFENDS" ) || !Q_stricmp( medalName, "DEFEND" ) ) {
+		return SV_STEAM_STAT_MEDAL_DEFENSE;
+	}
+	if ( !Q_stricmp( medalName, "ASSISTS" ) ) {
+		return SV_STEAM_STAT_MEDAL_ASSIST;
+	}
+	if ( !Q_stricmp( medalName, "CAPTURES" ) ) {
+		return SV_STEAM_STAT_MEDAL_CAPTURE;
+	}
+
+	return -1;
+}
+
+/*
+=================
 SV_SteamStats_GetAchievementName
 
 Returns the mapped retail Steam achievement name for one achievement index while
@@ -974,12 +1102,12 @@ static qboolean SV_SteamStats_RequestCurrentValues( sv_steam_stats_session_t *se
 		return qfalse;
 	}
 
+	session->requestIssued = qfalse;
 	if ( !QL_Steamworks_ServerRequestUserStats( &session->steamId ) ) {
 		SV_LogSteamStatsLifecycle( &session->steamId, "request-current-values", "request failed" );
 		return qfalse;
 	}
 
-	session->backendAvailable = qtrue;
 	session->requestIssued = qtrue;
 	SV_LogSteamStatsLifecycle( &session->steamId, "request-current-values", "request issued" );
 	return qtrue;
@@ -1037,6 +1165,12 @@ static qboolean SV_SteamStats_LoadFieldValue( sv_steam_stats_session_t *session,
 
 	if ( !session->requestIssued ) {
 		SV_SteamStats_RequestCurrentValues( session );
+	}
+
+	if ( !session->backendAvailable ) {
+		Com_sprintf( detail, sizeof( detail ), "stat %s unavailable pending stats response", name );
+		SV_LogSteamStatsLifecycle( &session->steamId, "value-query", detail );
+		return qfalse;
 	}
 
 	session->statQueryAttempted[statIndex] = qtrue;
@@ -1132,6 +1266,12 @@ static qboolean SV_SteamStats_LoadAchievement( sv_steam_stats_session_t *session
 		SV_SteamStats_RequestCurrentValues( session );
 	}
 
+	if ( !session->backendAvailable ) {
+		Com_sprintf( detail, sizeof( detail ), "achievement %s unavailable pending stats response", name );
+		SV_LogSteamStatsLifecycle( &session->steamId, "value-query", detail );
+		return qfalse;
+	}
+
 	session->achievementQueryAttempted[achievementId] = qtrue;
 	achieved = qfalse;
 	if ( !QL_Steamworks_ServerGetUserAchievement( &session->steamId, name, &achieved ) ) {
@@ -1151,12 +1291,35 @@ static qboolean SV_SteamStats_LoadAchievement( sv_steam_stats_session_t *session
 
 /*
 =================
+SV_SteamStats_PrimeReceivedValues
+
+Refreshes mapped stat baselines after Steam reports that current values are
+available.
+=================
+*/
+static void SV_SteamStats_PrimeReceivedValues( sv_steam_stats_session_t *session ) {
+	int i;
+
+	if ( !session || !session->active ) {
+		return;
+	}
+
+	session->backendAvailable = qtrue;
+	session->requestIssued = qtrue;
+	for ( i = 0; i < SV_STEAM_STATS_FIELD_COUNT; i++ ) {
+		session->statLoaded[i] = qfalse;
+		SV_SteamStats_LoadFieldValue( session, i );
+	}
+}
+
+/*
+=================
 SV_SteamStats_FlushPendingValues
 
 Publishes pending stat deltas and achievement unlocks for one active session.
 =================
 */
-static void SV_SteamStats_FlushPendingValues( sv_steam_stats_session_t *session ) {
+static void SV_SteamStats_FlushPendingValues( sv_steam_stats_session_t *session, qboolean forceStore ) {
 	const sv_steam_stat_descriptor_t *descriptor;
 	const char *name;
 	qboolean hasPending;
@@ -1266,7 +1429,7 @@ static void SV_SteamStats_FlushPendingValues( sv_steam_stats_session_t *session 
 		session->backendAvailable = qtrue;
 	}
 
-	if ( !hasPending ) {
+	if ( !hasPending && !forceStore ) {
 		SV_LogSteamStatsLifecycle( &session->steamId, "value-flush", "no pending stat or achievement updates" );
 		return;
 	}
@@ -1310,6 +1473,66 @@ static void SV_SteamStats_FlushPendingValues( sv_steam_stats_session_t *session 
 
 /*
 =================
+SV_SteamStats_SetAchievement
+
+Sets one achievement through SteamGameServerStats and stores the active session
+when the current-values response has primed the retail ready flag.
+=================
+*/
+static qboolean SV_SteamStats_SetAchievement( sv_steam_stats_session_t *session, int achievementId ) {
+	const char *name;
+	char detail[128];
+
+	if ( !session ) {
+		Com_sprintf( detail, sizeof( detail ), "ignored achievement set for null session at id %d", achievementId );
+		SV_LogSteamStatsLifecycle( NULL, "achievement-unlock", detail );
+		return qfalse;
+	}
+
+	if ( !session->active ) {
+		Com_sprintf( detail, sizeof( detail ), "ignored achievement set for inactive session at id %d", achievementId );
+		SV_LogSteamStatsLifecycle( &session->steamId, "achievement-unlock", detail );
+		return qfalse;
+	}
+
+	if ( session->steamId.value == 0ull ) {
+		Com_sprintf( detail, sizeof( detail ), "ignored achievement set for session without steam id at id %d", achievementId );
+		SV_LogSteamStatsLifecycle( NULL, "achievement-unlock", detail );
+		return qfalse;
+	}
+
+	if ( achievementId < 0 || achievementId >= SV_STEAM_ACHIEVEMENT_COUNT ) {
+		Com_sprintf( detail, sizeof( detail ), "ignored achievement set for invalid id %d", achievementId );
+		SV_LogSteamStatsLifecycle( &session->steamId, "achievement-unlock", detail );
+		return qfalse;
+	}
+
+	name = SV_SteamStats_GetAchievementName( achievementId, "achievement-unlock" );
+	if ( !name ) {
+		Com_sprintf( detail, sizeof( detail ), "ignored achievement set for unmapped id %d", achievementId );
+		SV_LogSteamStatsLifecycle( &session->steamId, "achievement-unlock", detail );
+		return qfalse;
+	}
+
+	if ( !session->backendAvailable ) {
+		Com_sprintf( detail, sizeof( detail ), "achievement %s unavailable pending stats response", name );
+		SV_LogSteamStatsLifecycle( &session->steamId, "achievement-unlock", detail );
+		return qfalse;
+	}
+
+	if ( !QL_Steamworks_ServerSetUserAchievement( &session->steamId, name ) ) {
+		Com_sprintf( detail, sizeof( detail ), "achievement %s publish failed", name );
+		SV_LogSteamStatsLifecycle( &session->steamId, "achievement-unlock", detail );
+		return qfalse;
+	}
+
+	session->backendAvailable = qtrue;
+	SV_SteamStats_FlushPendingValues( session, qtrue );
+	return qtrue;
+}
+
+/*
+=================
 SV_SteamStats_ShouldUnlockAchievement
 
 Applies the recovered retail achievement gate around match state, training, and
@@ -1335,6 +1558,117 @@ static qboolean SV_SteamStats_ShouldUnlockAchievement( void ) {
 	}
 
 	return qfalse;
+}
+
+/*
+=================
+SV_SteamStats_ClearSummaryPeers
+
+Clears the source-side mirror of retail `data_e30374`, the transient Steam
+summary-recipient tree drained after a match-report broadcast.
+=================
+*/
+static void SV_SteamStats_ClearSummaryPeers( void ) {
+	if ( s_svSteamSummaryPeerCount <= 0 ) {
+		return;
+	}
+
+	Com_Memset( s_svSteamSummaryPeers, 0, sizeof( s_svSteamSummaryPeers ) );
+	s_svSteamSummaryPeerCount = 0;
+}
+
+/*
+=================
+SV_SteamStats_AddSummaryPeer
+
+Tracks one SteamID as a pending recipient for the retained retail
+match-report summary fanout.
+=================
+*/
+static void SV_SteamStats_AddSummaryPeer( const CSteamID *steamId ) {
+	sv_steam_stats_summary_peer_t *peer;
+	char detail[128];
+	int i;
+
+	if ( !steamId || steamId->value == 0ull ) {
+		SV_LogSteamStatsLifecycle( steamId, "match-summary-peer", "ignored peer without steam id" );
+		return;
+	}
+
+	for ( i = 0; i < s_svSteamSummaryPeerCount; i++ ) {
+		peer = &s_svSteamSummaryPeers[i];
+		if ( peer->active && peer->steamId.value == steamId->value ) {
+			return;
+		}
+	}
+
+	if ( s_svSteamSummaryPeerCount >= SV_STEAM_STATS_SUMMARY_PEER_LIMIT ) {
+		Com_sprintf( detail, sizeof( detail ), "ignored summary peer overflow at %d",
+			s_svSteamSummaryPeerCount );
+		SV_LogSteamStatsLifecycle( steamId, "match-summary-peer", detail );
+		return;
+	}
+
+	peer = &s_svSteamSummaryPeers[s_svSteamSummaryPeerCount++];
+	peer->active = qtrue;
+	peer->steamId = *steamId;
+	SV_LogSteamStatsLifecycle( steamId, "match-summary-peer", "tracked pending MATCH_REPORT summary peer" );
+}
+
+/*
+=================
+SV_SteamStats_SendSummaryToPeers
+
+Broadcasts the prepared match-report summary through the retained
+SteamGameServerNetworking wrapper, matching retail send type `2` on channel `0`.
+=================
+*/
+static void SV_SteamStats_SendSummaryToPeers( const char *report ) {
+	const sv_steam_stats_summary_peer_t *peer;
+	size_t reportLength;
+	char detail[128];
+	int failed;
+	int sent;
+	int i;
+
+	if ( s_svSteamSummaryPeerCount <= 0 ) {
+		return;
+	}
+
+	if ( !report || !report[0] ) {
+		SV_LogSteamStatsLifecycle( NULL, "match-summary", "cleared pending summary peers without report payload" );
+		SV_SteamStats_ClearSummaryPeers();
+		return;
+	}
+
+	reportLength = strlen( report );
+	if ( reportLength == 0 ) {
+		SV_LogSteamStatsLifecycle( NULL, "match-summary", "cleared pending summary peers for empty report payload" );
+		SV_SteamStats_ClearSummaryPeers();
+		return;
+	}
+
+	sent = 0;
+	failed = 0;
+	for ( i = 0; i < s_svSteamSummaryPeerCount; i++ ) {
+		peer = &s_svSteamSummaryPeers[i];
+		if ( !peer->active || peer->steamId.value == 0ull ) {
+			continue;
+		}
+
+		if ( QL_Steamworks_ServerSendP2PPacket( &peer->steamId, report, (uint32_t)reportLength,
+			SV_STEAM_STATS_SUMMARY_SEND_RELIABLE, SV_STEAM_STATS_SUMMARY_CHANNEL ) ) {
+			sent++;
+		} else {
+			failed++;
+		}
+	}
+
+	Com_sprintf( detail, sizeof( detail ),
+		"sent MATCH_REPORT summary to %d peers (%d failed) on p2p channel %d",
+		sent, failed, SV_STEAM_STATS_SUMMARY_CHANNEL );
+	SV_LogSteamStatsLifecycle( NULL, "match-summary", detail );
+	SV_SteamStats_ClearSummaryPeers();
 }
 
 /*
@@ -1396,6 +1730,7 @@ static void SV_SteamStats_CreatePlayerSession( client_t *cl ) {
 	session = &sv_steamStatsSessions[clientNum];
 	if ( session->active && session->steamId.value == steamId.value ) {
 		SV_LogSteamStatsLifecycle( &session->steamId, "session-bootstrap", "reusing active session" );
+		SV_SteamStats_AddSummaryPeer( &session->steamId );
 		SV_SteamStats_RequestCurrentValues( session );
 		return;
 	}
@@ -1405,6 +1740,7 @@ static void SV_SteamStats_CreatePlayerSession( client_t *cl ) {
 	session->steamId = steamId;
 	session->appId = QL_Steamworks_ServerGetAppID();
 	SV_LogSteamStatsLifecycle( &session->steamId, "session-bootstrap", "created session" );
+	SV_SteamStats_AddSummaryPeer( &session->steamId );
 	SV_SteamStats_RequestCurrentValues( session );
 	if ( !QL_Steamworks_ServerSendP2PPacket( &session->steamId, SV_STEAM_STATS_P2P_HELLO, 5, SV_STEAM_STATS_P2P_SEND_RELIABLE, SV_STEAM_STATS_P2P_CHANNEL ) ) {
 		SV_LogSteamStatsLifecycle( &session->steamId, "session-bootstrap", "p2p hello send failed" );
@@ -1443,7 +1779,7 @@ static void SV_SteamStats_RemovePlayerSession( client_t *cl ) {
 	}
 
 	steamId = session->steamId;
-	SV_SteamStats_FlushPendingValues( session );
+	SV_SteamStats_FlushPendingValues( session, qfalse );
 	SV_SteamStats_ResetSession( session );
 	Com_sprintf( detail, sizeof( detail ), "cleared session for client %d", clientNum );
 	SV_LogSteamStatsLifecycle( &steamId, "session-teardown", detail );
@@ -1468,6 +1804,7 @@ static void SV_SteamStats_RequerySessions( void ) {
 		}
 
 		session->requestIssued = qfalse;
+		session->backendAvailable = qfalse;
 		SV_LogSteamStatsLifecycle( &session->steamId, "session-requery", "backend reconnected; request reset" );
 		SV_SteamStats_RequestCurrentValues( session );
 	}
@@ -1582,31 +1919,30 @@ void SV_SteamStats_UnlockAchievement( int clientNum, int achievementId ) {
 		return;
 	}
 
-	SV_SteamStats_LoadAchievement( session, achievementId );
-	if ( session->achievementUnlocked[achievementId] ) {
-		Com_sprintf( detail, sizeof( detail ), "achievement %s already unlocked for client %d", name, clientNum );
+	if ( !SV_SteamStats_SetAchievement( session, achievementId ) ) {
+		Com_sprintf( detail, sizeof( detail ), "achievement %s publish failed for client %d", name, clientNum );
 		SV_LogSteamStatsLifecycle( &session->steamId, "achievement-unlock", detail );
 		return;
 	}
 
 	session->achievementUnlocked[achievementId] = qtrue;
-	session->achievementDirty[achievementId] = qtrue;
-	Com_sprintf( detail, sizeof( detail ), "queued achievement %s unlock for client %d", name, clientNum );
+	session->achievementLoaded[achievementId] = qtrue;
+	Com_sprintf( detail, sizeof( detail ), "unlocked achievement %s for client %d", name, clientNum );
 	SV_LogSteamStatsLifecycle( &session->steamId, "achievement-unlock", detail );
-	SV_SteamStats_FlushPendingValues( session );
 }
 
 /*
 =================
 SV_SteamStats_HasAchievement
 
-Reports whether the retained session already owns one mapped achievement.
+Reports whether the retained ready session already owns one mapped achievement.
 =================
 */
 qboolean SV_SteamStats_HasAchievement( int clientNum, int achievementId ) {
 	client_t *cl;
 	sv_steam_stats_session_t *session;
 	const char *name;
+	CSteamID steamId;
 	char detail[128];
 	char subject[128];
 
@@ -1623,19 +1959,1392 @@ qboolean SV_SteamStats_HasAchievement( int clientNum, int achievementId ) {
 		return qfalse;
 	}
 
-	SV_SteamStats_CreatePlayerSession( cl );
-	session = &sv_steamStatsSessions[clientNum];
-	if ( !session->active ) {
+	if ( !SV_ParsePlatformSteamId( cl->platformSteamId, &steamId ) || steamId.value == 0ull ) {
 		Com_sprintf( detail, sizeof( detail ), "achievement %s session unavailable for client %d", name, clientNum );
 		SV_LogSteamStatsLifecycle( NULL, "achievement-query", detail );
 		return qfalse;
 	}
 
-	SV_SteamStats_LoadAchievement( session, achievementId );
+	session = SV_SteamStats_FindSessionBySteamId( &steamId );
+	if ( !session ) {
+		Com_sprintf( detail, sizeof( detail ), "achievement %s session unavailable for client %d", name, clientNum );
+		SV_LogSteamStatsLifecycle( NULL, "achievement-query", detail );
+		return qfalse;
+	}
+
+	if ( !session->backendAvailable ) {
+		Com_sprintf( detail, sizeof( detail ), "achievement %s unavailable pending stats response for client %d", name, clientNum );
+		SV_LogSteamStatsLifecycle( &session->steamId, "achievement-query", detail );
+		return qfalse;
+	}
+
 	Com_sprintf( detail, sizeof( detail ), "achievement %s ownership is %s for client %d",
 		name, session->achievementUnlocked[achievementId] ? "present" : "absent", clientNum );
 	SV_LogSteamStatsLifecycle( &session->steamId, "achievement-query", detail );
 	return session->achievementUnlocked[achievementId] ? qtrue : qfalse;
+}
+
+/*
+=================
+SV_SteamStats_SkipEventPayloadWhitespace
+
+Advances over JSON whitespace in the source-side qagame event payload proxy.
+=================
+*/
+static const char *SV_SteamStats_SkipEventPayloadWhitespace( const char *cursor ) {
+	if ( !cursor ) {
+		return NULL;
+	}
+
+	while ( *cursor == ' ' || *cursor == '\t' || *cursor == '\r' || *cursor == '\n' ) {
+		cursor++;
+	}
+
+	return cursor;
+}
+
+/*
+=================
+SV_SteamStats_FindEventPayloadFieldValue
+
+Finds the value cursor for one flat field in the source-side qagame event
+payload proxy.
+=================
+*/
+static const char *SV_SteamStats_FindEventPayloadFieldValue( const char *payload, const char *fieldName ) {
+	char key[64];
+	const char *cursor;
+
+	if ( !payload || !fieldName || !fieldName[0] ) {
+		return NULL;
+	}
+
+	Com_sprintf( key, sizeof( key ), "\"%s\"", fieldName );
+	cursor = strstr( payload, key );
+	if ( !cursor ) {
+		return NULL;
+	}
+
+	cursor += strlen( key );
+	cursor = SV_SteamStats_SkipEventPayloadWhitespace( cursor );
+	if ( !cursor || *cursor != ':' ) {
+		return NULL;
+	}
+
+	cursor++;
+	return SV_SteamStats_SkipEventPayloadWhitespace( cursor );
+}
+
+/*
+=================
+SV_SteamStats_ParseEventPayloadInt
+
+Reads one flat integer field from the source-side JSON proxy used for qagame
+ranking events.
+=================
+*/
+static qboolean SV_SteamStats_ParseEventPayloadInt( const char *payload, const char *fieldName, int *outValue ) {
+	char key[64];
+	const char *cursor;
+	int sign;
+	int value;
+
+	if ( outValue ) {
+		*outValue = 0;
+	}
+
+	if ( !payload || !fieldName || !fieldName[0] || !outValue ) {
+		return qfalse;
+	}
+
+	Com_sprintf( key, sizeof( key ), "\"%s\"", fieldName );
+	cursor = strstr( payload, key );
+	if ( !cursor ) {
+		return qfalse;
+	}
+
+	cursor += strlen( key );
+	while ( *cursor == ' ' || *cursor == '\t' || *cursor == '\r' || *cursor == '\n' ) {
+		cursor++;
+	}
+	if ( *cursor != ':' ) {
+		return qfalse;
+	}
+
+	cursor++;
+	while ( *cursor == ' ' || *cursor == '\t' || *cursor == '\r' || *cursor == '\n' ) {
+		cursor++;
+	}
+
+	sign = 1;
+	if ( *cursor == '-' ) {
+		sign = -1;
+		cursor++;
+	}
+
+	if ( *cursor < '0' || *cursor > '9' ) {
+		return qfalse;
+	}
+
+	value = 0;
+	while ( *cursor >= '0' && *cursor <= '9' ) {
+		if ( value > ( INT_MAX - ( *cursor - '0' ) ) / 10 ) {
+			value = INT_MAX;
+			break;
+		}
+		value = ( value * 10 ) + ( *cursor - '0' );
+		cursor++;
+	}
+
+	*outValue = value * sign;
+	return qtrue;
+}
+
+/*
+=================
+SV_SteamStats_ParseEventPayloadBool
+
+Reads one flat boolean field from the source-side JSON proxy used for qagame
+ranking events.
+=================
+*/
+static qboolean SV_SteamStats_ParseEventPayloadBool( const char *payload, const char *fieldName, qboolean *outValue ) {
+	const char *cursor;
+
+	if ( outValue ) {
+		*outValue = qfalse;
+	}
+
+	if ( !outValue ) {
+		return qfalse;
+	}
+
+	cursor = SV_SteamStats_FindEventPayloadFieldValue( payload, fieldName );
+	if ( !cursor ) {
+		return qfalse;
+	}
+
+	if ( !strncmp( cursor, "true", 4 ) ) {
+		*outValue = qtrue;
+		return qtrue;
+	}
+	if ( !strncmp( cursor, "false", 5 ) ) {
+		*outValue = qfalse;
+		return qtrue;
+	}
+	if ( *cursor == '1' ) {
+		*outValue = qtrue;
+		return qtrue;
+	}
+	if ( *cursor == '0' ) {
+		*outValue = qfalse;
+		return qtrue;
+	}
+
+	return qfalse;
+}
+
+/*
+=================
+SV_SteamStats_ShouldSendMatchSummary
+
+Mirrors the retail `SteamStats_BroadcastSummary` guard: send only when the
+prepared match report explicitly has `TRAINING == false` and is not aborted.
+=================
+*/
+static qboolean SV_SteamStats_ShouldSendMatchSummary( const char *report ) {
+	qboolean aborted;
+	qboolean training;
+
+	if ( s_svSteamSummaryPeerCount <= 0 ) {
+		return qfalse;
+	}
+
+	if ( !report || !report[0] ) {
+		SV_LogSteamStatsLifecycle( NULL, "match-summary", "suppressed summary without report payload" );
+		return qfalse;
+	}
+
+	if ( !SV_SteamStats_ParseEventPayloadBool( report, "TRAINING", &training ) ) {
+		SV_LogSteamStatsLifecycle( NULL, "match-summary", "suppressed summary without TRAINING=false" );
+		return qfalse;
+	}
+
+	if ( training ) {
+		SV_LogSteamStatsLifecycle( NULL, "match-summary", "suppressed training MATCH_REPORT summary" );
+		return qfalse;
+	}
+
+	if ( SV_SteamStats_ParseEventPayloadBool( report, "ABORTED", &aborted ) && aborted ) {
+		SV_LogSteamStatsLifecycle( NULL, "match-summary", "suppressed aborted MATCH_REPORT summary" );
+		return qfalse;
+	}
+
+	return qtrue;
+}
+
+/*
+=================
+SV_SteamStats_ParseEventPayloadString
+
+Reads one flat string field from the source-side JSON proxy used for qagame
+ranking events.
+=================
+*/
+static qboolean SV_SteamStats_ParseEventPayloadString( const char *payload, const char *fieldName, char *outValue, size_t outSize ) {
+	const char *cursor;
+	char *write;
+	size_t remaining;
+
+	if ( outValue && outSize > 0 ) {
+		outValue[0] = '\0';
+	}
+
+	if ( !outValue || outSize == 0 ) {
+		return qfalse;
+	}
+
+	cursor = SV_SteamStats_FindEventPayloadFieldValue( payload, fieldName );
+	if ( !cursor || *cursor != SV_STEAM_JSON_STRING_QUOTE ) {
+		return qfalse;
+	}
+
+	cursor++;
+	write = outValue;
+	remaining = outSize;
+	while ( *cursor && *cursor != SV_STEAM_JSON_STRING_QUOTE ) {
+		int value;
+
+		value = (unsigned char)*cursor;
+		if ( value == SV_STEAM_JSON_ESCAPE && cursor[1] ) {
+			cursor++;
+			value = (unsigned char)*cursor;
+		}
+		if ( remaining > 1 ) {
+			*write++ = (char)value;
+			remaining--;
+		}
+		cursor++;
+	}
+
+	if ( *cursor != SV_STEAM_JSON_STRING_QUOTE ) {
+		outValue[0] = '\0';
+		return qfalse;
+	}
+
+	*write = '\0';
+	return qtrue;
+}
+
+/*
+=================
+SV_SteamStats_FindNestedEventPayloadFieldValue
+
+Finds the value cursor for one field inside a named object in the source-side
+qagame event payload proxy.
+=================
+*/
+static const char *SV_SteamStats_FindNestedEventPayloadFieldValue( const char *payload, const char *objectName, const char *fieldName ) {
+	char fieldKey[64];
+	const char *objectStart;
+	const char *objectEnd;
+	const char *field;
+	const char *cursor;
+	int depth;
+	qboolean inString;
+	qboolean escaped;
+
+	objectStart = SV_SteamStats_FindEventPayloadFieldValue( payload, objectName );
+	if ( !objectStart || *objectStart != SV_STEAM_JSON_OBJECT_OPEN ) {
+		return NULL;
+	}
+
+	depth = 0;
+	inString = qfalse;
+	escaped = qfalse;
+	for ( objectEnd = objectStart; *objectEnd; objectEnd++ ) {
+		if ( inString ) {
+			if ( escaped ) {
+				escaped = qfalse;
+			} else if ( *objectEnd == SV_STEAM_JSON_ESCAPE ) {
+				escaped = qtrue;
+			} else if ( *objectEnd == SV_STEAM_JSON_STRING_QUOTE ) {
+				inString = qfalse;
+			}
+			continue;
+		}
+
+		if ( *objectEnd == SV_STEAM_JSON_STRING_QUOTE ) {
+			inString = qtrue;
+			continue;
+		}
+		if ( *objectEnd == SV_STEAM_JSON_OBJECT_OPEN ) {
+			depth++;
+			continue;
+		}
+		if ( *objectEnd == SV_STEAM_JSON_OBJECT_CLOSE ) {
+			depth--;
+			if ( depth == 0 ) {
+				break;
+			}
+		}
+	}
+
+	if ( depth != 0 ) {
+		return NULL;
+	}
+
+	Com_sprintf( fieldKey, sizeof( fieldKey ), "\"%s\"", fieldName );
+	for ( field = objectStart; field && field < objectEnd; field = strstr( field + 1, fieldKey ) ) {
+		field = strstr( field, fieldKey );
+		if ( !field || field >= objectEnd ) {
+			break;
+		}
+
+		cursor = field + strlen( fieldKey );
+		cursor = SV_SteamStats_SkipEventPayloadWhitespace( cursor );
+		if ( !cursor || cursor >= objectEnd || *cursor != ':' ) {
+			continue;
+		}
+
+		cursor++;
+		cursor = SV_SteamStats_SkipEventPayloadWhitespace( cursor );
+		return ( cursor && cursor < objectEnd ) ? cursor : NULL;
+	}
+
+	return NULL;
+}
+
+/*
+=================
+SV_SteamStats_ParseNestedEventPayloadFloat
+
+Reads one float field from a nested source-side qagame event payload object.
+=================
+*/
+static qboolean SV_SteamStats_ParseNestedEventPayloadFloat( const char *payload, const char *objectName, const char *fieldName, float *outValue ) {
+	const char *cursor;
+	char *end;
+	double value;
+
+	if ( outValue ) {
+		*outValue = 0.0f;
+	}
+
+	if ( !outValue ) {
+		return qfalse;
+	}
+
+	cursor = SV_SteamStats_FindNestedEventPayloadFieldValue( payload, objectName, fieldName );
+	if ( !cursor ) {
+		return qfalse;
+	}
+
+	value = strtod( cursor, &end );
+	if ( end == cursor ) {
+		return qfalse;
+	}
+
+	*outValue = (float)value;
+	return qtrue;
+}
+
+/*
+=================
+SV_SteamStats_ParseNestedEventPayloadInt
+
+Reads one integer field from a nested source-side qagame event payload object.
+=================
+*/
+static qboolean SV_SteamStats_ParseNestedEventPayloadInt( const char *payload, const char *objectName, const char *fieldName, int *outValue ) {
+	const char *cursor;
+	char *end;
+	long value;
+
+	if ( outValue ) {
+		*outValue = 0;
+	}
+
+	if ( !outValue ) {
+		return qfalse;
+	}
+
+	cursor = SV_SteamStats_FindNestedEventPayloadFieldValue( payload, objectName, fieldName );
+	if ( !cursor ) {
+		return qfalse;
+	}
+
+	value = strtol( cursor, &end, 10 );
+	if ( end == cursor || value < INT_MIN || value > INT_MAX ) {
+		return qfalse;
+	}
+
+	*outValue = (int)value;
+	return qtrue;
+}
+
+/*
+=================
+SV_SteamStats_ParseNestedEventPayloadString
+
+Reads one string field from a nested source-side qagame event payload object.
+=================
+*/
+static qboolean SV_SteamStats_ParseNestedEventPayloadString( const char *payload, const char *objectName, const char *fieldName, char *outValue, size_t outSize ) {
+	const char *cursor;
+	char *write;
+	size_t remaining;
+
+	if ( outValue && outSize > 0 ) {
+		outValue[0] = '\0';
+	}
+
+	if ( !outValue || outSize == 0 ) {
+		return qfalse;
+	}
+
+	cursor = SV_SteamStats_FindNestedEventPayloadFieldValue( payload, objectName, fieldName );
+	if ( !cursor || *cursor != SV_STEAM_JSON_STRING_QUOTE ) {
+		return qfalse;
+	}
+
+	cursor++;
+	write = outValue;
+	remaining = outSize;
+	while ( *cursor && *cursor != SV_STEAM_JSON_STRING_QUOTE ) {
+		int value;
+
+		value = (unsigned char)*cursor;
+		if ( value == SV_STEAM_JSON_ESCAPE && cursor[1] ) {
+			cursor++;
+			value = (unsigned char)*cursor;
+		}
+		if ( remaining > 1 ) {
+			*write++ = (char)value;
+			remaining--;
+		}
+		cursor++;
+	}
+
+	if ( *cursor != SV_STEAM_JSON_STRING_QUOTE ) {
+		outValue[0] = '\0';
+		return qfalse;
+	}
+
+	*write = '\0';
+	return qtrue;
+}
+
+/*
+=================
+SV_SteamStats_CopyNestedEventPayloadArray
+
+Copies one nested JSON array value from the source-side qagame event payload.
+=================
+*/
+static qboolean SV_SteamStats_CopyNestedEventPayloadArray( const char *payload, const char *objectName, const char *fieldName, char *outValue, size_t outSize ) {
+	const char *cursor;
+	const char *scan;
+	size_t length;
+	int depth;
+	qboolean inString;
+	qboolean escaped;
+
+	if ( outValue && outSize > 0 ) {
+		outValue[0] = '\0';
+	}
+
+	if ( !outValue || outSize == 0 ) {
+		return qfalse;
+	}
+
+	cursor = SV_SteamStats_FindNestedEventPayloadFieldValue( payload, objectName, fieldName );
+	if ( !cursor || *cursor != SV_STEAM_JSON_ARRAY_OPEN ) {
+		return qfalse;
+	}
+
+	depth = 0;
+	inString = qfalse;
+	escaped = qfalse;
+	for ( scan = cursor; *scan; scan++ ) {
+		if ( inString ) {
+			if ( escaped ) {
+				escaped = qfalse;
+			} else if ( *scan == SV_STEAM_JSON_ESCAPE ) {
+				escaped = qtrue;
+			} else if ( *scan == SV_STEAM_JSON_STRING_QUOTE ) {
+				inString = qfalse;
+			}
+			continue;
+		}
+
+		if ( *scan == SV_STEAM_JSON_STRING_QUOTE ) {
+			inString = qtrue;
+			continue;
+		}
+		if ( *scan == SV_STEAM_JSON_ARRAY_OPEN ) {
+			depth++;
+			continue;
+		}
+		if ( *scan == SV_STEAM_JSON_ARRAY_CLOSE ) {
+			depth--;
+			if ( depth == 0 ) {
+				length = (size_t)( scan - cursor ) + 1;
+				if ( length >= outSize ) {
+					return qfalse;
+				}
+				memcpy( outValue, cursor, length );
+				outValue[length] = '\0';
+				return qtrue;
+			}
+		}
+	}
+
+	return qfalse;
+}
+
+/*
+=================
+SV_SteamStats_AddSessionFieldValue
+
+Applies one recovered `sub_467d40`-style integer stat delta to an existing
+retained Steam stats session.
+=================
+*/
+static qboolean SV_SteamStats_AddSessionFieldValue( sv_steam_stats_session_t *session, int statIndex, int delta, const char *stage ) {
+	const sv_steam_stat_descriptor_t *descriptor;
+	const char *name;
+	const char *logStage;
+	char detail[128];
+
+	logStage = stage ? stage : "field-delta";
+	descriptor = SV_SteamStats_GetFieldDescriptor( statIndex, logStage );
+	if ( !descriptor ) {
+		return qfalse;
+	}
+	name = descriptor->name;
+
+	if ( !session ) {
+		Com_sprintf( detail, sizeof( detail ), "ignored stat %s delta %d for null session", name, delta );
+		SV_LogSteamStatsLifecycle( NULL, logStage, detail );
+		return qfalse;
+	}
+
+	if ( !session->active ) {
+		Com_sprintf( detail, sizeof( detail ), "ignored stat %s delta %d for inactive session", name, delta );
+		SV_LogSteamStatsLifecycle( &session->steamId, logStage, detail );
+		return qfalse;
+	}
+
+	if ( descriptor->type != SV_STEAM_STAT_INT ) {
+		Com_sprintf( detail, sizeof( detail ), "ignored non-int %s stat %s delta %d",
+			SV_SteamStats_GetFieldTypeLabel( descriptor->type ), name, delta );
+		SV_LogSteamStatsLifecycle( &session->steamId, logStage, detail );
+		return qfalse;
+	}
+
+	if ( delta == 0 ) {
+		Com_sprintf( detail, sizeof( detail ), "stat %s += 0 skipped", name );
+		SV_LogSteamStatsLifecycle( &session->steamId, logStage, detail );
+		return qtrue;
+	}
+
+	SV_SteamStats_LoadFieldValue( session, statIndex );
+	if ( !session->statLoaded[statIndex] ) {
+		Com_sprintf( detail, sizeof( detail ), "stat %s baseline unavailable; queuing delta %d", name, delta );
+		SV_LogSteamStatsLifecycle( &session->steamId, logStage, detail );
+	}
+
+	session->statValue[statIndex] += delta;
+	session->pendingStatDelta[statIndex] += delta;
+	session->statDirty[statIndex] = qtrue;
+
+	Com_sprintf( detail, sizeof( detail ), "stat %s += %d -> %d", name, delta, session->statValue[statIndex] );
+	SV_LogSteamStatsLifecycle( &session->steamId, logStage, detail );
+	return qtrue;
+}
+
+/*
+=================
+SV_SteamStats_HasSessionAchievement
+
+Reports whether one retained Steam stats session already owns a mapped
+achievement, mirroring retail `sub_467f70` without issuing a fresh query.
+=================
+*/
+static qboolean SV_SteamStats_HasSessionAchievement( sv_steam_stats_session_t *session, int achievementId ) {
+	const char *name;
+	char detail[128];
+
+	name = SV_SteamStats_GetAchievementName( achievementId, "achievement-query" );
+	if ( !name ) {
+		return qfalse;
+	}
+
+	if ( !session ) {
+		Com_sprintf( detail, sizeof( detail ), "achievement %s session unavailable for event query", name );
+		SV_LogSteamStatsLifecycle( NULL, "achievement-query", detail );
+		return qfalse;
+	}
+
+	if ( !session->active ) {
+		Com_sprintf( detail, sizeof( detail ), "achievement %s unavailable for inactive event session", name );
+		SV_LogSteamStatsLifecycle( &session->steamId, "achievement-query", detail );
+		return qfalse;
+	}
+
+	if ( !session->backendAvailable ) {
+		Com_sprintf( detail, sizeof( detail ), "achievement %s unavailable pending stats response", name );
+		SV_LogSteamStatsLifecycle( &session->steamId, "achievement-query", detail );
+		return qfalse;
+	}
+
+	Com_sprintf( detail, sizeof( detail ), "achievement %s event ownership is %s",
+		name, session->achievementUnlocked[achievementId] ? "present" : "absent" );
+	SV_LogSteamStatsLifecycle( &session->steamId, "achievement-query", detail );
+	return session->achievementUnlocked[achievementId] ? qtrue : qfalse;
+}
+
+/*
+=================
+SV_SteamStats_UnlockSessionAchievement
+
+Unlocks one mapped Steam achievement from a retained event session, matching
+retail `sub_467e00`'s gameplay gate before the direct SetAchievement dispatch.
+=================
+*/
+static qboolean SV_SteamStats_UnlockSessionAchievement( sv_steam_stats_session_t *session, int achievementId, const char *reason ) {
+	const char *name;
+	const char *unlockReason;
+	char detail[128];
+
+	unlockReason = reason ? reason : "event-process";
+	name = SV_SteamStats_GetAchievementName( achievementId, "achievement-unlock" );
+	if ( !name ) {
+		return qfalse;
+	}
+
+	if ( SV_SteamStats_HasSessionAchievement( session, achievementId ) ) {
+		Com_sprintf( detail, sizeof( detail ), "achievement %s already unlocked from %s", name, unlockReason );
+		SV_LogSteamStatsLifecycle( &session->steamId, "achievement-unlock", detail );
+		return qtrue;
+	}
+
+	if ( !SV_SteamStats_ShouldUnlockAchievement() ) {
+		Com_sprintf( detail, sizeof( detail ), "achievement %s blocked by gameplay gate from %s", name, unlockReason );
+		SV_LogSteamStatsLifecycle( session ? &session->steamId : NULL, "achievement-unlock", detail );
+		return qfalse;
+	}
+
+	if ( !SV_SteamStats_SetAchievement( session, achievementId ) ) {
+		Com_sprintf( detail, sizeof( detail ), "achievement %s publish failed from %s", name, unlockReason );
+		SV_LogSteamStatsLifecycle( session ? &session->steamId : NULL, "achievement-unlock", detail );
+		return qfalse;
+	}
+
+	session->achievementUnlocked[achievementId] = qtrue;
+	session->achievementLoaded[achievementId] = qtrue;
+	Com_sprintf( detail, sizeof( detail ), "unlocked achievement %s from %s", name, unlockReason );
+	SV_LogSteamStatsLifecycle( &session->steamId, "achievement-unlock", detail );
+	return qtrue;
+}
+
+/*
+=================
+SV_SteamStats_ClearPlayerDeathEvents
+
+Clears the source-side mirror of retail `data_e30380`, the pending PLAYER_DEATH
+event array merged by the retail match-report path.
+=================
+*/
+static void SV_SteamStats_ClearPlayerDeathEvents( void ) {
+	if ( s_svSteamPlayerDeathEventCount <= 0 ) {
+		return;
+	}
+
+	memset( s_svSteamPlayerDeathEvents, 0, sizeof( s_svSteamPlayerDeathEvents ) );
+	s_svSteamPlayerDeathEventCount = 0;
+}
+
+/*
+=================
+SV_SteamStats_ProcessPlayerDeathEvent
+
+Reconstructs the recovered `PLAYER_DEATH` pending-event cache branch from
+retail `SteamStats_ProcessEvent`.
+=================
+*/
+static void SV_SteamStats_ProcessPlayerDeathEvent( const char *payload ) {
+	sv_steam_player_death_event_t *event;
+	char detail[256];
+
+	if ( !payload || !payload[0] ) {
+		SV_LogSteamStatsLifecycle( NULL, "event-process", "ignored PLAYER_DEATH event without payload" );
+		return;
+	}
+
+	if ( s_svSteamPlayerDeathEventCount >= SV_STEAM_PLAYER_DEATH_EVENT_LIMIT ) {
+		Com_sprintf( detail, sizeof( detail ), "ignored PLAYER_DEATH event cache overflow at %d",
+			s_svSteamPlayerDeathEventCount );
+		SV_LogSteamStatsLifecycle( NULL, "event-process", detail );
+		return;
+	}
+
+	event = &s_svSteamPlayerDeathEvents[s_svSteamPlayerDeathEventCount];
+	memset( event, 0, sizeof( *event ) );
+	event->killerTeam = -1;
+	event->victimTeam = -1;
+	Q_strncpyz( event->killerPowerups, "[]", sizeof( event->killerPowerups ) );
+	Q_strncpyz( event->victimPowerups, "[]", sizeof( event->victimPowerups ) );
+	Q_strncpyz( event->rawPayload, payload, sizeof( event->rawPayload ) );
+
+	if ( !SV_SteamStats_ParseEventPayloadInt( payload, "TIME", &event->time ) ) {
+		SV_LogSteamStatsLifecycle( NULL, "event-process", "PLAYER_DEATH missing TIME; defaulting to 0" );
+	}
+	if ( !SV_SteamStats_ParseEventPayloadString( payload, "MOD", event->modName, sizeof( event->modName ) )
+		&& !SV_SteamStats_ParseEventPayloadString( payload, "WEAPON", event->modName, sizeof( event->modName ) ) ) {
+		Q_strncpyz( event->modName, "UNKNOWN", sizeof( event->modName ) );
+	}
+
+	SV_SteamStats_ParseNestedEventPayloadString( payload, "KILLER", "NAME",
+		event->killerName, sizeof( event->killerName ) );
+	SV_SteamStats_ParseNestedEventPayloadString( payload, "KILLER", "STEAM_ID",
+		event->killerSteamId, sizeof( event->killerSteamId ) );
+	SV_SteamStats_ParseNestedEventPayloadInt( payload, "KILLER", "TEAM", &event->killerTeam );
+	SV_SteamStats_CopyNestedEventPayloadArray( payload, "KILLER", "POWERUPS",
+		event->killerPowerups, sizeof( event->killerPowerups ) );
+
+	if ( !SV_SteamStats_ParseNestedEventPayloadString( payload, "VICTIM", "NAME",
+		event->victimName, sizeof( event->victimName ) ) ) {
+		SV_LogSteamStatsLifecycle( NULL, "event-process", "PLAYER_DEATH missing VICTIM.NAME" );
+	}
+	if ( !SV_SteamStats_ParseNestedEventPayloadString( payload, "VICTIM", "STEAM_ID",
+		event->victimSteamId, sizeof( event->victimSteamId ) ) ) {
+		SV_LogSteamStatsLifecycle( NULL, "event-process", "PLAYER_DEATH missing VICTIM.STEAM_ID" );
+	}
+	if ( !SV_SteamStats_ParseNestedEventPayloadInt( payload, "VICTIM", "TEAM", &event->victimTeam ) ) {
+		SV_LogSteamStatsLifecycle( NULL, "event-process", "PLAYER_DEATH missing VICTIM.TEAM" );
+	}
+	SV_SteamStats_CopyNestedEventPayloadArray( payload, "VICTIM", "POWERUPS",
+		event->victimPowerups, sizeof( event->victimPowerups ) );
+
+	s_svSteamPlayerDeathEventCount++;
+	Com_sprintf( detail, sizeof( detail ),
+		"cached PLAYER_DEATH event %d time=%d mod=%s killer=%s victim=%s",
+		s_svSteamPlayerDeathEventCount, event->time, event->modName,
+		event->killerName[0] ? event->killerName : "<none>",
+		event->victimName[0] ? event->victimName : "<none>" );
+	SV_LogSteamStatsLifecycle( NULL, "event-process", detail );
+}
+
+/*
+=================
+SV_SteamStats_AppendJsonFragment
+
+Appends formatted text to a server-owned JSON proxy buffer.
+=================
+*/
+static qboolean SV_SteamStats_AppendJsonFragment( char *buffer, size_t bufferSize, size_t *length, const char *fmt, ... ) {
+	va_list args;
+	int written;
+
+	if ( !buffer || !length || !fmt || bufferSize == 0 || *length >= bufferSize ) {
+		return qfalse;
+	}
+
+	va_start( args, fmt );
+	written = Q_vsnprintf( buffer + *length, bufferSize - *length, fmt, args );
+	va_end( args );
+
+	if ( written < 0 || (size_t)written >= ( bufferSize - *length ) ) {
+		return qfalse;
+	}
+
+	*length += written;
+	return qtrue;
+}
+
+/*
+=================
+SV_SteamStats_EscapeJsonString
+
+Escapes one parsed rankings string before placing it back into the retained
+server-side JSON report proxy.
+=================
+*/
+static void SV_SteamStats_EscapeJsonString( const char *src, char *dst, size_t dstSize ) {
+	size_t outIndex;
+	const char *cursor;
+
+	if ( !dst || dstSize == 0 ) {
+		return;
+	}
+
+	outIndex = 0;
+	cursor = src ? src : "";
+
+	while ( *cursor && outIndex + 1 < dstSize ) {
+		const char *escape = NULL;
+		size_t escapeLength = 0;
+		unsigned char ch = (unsigned char)*cursor;
+
+		switch ( ch ) {
+			case '\\':
+				escape = "\\\\";
+				escapeLength = 2;
+				break;
+			case '"':
+				escape = "\\\"";
+				escapeLength = 2;
+				break;
+			case '\n':
+				escape = "\\n";
+				escapeLength = 2;
+				break;
+			case '\r':
+				escape = "\\r";
+				escapeLength = 2;
+				break;
+			case '\t':
+				escape = "\\t";
+				escapeLength = 2;
+				break;
+			default:
+				break;
+		}
+
+		if ( escape ) {
+			if ( outIndex + escapeLength >= dstSize ) {
+				break;
+			}
+
+			dst[outIndex++] = escape[0];
+			dst[outIndex++] = escape[1];
+			cursor++;
+			continue;
+		}
+
+		if ( ch < 0x20 ) {
+			dst[outIndex++] = ' ';
+			cursor++;
+			continue;
+		}
+
+		dst[outIndex++] = *cursor++;
+	}
+
+	dst[outIndex] = '\0';
+}
+
+/*
+=================
+SV_SteamStats_FindMatchReportObjectClose
+
+Finds the closing brace for a root JSON object in the source-side match-report
+proxy so the retained Steam stats owner can splice in `PLYR_EVENTS`.
+=================
+*/
+static const char *SV_SteamStats_FindMatchReportObjectClose( const char *report ) {
+	const char *cursor;
+	const char *scan;
+	int depth;
+	qboolean inString;
+	qboolean escaped;
+
+	cursor = SV_SteamStats_SkipEventPayloadWhitespace( report );
+	if ( !cursor || *cursor != SV_STEAM_JSON_OBJECT_OPEN ) {
+		return NULL;
+	}
+
+	depth = 0;
+	inString = qfalse;
+	escaped = qfalse;
+	for ( scan = cursor; *scan; scan++ ) {
+		if ( inString ) {
+			if ( escaped ) {
+				escaped = qfalse;
+			} else if ( *scan == SV_STEAM_JSON_ESCAPE ) {
+				escaped = qtrue;
+			} else if ( *scan == SV_STEAM_JSON_STRING_QUOTE ) {
+				inString = qfalse;
+			}
+			continue;
+		}
+
+		if ( *scan == SV_STEAM_JSON_STRING_QUOTE ) {
+			inString = qtrue;
+			continue;
+		}
+		if ( *scan == SV_STEAM_JSON_OBJECT_OPEN ) {
+			depth++;
+			continue;
+		}
+		if ( *scan == SV_STEAM_JSON_OBJECT_CLOSE ) {
+			const char *tail;
+
+			depth--;
+			if ( depth != 0 ) {
+				continue;
+			}
+
+			tail = SV_SteamStats_SkipEventPayloadWhitespace( scan + 1 );
+			return ( tail && *tail == '\0' ) ? scan : NULL;
+		}
+	}
+
+	return NULL;
+}
+
+/*
+=================
+SV_SteamStats_MatchReportHasFields
+
+Returns whether the root match-report object already contains at least one
+field before `PLYR_EVENTS` is appended.
+=================
+*/
+static qboolean SV_SteamStats_MatchReportHasFields( const char *report, const char *objectClose ) {
+	const char *cursor;
+
+	cursor = SV_SteamStats_SkipEventPayloadWhitespace( report );
+	if ( !cursor || *cursor != SV_STEAM_JSON_OBJECT_OPEN || !objectClose ) {
+		return qfalse;
+	}
+
+	for ( cursor++; cursor < objectClose; cursor++ ) {
+		if ( *cursor != ' ' && *cursor != '\t' && *cursor != '\n' && *cursor != '\r' ) {
+			return qtrue;
+		}
+	}
+
+	return qfalse;
+}
+
+/*
+=================
+SV_SteamStats_AppendPlayerDeathReportEvent
+
+Serializes one cached retail `PLAYER_DEATH` event into the match-report
+`PLYR_EVENTS` array shape recovered from `sub_468ee0`.
+=================
+*/
+static qboolean SV_SteamStats_AppendPlayerDeathReportEvent( char *buffer, size_t bufferSize, size_t *length, const sv_steam_player_death_event_t *event ) {
+	char modName[SV_STEAM_PLAYER_DEATH_TOKEN_CHARS * 2 + 1];
+	char killerName[MAX_NAME_LENGTH * 2 + 1];
+	char killerSteamId[SV_STEAM_PLAYER_DEATH_STEAMID_CHARS * 2 + 1];
+	char victimName[MAX_NAME_LENGTH * 2 + 1];
+	char victimSteamId[SV_STEAM_PLAYER_DEATH_STEAMID_CHARS * 2 + 1];
+	const char *killerPowerups;
+	const char *victimPowerups;
+
+	if ( !event ) {
+		return qfalse;
+	}
+
+	SV_SteamStats_EscapeJsonString( event->modName[0] ? event->modName : "UNKNOWN",
+		modName, sizeof( modName ) );
+	SV_SteamStats_EscapeJsonString( event->killerName,
+		killerName, sizeof( killerName ) );
+	SV_SteamStats_EscapeJsonString( event->killerSteamId,
+		killerSteamId, sizeof( killerSteamId ) );
+	SV_SteamStats_EscapeJsonString( event->victimName,
+		victimName, sizeof( victimName ) );
+	SV_SteamStats_EscapeJsonString( event->victimSteamId,
+		victimSteamId, sizeof( victimSteamId ) );
+
+	killerPowerups = ( event->killerPowerups[0] == SV_STEAM_JSON_ARRAY_OPEN ) ? event->killerPowerups : "[]";
+	victimPowerups = ( event->victimPowerups[0] == SV_STEAM_JSON_ARRAY_OPEN ) ? event->victimPowerups : "[]";
+
+	return SV_SteamStats_AppendJsonFragment( buffer, bufferSize, length,
+		"{\"TIME\":%d,\"MOD\":\"%s\",\"KILLER\":{\"NAME\":\"%s\",\"ID\":\"%s\",\"TEAM\":%d,\"POWERUPS\":%s},"
+		"\"VICTIM\":{\"NAME\":\"%s\",\"ID\":\"%s\",\"TEAM\":%d,\"POWERUPS\":%s}}",
+		event->time, modName,
+		killerName, killerSteamId, event->killerTeam, killerPowerups,
+		victimName, victimSteamId, event->victimTeam, victimPowerups );
+}
+
+/*
+=================
+SV_SteamStats_AppendPlayerDeathReportEvents
+
+Appends the full cached `PLYR_EVENTS` array to an already-open match-report
+object.
+=================
+*/
+static qboolean SV_SteamStats_AppendPlayerDeathReportEvents( char *buffer, size_t bufferSize, size_t *length ) {
+	int i;
+
+	if ( !SV_SteamStats_AppendJsonFragment( buffer, bufferSize, length, "\"PLYR_EVENTS\":[" ) ) {
+		return qfalse;
+	}
+
+	for ( i = 0; i < s_svSteamPlayerDeathEventCount; i++ ) {
+		if ( i > 0 && !SV_SteamStats_AppendJsonFragment( buffer, bufferSize, length, "," ) ) {
+			return qfalse;
+		}
+		if ( !SV_SteamStats_AppendPlayerDeathReportEvent( buffer, bufferSize, length,
+			&s_svSteamPlayerDeathEvents[i] ) ) {
+			return qfalse;
+		}
+	}
+
+	return SV_SteamStats_AppendJsonFragment( buffer, bufferSize, length, "]" );
+}
+
+/*
+=================
+SV_SteamStats_BuildMatchReportWithPlayerEvents
+
+Copies the qagame match-report JSON proxy and splices cached retail
+`PLAYER_DEATH` events into the root object as `PLYR_EVENTS`.
+=================
+*/
+static qboolean SV_SteamStats_BuildMatchReportWithPlayerEvents( const char *report, char *buffer, size_t bufferSize ) {
+	const char *objectClose;
+	size_t prefixLength;
+	size_t length;
+	qboolean hasFields;
+
+	if ( !buffer || bufferSize == 0 ) {
+		return qfalse;
+	}
+
+	buffer[0] = '\0';
+	if ( s_svSteamPlayerDeathEventCount <= 0 ) {
+		return qfalse;
+	}
+
+	if ( !report || !report[0] ) {
+		length = 0;
+		if ( !SV_SteamStats_AppendJsonFragment( buffer, bufferSize, &length, "{" ) ) {
+			return qfalse;
+		}
+		if ( !SV_SteamStats_AppendPlayerDeathReportEvents( buffer, bufferSize, &length ) ) {
+			return qfalse;
+		}
+		return SV_SteamStats_AppendJsonFragment( buffer, bufferSize, &length, "}" );
+	}
+
+	if ( SV_SteamStats_FindEventPayloadFieldValue( report, "PLYR_EVENTS" ) ) {
+		return qfalse;
+	}
+
+	objectClose = SV_SteamStats_FindMatchReportObjectClose( report );
+	if ( !objectClose ) {
+		return qfalse;
+	}
+
+	prefixLength = (size_t)( objectClose - report );
+	if ( prefixLength >= bufferSize ) {
+		return qfalse;
+	}
+
+	memcpy( buffer, report, prefixLength );
+	length = prefixLength;
+	buffer[length] = '\0';
+	hasFields = SV_SteamStats_MatchReportHasFields( report, objectClose );
+
+	if ( hasFields && !SV_SteamStats_AppendJsonFragment( buffer, bufferSize, &length, "," ) ) {
+		return qfalse;
+	}
+	if ( !SV_SteamStats_AppendPlayerDeathReportEvents( buffer, bufferSize, &length ) ) {
+		return qfalse;
+	}
+	return SV_SteamStats_AppendJsonFragment( buffer, bufferSize, &length, "}" );
+}
+
+/*
+=================
+SV_SteamStats_ProcessMatchReport
+
+Handles the retained Steam stats side of the qagame MATCH_REPORT bridge and
+returns the report payload that should be published through the shared runtime
+path.
+=================
+*/
+const void *SV_SteamStats_ProcessMatchReport( const void *report, char *buffer, int bufferSize ) {
+	char detail[128];
+	const void *preparedReport;
+
+	preparedReport = report;
+
+	if ( s_svSteamPlayerDeathEventCount > 0 ) {
+		if ( SV_SteamStats_BuildMatchReportWithPlayerEvents( (const char *)report,
+			buffer, bufferSize > 0 ? (size_t)bufferSize : 0 ) ) {
+			preparedReport = buffer;
+			Com_sprintf( detail, sizeof( detail ),
+				"attached %d cached PLAYER_DEATH events as PLYR_EVENTS for MATCH_REPORT",
+				s_svSteamPlayerDeathEventCount );
+			SV_LogSteamStatsLifecycle( NULL, "match-report", detail );
+		} else {
+			Com_sprintf( detail, sizeof( detail ),
+				"cleared %d cached PLAYER_DEATH events for MATCH_REPORT without PLYR_EVENTS merge",
+				s_svSteamPlayerDeathEventCount );
+			SV_LogSteamStatsLifecycle( NULL, "match-report", detail );
+		}
+	}
+
+	if ( SV_SteamStats_ShouldSendMatchSummary( (const char *)preparedReport ) ) {
+		SV_SteamStats_SendSummaryToPeers( (const char *)preparedReport );
+	} else {
+		SV_SteamStats_ClearSummaryPeers();
+	}
+	SV_SteamStats_ClearPlayerDeathEvents();
+	return preparedReport;
+}
+
+/*
+=================
+SV_SteamStats_ProcessPlayerStatsEvent
+
+Reconstructs recovered `PLAYER_STATS` win/loss/played stat updates and the
+achievement branches from retail `SteamStats_ProcessEvent`.
+=================
+*/
+static void SV_SteamStats_ProcessPlayerStatsEvent( sv_steam_stats_session_t *session, const char *payload ) {
+	int wins;
+	int losses;
+	int score;
+	char mapName[MAX_QPATH];
+	char detail[128];
+
+	wins = 0;
+	losses = 0;
+	score = 0;
+	mapName[0] = '\0';
+
+	if ( !payload || !payload[0] ) {
+		SV_LogSteamStatsLifecycle( session ? &session->steamId : NULL,
+			"event-process", "ignored PLAYER_STATS event without payload" );
+		return;
+	}
+
+	if ( !SV_SteamStats_ParseEventPayloadInt( payload, "WIN", &wins ) ) {
+		SV_LogSteamStatsLifecycle( &session->steamId, "event-process", "PLAYER_STATS missing WIN; defaulting to 0" );
+	}
+	if ( !SV_SteamStats_ParseEventPayloadInt( payload, "LOSE", &losses ) ) {
+		SV_LogSteamStatsLifecycle( &session->steamId, "event-process", "PLAYER_STATS missing LOSE; defaulting to 0" );
+	}
+
+	SV_SteamStats_AddSessionFieldValue( session, SV_STEAM_STAT_WINS, wins, "event-process" );
+	SV_SteamStats_AddSessionFieldValue( session, SV_STEAM_STAT_LOSSES, losses, "event-process" );
+	SV_SteamStats_AddSessionFieldValue( session, SV_STEAM_STAT_PLAYED, 1, "event-process" );
+	SV_SteamStats_FlushPendingValues( session, qtrue );
+
+	if ( !SV_SteamStats_HasSessionAchievement( session, SV_STEAM_ACHIEVEMENT_TRAINING_3_2 ) ) {
+		Cvar_VariableStringBuffer( "mapname", mapName, sizeof( mapName ) );
+		if ( !strcmp( mapName, SV_STEAM_PLAYER_STATS_TRAINING_MAP )
+			&& Cvar_VariableIntegerValue( "g_training" ) > 0
+			&& wins != 0 ) {
+			SV_SteamStats_UnlockSessionAchievement( session, SV_STEAM_ACHIEVEMENT_TRAINING_3_2, "PLAYER_STATS WIN" );
+		}
+	}
+
+	if ( !SV_SteamStats_HasSessionAchievement( session, SV_STEAM_ACHIEVEMENT_WICKED )
+		&& Cvar_VariableIntegerValue( "g_gametype" ) == SV_STEAM_PLAYER_STATS_WICKED_GAMETYPE ) {
+		if ( !SV_SteamStats_ParseEventPayloadInt( payload, "SCORE", &score ) ) {
+			SV_LogSteamStatsLifecycle( &session->steamId, "event-process", "PLAYER_STATS missing SCORE for AW_WICKED gate" );
+		} else if ( score == SV_STEAM_PLAYER_STATS_WICKED_SCORE ) {
+			SV_SteamStats_UnlockSessionAchievement( session, SV_STEAM_ACHIEVEMENT_WICKED, "PLAYER_STATS SCORE" );
+		}
+	}
+
+	Com_sprintf( detail, sizeof( detail ), "processed PLAYER_STATS win=%d lose=%d played=1", wins, losses );
+	SV_LogSteamStatsLifecycle( &session->steamId, "event-process", detail );
+}
+
+/*
+=================
+SV_SteamStats_ProcessPlayerKillEvent
+
+Reconstructs the recovered `PLAYER_KILL` speed achievement branch from retail
+`SteamStats_ProcessEvent`.
+=================
+*/
+static void SV_SteamStats_ProcessPlayerKillEvent( sv_steam_stats_session_t *session, const char *payload ) {
+	qboolean teamKill;
+	qboolean suicide;
+	float killerSpeed;
+	char detail[128];
+
+	teamKill = qfalse;
+	suicide = qfalse;
+	killerSpeed = 0.0f;
+
+	if ( !payload || !payload[0] ) {
+		SV_LogSteamStatsLifecycle( session ? &session->steamId : NULL,
+			"event-process", "ignored PLAYER_KILL event without payload" );
+		return;
+	}
+
+	if ( !SV_SteamStats_ParseEventPayloadBool( payload, "TEAMKILL", &teamKill ) ) {
+		SV_LogSteamStatsLifecycle( &session->steamId, "event-process", "PLAYER_KILL missing TEAMKILL; defaulting to false" );
+	}
+	if ( !SV_SteamStats_ParseEventPayloadBool( payload, "SUICIDE", &suicide ) ) {
+		SV_LogSteamStatsLifecycle( &session->steamId, "event-process", "PLAYER_KILL missing SUICIDE; defaulting to false" );
+	}
+
+	if ( teamKill || suicide ) {
+		Com_sprintf( detail, sizeof( detail ), "ignored PLAYER_KILL speed gate teamkill=%d suicide=%d", teamKill, suicide );
+		SV_LogSteamStatsLifecycle( &session->steamId, "event-process", detail );
+		return;
+	}
+
+	if ( !SV_SteamStats_HasSessionAchievement( session, SV_STEAM_ACHIEVEMENT_SPEED_KILLS ) ) {
+		if ( !SV_SteamStats_ParseNestedEventPayloadFloat( payload, "KILLER", "SPEED", &killerSpeed ) ) {
+			SV_LogSteamStatsLifecycle( &session->steamId, "event-process", "PLAYER_KILL missing KILLER.SPEED for AW_SPEED_KILLS gate" );
+		} else if ( killerSpeed > SV_STEAM_PLAYER_KILL_SPEED_THRESHOLD ) {
+			SV_SteamStats_UnlockSessionAchievement( session, SV_STEAM_ACHIEVEMENT_SPEED_KILLS, "PLAYER_KILL KILLER.SPEED" );
+		}
+	}
+
+	Com_sprintf( detail, sizeof( detail ), "processed PLAYER_KILL teamkill=%d suicide=%d speed=%.3f",
+		teamKill, suicide, killerSpeed );
+	SV_LogSteamStatsLifecycle( &session->steamId, "event-process", detail );
+}
+
+/*
+=================
+SV_SteamStats_ProcessPlayerMedalEvent
+
+Reconstructs the recovered `PLAYER_MEDAL` medal-stat increment and support
+medal `AW_MVP` achievement branch from retail `SteamStats_ProcessEvent`.
+=================
+*/
+static void SV_SteamStats_ProcessPlayerMedalEvent( sv_steam_stats_session_t *session, const char *payload ) {
+	char medalName[64];
+	int statIndex;
+	int supportTotal;
+	char detail[128];
+
+	medalName[0] = '\0';
+
+	if ( !payload || !payload[0] ) {
+		SV_LogSteamStatsLifecycle( session ? &session->steamId : NULL,
+			"event-process", "ignored PLAYER_MEDAL event without payload" );
+		return;
+	}
+
+	if ( !SV_SteamStats_ParseEventPayloadString( payload, "MEDAL", medalName, sizeof( medalName ) ) ) {
+		SV_LogSteamStatsLifecycle( &session->steamId, "event-process", "PLAYER_MEDAL missing MEDAL token" );
+		return;
+	}
+
+	statIndex = SV_SteamStats_GetMedalStatIndex( medalName );
+	if ( statIndex < 0 ) {
+		Com_sprintf( detail, sizeof( detail ), "ignored PLAYER_MEDAL unknown medal %s", medalName );
+		SV_LogSteamStatsLifecycle( &session->steamId, "event-process", detail );
+		return;
+	}
+
+	SV_SteamStats_AddSessionFieldValue( session, statIndex, 1, "event-process" );
+	SV_SteamStats_FlushPendingValues( session, qtrue );
+
+	if ( !SV_SteamStats_HasSessionAchievement( session, SV_STEAM_ACHIEVEMENT_MVP ) ) {
+		supportTotal = session->statValue[SV_STEAM_STAT_MEDAL_CAPTURE]
+			+ session->statValue[SV_STEAM_STAT_MEDAL_ASSIST]
+			+ session->statValue[SV_STEAM_STAT_MEDAL_DEFENSE];
+		if ( supportTotal >= SV_STEAM_PLAYER_MEDAL_MVP_TOTAL ) {
+			SV_SteamStats_UnlockSessionAchievement( session, SV_STEAM_ACHIEVEMENT_MVP, "PLAYER_MEDAL support" );
+		}
+	} else {
+		supportTotal = 0;
+	}
+
+	Com_sprintf( detail, sizeof( detail ), "processed PLAYER_MEDAL medal=%s stat=%d support=%d",
+		medalName, statIndex, supportTotal );
+	SV_LogSteamStatsLifecycle( &session->steamId, "event-process", detail );
+}
+
+/*
+=================
+SV_SteamStats_EventHasRetailSideEffects
+
+Returns whether one qagame report event belongs to the retail Steam stats
+event processor handled by `sub_468030`.
+=================
+*/
+static qboolean SV_SteamStats_EventHasRetailSideEffects( const char *eventName ) {
+	if ( !eventName || !eventName[0] ) {
+		return qfalse;
+	}
+
+	if ( !strcmp( eventName, "PLAYER_STATS" ) ) {
+		return qtrue;
+	}
+	if ( !strcmp( eventName, "PLAYER_KILL" ) ) {
+		return qtrue;
+	}
+	if ( !strcmp( eventName, "PLAYER_DEATH" ) ) {
+		return qtrue;
+	}
+	if ( !strcmp( eventName, "PLAYER_MEDAL" ) ) {
+		return qtrue;
+	}
+
+	return qfalse;
+}
+
+/*
+=================
+SV_SteamStats_ProcessEvent
+
+Reconstructs the retail `SteamStats_ProcessEvent` owner boundary reached by
+`SV_ReportPlayerEvent` before the same payload is published through ZMQ.
+=================
+*/
+void SV_SteamStats_ProcessEvent( uint32_t steamIdLow, uint32_t steamIdHigh, const void *clientStats, const char *eventName, const void *payload ) {
+	CSteamID steamId;
+	sv_steam_stats_session_t *session;
+	char detail[128];
+
+	if ( !eventName || !eventName[0] ) {
+		SV_LogSteamStatsLifecycle( NULL, "event-process", "ignored unnamed player event" );
+		return;
+	}
+
+	if ( !strcmp( eventName, "PLAYER_DEATH" ) ) {
+		SV_SteamStats_ProcessPlayerDeathEvent( (const char *)payload );
+	}
+
+	steamId.value = ( (uint64_t)steamIdHigh << 32 ) | steamIdLow;
+	if ( steamId.value == 0ull ) {
+		Com_sprintf( detail, sizeof( detail ), "ignored %s event without steam id", eventName );
+		SV_LogSteamStatsLifecycle( NULL, "event-process", detail );
+		return;
+	}
+
+	if ( !SV_SteamStats_EventHasRetailSideEffects( eventName ) ) {
+		Com_sprintf( detail, sizeof( detail ), "ignored %s event without mapped Steam stats side effects", eventName );
+		SV_LogSteamStatsLifecycle( &steamId, "event-process", detail );
+		return;
+	}
+
+	session = SV_SteamStats_FindSessionBySteamId( &steamId );
+	if ( !session ) {
+		Com_sprintf( detail, sizeof( detail ), "deferred %s event without retained session", eventName );
+		SV_LogSteamStatsLifecycle( &steamId, "event-process", detail );
+		return;
+	}
+
+	if ( !strcmp( eventName, "PLAYER_STATS" ) ) {
+		SV_SteamStats_ProcessPlayerStatsEvent( session, (const char *)payload );
+		return;
+	}
+	if ( !strcmp( eventName, "PLAYER_KILL" ) ) {
+		SV_SteamStats_ProcessPlayerKillEvent( session, (const char *)payload );
+		return;
+	}
+	if ( !strcmp( eventName, "PLAYER_MEDAL" ) ) {
+		SV_SteamStats_ProcessPlayerMedalEvent( session, (const char *)payload );
+		return;
+	}
+
+	Com_sprintf( detail, sizeof( detail ), "accepted %s event for retained Steam stats owner", eventName );
+	SV_LogSteamStatsLifecycle( &session->steamId, "event-process", detail );
+
+	(void)clientStats;
+	(void)payload;
 }
 
 /*
@@ -1726,6 +3435,87 @@ static void SV_EndPlatformAuthSession( client_t *cl ) {
 	}
 
 	QL_Steamworks_ServerEndAuthSession( &steamId );
+}
+
+/*
+=================
+SV_SteamServerClientOwnsAuthSteamId
+
+Returns whether a Steam auth session is still owned by a live server client.
+=================
+*/
+static qboolean SV_SteamServerClientOwnsAuthSteamId( const CSteamID *steamId ) {
+	client_t	*cl;
+	CSteamID	parsedSteamId;
+	int		i;
+
+	if ( !steamId || steamId->value == 0ull || !svs.clients || !sv_maxclients ) {
+		return qfalse;
+	}
+
+	for ( i = 0, cl = svs.clients; i < sv_maxclients->integer; i++, cl++ ) {
+		if ( cl->state == CS_FREE || !cl->platformSteamId[0] ) {
+			continue;
+		}
+
+		if ( !SV_ParsePlatformSteamId( cl->platformSteamId, &parsedSteamId ) ) {
+			continue;
+		}
+
+		if ( parsedSteamId.value == steamId->value ) {
+			return qtrue;
+		}
+	}
+
+	return qfalse;
+}
+
+/*
+=================
+SV_SteamServerEndOrphanedAuthSessions
+
+Ends Steam GameServer auth sessions whose Steam IDs no longer belong to a live
+server client before spawning a fresh server instance.
+=================
+*/
+void SV_SteamServerEndOrphanedAuthSessions( void ) {
+	client_t	*cl;
+	CSteamID	steamId;
+	int		i;
+
+	if ( !svs.clients || !sv_maxclients ) {
+		return;
+	}
+
+	for ( i = 0, cl = svs.clients; i < sv_maxclients->integer; i++, cl++ ) {
+		if ( !cl->platformAuthSessionActive ) {
+			continue;
+		}
+
+		if ( !SV_ParsePlatformSteamId( cl->platformSteamId, &steamId ) ) {
+			cl->platformAuthSessionActive = qfalse;
+			SV_SteamStats_RemovePlayerSession( cl );
+			continue;
+		}
+
+		if ( SV_SteamServerClientOwnsAuthSteamId( &steamId ) ) {
+			continue;
+		}
+
+		Com_Printf( "Found an authed client with steam id %llu that is no longer a live client\n",
+			(unsigned long long)steamId.value );
+		cl->platformAuthSessionActive = qfalse;
+		SV_SteamStats_RemovePlayerSession( cl );
+
+		if ( QL_Steamworks_ServerIsInitialised() ) {
+			QL_Steamworks_ServerEndAuthSession( &steamId );
+			Com_Printf( "Called EndAuthSession on steam id %llu\n",
+				(unsigned long long)steamId.value );
+		} else {
+			Com_Printf( "Can't end auth session on steam id %llu because Steam GameServer is not initialized\n",
+				(unsigned long long)steamId.value );
+		}
+	}
 }
 
 /*
@@ -2018,12 +3808,12 @@ static void SV_SteamServerGSStatsReceivedCallback( void *context, const ql_steam
 	}
 
 	if ( event->result == 1 ) {
-		session->backendAvailable = qtrue;
-		session->requestIssued = qtrue;
+		SV_SteamStats_PrimeReceivedValues( session );
 		Com_sprintf( detail, sizeof( detail ), "received result=%d appid=%u",
 			event->result, session->appId );
 	} else {
 		session->backendAvailable = qfalse;
+		session->requestIssued = qfalse;
 		Com_sprintf( detail, sizeof( detail ), "receive failed result=%d appid=%u",
 			event->result, session->appId );
 	}
@@ -2069,8 +3859,7 @@ static void SV_SteamServerGSStatsStoredCallback( void *context, const ql_steam_g
 		Com_sprintf( detail, sizeof( detail ), "store validation warning result=%d appid=%u",
 			event->result, session->appId );
 		SV_LogSteamStatsLifecycle( &session->steamId, "stats-stored", detail );
-		session->requestIssued = qfalse;
-		SV_SteamStats_RequestCurrentValues( session );
+		SV_SteamStats_PrimeReceivedValues( session );
 		return;
 	}
 
@@ -2154,6 +3943,16 @@ void SV_SteamServerInitCallbacks( void ) {
 
 /*
 =================
+SV_SteamServerEndOrphanedAuthSessions
+
+Build-disabled stub for the retained Steam GameServer auth-session cleanup owner.
+=================
+*/
+void SV_SteamServerEndOrphanedAuthSessions( void ) {
+}
+
+/*
+=================
 SV_SteamStats_AddFieldValue
 
 Build-disabled stub for the retained server-owned Steam stat owner.
@@ -2210,6 +4009,42 @@ qboolean SV_SteamStats_HasAchievement( int clientNum, int achievementId ) {
 	(void)clientNum;
 	(void)achievementId;
 	return qfalse;
+}
+
+/*
+=================
+SV_SteamStats_ProcessMatchReport
+
+Build-disabled stub for the retained server-owned Steam stats match-report
+processor.
+=================
+*/
+const void *SV_SteamStats_ProcessMatchReport( const void *report, char *buffer, int bufferSize ) {
+	SV_LogSteamStatsStubLifecycle( "match-report", "ignored MATCH_REPORT for disabled Steam stats owner" );
+
+	(void)buffer;
+	(void)bufferSize;
+	return report;
+}
+
+/*
+=================
+SV_SteamStats_ProcessEvent
+
+Build-disabled stub for the retained server-owned Steam stats event processor.
+=================
+*/
+void SV_SteamStats_ProcessEvent( uint32_t steamIdLow, uint32_t steamIdHigh, const void *clientStats, const char *eventName, const void *payload ) {
+	char detail[128];
+
+	Com_sprintf( detail, sizeof( detail ),
+		"ignored %s event for %llu",
+		eventName && eventName[0] ? eventName : "unnamed",
+		( (unsigned long long)steamIdHigh << 32 ) | steamIdLow );
+	SV_LogSteamStatsStubLifecycle( "event-process", detail );
+
+	(void)clientStats;
+	(void)payload;
 }
 #endif
 

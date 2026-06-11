@@ -7,8 +7,17 @@ visibility, and carrier-query band that follows the support helpers. The
 owning retail binary is `qagamex86.dll`; the mapped range is
 `0x10017D20..0x10019D30`.
 
-No C source body change was needed. The existing reconstructed source already
-matches the retail evidence for this slice.
+Update 2026-06-11: the `BotFindEnemy` source now includes the retail
+offscreen/heard-client acceptance side path. This path is reached only after
+`BotEntityVisible` returns non-positive and delegates to
+`BotAcceptOffscreenEnemyCandidate`.
+
+Update 2026-06-11: `BotAttackMove` is now pinned at a higher-resolution source
+mapping level. The parity gate covers the retail chase-goal setup, character
+trait reads, gauntlet distance special case, jump/crouch timers,
+`0.4 + (1 - skill) * 0.2` strafe cadence, high-skill jitter, `0.935` strafe
+flip threshold, two-attempt side movement loop, and movement-failure strafe
+reset.
 
 ## Evidence
 
@@ -50,9 +59,11 @@ Observed source anchors now pinned by tests:
 - `BotRoamGoal` preserves the ten-try random roam target generator, forward
   trace, 200-unit distance gate, floor trace, and lava/slime rejection.
 - `BotAttackMove` preserves the attack-chase goal fast path, movement-state
-  setup, attack-skill/jumper/croucher characteristic reads, forward/backward
-  ideal-distance movement, strafe-direction flipping, and
-  `trap_BotMoveInDirection` side movement.
+  setup, attack-skill/jumper/croucher characteristic reads, gauntlet
+  zero-distance behavior, jump/crouch timers, forward/backward ideal-distance
+  movement, retail strafe cadence and high-skill jitter, strafe-direction
+  flipping/reset, and the two-attempt `trap_BotMoveInDirection` side movement
+  fallback.
 - `BotSameTeam` preserves the teamplay gate, paired `CS_PLAYERS` configstring
   reads, and parsed team-field comparison.
 - `InFieldOfVision` preserves first-two-axis angle normalization, signed
@@ -63,7 +74,8 @@ Observed source anchors now pinned by tests:
 - `BotFindEnemy` preserves alertness and easy-fragger characteristic reads,
   current-enemy distance handling, the obelisk special case, invisible/chatting
   player filters, teleport-origin exclusion, same-team rejection, visibility
-  scoring, battle-inventory update, and retreat avoidance gate.
+  scoring, the offscreen enemy fallback through `BotAcceptOffscreenEnemyCandidate`,
+  battle-inventory update, and retreat avoidance gate.
 - `BotTeamFlagCarrierVisible`, `BotTeamFlagCarrier`, and
   `BotEnemyFlagCarrierVisible` preserve the same-team or enemy-team flag carrier
   scans, with visibility required only for the visible variants.
@@ -75,10 +87,12 @@ Observed source anchors now pinned by tests:
   positive visibility checks.
 
 Observed retail call-flow anchors include the roam trace pair and contents
-reject, the movement characteristic and move-to-goal/move-in-direction calls,
-the `BotSameTeam` configstring pair, `InFieldOfVision` angle wrapping,
-`BotEntityVisible` contents/trace/fog scoring, `BotFindEnemy` cross-calls to
-`BotSameTeam`, `BotEntityVisible`, `InFieldOfVision`,
+reject, the attack-move chase-goal initialization, the movement characteristic
+and move-to-goal/move-in-direction calls, the direct strafe state stores at
+`bot_state_t + 0x173c` / `+0x17c4`, the `BotSameTeam` configstring pair,
+`InFieldOfVision` angle wrapping, `BotEntityVisible` contents/trace/fog
+scoring, `BotFindEnemy` cross-calls to `BotSameTeam`, `BotEntityVisible`,
+`InFieldOfVision`, `BotAcceptOffscreenEnemyCandidate`,
 `BotUpdateBattleInventory`, and `BotWantsToRetreat`, and the carrier helpers'
 calls into `EntityCarriesFlag`, `EntityCarriesCubes`, `BotSameTeam`, and
 `BotEntityVisible`.
@@ -136,11 +150,11 @@ python -m pytest tests/test_botlib_qagame_ai_dmq3_visibility_parity.py -q --tb=s
 - Focused qagame `ai_dmq3.c` visibility-band alias coverage:
   **before 0% -> after 95%**
 - Focused source-owned visibility-band parity confidence:
-  **before 90% -> after 97%**
+  **before 97% -> after 97.5%**
 - Focused botlib movement/visibility import wiring confidence:
-  **before 91% -> after 96%**
+  **before 96% -> after 96.5%**
 - Overall botlib plus adjacent qagame AI execution wiring:
-  **before 94% -> after 95%**
+  **before 95% -> after 95.2%**
 
 No runtime launch was needed. This was a static reverse-engineering mapping pass
 using committed HLIL, Ghidra, symbol-map, source-body, and import-wiring

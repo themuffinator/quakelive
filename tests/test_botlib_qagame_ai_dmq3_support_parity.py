@@ -297,6 +297,7 @@ SOURCE_HELPERS = {
 			"BotCTFCarryingFlag(bs)",
 			"Bot1FCTFCarryingFlag(bs)",
 			"BotHarvesterCarryingCubes(bs)",
+			"if (bs->enemy >= 0)",
 			"EntityCarriesFlag(&entinfo)",
 			"bs->ltgtype == LTG_GETFLAG",
 			"BotAggression(bs) > 50",

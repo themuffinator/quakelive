@@ -2166,7 +2166,8 @@ def test_engine_cvar_eighteenth_sound_tranche_matches_retail_contracts() -> None
 	]
 
 	assert 's_announcerVolume = Cvar_GetBounded( "s_announcerVolume", "1.0", "0.0", "2.0", CVAR_ARCHIVE | CVAR_PROTECTED | CVAR_VM_CREATED | CVAR_CLOUD );' in snd_dma
-	assert 'if ( entchannel == CHAN_ANNOUNCER && s_announcerVolume ) {' in snd_dma
+	assert 'if ( entchannel == CHAN_ANNOUNCER && s_announcerVolume ) {' not in snd_dma
+	assert "s_announcerVolume->value" not in snd_dma
 	assert 'trap_S_StartLocalSound( sfx, CHAN_ANNOUNCER );' in cg_view
 
 	assert 's_doppler = Cvar_Get( "s_doppler", "0", CVAR_ARCHIVE | CVAR_PROTECTED | CVAR_CLOUD );' in snd_dma
@@ -2203,7 +2204,8 @@ def test_engine_cvar_eighteenth_sound_tranche_matches_retail_contracts() -> None
 	assert 'if ( s_testsound->integer ) {' in snd_mix
 
 	assert 's_voiceVolume = Cvar_GetBounded( "s_voiceVolume", "1.0", "0.0", "2.0", CVAR_ARCHIVE | CVAR_PROTECTED | CVAR_VM_CREATED | CVAR_CLOUD );' in snd_dma
-	assert 'else if ( entchannel == CHAN_VOICE && s_voiceVolume ) {' in snd_dma
+	assert 'else if ( entchannel == CHAN_VOICE && s_voiceVolume ) {' not in snd_dma
+	assert 'if ( s_voiceVolume && s_voiceVolume->value > 0.0f ) {' in snd_mix
 	assert 'trap_S_StartLocalSound( vchat->snd, CHAN_VOICE);' in cg_servercmds
 
 	assert 's_voiceStep = Cvar_Get( "s_voiceStep", "0.02", CVAR_ARCHIVE | CVAR_PROTECTED );' in snd_dma
@@ -2211,7 +2213,8 @@ def test_engine_cvar_eighteenth_sound_tranche_matches_retail_contracts() -> None
 
 	assert 's_volume = Cvar_GetBounded( "s_volume", "0.8", "0.0", "2.0", CVAR_ARCHIVE | CVAR_PROTECTED | CVAR_VM_CREATED | CVAR_CLOUD );' in snd_dma
 	assert 'snd_vol = s_volume->value*255;' in snd_mix
-	assert 'ch->master_vol = S_ChannelMasterVolume( entchannel );' in snd_dma
+	assert 'ch->master_vol = (int)( volume * 127.0f );' in snd_dma
+	assert 'ch->master_vol = S_ChannelMasterVolume( entchannel );' not in snd_dma
 
 
 def test_engine_cvar_nineteenth_win32_joystick_analog_tranche_matches_retail_contracts() -> None:

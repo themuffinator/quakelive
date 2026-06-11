@@ -304,12 +304,13 @@ SV_SteamServerNetworkingFrame
 Runs the Steam server networking maintenance loop.
 =============
 */
-static void SV_SteamServerNetworkingFrame( void ) {
+void SV_SteamServerNetworkingFrame( void ) {
 	if ( !QL_Steamworks_ServerIsInitialised() ) {
 		return;
 	}
 
 	QL_Steamworks_RunServerCallbacks();
+	SV_SteamServerUpdatePublishedState( qfalse );
 
 	if ( svs.time < s_steamP2PKeepAliveTime ) {
 		s_steamP2PKeepAliveTime = 0;
@@ -1800,7 +1801,6 @@ void SV_Frame( int msec ) {
 		return;
 	}
 
-	SV_SteamServerNetworkingFrame();
 	Zmq_UpdatePasswords();
 	Zmq_PumpRcon();
 	if ( svs.time < s_botMaskRefreshTime ) {
@@ -1889,8 +1889,6 @@ void SV_Frame( int msec ) {
 		SV_SetConfigstring( CS_SYSTEMINFO, Cvar_InfoString_Big( CVAR_SYSTEMINFO ) );
 		cvar_modifiedFlags &= ~CVAR_SYSTEMINFO;
 	}
-
-	SV_SteamServerUpdatePublishedState( qfalse );
 
 	if ( com_speeds->integer ) {
 		startTime = Sys_Milliseconds ();

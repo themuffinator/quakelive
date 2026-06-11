@@ -170,6 +170,7 @@ extern cvar_t	*s_volume;
 extern cvar_t	*s_nosound;
 extern cvar_t	*s_show;
 extern cvar_t	*s_mixahead;
+extern cvar_t	*s_musicVolume;
 
 extern cvar_t	*s_testsound;
 extern cvar_t	*s_pvs;

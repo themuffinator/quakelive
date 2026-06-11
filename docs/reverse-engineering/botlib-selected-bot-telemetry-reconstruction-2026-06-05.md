@@ -11,6 +11,7 @@ Canonical Binary Ninja HLIL in `references/hlil/quakelive/qagamex86.dll/qagamex8
 - `BotRecordNodeSwitch` (`sub_10008460`) writes the node-switch history entry to the global `nodeswitch` buffer.
 - The same function then writes the current node string to `arg1 + 0x23cc` with a bounded `0x50` byte `Com_sprintf`-style call.
 - `BotPublishDebugInfoString` (`sub_10022ee0`) later passes `param_1 + 0x23cc` as the `ainode` field in the payload.
+- The same payload ends with `eh\\%i\\`; after the 2026-06-11 offscreen enemy reconstruction this field is backed by the `enemyFromGoalStack` state written by `BotFindEnemy`.
 - `BotResetState` (`sub_10022c60`) clears the full `0x2698` byte `bot_state_t` and restores only the same preserved state group as the source helper, so the node-name string is normal scratch state rather than a preserved reset field.
 
 Structured Ghidra companion evidence in `references/reverse-engineering/ghidra/qagamex86/decompile_top_functions.c` shows the selected-bot payload format:
@@ -25,6 +26,7 @@ The Ghidra decompile also shows the `ainode` argument as `param_1 + 0x23cc` and 
 - Added `bot_state_t::ainodename` as qagame scratch state.
 - Updated `BotRecordNodeSwitch` to copy the current AI node label into `bs->ainodename` using `Com_sprintf( ..., "%s", node )`, matching the retail call shape.
 - Updated `BotPublishDebugInfoString` to publish `bs->ainodename` directly instead of inferring a display string from the `ainode` function pointer.
+- Updated `BotPublishDebugInfoString` to publish the offscreen enemy marker from `bs->enemyFromGoalStack`, matching the marker written by the reconstructed retail `BotFindEnemy` side path.
 - Removed the source-only `BotDebugAINodeName` helper because retail keeps the display text as recorded state.
 
 ## Validation

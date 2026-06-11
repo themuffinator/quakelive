@@ -72,7 +72,7 @@ Observed local facts:
    - `sub_1005A2FD`: `(*(data_1074CCF8 + 0x74))(*ebp_1, 6)`
 3. The host wrapper is a pure tailcall:
    - `sub_4BEFB0 -> sub_4DB3F0(arg1, arg2)`
-4. `sub_4DB3F0` validates the handle range and logs `^3S_StartLocalSound: handle %i out of range\n` on failure, which pins the exact engine helper.
+4. `sub_4DB3F0` first returns silently unless the sound system is started and unmuted, then validates the handle range and logs `^3S_StartLocalSound: handle %i out of range\n` on failure, which pins the exact engine helper.
 5. The reconstructed host syscall layer matches that role:
    - `ql_cgame_imports.inc`: `QL_CG_trap_S_StartLocalSound`
    - `cl_cgame.c`: `case CG_S_STARTLOCALSOUND: S_StartLocalSound( args[1], args[2] );`

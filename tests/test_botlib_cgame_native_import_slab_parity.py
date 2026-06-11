@@ -16,6 +16,14 @@ FUNCTIONS_CSV = (
 	/ "quakelive_steam"
 	/ "functions.csv"
 )
+CGAME_FUNCTIONS_CSV = (
+	REPO_ROOT
+	/ "references"
+	/ "reverse-engineering"
+	/ "ghidra"
+	/ "cgamex86"
+	/ "functions.csv"
+)
 QL_STEAM_HLIL_PART04 = (
 	REPO_ROOT
 	/ "references"
@@ -34,9 +42,20 @@ QL_STEAM_HLIL_PART07 = (
 	/ "quakelive_steam.exe_hlil_split"
 	/ "quakelive_steam.exe_hlil_part07.txt"
 )
+CGAME_HLIL = (
+	REPO_ROOT
+	/ "references"
+	/ "hlil"
+	/ "quakelive"
+	/ "cgamex86.dll"
+	/ "cgamex86.dll_hlil.txt"
+)
 CLIENT_CL_CGAME = REPO_ROOT / "src" / "code" / "client" / "cl_cgame.c"
+CLIENT_QL_CGAME_IMPORTS = REPO_ROOT / "src" / "code" / "client" / "ql_cgame_imports.inc"
 CGAME_PUBLIC = REPO_ROOT / "src" / "code" / "cgame" / "cg_public.h"
 CGAME_SYSCALLS = REPO_ROOT / "src" / "code" / "cgame" / "cg_syscalls.c"
+CGAME_LOCAL = REPO_ROOT / "src" / "code" / "cgame" / "cg_local.h"
+CGAME_MAIN = REPO_ROOT / "src" / "code" / "cgame" / "cg_main.c"
 
 CGAME_NATIVE_SLAB_START = 0x4AF820
 CGAME_NATIVE_SLAB_END = 0x4B0500
@@ -115,6 +134,24 @@ EXPECTED_NATIVE_SLAB_ALIASES = {
 	"4B0440": ("QLCGImport_GetAvatarImageHandle", 21),
 	"4B0460": ("CL_LoadCGameForCvarRegistration", 87),
 	"4B04C0": ("CL_InitCGame", 321),
+}
+
+EXPECTED_NATIVE_SOUND_GHIDRA_ALIASES = {
+	"4AFE10": "QLCGImport_S_StartSound",
+	"4AFE20": "QLCGImport_S_StartSoundVolume",
+	"4AFE50": "QLCGImport_S_StartLocalSoundVolume",
+	"4AFE90": "QLCGImport_S_AddLoopingSound",
+	"4AFEA0": "QLCGImport_S_UpdateEntityPosition",
+	"4AFEB0": "QLCGImport_S_Respatialize",
+	"4AFEC0": "QLCGImport_S_RegisterSound",
+	"4AFED0": "QLCGImport_S_StartBackgroundTrack",
+}
+
+EXPECTED_PC_SOURCE_HANDLE_GHIDRA_ALIASES = {
+	"4B0270": "QLUIImport_PC_LoadSource",
+	"4B0290": "QLUIImport_PC_FreeSource",
+	"4B02B0": "QLUIImport_PC_ReadToken",
+	"4B02D0": "QLUIImport_PC_SourceFileAndLine",
 }
 
 EXPECTED_IMPORT_ASSIGNMENTS = (
@@ -203,13 +240,14 @@ def _aliases() -> dict[str, str]:
 	return json.loads(_read(SYMBOL_ALIASES))["quakelive_steam_srp"]
 
 
-def _function_rows() -> dict[str, str]:
+def _function_rows(path: Path = FUNCTIONS_CSV) -> dict[str, str]:
 	rows: dict[str, str] = {}
-	with FUNCTIONS_CSV.open(newline="", encoding="utf-8") as functions:
+	with path.open(newline="", encoding="utf-8") as functions:
 		for row in csv.DictReader(functions):
-			rows[row["entry"].upper()[2:]] = (
-				f'{row["name"]},{row["entry"]},{row["size"]},{row["thunk"]},{row["calling_convention"]}'
-			)
+			entry = row["entry"].upper()
+			value = f'{row["name"]},{row["entry"]},{row["size"]},{row["thunk"]},{row["calling_convention"]}'
+			rows[entry] = value
+			rows[entry[2:]] = value
 	return rows
 
 
@@ -231,6 +269,15 @@ def _extract_function_block(source: str, signature: str) -> str:
 	raise AssertionError(f"unterminated function block: {signature}")
 
 
+def _assert_order(source: str, *needles: str) -> None:
+	cursor = 0
+	for needle in needles:
+		index = source.find(needle, cursor)
+		if index == -1:
+			raise AssertionError(f"expected ordered snippet not found after {cursor}: {needle}")
+		cursor = index + len(needle)
+
+
 def test_native_cgame_import_slab_aliases_and_rows_are_pinned() -> None:
 	aliases = _aliases()
 	rows = _function_rows()
@@ -240,9 +287,22 @@ def test_native_cgame_import_slab_aliases_and_rows_are_pinned() -> None:
 		if size is not None:
 			assert rows[address] == f"FUN_00{address.lower()},00{address.lower()},{size},0,unknown"
 
+	for address, name in EXPECTED_NATIVE_SOUND_GHIDRA_ALIASES.items():
+		assert aliases[f"FUN_00{address.lower()}"] == name
+		expected_size = EXPECTED_NATIVE_SLAB_ALIASES[address][1]
+		assert rows[address] == f"FUN_00{address.lower()},00{address.lower()},{expected_size},0,unknown"
+
+	for address, name in EXPECTED_PC_SOURCE_HANDLE_GHIDRA_ALIASES.items():
+		assert aliases[f"FUN_00{address.lower()}"] == name
+		expected_size = EXPECTED_NATIVE_SLAB_ALIASES[address][1]
+		assert rows[address] == f"FUN_00{address.lower()},00{address.lower()},{expected_size},0,unknown"
+
 	assert "4B0050" not in rows
 	assert "4B0170" not in rows
 	assert "4B0210" not in rows
+	assert "4B02F0" not in rows
+	assert "sub_4B02F0" not in aliases
+	assert "QLCGImport_S_StopBackgroundTrack" not in aliases.values()
 
 	for alias, name in {
 		"sub_4BEFB0": "QLCGImport_S_StartLocalSound",
@@ -298,8 +358,12 @@ def test_native_cgame_import_slab_hlil_wrapper_shapes_are_pinned() -> None:
 		"004b0210  return sub_4c92a0() __tailcall",
 		"004b0270    int32_t sub_4b0270()",
 		"004b0280  jump(*(data_13e1844 + 0x204))",
+		"004b0290    int32_t sub_4b0290()",
+		"004b02a0  jump(*(data_13e1844 + 0x208))",
 		"004b02b0    int32_t sub_4b02b0()",
 		"004b02c0  jump(*(data_13e1844 + 0x20c))",
+		"004b02d0    int32_t sub_4b02d0()",
+		"004b02df  jump(*(data_13e1844 + 0x210))",
 		"004b03b4  return sub_4bf5d0() __tailcall",
 		"004b03e0    int32_t sub_4b03e0(int32_t arg1, int32_t arg2, int32_t arg3, int32_t arg4, float arg5, int32_t arg6, int32_t arg7, int32_t arg8)",
 		"004b0410  return data_146ccf0(arg1, arg2, arg3, arg4, fconvert.s(fconvert.t(arg5)), arg6, arg7,",
@@ -319,9 +383,160 @@ def test_native_cgame_import_slab_hlil_wrapper_shapes_are_pinned() -> None:
 		"00565a70  void* data_565a70 = sub_4bef40",
 		"00565a98  void* data_565a98 = sub_4b00c0",
 		"00565abc  void* data_565abc = sub_4b0170",
+		"00565b08  void* data_565b08 = sub_4b0270",
+		"00565b0c  void* data_565b0c = sub_4b0290",
+		"00565b10  void* data_565b10 = sub_4b02b0",
+		"00565b14  void* data_565b14 = sub_4b02d0",
 		"00565b2c  void* data_565b2c = sub_4b0370",
+		"0056749c  void* data_56749c = sub_4b0270",
+		"005674a0  void* data_5674a0 = sub_4b0290",
+		"005674a4  void* data_5674a4 = sub_4b02b0",
+		"005674a8  void* data_5674a8 = sub_4b02d0",
 	):
 		assert table_anchor in table_hlil
+
+
+def test_cgame_pc_source_handle_bridge_matches_botlib_precompiler_contract() -> None:
+	aliases = _aliases()
+	rows = _function_rows()
+	cgame_rows = _function_rows(CGAME_FUNCTIONS_CSV)
+	cl_cgame = _read(CLIENT_CL_CGAME)
+	ql_cgame_imports = _read(CLIENT_QL_CGAME_IMPORTS)
+	cgame_public = _read(CGAME_PUBLIC)
+	cg_local = _read(CGAME_LOCAL)
+	cg_syscalls = _read(CGAME_SYSCALLS)
+	cg_main = _read(CGAME_MAIN)
+	hlil = _read(QL_STEAM_HLIL_PART04)
+	table_hlil = _read(QL_STEAM_HLIL_PART07)
+	cgame_hlil = _read(CGAME_HLIL)
+
+	import_block = _extract_function_block(cl_cgame, "static void CL_InitCGameImports")
+	syscall_block = _extract_function_block(cl_cgame, "static int CL_CgameSystemCallsImpl")
+	map_block = _extract_function_block(cg_syscalls, "static int CG_MapNativeImport")
+	host_load = _extract_function_block(ql_cgame_imports, "static int QDECL QL_CG_trap_PC_LoadSource")
+	host_free = _extract_function_block(ql_cgame_imports, "static int QDECL QL_CG_trap_PC_FreeSource")
+	host_read = _extract_function_block(ql_cgame_imports, "static int QDECL QL_CG_trap_PC_ReadToken")
+	host_line = _extract_function_block(
+		ql_cgame_imports,
+		"static int QDECL QL_CG_trap_PC_SourceFileAndLine",
+	)
+	cg_load = _extract_function_block(cg_syscalls, "int trap_PC_LoadSource")
+	cg_free = _extract_function_block(cg_syscalls, "int trap_PC_FreeSource")
+	cg_read = _extract_function_block(cg_syscalls, "int trap_PC_ReadToken")
+	cg_line = _extract_function_block(cg_syscalls, "int trap_PC_SourceFileAndLine")
+	menu_start = cg_main.find("void CG_ParseMenu")
+	menu_end = cg_main.find("qboolean CG_Load_Menu", menu_start)
+	assert menu_start != -1
+	assert menu_end != -1
+	menu_block = cg_main[menu_start:menu_end]
+
+	for address, name in EXPECTED_PC_SOURCE_HANDLE_GHIDRA_ALIASES.items():
+		assert aliases[f"sub_{address}"] == name
+		assert aliases[f"FUN_00{address.lower()}"] == name
+		assert rows[address] == (
+			f"FUN_00{address.lower()},00{address.lower()},"
+			f"{EXPECTED_NATIVE_SLAB_ALIASES[address][1]},0,unknown"
+		)
+
+	for expected in (
+		"004b0270    int32_t sub_4b0270()",
+		"004b0280  jump(*(data_13e1844 + 0x204))",
+		"004b0290    int32_t sub_4b0290()",
+		"004b02a0  jump(*(data_13e1844 + 0x208))",
+		"004b02b0    int32_t sub_4b02b0()",
+		"004b02c0  jump(*(data_13e1844 + 0x20c))",
+		"004b02d0    int32_t sub_4b02d0()",
+		"004b02df  jump(*(data_13e1844 + 0x210))",
+	):
+		assert expected in hlil
+
+	_assert_order(
+		table_hlil,
+		"00565b08  void* data_565b08 = sub_4b0270",
+		"00565b0c  void* data_565b0c = sub_4b0290",
+		"00565b10  void* data_565b10 = sub_4b02b0",
+		"00565b14  void* data_565b14 = sub_4b02d0",
+	)
+	_assert_order(
+		table_hlil,
+		"0056749c  void* data_56749c = sub_4b0270",
+		"005674a0  void* data_5674a0 = sub_4b0290",
+		"005674a4  void* data_5674a4 = sub_4b02b0",
+		"005674a8  void* data_5674a8 = sub_4b02d0",
+	)
+	assert cgame_rows["10025AC0"] == "FUN_10025ac0,10025ac0,383,0,unknown"
+	for expected in (
+		"10025ac0    void sub_10025ac0(int32_t arg1)",
+		"10025aec  int32_t edi = (*(data_1074cccc + 0x1b0))(arg1)",
+		"10025b2e      if ((*(data_1074cccc + 0x1b8))(edi, &var_418) != 0)",
+		"10025b54              if (sub_10057330(\"assetGlobalDef\", 0x1869f, &i) != 0)",
+		"10025b81                  if (sub_10057330(\"menudef\", 0x1869f, &i) == 0)",
+		"10025c22      (*(data_1074cccc + 0x1b4))(edi)",
+		"10025b08      edi = (*(data_1074cccc + 0x1b0))(\"ui/testhud.menu\")",
+	):
+		assert expected in cgame_hlil
+	_assert_order(
+		cgame_public,
+		"CG_QL_IMPORT_PC_ADD_GLOBAL_DEFINE = 107,",
+		"CG_QL_IMPORT_PC_LOAD_SOURCE = 108,",
+		"CG_QL_IMPORT_PC_FREE_SOURCE = 109,",
+		"CG_QL_IMPORT_PC_READ_TOKEN = 110,",
+		"CG_QL_IMPORT_PC_SOURCE_FILE_AND_LINE = 111,",
+		"CG_QL_IMPORT_RETAIL_RESERVED_112 = 112,",
+	)
+	_assert_order(
+		import_block,
+		"ql_cgame_imports[CG_QL_IMPORT_PC_ADD_GLOBAL_DEFINE] = (ql_import_f)QL_CG_trap_PC_AddGlobalDefine;",
+		"ql_cgame_imports[CG_QL_IMPORT_PC_LOAD_SOURCE] = (ql_import_f)QL_CG_trap_PC_LoadSource;",
+		"ql_cgame_imports[CG_QL_IMPORT_PC_FREE_SOURCE] = (ql_import_f)QL_CG_trap_PC_FreeSource;",
+		"ql_cgame_imports[CG_QL_IMPORT_PC_READ_TOKEN] = (ql_import_f)QL_CG_trap_PC_ReadToken;",
+		"ql_cgame_imports[CG_QL_IMPORT_PC_SOURCE_FILE_AND_LINE] = (ql_import_f)QL_CG_trap_PC_SourceFileAndLine;",
+		"ql_cgame_imports[CG_QL_IMPORT_RETAIL_RESERVED_112] = (ql_import_f)QL_CG_trap_RetailReservedImport;",
+	)
+
+	for expected in (
+		"case CG_PC_LOAD_SOURCE: return CG_QL_IMPORT_PC_LOAD_SOURCE;",
+		"case CG_PC_FREE_SOURCE: return CG_QL_IMPORT_PC_FREE_SOURCE;",
+		"case CG_PC_READ_TOKEN: return CG_QL_IMPORT_PC_READ_TOKEN;",
+		"case CG_PC_SOURCE_FILE_AND_LINE: return CG_QL_IMPORT_PC_SOURCE_FILE_AND_LINE;",
+	):
+		assert expected in map_block
+
+	for expected in (
+		"return botlib_export->PC_LoadSourceHandle( VMA(1) );",
+		"return botlib_export->PC_FreeSourceHandle( args[1] );",
+		"return botlib_export->PC_ReadTokenHandle( args[1], VMA(2) );",
+		"return botlib_export->PC_SourceFileAndLine( args[1], VMA(2), VMA(3) );",
+	):
+		assert expected in syscall_block
+
+	assert "return CG_Import_Syscall( CG_PC_LOAD_SOURCE, filename );" in host_load
+	assert "return CG_Import_Syscall( CG_PC_FREE_SOURCE, handle );" in host_free
+	assert "return CG_Import_Syscall( CG_PC_READ_TOKEN, handle, pc_token );" in host_read
+	assert "return CG_Import_Syscall( CG_PC_SOURCE_FILE_AND_LINE, handle, filename, line );" in host_line
+
+	assert "return syscall( CG_PC_LOAD_SOURCE, filename );" in cg_load
+	assert "return syscall( CG_PC_FREE_SOURCE, handle );" in cg_free
+	assert "return syscall( CG_PC_READ_TOKEN, handle, pc_token );" in cg_read
+	assert "return syscall( CG_PC_SOURCE_FILE_AND_LINE, handle, filename, line );" in cg_line
+
+	for expected in (
+		"int\t\t\ttrap_PC_LoadSource( const char *filename );",
+		"int\t\t\ttrap_PC_FreeSource( int handle );",
+		"int\t\t\ttrap_PC_ReadToken( int handle, pc_token_t *pc_token );",
+		"int\t\t\ttrap_PC_SourceFileAndLine( int handle, char *filename, int *line );",
+	):
+		assert expected in cg_local
+
+	_assert_order(
+		menu_block,
+		"handle = trap_PC_LoadSource( menuFile );",
+		"handle = trap_PC_LoadSource( \"ui/testhud.menu\" );",
+		"if ( !trap_PC_ReadToken( handle, &token ) )",
+		"if ( Q_stricmp( token.string, \"assetGlobalDef\" ) == 0 )",
+		"if ( Q_stricmp( token.string, \"menudef\" ) == 0 )",
+		"trap_PC_FreeSource( handle );",
+	)
 
 
 def test_native_cgame_sound_import_wiring_reconstructs_retail_clear_slots() -> None:
@@ -348,6 +563,169 @@ def test_native_cgame_sound_import_wiring_reconstructs_retail_clear_slots() -> N
 	assert "case CG_S_STOPBACKGROUNDTRACK: return CG_QL_IMPORT_S_STOPBACKGROUNDTRACK;" in map_block
 	assert "case CG_S_ADDREALLOOPINGSOUND: return CG_QL_IMPORT_COMPAT_S_ADDREALLOOPINGSOUND;" in map_block
 	assert "case CG_S_STOPLOOPINGSOUND: return CG_QL_IMPORT_COMPAT_S_STOPLOOPINGSOUND;" in map_block
+
+
+def test_native_cgame_sound_slab_keeps_volume_slots_direct_and_legacy_slots_fixed_volume() -> None:
+	cl_cgame = _read(CLIENT_CL_CGAME)
+	ql_cgame_imports = _read(CLIENT_QL_CGAME_IMPORTS)
+	cgame_public = _read(CGAME_PUBLIC)
+	cg_local = _read(CGAME_LOCAL)
+	cg_syscalls = _read(CGAME_SYSCALLS)
+	hlil = _read(QL_STEAM_HLIL_PART04)
+	table_hlil = _read(QL_STEAM_HLIL_PART07)
+
+	import_block = _extract_function_block(cl_cgame, "static void CL_InitCGameImports")
+	syscall_block = _extract_function_block(cl_cgame, "static int CL_CgameSystemCallsImpl")
+	map_block = _extract_function_block(cg_syscalls, "static int CG_MapNativeImport")
+	native_start_volume_block = _extract_function_block(cg_syscalls, "void trap_QL_S_StartSoundVolume")
+	native_local_volume_block = _extract_function_block(cg_syscalls, "void trap_QL_S_StartLocalSoundVolume")
+	qvm_start_volume_block = _extract_function_block(cg_local, "static ID_INLINE void trap_QL_S_StartSoundVolume")
+	qvm_local_volume_block = _extract_function_block(cg_local, "static ID_INLINE void trap_QL_S_StartLocalSoundVolume")
+	host_start_volume_block = _extract_function_block(
+		cl_cgame,
+		"static void QDECL QL_CG_trap_S_StartSoundVolume",
+	)
+	host_local_volume_block = _extract_function_block(
+		cl_cgame,
+		"static void QDECL QL_CG_trap_S_StartLocalSoundVolume",
+	)
+	legacy_start_block = _extract_function_block(
+		ql_cgame_imports,
+		"static void QDECL QL_CG_trap_S_StartSound",
+	)
+	legacy_local_block = _extract_function_block(
+		ql_cgame_imports,
+		"static void QDECL QL_CG_trap_S_StartLocalSound",
+	)
+
+	_assert_order(
+		table_hlil,
+		"005659ec  void* data_5659ec = sub_4afe10",
+		"005659f0  void* data_5659f0 = sub_4afe20",
+		"005659f4  void* data_5659f4 = sub_4befb0",
+		"005659f8  void* data_5659f8 = sub_4afe50",
+		"005659fc  void* data_5659fc = j_sub_4da490",
+		"00565a00  void* data_565a00 = j_sub_4da3e0",
+		"00565a04  void* data_565a04 = sub_4afe90",
+		"00565a08  void* data_565a08 = sub_4afea0",
+		"00565a0c  void* data_565a0c = sub_4afeb0",
+		"00565a10  void* data_565a10 = sub_4afec0",
+		"00565a14  void* data_565a14 = sub_4afed0",
+		"00565a18  void* data_565a18 = 0x4b02f0",
+		"00565a1c  void* data_565a1c = sub_4afee0",
+	)
+	_assert_order(
+		cgame_public,
+		"CG_QL_IMPORT_S_STARTSOUND = 37,",
+		"CG_QL_IMPORT_S_STARTSOUND_VOLUME = 38,",
+		"CG_QL_IMPORT_S_STARTLOCALSOUND = 39,",
+		"CG_QL_IMPORT_S_STARTLOCALSOUND_VOLUME = 40,",
+		"CG_QL_IMPORT_S_CLEARLOOPINGSOUNDS_FRAME = 41,",
+		"CG_QL_IMPORT_S_CLEARLOOPINGSOUNDS_KILLALL = 42,",
+		"CG_QL_IMPORT_S_ADDLOOPINGSOUND = 43,",
+		"CG_QL_IMPORT_S_UPDATEENTITYPOSITION = 44,",
+		"CG_QL_IMPORT_S_RESPATIALIZE = 45,",
+		"CG_QL_IMPORT_S_REGISTERSOUND = 46,",
+		"CG_QL_IMPORT_S_STARTBACKGROUNDTRACK = 47,",
+		"CG_QL_IMPORT_S_STOPBACKGROUNDTRACK = 48,",
+	)
+	_assert_order(
+		cgame_public,
+		"CG_S_STARTSOUND,",
+		"CG_S_STARTLOCALSOUND,",
+		"CG_S_CLEARLOOPINGSOUNDS,",
+		"CG_S_ADDLOOPINGSOUND,",
+		"CG_S_UPDATEENTITYPOSITION,",
+		"CG_S_RESPATIALIZE,",
+		"CG_S_REGISTERSOUND,",
+		"CG_S_STARTBACKGROUNDTRACK,",
+	)
+
+	for expected in (
+		"004afe10    int32_t sub_4afe10()",
+		"004afe14  return sub_4da350() __tailcall",
+		"004afe20    int32_t sub_4afe20(float* arg1, int32_t arg2, int32_t arg3, int32_t arg4, float arg5)",
+		"004afe43  return sub_4da050(arg1, arg2, arg3, arg4, fconvert.s(fconvert.t(arg5)))",
+		"004afe50    int32_t sub_4afe50(int32_t arg1, int32_t arg2, float arg3)",
+		"004afe6b  return sub_4da380(arg1, arg2, fconvert.s(fconvert.t(arg3)))",
+		"004afe70  return sub_4da490() __tailcall",
+		"004afe80  return sub_4da3e0() __tailcall",
+		"004afe94  return sub_4da4c0() __tailcall",
+		"004afea4  return sub_4dac80() __tailcall",
+		"004afeb4  return sub_4dacd0() __tailcall",
+		"004afec4  return sub_4d9e50() __tailcall",
+		"004afed4  return sub_4db060() __tailcall",
+	):
+		assert expected in hlil
+
+	for expected in (
+		"case CG_S_STARTSOUND: return CG_QL_IMPORT_S_STARTSOUND;",
+		"case CG_S_STARTLOCALSOUND: return CG_QL_IMPORT_S_STARTLOCALSOUND;",
+		"case CG_S_CLEARLOOPINGSOUNDS:",
+		"return ( stack && stack[1] ) ? CG_QL_IMPORT_S_CLEARLOOPINGSOUNDS_KILLALL : CG_QL_IMPORT_S_CLEARLOOPINGSOUNDS_FRAME;",
+		"case CG_S_ADDLOOPINGSOUND: return CG_QL_IMPORT_S_ADDLOOPINGSOUND;",
+		"case CG_S_UPDATEENTITYPOSITION: return CG_QL_IMPORT_S_UPDATEENTITYPOSITION;",
+		"case CG_S_RESPATIALIZE: return CG_QL_IMPORT_S_RESPATIALIZE;",
+		"case CG_S_STARTBACKGROUNDTRACK: return CG_QL_IMPORT_S_STARTBACKGROUNDTRACK;",
+		"case CG_S_STOPBACKGROUNDTRACK: return CG_QL_IMPORT_S_STOPBACKGROUNDTRACK;",
+	):
+		assert expected in map_block
+	assert "CG_QL_IMPORT_S_STARTSOUND_VOLUME" not in map_block
+	assert "CG_QL_IMPORT_S_STARTLOCALSOUND_VOLUME" not in map_block
+	assert "CG_S_STARTSOUND_VOLUME" not in cgame_public
+	assert "CG_S_STARTLOCALSOUND_VOLUME" not in cgame_public
+
+	for expected in (
+		"ql_cgame_imports[CG_QL_IMPORT_S_STARTSOUND] = (ql_import_f)QL_CG_trap_S_StartSound;",
+		"ql_cgame_imports[CG_QL_IMPORT_S_STARTSOUND_VOLUME] = (ql_import_f)QL_CG_trap_S_StartSoundVolume;",
+		"ql_cgame_imports[CG_QL_IMPORT_S_STARTLOCALSOUND] = (ql_import_f)QL_CG_trap_S_StartLocalSound;",
+		"ql_cgame_imports[CG_QL_IMPORT_S_STARTLOCALSOUND_VOLUME] = (ql_import_f)QL_CG_trap_S_StartLocalSoundVolume;",
+		"ql_cgame_imports[CG_QL_IMPORT_S_CLEARLOOPINGSOUNDS_FRAME] = (ql_import_f)QL_CG_trap_S_ClearLoopingSoundsFrame;",
+		"ql_cgame_imports[CG_QL_IMPORT_S_CLEARLOOPINGSOUNDS_KILLALL] = (ql_import_f)QL_CG_trap_S_ClearLoopingSoundsKillAll;",
+		"ql_cgame_imports[CG_QL_IMPORT_S_ADDLOOPINGSOUND] = (ql_import_f)QL_CG_trap_S_AddLoopingSound;",
+		"ql_cgame_imports[CG_QL_IMPORT_S_UPDATEENTITYPOSITION] = (ql_import_f)QL_CG_trap_S_UpdateEntityPosition;",
+		"ql_cgame_imports[CG_QL_IMPORT_S_RESPATIALIZE] = (ql_import_f)QL_CG_trap_S_Respatialize;",
+		"ql_cgame_imports[CG_QL_IMPORT_S_REGISTERSOUND] = (ql_import_f)QL_CG_trap_S_RegisterSound;",
+		"ql_cgame_imports[CG_QL_IMPORT_S_STARTBACKGROUNDTRACK] = (ql_import_f)QL_CG_trap_S_StartBackgroundTrack;",
+		"ql_cgame_imports[CG_QL_IMPORT_S_STOPBACKGROUNDTRACK] = (ql_import_f)QL_CG_trap_S_StopBackgroundTrack;",
+	):
+		assert expected in import_block
+
+	for expected in (
+		"S_StartSound( VMA(1), args[2], args[3], args[4] );",
+		"S_StartLocalSound( args[1], args[2] );",
+		"S_ClearLoopingSounds( args[1] ? qtrue : qfalse );",
+		"S_AddLoopingSound( args[1], VMA(2), VMA(3), args[4] );",
+		"S_UpdateEntityPosition( args[1], VMA(2) );",
+		"S_Respatialize( args[1], VMA(2), VMA(3), args[4] );",
+		"S_StartBackgroundTrack( VMA(1), VMA(2) );",
+		"S_StopBackgroundTrack();",
+	):
+		assert expected in syscall_block
+
+	assert "S_StartSoundVolume( origin, entityNum, entchannel, sfx, volume );" in host_start_volume_block
+	assert "S_StartLocalSoundVolume( sfx, channelNum, volume );" in host_local_volume_block
+	assert "CG_Import_Syscall" not in host_start_volume_block
+	assert "CG_Import_Syscall" not in host_local_volume_block
+
+	assert "CG_GetNativeImportFunction( CG_QL_IMPORT_S_STARTSOUND_VOLUME );" in native_start_volume_block
+	assert "((void (QDECL *)( vec3_t, int, int, sfxHandle_t, float ))import)( origin, entityNum, entchannel, sfx, volume );" in native_start_volume_block
+	assert "CG_GetNativeImportFunction( CG_QL_IMPORT_S_STARTLOCALSOUND_VOLUME );" in native_local_volume_block
+	assert "((void (QDECL *)( sfxHandle_t, int, float ))import)( sfx, channelNum, volume );" in native_local_volume_block
+	assert "syscall(" not in native_start_volume_block
+	assert "syscall(" not in native_local_volume_block
+	assert "(void)volume;" not in native_start_volume_block
+	assert "(void)volume;" not in native_local_volume_block
+
+	assert "(void)volume;" in qvm_start_volume_block
+	assert "trap_S_StartSound( origin, entityNum, entchannel, sfx );" in qvm_start_volume_block
+	assert "(void)volume;" in qvm_local_volume_block
+	assert "trap_S_StartLocalSound( sfx, channelNum );" in qvm_local_volume_block
+
+	assert "CG_Import_Syscall( CG_S_STARTSOUND, origin, entityNum, entchannel, sfx );" in legacy_start_block
+	assert "CG_Import_Syscall( CG_S_STARTLOCALSOUND, sfx, channelNum );" in legacy_local_block
+	assert "S_StartSoundVolume" not in legacy_start_block
+	assert "S_StartLocalSoundVolume" not in legacy_local_block
 
 
 def test_native_cgame_import_table_source_matches_reconstructed_slot_surface() -> None:

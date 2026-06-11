@@ -7,10 +7,15 @@ prediction bridge, console-message scanner, event/snapshot sweep, and
 alternate-route setup helpers. The owning retail binary is `qagamex86.dll`;
 the mapped range is `0x1001BCD0..0x1001EE30`.
 
-No C behavior was changed in this pass. The source bodies already matched the
-retail evidence closely enough for this slice; the reconstruction work was to
-promote the remaining names and add parity guards that bind source, HLIL,
-Ghidra sizes, symbol-map signatures, and botlib import wiring together.
+No C behavior was changed in the original pass. The source bodies already
+matched the retail evidence closely enough for this slice; the reconstruction
+work was to promote the remaining names and add parity guards that bind source,
+HLIL, Ghidra sizes, symbol-map signatures, and botlib import wiring together.
+
+Update 2026-06-11: `BotCheckEvents` now records the retail heard-client event
+mask used by `BotAcceptOffscreenEnemyCandidate`. The mask is reset for each new
+entity event and populated by local movement, jump, water, item, weapon, no-ammo,
+and taunt events.
 
 ## Evidence
 
@@ -82,7 +87,8 @@ Observed source anchors now pinned by tests:
 - `BotCheckEvents` and `BotCheckSnapshot` preserve obituary bookkeeping, CTF
   and 1FCTF flag status updates, kamikaze and powerup respawn reactions,
   falling-teleporter use, grenade/prox-mine avoidance, kamikaze-body tracking,
-  and player-state external event copying.
+  player-state external event copying, and the heard-client event mask consumed
+  by offscreen enemy acceptance.
 - `BotAlternateRoute`, `BotGetAlternateRouteGoal`, and
   `BotSetupAlternativeRouteGoals` preserve alternate route reach detection,
   random red/blue route goal selection, CTF/1FCTF/obelisk/harvester setup, and

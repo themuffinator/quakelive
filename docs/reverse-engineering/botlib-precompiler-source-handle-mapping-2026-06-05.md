@@ -31,6 +31,11 @@ Reference corpus used:
 - `src/code/game/g_syscalls.c`
 - `src/code/server/sv_game.c`
 - `src/code/server/ql_game_imports.inc`
+- `src/code/client/cl_cgame.c`
+- `src/code/client/ql_cgame_imports.inc`
+- `src/code/cgame/cg_public.h`
+- `src/code/cgame/cg_syscalls.c`
+- `src/code/cgame/cg_main.c`
 
 ## Why This Slice
 
@@ -117,6 +122,34 @@ Inference:
   treated as closed unless future work touches precompiler token layout,
   qagame import packing, or VM/native import compatibility.
 
+## 2026-06-11 Cgame Bridge Recheck
+
+Follow-up mapping closed the native cgame side of the same PC source-handle
+bridge:
+
+- `FUN_004b0270` / `sub_4B0270 -> QLUIImport_PC_LoadSource`
+- `FUN_004b0290` / `sub_4B0290 -> QLUIImport_PC_FreeSource`
+- `FUN_004b02b0` / `sub_4B02B0 -> QLUIImport_PC_ReadToken`
+- `FUN_004b02d0` / `sub_4B02D0 -> QLUIImport_PC_SourceFileAndLine`
+
+Observed facts:
+
+- Host HLIL shows the four wrappers as table jumps through
+  `data_13e1844 + 0x204`, `+0x208`, `+0x20c`, and `+0x210`.
+- The retail native import tables store the callbacks at
+  `data_565b08..data_565b14` and `data_56749c..data_5674a8`.
+- Source slots `CG_QL_IMPORT_PC_LOAD_SOURCE = 108` through
+  `CG_QL_IMPORT_PC_SOURCE_FILE_AND_LINE = 111` map through
+  `CG_MapNativeImport`, `ql_cgame_imports.inc`, and
+  `CL_CgameSystemCallsImpl` back to `botlib_export->PC_*`.
+- Companion cgame DLL HLIL for `FUN_10025ac0` confirms `CG_ParseMenu` consumes
+  the same callback lane for HUD/menu source parsing, including the
+  `ui/testhud.menu` fallback and the `assetGlobalDef` / `menudef` token
+  dispatch.
+
+The detailed round note is
+`docs/reverse-engineering/botlib-cgame-pc-source-handle-bridge-recheck-2026-06-11.md`.
+
 ## Changes
 
 - Added `test_botlib_precompiler_source_handle_slice_matches_retail_references`
@@ -139,9 +172,9 @@ Good next botlib slices:
   `PC_ReadToken`, `PC_ExpandDefineIntoSource`, and include handling.
 - `l_script.c::PS_ReadNumber` and punctuation handling, especially where bot
   resource parsers rely on permissive legacy token behavior.
-- The UI-side PC source-handle import wrappers, if a future task explicitly
-  includes UI work. `src/ui/` remains read-only under the current repository
-  instructions.
+- The remaining UI-side PC source-handle import wrappers, if a future task
+  explicitly includes UI work. `src/ui/` remains read-only under the current
+  repository instructions.
 
 ## Validation
 

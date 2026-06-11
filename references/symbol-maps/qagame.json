@@ -996,7 +996,7 @@
       "signature": "void AIEnter_Lead_Teammate(bot_state_t *bs)",
       "string_refs": [],
       "relocation_refs": [],
-      "comment": "Retail-only team tutorial enter helper that points the bot at the adjacent lead teammate node and preserves the lead teammate state label from the retail bot tutorial flow."
+      "comment": "Mapped-only team tutorial enter helper. HLIL seeds `ltg_time` with `FloatTime()+99999`, assigns retail LTG value `0x12` / `LTG_TOURING`, clears the lead-teammate tutorial scratch fields in the `0x241c..0x2500` tail, points `ainode` at `AINode_Lead_Teammate`, applies the tutorial bot-state flags, resolves the local client via the adjacent helper, and records the `lead teammate` node label."
     },
     {
       "address": "0x1000FA00",
@@ -1016,7 +1016,7 @@
       "signature": "void AIEnter_Torment_Human(bot_state_t *bs)",
       "string_refs": [],
       "relocation_refs": [],
-      "comment": "Retail-only tutorial enter helper that swaps the bot into the adjacent torment human node while preserving the torment human label from the retail training script."
+      "comment": "Mapped-only tutorial enter helper. HLIL seeds `ltg_time` with `FloatTime()+99999`, assigns retail LTG value `0x13` / `LTG_TORMENT_HUMAN`, points `ainode` at `AINode_Torment_Human`, clears the cached enemy and the `+0x2498` torment retry/stall counter, applies the training entity flag bit, and records the `torment human` node label."
     },
     {
       "address": "0x10011980",
@@ -1036,7 +1036,7 @@
       "signature": "void AIEnter_Lead_Teammate_FragBait(bot_state_t *bs)",
       "string_refs": [],
       "relocation_refs": [],
-      "comment": "Descriptive retail-only late tutorial enter helper. `BotDeathmatchAI` enters this state when the recovered training phase selector reaches `3`, and the body resets the late-training timers and flags, reapplies the tutorial bot-state bits, and records the node switch under the retail `lead teammate` label before handing control to the adjacent fragbait / return node."
+      "comment": "Mapped-only late tutorial enter helper. `BotDeathmatchAI` enters this state when the recovered training phase selector reaches `3`; HLIL clears the late tutorial scratch fields, seeds `ltg_time` with `FloatTime()+99999`, sets the `+0x2444` timer to `FloatTime()+10`, assigns retail LTG value `0x14` / `LTG_TARGET`, points `ainode` at `AINode_Lead_Teammate_FragBait`, reapplies the tutorial bot-state bits, and records the node switch under the retail `lead teammate` label."
     },
     {
       "address": "0x10012560",
@@ -1059,7 +1059,7 @@
       "signature": "void AIEnter_InstaGib(bot_state_t *bs)",
       "string_refs": [],
       "relocation_refs": [],
-      "comment": "Retail-only enter helper for the instant-rail tutorial mode. HLIL shows it assigning the adjacent insta-gib node and preserving the insta gib! label from the bot state machine."
+      "comment": "Source-backed enter helper for the instant-rail tutorial mode. HLIL shows the long ltg_time seed, retail LTG value 0x15, adjacent insta-gib node assignment, and the `insta gib!` node-switch label now represented by ai_dmnet.c::AIEnter_InstaGib."
     },
     {
       "address": "0x10013410",
@@ -1069,7 +1069,7 @@
       "signature": "int AINode_InstaGib(bot_state_t *bs)",
       "string_refs": [],
       "relocation_refs": [],
-      "comment": "Retail-only instagib tutorial node identified by the exact insta gib! observer/no ai node/found enemy strings and the surrounding rail-only combat state transitions."
+      "comment": "Source-backed instagib tutorial node identified by the exact observer/intermission/dead/no-ai/found-enemy strings, BotFindInstaGibTarget entry call, 0x011C0FBE travel mask, BotApplyBeyondRealityTravelFlags handoff, BotMoveToGoal path, and movement-view/weapon tail now represented by ai_dmnet.c::AINode_InstaGib. The raw retail player-state cleanup offsets on dead/intermission exits remain documented as a tail-layout boundary."
     },
     {
       "address": "0x10020200",
@@ -1079,7 +1079,7 @@
       "signature": "int BotFindInstaGibTarget(bot_state_t *bs)",
       "string_refs": [],
       "relocation_refs": [],
-      "comment": "Descriptive retail-only instagib target picker. It first validates the cached target through the full 360-degree visibility and route checks, then scans live players or entities for the closest reachable opponent before returning the chosen entity number to AINode_InstaGib."
+      "comment": "Source-backed instagib target picker. It first validates the cached target through the full 360-degree visibility and route checks, then scans live players or entities for the closest reachable opponent before returning the chosen entity number to AINode_InstaGib."
     },
     {
       "address": "0x10020600",
@@ -1089,7 +1089,7 @@
       "signature": "int BotRefreshInstaGibTargetGoal(bot_state_t *bs)",
       "string_refs": [],
       "relocation_refs": [],
-      "comment": "Descriptive retail-only instagib goal refresher. HLIL shows it revalidating the cached target entity at `bs->target_goal.entitynum`, refreshing the stored goal origin, bounds, area number, and expiry window in the `0x19C0` goal slab, and clearing the timer when the target is no longer valid."
+      "comment": "Source-backed instagib goal refresher. HLIL shows it revalidating the cached target entity at `bs->target_goal.entitynum`, refreshing the stored goal origin, bounds, area number, and expiry window in the `0x19C0` goal slab, and clearing the timer when the target is no longer valid."
     },
     {
       "address": "0x10020730",
@@ -1099,7 +1099,7 @@
       "signature": "void BotGetInstaGibTargetGoal(bot_state_t *bs, bot_goal_t *goal)",
       "string_refs": [],
       "relocation_refs": [],
-      "comment": "Descriptive retail-only instagib goal getter. It tries `BotRefreshInstaGibTargetGoal`, falls back to a fresh nearest-target scan when needed, seeds the instagib LTG timers and target entity number, and finally copies the cached goal slab out to the caller."
+      "comment": "Source-backed instagib goal getter. It tries `BotRefreshInstaGibTargetGoal`, falls back to a fresh nearest-target scan when needed, seeds the instagib LTG timers and target entity number, and finally copies the cached goal slab out to the caller."
     },
     {
       "address": "0x10013AC0",
@@ -1551,7 +1551,7 @@
       "signature": "int BotWantsToChase(bot_state_t *bs)",
       "string_refs": [],
       "relocation_refs": [],
-      "comment": "Chase-decision helper identified by the complementary CTF, 1FCTF, obelisk, and harvester carrier checks, the LTG_GETFLAG rejection, and the final BotAggression>50 gate from ai_dmq3.c::BotWantsToChase."
+      "comment": "Chase-decision helper identified by the complementary CTF, 1FCTF, obelisk, and harvester carrier checks, the retail invalid-enemy guard before flag-carrier probing, the LTG_GETFLAG rejection, and the final BotAggression>50 gate from ai_dmq3.c::BotWantsToChase."
     },
     {
       "address": "0x10017740",
@@ -1631,7 +1631,7 @@
       "signature": "bot_moveresult_t BotAttackMove(bot_state_t *bs, int tfl)",
       "string_refs": [],
       "relocation_refs": [],
-      "comment": "Combat-movement helper identified by the attack chase-goal fast path, the attack_skill/jumper/croucher characteristic reads, the BFL_STRAFERIGHT flip logic, and the forward/backward/sideward movement selection from ai_dmq3.c::BotAttackMove."
+      "comment": "Source-backed combat-movement helper identified by the attack chase-goal fast path, the attack_skill/jumper/croucher characteristic reads, the gauntlet zero-distance special case, the 0.4+(1-skill)*0.2 strafe cadence with high-skill jitter, the BFL_STRAFERIGHT flip/reset logic, and the forward/backward/sideward movement selection from ai_dmq3.c::BotAttackMove."
     },
     {
       "address": "0x10018900",
@@ -1671,7 +1671,7 @@
       "signature": "int BotFindEnemy(bot_state_t *bs, int curenemy)",
       "string_refs": [],
       "relocation_refs": [],
-      "comment": "Enemy-acquisition helper identified by the GT_OBELISK special-case obelisk visibility branch, the easyfragger/chatting and invisibility filters, the alertness distance gate, and the BotEntityVisible-driven enemy handoff from ai_dmq3.c::BotFindEnemy."
+      "comment": "Enemy-acquisition helper identified by the GT_OBELISK special-case obelisk visibility branch, the easyfragger/chatting and invisibility filters, the alertness distance gate, the BotEntityVisible handoff, and the retail offscreen/heard-client acceptance side path through BotAcceptOffscreenEnemyCandidate from ai_dmq3.c::BotFindEnemy."
     },
     {
       "address": "0x100198A0",
@@ -1941,7 +1941,7 @@
       "signature": "void BotCheckEvents(bot_state_t *bs, entityState_t *state)",
       "string_refs": [],
       "relocation_refs": [],
-      "comment": "Exact match for ai_dmq3.c::BotCheckEvents. The retail body preserves the global/general sound range warnings and the event-driven chatter for falling, respawn, and powerup pickup sounds."
+      "comment": "Exact match for ai_dmq3.c::BotCheckEvents. The retail body preserves the global/general sound range warnings, event-driven chatter for falling, respawn, and powerup pickup sounds, and the heard-client event mask consumed by the offscreen enemy acceptance path."
     },
     {
       "address": "0x1001EAF0",
@@ -1991,7 +1991,7 @@
       "signature": "void BotDeathmatchAI(bot_state_t *bs, float thinktime)",
       "string_refs": [],
       "relocation_refs": [],
-      "comment": "Exact match for ai_dmq3.c::BotDeathmatchAI. The control flow, setupcount handling, console-message pass, team AI handoff, enter-game chat, and node dispatch string all line up with the GPL bot think loop."
+      "comment": "Source-backed ai_dmq3.c::BotDeathmatchAI. The control flow, setupcount handling, console-message pass, team AI handoff, retail instagib-mode dispatch into AIEnter_InstaGib, enter-game chat, and node dispatch string line up with the recovered qagame bot think loop."
     },
     {
       "address": "0x1001F4C0",
@@ -2021,7 +2021,7 @@
       "signature": "int BotSelectTormentTarget(bot_state_t *bs, float maxDist)",
       "string_refs": [],
       "relocation_refs": [],
-      "comment": "Descriptive retail-only tutorial target selector used by `AINode_Torment_Human`. It first revalidates the cached torment target with a 360-degree visibility, distance, and reachability check, then scans the live client and entity slabs for the nearest reachable candidate within the supplied radius before returning the chosen entity number or `-1`."
+      "comment": "Source-backed tutorial target selector used by `AINode_Torment_Human`. It first revalidates the cached torment target with a 360-degree visibility, caller-supplied distance, and reachability check, then scans the 64-client retail slab for human `PM_NORMAL` candidates, trace-assisted reachable humans, and finally the nearest valid human target before returning the chosen entity number or `-1`."
     },
     {
       "address": "0x1001FEC0",
@@ -2033,7 +2033,7 @@
         "0x1007D220"
       ],
       "relocation_refs": [],
-      "comment": "Descriptive retail-only tutorial helper used by the lead-teammate and torment-human nodes. It resolves either the current entity-linked `info_tour_point` or the first active fallback tour point, traces that point to floor height, writes the point origin plus linked `info_notnull` target origin to the output vectors, and returns the chosen tour-point entity number."
+      "comment": "Source-backed tutorial helper used by the lead-teammate and torment-human nodes. It resolves either the current entity-linked `info_tour_point` or the first active fallback tour point, traces that point down to floor height, writes the point origin plus linked `info_notnull` target origin to the output vectors, and returns the chosen tour-point entity number."
     },
     {
       "address": "0x10020980",
@@ -2083,7 +2083,7 @@
       "signature": "qboolean BotAcceptOffscreenEnemyCandidate(bot_state_t *bs, int clientNum)",
       "string_refs": [],
       "relocation_refs": [],
-      "comment": "Descriptive retail-only `BotFindEnemy` sidecar reached only when the direct `BotEntityVisible` test fails. HLIL shows it rechecking the current enemy slot, consulting the live candidate entity state through the botlib imports, and returning true when the unseen client still qualifies as a promotable enemy candidate."
+      "comment": "Source-backed `BotFindEnemy` sidecar reached only when the direct `BotEntityVisible` test fails. HLIL shows the no-current-enemy, no-retreat, wants-chase, top/second goal-stack, skill>=4, and heard-client-mask gates used to accept an unseen client and set the `enemyFromGoalStack` telemetry marker."
     },
     {
       "address": "0x10020D70",
@@ -2113,7 +2113,7 @@
       "signature": "int BotCanSpawnTourPoint(void)",
       "string_refs": [],
       "relocation_refs": [],
-      "comment": "Descriptive retail-only tour-point gate. It scans the live entity slab for a free or expired tutorial marker slot, and the caller immediately uses the result to decide whether it can recycle an `info_tour_point` spot."
+      "comment": "Source-backed tour-point spawn gate. It scans non-client entity slots from `MAX_CLIENTS` to `ENTITYNUM_MAX_NORMAL`, returns true only for a free slot whose `freetime + 2000` has expired against `level.time`, and is consumed by the retail-expanded AAS debug/tour-point path."
     },
     {
       "address": "0x10020F00",
@@ -2315,7 +2315,7 @@
         "0x1007DF30"
       ],
       "relocation_refs": [],
-      "comment": "Descriptive retail-only selected-bot telemetry publisher. It formats the preserved `e\\\\...\\\\ainode\\\\...\\\\ltg\\\\...` debug payload with enemy, top-goal, script-goal, LTG, battle, and skill fields, then pushes it through configstring slot `0x10` from the `BotAIStartFrame` tail."
+      "comment": "Selected-bot telemetry publisher. It formats the preserved `e\\\\...\\\\ainode\\\\...\\\\ltg\\\\...\\\\eh\\\\...` debug payload with enemy, top-goal, script-goal, LTG, battle, skill, and offscreen-enemy marker fields, then pushes it through configstring slot `0x10` from the `BotAIStartFrame` tail."
     },
     {
       "address": "0x10023C00",
@@ -2398,7 +2398,7 @@
       "signature": "void BotSetTrainingBotState(bot_state_t *bs, qboolean enabled)",
       "string_refs": [],
       "relocation_refs": [],
-      "comment": "Descriptive retail-only training-state toggle used by the seek-teammate and lead-teammate tutorial nodes. The helper sets or clears the local bot entity's training flags and paired timer fields in the same pattern those nodes unwind on observer, intermission, and no-client exits."
+      "comment": "Descriptive training-state toggle used by the seek-teammate and lead-teammate tutorial nodes. The helper sets or clears the local bot entity's retail training flag groups, grants rocket-launcher ammo plus weapon bits on enable, and restores shotgun ammo while clearing those entity flags on disable."
     },
     {
       "address": "0x10024640",
@@ -2410,7 +2410,7 @@
         "0x1007E1C4"
       ],
       "relocation_refs": [],
-      "comment": "Descriptive retail-only training helper keyed by the exact `bot_itemDelayTime` cvar string. The body resets that cvar to `0`, reads `g_spSkill`, and applies the retail staged `10/15/20/25` delays during the tutorial-specific bot-training flow."
+      "comment": "Source-backed training helper keyed by the exact `bot_itemDelayTime` cvar string. The body no-ops outside `g_training`, resets the delay to `0`, reads `g_spSkill`, and applies the retail staged `10/15/20/25` delays from the `BotAIStartFrame` time input during the tutorial-specific bot-training flow."
     },
     {
       "address": "0x10024700",
@@ -2420,7 +2420,7 @@
       "signature": "void BotAppendDynamicSkillSample(bot_state_t *bs, int delta, float skill, int time)",
       "string_refs": [],
       "relocation_refs": [],
-      "comment": "Descriptive retail-only dynamic-skill history helper. It maintains the capped 32-entry sample ring under the `BotUpdateDynamicSkill` state slab, shifting older triplets forward when full and appending the newest delta, skill, and timestamp sample."
+      "comment": "Descriptive dynamic-skill history helper. It maintains the capped 32-entry sample ring under the `BotUpdateDynamicSkill` state slab, shifting older triplets forward when full and appending the newest score-delta, skill, and timestamp sample."
     },
     {
       "address": "0x100247C0",
@@ -2430,7 +2430,7 @@
       "signature": "void BotUpdateDynamicSkill(int time)",
       "string_refs": [],
       "relocation_refs": [],
-      "comment": "Descriptive retail-only bot training helper. The body polls cl_running and g_spSkill, recalculates dynamic skill feedback, reloads character and weapon weights, and refreshes client userinfo when the single-player training skill shifts."
+      "comment": "Descriptive bot training helper. The body polls `bot_dynamicSkill` and `cl_running`, throttles feedback updates on elapsed level seconds, compares local-player and bot scores, reloads character/item/weapon weights, refreshes client userinfo, and mirrors the adjusted single-player training skill."
     },
     {
       "address": "0x10024E10",
@@ -2442,7 +2442,7 @@
         "0x1007D71C"
       ],
       "relocation_refs": [],
-      "comment": "Descriptive retail-only map-specific travel-flag helper. It reads the current `mapname` from serverinfo and clears `TFL_FUNCBOB` unless the map is exactly `beyondreality`, matching the dedicated func-bobbing exception used by the late tutorial lead path."
+      "comment": "Descriptive map-specific travel-flag helper. It reads the current `mapname` from serverinfo and clears `TFL_FUNCBOB` when the map is exactly `beyondreality`, matching the dedicated func-bobbing exception used by the late tutorial lead path."
     },
     {
       "address": "0x10024EA0",

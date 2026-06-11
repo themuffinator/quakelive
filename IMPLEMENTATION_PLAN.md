@@ -1,6 +1,6 @@
 # Implementation Plan
 
-Last updated: 2026-06-06
+Last updated: 2026-06-11
 
 This file now tracks only active repo-level work. Detailed closure narratives
 live in the dedicated subsystem audits under `docs/reverse-engineering/`.
@@ -46,6 +46,2033 @@ disabled, until a documented open replacement path exists.
   pick and close remaining `src/ui/menudef.h` ownerdraw IDs.
 
 ## Active work
+
+### Task A410: Map Steam client helper aliases [COMPLETED]
+Priority: High
+Primary areas: `references/analysis/quakelive_symbol_aliases.json`,
+`tests/test_platform_services.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_545.md`
+Parity estimate: **before 72% -> after 99%** for focused Steam client helper
+alias confidence, **before 90% -> after 98%** for focused Steam
+launch/runtime helper evidence coverage, and overall Steam launch/runtime
+reconstruction parity **92.15% -> 92.2%**.
+
+Completed work:
+
+1. Rechecked the retail `0x00460510..0x00461d40` Steam client helper band
+   against Binary Ninja HLIL, committed Ghidra function-size rows, and the
+   reconstructed client/platform Steam source.
+2. Promoted missing Ghidra-style `FUN_*` aliases and lower-case Binary Ninja
+   spellings for `SteamClient_IsInitialized`, `SteamClient_GetSteamID`,
+   auth-ticket acquire/cancel, persona sync, avatar image handle lookup, and
+   the per-frame Steam client pump.
+3. Added a focused parity gate that cross-checks alias promotion, row
+   address/size metadata, HLIL function starts, and retained source function
+   definitions for the Steam launch/runtime helper band.
+
+### Task A409: Map botlib goal/fuzzy Ghidra alias bridge [COMPLETED]
+Priority: High
+Primary areas: `references/analysis/quakelive_symbol_aliases.json`,
+`tests/test_botlib_goal_item_parity.py`,
+`docs/reverse-engineering/botlib-goal-item-mapping-2026-06-06.md`,
+`docs/reverse-engineering/botlib-goal-fuzzy-ghidra-bridge-recheck-2026-06-11.md`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_544.md`
+Parity estimate: **before 58% -> after 98%** for focused goal/fuzzy/item
+Ghidra/Binary Ninja alias bridge confidence, **before 95% -> after 97%** for
+focused goal-item source/wiring evidence confidence, and overall botlib static
+mapping **89.5% -> 89.7%**.
+
+Completed work:
+
+1. Rechecked the retail `0x0049C6C0..0x0049F920` botlib goal band across
+   genetic selection, goal fuzzy-logic helpers, item/avoid/goal-stack helpers,
+   LTG/NBG choice, item weights, and goal-state lifecycle owners against
+   Binary Ninja HLIL and the committed Ghidra function-size rows.
+2. Promoted matching Ghidra-style `FUN_*` aliases for all 39 committed rows in
+   the band, keeping the existing Binary Ninja `sub_*` owner names as the
+   source-owner pair for each alias.
+3. Strengthened the goal-item parity gate so the band now proves `sub_*` and
+   `FUN_*` aliases resolve to the same owner while pinning the Ghidra row size
+   for every selected function.
+
+### Task A408: Map Steam Lobby owner aliases [COMPLETED]
+Priority: High
+Primary areas: `references/analysis/quakelive_symbol_aliases.json`,
+`tests/test_platform_services.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_543.md`
+Parity estimate: **before 70% -> after 99%** for focused Steam lobby owner
+alias confidence, **before 88% -> after 98%** for focused SteamMatchmaking
+Ghidra/Binary Ninja evidence coverage, and overall Steam launch/runtime
+reconstruction parity **92.1% -> 92.15%**.
+
+Completed work:
+
+1. Rechecked the retail `0x004645a0..0x00465840` Steam lobby owner band against
+   Binary Ninja HLIL, the committed Ghidra function-size rows, and the
+   reconstructed client/platform Steam lobby source.
+2. Promoted missing Ghidra-style `FUN_*` aliases and lower-case Binary Ninja
+   spellings for stable `SteamLobby*` source-owner names while keeping
+   `CL_Steam_ConnectLobby_f` as an explicit Binary Ninja-only no-row boundary.
+3. Strengthened the lobby social wrapper parity gate around alias promotion,
+   Ghidra row/size anchors, HLIL function starts, matchmaking/friends wrapper
+   slots, and the documented `connect_lobby` Ghidra-row absence.
+
+### Task A407: Map botlib chat Ghidra alias bridge [COMPLETED]
+Priority: High
+Primary areas: `references/analysis/quakelive_symbol_aliases.json`,
+`tests/test_botlib_chat_parity.py`,
+`docs/reverse-engineering/botlib-chat-tail-source-mapping-2026-06-05.md`,
+`docs/reverse-engineering/botlib-chat-ghidra-bridge-recheck-2026-06-11.md`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_542.md`
+Parity estimate: **before 63% -> after 98%** for focused botlib chat
+Ghidra/Binary Ninja alias bridge confidence, **before 91% -> after 96%** for
+focused botlib chat source/wiring evidence confidence, and overall botlib
+static mapping **89.3% -> 89.5%**.
+
+Completed work:
+
+1. Rechecked the retail `be_ai_chat.c` corridor from console-message heap
+   helpers through chat resource loading, match helpers, public chat exports,
+   and chat AI setup/shutdown against Binary Ninja HLIL and the committed
+   Ghidra function-size rows.
+2. Promoted matching Ghidra-style `FUN_*` aliases for every chat-corridor
+   owner that has a committed Ghidra row, while keeping `BotAllocChatState`
+   (`sub_49C440`) as an explicit Binary Ninja-only owner because
+   `functions.csv` has no `0049c440` row.
+3. Strengthened the chat parity gate with a central alias-row bridge check
+   that verifies `sub_*` and `FUN_*` aliases resolve to the same source owner,
+   pins row sizes/thunks/calling conventions, and preserves the no-row
+   `BotAllocChatState` boundary.
+
+### Task A406: Map Steam Workshop owner aliases [COMPLETED]
+Priority: High
+Primary areas: `references/analysis/quakelive_symbol_aliases.json`,
+`tests/test_platform_services.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_541.md`
+Parity estimate: **before 76% -> after 99%** for focused Steam Workshop owner
+alias confidence, **before 90% -> after 98%** for focused Workshop/UGC
+Ghidra/Binary Ninja evidence coverage, and overall Steam launch/runtime
+reconstruction parity **92.05% -> 92.1%**.
+
+Completed work:
+
+1. Rechecked the retail `0x00469260..0x004699c0` Steam Workshop/UGC owner band
+   against Binary Ninja HLIL, the committed Ghidra function-size rows, and the
+   reconstructed client/platform Workshop source.
+2. Promoted missing Ghidra-style `FUN_*` aliases and lower-case Binary Ninja
+   spellings for stable `SteamWorkshop_*` source-owner names.
+3. Strengthened the Workshop bootstrap parity gate around alias promotion,
+   Ghidra row/size anchors, HLIL owner signatures, required-item bootstrap,
+   queue advancement, download request cvars, finalization, and completion
+   behavior.
+
+### Task A405: Map SteamStats owner aliases [COMPLETED]
+Priority: High
+Primary areas: `references/analysis/quakelive_symbol_aliases.json`,
+`tests/test_platform_services.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_540.md`
+Parity estimate: **before 74% -> after 99%** for focused SteamStats owner
+alias confidence, **before 91% -> after 98%** for focused GameServerStats
+Ghidra/Binary Ninja evidence coverage, and overall Steam launch/runtime
+reconstruction parity **92.0% -> 92.05%**.
+
+Completed work:
+
+1. Rechecked the retail `0x004670c0..0x00468ee0` SteamStats owner band against
+   Binary Ninja HLIL, the committed Ghidra function-size rows, and the
+   reconstructed server/platform Steam stats source.
+2. Promoted the missing Ghidra-style `FUN_*` aliases and lower-case Binary
+   Ninja spellings for stable `SteamStats_*` source-owner names while leaving
+   raw callback destructor thunks unpromoted.
+3. Strengthened the Steam stats parity gate around alias promotion, Ghidra
+   row/size anchors, stats-received/stored callbacks, pending value flush,
+   event processing, summary broadcast, and GameServerStats vtable ownership.
+
+### Task A404: Map botlib script lifecycle and loader bridge [COMPLETED]
+Priority: High
+Primary areas: `references/analysis/quakelive_symbol_aliases.json`,
+`tests/test_botlib_parser_tail_coverage_parity.py`,
+`docs/reverse-engineering/botlib-parser-tail-coverage-mapping-2026-06-06.md`,
+`docs/reverse-engineering/botlib-script-lifecycle-loader-bridge-recheck-2026-06-11.md`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_539.md`
+Parity estimate: **before 64% -> after 98%** for focused script
+lifecycle/loader Ghidra/Binary Ninja alias bridge confidence, **before 82% ->
+after 95%** for focused `l_script.c` loader/token-dispatch source evidence,
+and overall botlib parser/support static mapping **89.0% -> 89.3%**.
+
+Completed work:
+
+1. Rechecked the `l_script.c` lifecycle and loader band from
+   `PS_CreatePunctuationTable` through `PS_SetBaseFolder` against Binary Ninja
+   HLIL and the committed Ghidra function-size rows.
+2. Promoted the missing Ghidra-style `FUN_*` aliases for script diagnostics,
+   whitespace, string/name/value readers, primitive/full-token readers, quote
+   strippers, flag/end helpers, file and memory loaders, script free, and
+   base-folder setter.
+3. Strengthened the parser-tail parity gate around row sizes, representative
+   HLIL anchors, `l_script.h` prototypes, punctuation-table construction,
+   diagnostics, whitespace/comment skipping, token dispatch, loader allocation
+   layout, file read/compress flow, memory copy flow, free, and base-folder
+   setup.
+
+### Task A403: Map Steam server lifecycle helper aliases [COMPLETED]
+Priority: High
+Primary areas: `references/analysis/quakelive_symbol_aliases.json`,
+`tests/test_platform_services.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_538.md`
+Parity estimate: **before 72% -> after 99%** for focused Steam server
+lifecycle/auth helper alias confidence, **before 90% -> after 98%** for
+focused Ghidra/Binary Ninja helper-band evidence coverage, and overall Steam
+launch/runtime reconstruction parity **91.95% -> 92.0%**.
+
+Completed work:
+
+1. Rechecked the retail `0x00465a30..0x00466b90` Steam server lifecycle,
+   identity, packet, heartbeat, unauthenticated-user, and auth-session helper
+   band against Binary Ninja HLIL and the committed Ghidra function-size rows.
+2. Promoted the missing Ghidra-style `FUN_*` aliases and lower-case Binary
+   Ninja spellings for helpers already represented by stable source-side
+   `SteamServer_*` names.
+3. Strengthened the Steam GameServer wrapper parity gate around alias
+   promotion, Ghidra row/size anchors, retail HLIL call ownership, and the
+   reconstructed platform-layer vtable wrappers.
+
+### Task A402: Map botlib parser lexer number/punctuation bridge [COMPLETED]
+Priority: High
+Primary areas: `references/analysis/quakelive_symbol_aliases.json`,
+`tests/test_botlib_parser_tail_coverage_parity.py`,
+`docs/reverse-engineering/botlib-parser-tail-coverage-mapping-2026-06-06.md`,
+`docs/reverse-engineering/botlib-parser-lexer-number-punctuation-bridge-recheck-2026-06-11.md`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_537.md`
+Parity estimate: **before 82% -> after 99%** for focused parser-tail
+Ghidra/Binary Ninja alias bridge confidence, **before 45% -> after 96%** for
+focused `PS_ReadPunctuation` source/HLIL coverage, and **before 88% -> after
+90%** for focused lower botlib lexer/structure-number bridge confidence.
+
+Completed work:
+
+1. Rechecked `PC_EvaluateTokens`, `PS_ReadEscapeCharacter`, `PS_ReadNumber`,
+   `PS_ReadPunctuation`, `PS_ExpectTokenType`, and structure `ReadNumber`
+   against Binary Ninja HLIL and Ghidra function-size rows.
+2. Promoted the missing Ghidra-style `FUN_*` aliases for the selected lower
+   parser/lexer rows while preserving the existing Binary Ninja `sub_*`
+   spellings.
+3. Strengthened the parser-tail parity gate around `PS_ReadPunctuation` table
+   lookup, punctuation string copy, `TT_PUNCTUATION` type assignment,
+   punctuation subtype assignment, `PS_ReadToken` dispatch, and structure
+   numeric conversion through `ReadNumber`.
+
+### Task A401: Map Steam GameServer callback bootstrap aliases [COMPLETED]
+Priority: High
+Primary areas: `references/analysis/quakelive_symbol_aliases.json`,
+`tests/test_platform_services.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_536.md`
+Parity estimate: **before 70% -> after 99%** for focused GameServer callback
+bootstrap alias confidence, **before 92% -> after 98%** for focused server
+callback registration evidence coverage, and overall Steam launch/runtime
+reconstruction parity **91.9% -> 91.95%**.
+
+Completed work:
+
+1. Rechecked retail `SteamServerCallbacks_Init` (`0x00466db0`) and its
+   immediate connected, failure, disconnected, auth-ticket, and P2P callback
+   targets against Binary Ninja HLIL and the committed Ghidra function-size
+   rows where present.
+2. Promoted the missing Ghidra-style `FUN_*` aliases for the callback entries
+   emitted in `functions.csv` and added lower-case Binary Ninja spellings for
+   the full server callback target set.
+3. Strengthened the Steam server callback parity gate around source binding
+   assignment order, Ghidra row anchors, Binary Ninja-only callback targets,
+   and the existing retail callback-id/flag evidence.
+
+### Task A400: Map botlib cgame PC source-handle bridge [COMPLETED]
+Priority: High
+Primary areas: `references/analysis/quakelive_symbol_aliases.json`,
+`tests/test_botlib_cgame_native_import_slab_parity.py`,
+`docs/reverse-engineering/botlib-precompiler-source-handle-mapping-2026-06-05.md`,
+`docs/reverse-engineering/botlib-cgame-pc-source-handle-bridge-recheck-2026-06-11.md`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_535.md`
+Parity estimate: **before 78% -> after 98%** for focused cgame PC
+source-handle bridge confidence, **before 88% -> after 96%** for focused
+botlib precompiler-to-cgame wiring evidence, and overall botlib plus adjacent
+parser/import wiring **69.0% -> 69.2%**.
+
+Completed work:
+
+1. Rechecked the retail `0x004b0270..0x004b02d0` PC source-handle wrapper band
+   against Binary Ninja HLIL, the Ghidra function-size rows, and the two native
+   cgame import table placements.
+2. Promoted the missing Ghidra-style `FUN_*` aliases for the four PC
+   source-handle callbacks while retaining the existing stable
+   `QLUIImport_*` names.
+3. Strengthened the native cgame botlib parity gate around the host table
+   jumps, cgame native import slots, `CG_MapNativeImport`,
+   `ql_cgame_imports.inc`, legacy `CL_CgameSystemCallsImpl` dispatch into
+   `botlib_export->PC_*`, cgame `trap_PC_*` wrappers, and the retail
+   `cgamex86.dll` `CG_ParseMenu` consumer.
+
+### Task A399: Map Steam client callback bootstrap aliases [COMPLETED]
+Priority: High
+Primary areas: `references/analysis/quakelive_symbol_aliases.json`,
+`tests/test_platform_services.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_534.md`
+Parity estimate: **before 68% -> after 99%** for focused Steam client
+callback bootstrap alias confidence, **before 90% -> after 98%** for focused
+callback registration evidence coverage, and overall Steam launch/runtime
+reconstruction parity **91.85% -> 91.9%**.
+
+Completed work:
+
+1. Rechecked retail `SteamCallbacks_Init` (`0x004613a0`), the seven immediate
+   client callback targets, `SteamMicroCallbacks_Init` (`0x004659e0`), and
+   `SteamMicroCallbacks_OnAuthorizationResponse` (`0x004658a0`) against Binary
+   Ninja HLIL and Ghidra function-size rows.
+2. Promoted the missing Ghidra-style `FUN_*` aliases and lower-case Binary
+   Ninja spellings for the callback bootstrap bridge into the shared alias
+   corpus.
+3. Strengthened the Steam callback registration parity gate around callback
+   ids, constructor signatures, source binding assignment order, the UGC
+   call-result slot, and the microtransaction callback target.
+
+### Task A398: Map native cgame sound import alias bridge [COMPLETED]
+Priority: High
+Primary areas: `references/analysis/quakelive_symbol_aliases.json`,
+`tests/test_botlib_cgame_native_import_slab_parity.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_533.md`
+Parity estimate: **before 88% -> after 99%** for focused native cgame sound
+import alias coverage, **before 82% -> after 98%** for focused cgame sound
+import Ghidra/Binary Ninja bridge coverage, and overall sound-system wiring
+reconstruction parity **93.8% -> 93.85%**.
+
+Completed work:
+
+1. Rechecked the retail native cgame sound import wrapper band
+   (`0x004afe10..0x004afed0`) against Binary Ninja HLIL, the Ghidra
+   function-size rows, and the reconstructed native import table/source
+   wrappers.
+2. Promoted the stable Ghidra-style `FUN_*` aliases for start sound, volume
+   start sound, local volume sound, looping sound, entity-position,
+   respatialize, register-sound, and background-track start wrappers.
+3. Strengthened the native cgame import slab parity gate so the sound wrapper
+   band is pinned by both Binary Ninja `sub_*` names and Ghidra `FUN_*` names,
+   while preserving the deliberately unpromoted raw stop-background-track table
+   slot boundary.
+
+### Task A397: Recheck botlib tutorial enter wiring [COMPLETED]
+Priority: High
+Primary areas: `src/code/game/ai_main.h`, `src/code/game/ai_main.c`,
+`tests/test_botlib_qagame_ai_dmnet_tutorial_tail_parity.py`,
+`references/symbol-maps/qagame.json`,
+`docs/reverse-engineering/botlib-qagame-ai-dmnet-tutorial-tail-mapping-2026-06-06.md`,
+`docs/reverse-engineering/botlib-qagame-tutorial-enter-wiring-recheck-2026-06-11.md`
+Parity estimate: **before 70% -> after 96%** for focused tutorial
+enter-helper mapping confidence, **before 50% -> after 98%** for focused
+retail tutorial LTG-name source coverage, and overall botlib/qagame AI
+tutorial-tail parity **99.35% -> 99.4%**.
+
+Completed work:
+
+1. Rechecked `AIEnter_Lead_Teammate`, `AIEnter_Torment_Human`, and
+   `AIEnter_Lead_Teammate_FragBait` against Binary Ninja HLIL and the qagame
+   Ghidra function-size rows.
+2. Reconstructed the raw tutorial LTG values `0x10..0x14` as named source
+   constants and replaced the matching debug-label switch cases in
+   `BotDebugLTGTypeName`.
+3. Strengthened the tutorial-tail parity gate around the enter helpers'
+   LTG assignments, adjacent node-pointer writes, torment cached-enemy reset,
+   torment retry/stall counter reset, fragbait timer seed, and tutorial
+   bot-state flag writes.
+4. Updated the symbol map and reverse-engineering notes to keep the small enter
+   helpers mapped-only until the larger `AINode_Torment_Human` /
+   lead-teammate tutorial state-machine bodies and their `0x241c..0x2500`
+   `bot_state_t` tail fields are reconstructed.
+
+### Task A396: Map cgame sound registration evidence bridge [COMPLETED]
+Priority: High
+Primary areas: `references/analysis/quakelive_symbol_aliases.json`,
+`tests/test_cgame_sound_registration_parity.py`,
+`tests/test_cgame_sound_wiring_parity.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_532.md`
+Parity estimate: **before 82% -> after 98%** for focused cgame
+sound-registration evidence coverage, **before 75% -> after 99%** for
+focused `CG_RegisterSounds` alias bridge coverage, and overall sound-system
+wiring reconstruction parity **93.7% -> 93.8%**.
+
+Completed work:
+
+1. Rechecked retail `CG_RegisterSounds` (`0x10020e70`) and
+   `CG_BuildAnnouncerSoundPath` (`0x10020dd0`) against Binary Ninja HLIL,
+   Ghidra function-size rows, the cgame symbol map, and reconstructed
+   `cg_main.c` source.
+2. Promoted the missing `sub_10020e70 -> CG_RegisterSounds` alias beside the
+   existing Ghidra-style `FUN_10020e70` alias.
+3. Strengthened the cgame sound registration parity gate around teamplay
+   announcer samples, configured announcer samples, powerup announcer samples,
+   direct item/effect `.ogg` registrations, and the complete source-side
+   legacy `.wav` rejection set.
+
+### Task A395: Map Steam client and lobby bootstrap aliases [COMPLETED]
+Priority: High
+Primary areas: `references/analysis/quakelive_symbol_aliases.json`,
+`tests/test_platform_services.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_531.md`
+Parity estimate: **before 74% -> after 99%** for focused Steam
+client/lobby bootstrap alias confidence, **before 92% -> after 98%** for
+focused launch/runtime bootstrap evidence coverage, and overall Steam
+launch/runtime reconstruction parity **91.75% -> 91.8%**.
+
+Completed work:
+
+1. Rechecked retail `SteamClient_Init` (`0x00461500`),
+   `SteamLobbyCallbacks_Init` (`0x004656a0`), and `SteamLobby_Init`
+   (`0x00465840`) against Binary Ninja HLIL and the Ghidra function-size
+   corpus.
+2. Promoted the missing Ghidra-style `FUN_*` aliases and the lower-case
+   Binary Ninja `sub_4656a0` spelling into the shared alias corpus.
+3. Strengthened the Steam platform parity gate around callback bootstrap,
+   lobby cvar/command registration, voice commands, conditional
+   `stats_clear`, rich presence, and the final success diagnostic ordering.
+
+### Task A394: Map cgame movement and environment event sounds [COMPLETED]
+Priority: High
+Primary areas: `references/analysis/quakelive_symbol_aliases.json`,
+`tests/test_cgame_sound_wiring_parity.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_530.md`
+Parity estimate: **before 78% -> after 97%** for focused cgame
+movement/environment event sound wiring confidence, **before 50% -> after
+98%** for focused `CG_PainEvent` alias/source-behavior coverage, and overall
+sound-system wiring reconstruction parity **93.6% -> 93.7%**.
+
+Completed work:
+
+1. Rechecked retail `CG_PainEvent` (`0x10019ca0`) and the movement/environment
+   sound branches under `CG_EntityEvent` (`0x10019eb0`) against Binary Ninja
+   HLIL, Ghidra function-size rows, the cgame symbol map, and reconstructed
+   `cg_event.c` / `cg_main.c` source.
+2. Promoted the missing `sub_10019ca0 -> CG_PainEvent` alias beside the
+   existing Ghidra-style `FUN_10019ca0` alias.
+3. Strengthened the cgame sound parity gate around footstep families, fall and
+   jump sounds, water transitions, teleport/item-respawn/grenade-bounce
+   sounds, pain/death/drown custom voice sounds, `cg_footsteps`, and the
+   matching `CG_RegisterSounds` media registration set.
+
+### Task A393: Recheck botlib qagame attack-move wiring [COMPLETED]
+Priority: High
+Primary areas: `tests/test_botlib_qagame_ai_dmq3_visibility_parity.py`,
+`references/symbol-maps/qagame.json`,
+`docs/reverse-engineering/botlib-qagame-ai-dmq3-visibility-mapping-2026-06-06.md`,
+`docs/reverse-engineering/botlib-qagame-attack-move-wiring-recheck-2026-06-11.md`
+Parity estimate: **before 94% -> after 98%** for focused
+`BotAttackMove` source-mapping confidence, **before 96% -> after 96.5%** for
+movement import wiring confidence, and overall botlib/qagame AI movement
+wiring parity **99.3% -> 99.35%**.
+
+Completed work:
+
+1. Rechecked retail `BotAttackMove` (`0x10018280`) against Binary Ninja HLIL,
+   Ghidra function-size metadata, the shared qagame alias corpus, and the
+   reconstructed `ai_dmq3.c` source body.
+2. Strengthened the visibility-band parity gate around the attack-chase goal
+   fast path, characteristic reads, gauntlet zero-distance behavior, jump and
+   crouch timers, retail strafe cadence, random flip thresholds, two-attempt
+   side movement fallback, and movement-failure strafe reset.
+3. Reconfirmed the botlib movement wiring through
+   `BOTLIB_AI_CHARACTERISTIC_BFLOAT`, `BOTLIB_AI_MOVE_TO_GOAL`, and
+   `BOTLIB_AI_MOVE_IN_DIRECTION` from qagame wrappers through native server
+   imports.
+4. Updated the qagame symbol-map comment and reverse-engineering notes to
+   distinguish the newly pinned static source shape from remaining live-map or
+   character-file tuning uncertainty.
+
+### Task A392: Map Steam GameServer init version literal owner [COMPLETED]
+Priority: High
+Primary areas: `src/code/qcommon/common.c`,
+`references/analysis/quakelive_symbol_aliases.json`,
+`tests/test_platform_services.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_529.md`
+Parity estimate: **before 70% -> after 98%** for focused Steam GameServer
+default-version owner confidence, **before 50% -> after 98%** for focused
+`SteamServer_Init` Ghidra/Binary Ninja alias bridge confidence, and overall
+Steam launch/runtime integration confidence **91.7% -> 91.75%**.
+
+Completed work:
+
+1. Rechecked retail `SteamServer_Init` (`sub_466ED0` / `FUN_00466ed0`) across
+   Binary Ninja HLIL, Ghidra function-size rows, and the reconstructed
+   `Com_InitSteamGameServer` / `QL_Steamworks_ServerInitWithVersion` owners.
+2. Confirmed the final `SteamGameServer_Init(...)` version argument is
+   `data_5674d4`, and Binary Ninja resolves that pointer to
+   `data_53fe9c {"1069"}`.
+3. Promoted `FUN_00466ed0 -> SteamServer_Init` beside the existing
+   `sub_466ED0 -> SteamServer_Init` alias.
+4. Replaced the old source diagnostic label
+   `unpromoted retail default version owner` with
+   `retail data_5674d4 version literal`, while keeping the explicit
+   `sv_steamServerVersion` override lane documented as a source compatibility
+   extension.
+5. Strengthened the platform-services bootstrap metadata gate around the
+   alias, function-size row, retail version pointer, version literal, and
+   `SteamGameServer_Init(..., data_5674d4)` argument.
+
+### Task A391: Reconstruct botlib training item-delay frame wiring [COMPLETED]
+Priority: High
+Primary areas: `src/code/game/ai_main.c`,
+`references/symbol-maps/qagame.json`,
+`tests/test_botlib_qagame_ai_main_lifecycle_training_parity.py`,
+`tests/test_game_helper_seam_parity.py`,
+`docs/reverse-engineering/botlib-qagame-item-delay-time-reconstruction-2026-06-11.md`
+Parity estimate: **before 80% -> after 96%** for focused
+`BotUpdateItemDelayTime` source-behavior confidence, **before 98.2% -> after
+98.3%** for qagame AI lifecycle/training frame-tail wiring confidence, and
+overall botlib/qagame AI execution wiring parity **99.25% -> 99.3%**.
+
+Completed work:
+
+1. Rechecked retail qagame `BotUpdateItemDelayTime` (`0x10024640`) against the
+   promoted Binary Ninja signature, Ghidra size row, symbol-map identity, and
+   lifecycle/training HLIL anchors preserved by the parity gate.
+2. Reconstructed the helper signature as `BotUpdateItemDelayTime(int time)`,
+   preserved the retail `g_training` guard, and keyed elapsed tutorial seconds
+   off the explicit frame-time input.
+3. Moved item-delay maintenance from the training-state helper into the
+   `BotAIStartFrame` tail, immediately before `BotUpdateDynamicSkill(time)` and
+   `BotUpdateTrainingState()`.
+4. Strengthened the lifecycle/training and game-helper parity gates around the
+   retail call order, `bot_itemDelayTime` cvar key, `g_spSkill` gate, and
+   `60/120/180/240 -> 10/15/20/25` delay ladder.
+
+### Task A390: Reconstruct cgame item pickup and powerup sound wiring [COMPLETED]
+Priority: High
+Primary areas: `src/code/cgame/cg_event.c`,
+`references/analysis/quakelive_symbol_aliases.json`,
+`tests/test_cgame_sound_wiring_parity.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_528.md`
+Parity estimate: **before 80% -> after 97%** for focused cgame
+item-use/pickup/powerup sound wiring confidence, **before 70% -> after 98%**
+for focused `CG_UseItem` alias/source-behavior coverage, and overall
+sound-system wiring reconstruction parity **93.5% -> 93.6%**.
+
+Completed work:
+
+1. Rechecked retail `CG_UseItem` (`0x10019af0`), `CG_ItemPickup`
+   (`0x10019c40`), and the item/powerup sound branches in `CG_EntityEvent`
+   against Binary Ninja HLIL, Ghidra function-size rows, the cgame symbol map,
+   and reconstructed `cg_event.c` / `cg_main.c` source.
+2. Promoted the missing `sub_10019af0 -> CG_UseItem` alias alongside the
+   existing Ghidra-style `FUN_10019af0` alias.
+3. Reconstructed the retail invalid-use-item diagnostic so
+   `CG_UseItem` now raises `CG_UseItem: invalid item %d` instead of silently
+   clamping out-of-range use-item events to `HI_NONE`.
+4. Strengthened the cgame sound parity gate around holdable-use sounds,
+   predicted/global pickup sounds, persistant/powerup announcer queues,
+   Quad Hog announcer suppression, powerup activation sounds, and the direct
+   event/powerup announcer media registration set.
+5. Validated the neighboring cgame event transport, spectator event, display
+   context event, and focused impact-event dispatch parity checks.
+
+### Task A389: Reconstruct common-frame Steam GameServer runtime pump [COMPLETED]
+Priority: High
+Primary areas: `src/code/qcommon/common.c`,
+`src/code/qcommon/qcommon.h`,
+`src/code/server/sv_main.c`,
+`src/code/server/server.h`,
+`references/analysis/quakelive_symbol_aliases.json`,
+`tests/test_platform_services.py`,
+`tests/test_netcode_parity_manifest.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_527.md`
+Parity estimate: **before 55% -> after 98%** for focused
+`Com_Frame -> SteamServer_Frame` caller-placement confidence, **before 50% ->
+after 98%** for focused host-frame Ghidra/Binary Ninja alias bridge
+confidence, and overall Steam launch/runtime integration confidence
+**91.6% -> 91.7%**.
+
+Completed work:
+
+1. Rechecked retail `Com_Frame` (`sub_4CC6C0` / `FUN_004cc6c0`) and
+   `SteamServer_Frame` (`sub_466850` / `FUN_00466850`) across Binary Ninja
+   HLIL, Ghidra function-size rows, Ghidra decompile hints, and the existing
+   reconstructed source owners.
+2. Promoted `FUN_004cc6c0 -> Com_Frame` beside the existing
+   `sub_4CC6C0 -> Com_Frame` alias.
+3. Exposed `SV_SteamServerNetworkingFrame()` through qcommon/server interfaces
+   and moved its caller from `SV_Frame()` into `Com_Frame()` immediately after
+   the optional first frame timing sample and before the normal frame pacing
+   and `SV_Frame( msec )` branch.
+4. Preserved ZMQ password/RCON work and server-info publication in `SV_Frame()`
+   while keeping the Steam GameServer callback/published-state/P2P pump in the
+   retail host-frame owner.
+5. Strengthened platform-services, netcode manifest, and client run-loop
+   mapping gates around alias coverage, HLIL caller ordering, and source
+   caller placement.
+
+### Task A388: Map cgame team result and gameover music wiring [COMPLETED]
+Priority: High
+Primary areas: `references/analysis/quakelive_symbol_aliases.json`,
+`tests/test_cgame_sound_wiring_parity.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_526.md`
+Parity estimate: **before 79% -> after 97%** for focused cgame event
+team-result/gameover music wiring confidence, **before 50% -> after 98%**
+for focused `CG_EntityEvent` sound alias/function-size coverage, and overall
+sound-system wiring reconstruction parity **93.4% -> 93.5%**.
+
+Completed work:
+
+1. Rechecked retail `CG_EntityEvent` (`0x10019eb0`) across Binary Ninja HLIL,
+   Ghidra function-size rows, the cgame symbol map, and reconstructed
+   `cg_event.c` / `cg_main.c` source.
+2. Promoted the missing `sub_10019eb0 -> CG_EntityEvent` alias alongside the
+   existing Ghidra-style `FUN_10019eb0` alias.
+3. Strengthened the cgame sound parity gate around red/blue team win music,
+   round-result buffered sounds, `QL_EV_GAMEOVER` winner/spectator/loser
+   background-track selection, kamikaze far sound playback, and global/round
+   result announcer media registration.
+4. Validated the neighboring cgame event transport, spectator event, display
+   context event, and focused impact-event dispatch parity checks.
+
+### Task A387: Reconstruct botlib torment-human target selector [COMPLETED]
+Priority: High
+Primary areas: `src/code/game/ai_dmq3.c`,
+`src/code/game/ai_dmq3.h`,
+`tests/test_botlib_qagame_ai_dmq3_deathmatch_setup_parity.py`,
+`docs/reverse-engineering/botlib-qagame-torment-target-reconstruction-2026-06-11.md`
+Parity estimate: **before 0% -> after 89%** for focused
+`BotSelectTormentTarget` source reconstruction confidence, **before 94% ->
+after 98%** for focused torment/tutorial helper source coverage, and overall
+botlib plus qagame AI execution wiring confidence **99.2% -> 99.25%**.
+
+Completed work:
+
+1. Rechecked retail `BotSelectTormentTarget` (`0x1001F9C0`) against Binary
+   Ninja HLIL, Ghidra decompile evidence, function-size metadata, symbol-map
+   aliases, and the mapped `AINode_Torment_Human` caller.
+2. Confirmed the cached enemy branch uses 360-degree visibility, the caller's
+   distance limit, `BotPointAreaNum`, and the retail `0x011C0FBE` travel mask.
+3. Confirmed the selector then walks exactly 64 client slots through three
+   passes: direct reachable `PM_NORMAL` non-bot humans, trace-assisted
+   reachable non-bot humans with a 24-unit upward probe, then nearest valid
+   non-bot human fallback.
+4. Reconstructed `BotSelectTormentTarget` and local torment-target helpers in
+   `ai_dmq3.c`, then exposed the declaration through `ai_dmq3.h`.
+5. Promoted the helper from mapped-only to source-owned in the deathmatch setup
+   parity gate and documented the remaining larger tutorial-node boundary.
+
+### Task A386: Reconstruct Steam GameServer frame published-state pump [COMPLETED]
+Priority: High
+Primary areas: `src/code/server/sv_main.c`,
+`references/analysis/quakelive_symbol_aliases.json`,
+`tests/test_platform_services.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_525.md`
+Parity estimate: **before 82% -> after 98%** for focused Steam GameServer
+frame published-state ordering confidence, **before 50% -> after 98%** for
+focused Steam server frame Ghidra/Binary Ninja alias bridge confidence, and
+overall Steam launch/runtime integration confidence **91.5% -> 91.6%**.
+
+Completed work:
+
+1. Rechecked retail `SteamServer_Frame` (`sub_466850`) and
+   `SteamServer_UpdatePublishedState` (`sub_466260`) across Binary Ninja HLIL,
+   Ghidra function-size rows, the existing source owner, and platform-services
+   parity gates.
+2. Promoted paired `FUN_00466260` and `FUN_00466850` aliases beside the
+   existing `sub_...` aliases for the Steam server frame/published-state owner
+   pair.
+3. Moved `SV_SteamServerUpdatePublishedState( qfalse )` into
+   `SV_SteamServerNetworkingFrame()` immediately after
+   `QL_Steamworks_RunServerCallbacks()`, matching retail's
+   `SteamGameServer_RunCallbacks() -> sub_466260(0)` order.
+4. Removed the later `SV_Frame()` duplicate published-state call so the
+   runtime sweep has one source owner.
+5. Strengthened the platform-services parity gate for alias coverage, Ghidra
+   rows, HLIL ordering, and source ordering through the keepalive/P2P/drain
+   tail.
+
+### Task A385: Map cgame configstring music bridge [COMPLETED]
+Priority: High
+Primary areas: `references/analysis/quakelive_symbol_aliases.json`,
+`tests/test_cgame_sound_wiring_parity.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_524.md`
+Parity estimate: **before 82% -> after 98%** for focused cgame
+configstring/background-music bridge confidence, **before 50% -> after 98%**
+for focused `CG_StartMusic` alias coverage, and overall sound-system wiring
+reconstruction parity **93.3% -> 93.4%**.
+
+Completed work:
+
+1. Rechecked retail `CG_StartMusic` (`0x10025320`) across Binary Ninja HLIL,
+   Ghidra function-size rows, the cgame symbol map, and the reconstructed
+   `cg_main.c`, `cg_servercmds.c`, `cg_syscalls.c`, and `cg_local.h` owners.
+2. Promoted the missing `sub_10025320 -> CG_StartMusic` alias alongside the
+   existing Ghidra-style `FUN_10025320` alias.
+3. Strengthened the cgame sound parity gate around `CS_MUSIC` configstring
+   token parsing, background-track start import slot `+0xBC`, `CG_Init`
+   startup ordering, configstring-modified dispatch, map-restart music
+   restart ordering, and `playMusic` / `stopMusic` server-command wiring.
+4. Validated the adjacent native cgame sound import slab so the start/stop
+   background-track bridge remains aligned with the reconstructed import table.
+
+### Task A384: Map engine sound helper Ghidra/Binary Ninja alias bridge [COMPLETED]
+Priority: High
+Primary areas: `references/analysis/quakelive_symbol_aliases.json`,
+`tests/test_client_sound_playback_parity.py`,
+`tests/test_client_sound_voice_parity.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_523.md`
+Parity estimate: **before 68% -> after 98%** for focused engine sound
+helper Ghidra/Binary Ninja alias bridge confidence, **before 82% -> after
+98%** for focused client sound helper test coverage, and overall
+sound-system wiring reconstruction parity **93.2% -> 93.3%**.
+
+Completed work:
+
+1. Rechecked the retail `quakelive_steam.exe` sound helper band across Ghidra
+   function rows, Binary Ninja HLIL names, the existing source-owned sound
+   tests, and reconstructed `snd_dma.c`, `snd_mem.c`, and `snd_mix.c`.
+2. Promoted paired `FUN_...` aliases alongside the existing `sub_...`
+   aliases for core playback, registration/cache, console-control,
+   background-track, OGG/WAV decode, voice-sample, allocator, and mixer
+   helpers.
+3. Strengthened the client sound parity gates so helpers with stable Ghidra
+   function rows must resolve through both naming families and retain their
+   expected retail sizes.
+4. Documented the remaining no-Ghidra-row boundary for `S_SoundList_f`,
+   `S_Music_f`, and the looping-sound frame-clear thunk in Round 523.
+
+### Task A383: Map cgame weapon fire/impact/tracer sound wiring [COMPLETED]
+Priority: High
+Primary areas: `tests/test_cgame_sound_wiring_parity.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_522.md`
+Parity estimate: **before 83% -> after 97%** for focused cgame
+weapon fire/impact/tracer sound mapping confidence, **before 78% -> after
+98%** for focused weapon-sound helper alias/function-size coverage, and
+overall sound-system wiring reconstruction parity **93.1% -> 93.2%**.
+
+Completed work:
+
+1. Rechecked the retail cgame weapon sound helper band across Binary Ninja
+   HLIL, Ghidra function-size rows, the cgame symbol map, and reconstructed
+   `cg_weapons.c` / `cg_main.c` source.
+2. Promoted stable `sub_...` aliases for `CG_MachinegunSpinAngle`,
+   `CG_AddPlayerWeapon`, `CG_FireWeapon`, `CG_MissileHitWall`,
+   `CG_MissileHitWallDmgThrough`, and `CG_Tracer`.
+3. Strengthened the cgame sound parity gate around chaingun wind-down
+   playback, held-fire and ready looping sounds, fire-event flash and quad
+   sounds, impact sound selection/playback, damage-through fallthrough, tracer
+   media registration, tracer drawing, and tracer sound playback.
+4. Documented the mapping and the remaining HLIL decompiler boundaries in
+   Round 522.
+
+### Task A382: Map cgame low-ammo sound warning [COMPLETED]
+Priority: High
+Primary areas: `tests/test_cgame_sound_wiring_parity.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_521.md`
+Parity estimate: **before 84% -> after 98%** for focused cgame low-ammo
+sound warning mapping confidence, **before 86% -> after 97%** for focused
+low-ammo cvar/media/HUD sound-state coupling, and overall sound-system wiring
+reconstruction parity **93.0% -> 93.1%**.
+
+Completed work:
+
+1. Rechecked retail `CG_CheckAmmo` (`sub_10042e50`) against Binary Ninja
+   HLIL, Ghidra function-size rows, the cgame symbol map, and the
+   reconstructed `cg_playerstate.c` source.
+2. Added `CG_CheckAmmo` to the focused cgame sound helper alias/function-size
+   parity table.
+3. Confirmed the existing source already matches retail for active-weapon
+   ammo lookup, per-weapon threshold scaling by cached
+   `cg.lowAmmoWarningPercentile`, warning states `0/1/2`, no-repeat
+   suppression, level-2 no-ammo playback, and level-1
+   `cg_lowAmmoWarningSound` selection.
+4. Strengthened the sound parity gate around the low-ammo cvar bounds, cached
+   percentile update, low/no-ammo media registration, HUD warning text,
+   weapon-bar color coupling, and transition ordering through
+   `CG_CheckAmmo`.
+5. Documented the mapping and the HLIL decompiler artifact around the
+   local-sound import call in Round 521.
+
+### Task A381: Reconstruct Steam match-summary training/abort guard [COMPLETED]
+Priority: High
+Primary areas: `src/code/server/sv_client.c`,
+`tests/test_platform_services.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_520.md`
+Parity estimate: **before 0% -> after 88%** for focused match-summary
+training/abort guard reconstruction confidence, **before 70% -> after 82%**
+for focused Steam summary P2P fanout reconstruction confidence, and overall
+Steam launch/runtime integration confidence **91.4% -> 91.5%**.
+
+Completed work:
+
+1. Rechecked retail `SteamStats_BroadcastSummary` (`sub_468ee0`) around the
+   Json `TRAINING` and `ABORTED` comparisons before the
+   `SteamGameServerNetworking(..., 2, 0)` send loop.
+2. Cross-checked the Json comparison helper polarity against nearby
+   `PLAYER_STATS` achievement branches: `sub_429850` is the not-equal helper
+   and `sub_429860` is the equality helper.
+3. Confirmed qagame retail HLIL and the reconstructed
+   `G_RankBuildMatchReportPayload()` both produce `ABORTED` and `TRAINING`
+   fields for match reports.
+4. Added `SV_SteamStats_ShouldSendMatchSummary()` so the retained server owner
+   only fans out summaries when `TRAINING` parses explicitly false and
+   `ABORTED` is not true.
+5. Preserved the transient `data_e30374` behavior by clearing pending summary
+   peers when the guard suppresses a send.
+6. Strengthened static parity gates for the retail guard addresses, qagame
+   producer fields, source predicate behavior, and send/clear ordering.
+
+### Task A380: Map cgame local reward sound transition [COMPLETED]
+Priority: High
+Primary areas: `references/analysis/quakelive_symbol_aliases.json`,
+`tests/test_cgame_sound_wiring_parity.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_519.md`
+Parity estimate: **before 88% -> after 98%** for focused cgame local
+reward sound transition mapping confidence, **before 80% -> after 98%** for
+focused `CG_CheckLocalSounds` alias coverage, and overall sound-system wiring
+reconstruction parity **92.9% -> 93.0%**.
+
+Completed work:
+
+1. Rechecked retail `pushReward` (`sub_10043570`) and
+   `CG_CheckLocalSounds` (`sub_100435b0`) against Binary Ninja HLIL, Ghidra
+   function-size rows, the cgame symbol map, and the reconstructed
+   `cg_playerstate.c` source.
+2. Promoted the missing `sub_100435b0 -> CG_CheckLocalSounds` alias alongside
+   the existing Ghidra-style `FUN_100435b0` alias.
+3. Confirmed the existing source already matches retail for local hit/team-hit
+   sounds, kill-beep volume playback, reward-stack enqueue, direct reward VO
+   announcer events, flag-pickup announcer playback, buffered lead changes,
+   direct timelimit warnings, and buffered fraglimit warnings.
+4. Strengthened the cgame sound parity gate around the retail HLIL helper
+   boundary, source branch ordering, and transition ordering from local sounds
+   through low-ammo and playerstate event replay.
+5. Documented the mapping and remaining stack-variable naming boundary in
+   Round 519.
+
+### Task A379: Reconstruct Steam summary P2P fanout [COMPLETED]
+Priority: High
+Primary areas: `src/code/server/sv_client.c`,
+`tests/test_platform_services.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_518.md`
+Parity estimate: **before 0% -> after 70%** for focused Steam summary P2P
+fanout reconstruction confidence, **before 78% -> after 84%** for focused
+Steam stats match-report owner coverage, and overall Steam launch/runtime
+integration confidence **91.3% -> 91.4%**.
+
+Completed work:
+
+1. Rechecked retail `SteamStats_BroadcastSummary` (`sub_468ee0`) against
+   Binary Ninja HLIL and Ghidra import evidence for the
+   `SteamGameServerNetworking` summary send.
+2. Confirmed the retail path serializes the prepared match-report Json, walks
+   the transient `data_e30374` recipient tree, sends through
+   `SteamGameServerNetworking(..., 2, 0)`, then clears the summary/stat/event
+   transient state.
+3. Added a bounded `MAX_CLIENTS` source mirror for pending summary peers,
+   including clear, dedupe, overflow, and provider-aware diagnostics.
+4. Registered peers at retained Steam stats session create/reuse time, which is
+   the closest stable source owner tied to the recovered `"hello"` P2P
+   bootstrap; documented this as an inference because the committed corpus does
+   not expose a stable `data_e30374` population site.
+5. Updated `SV_SteamStats_ProcessMatchReport()` to send the prepared payload to
+   pending Steam summary peers before clearing cached `PLAYER_DEATH` events and
+   returning the prepared pointer to the shared ZMQ publication lane.
+6. Strengthened static parity gates for the retail send loop, the
+   `data_e30374` initialization/drain boundary, the source-side wrapper call,
+   and send-before-clear ordering.
+
+### Task A378: Map cgame voice-chat sound queue aliases [COMPLETED]
+Priority: High
+Primary areas: `references/analysis/quakelive_symbol_aliases.json`,
+`tests/test_cgame_sound_wiring_parity.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_517.md`
+Parity estimate: **before 86% -> after 97%** for focused cgame voice-chat
+sound queue mapping confidence, **before 72% -> after 98%** for focused cgame
+voice-chat helper alias coverage, and overall sound-system wiring
+reconstruction parity **92.8% -> 92.9%**.
+
+Completed work:
+
+1. Rechecked the retail cgame voice-chat helper band at
+   `0x1004A560..0x1004AC90` against Binary Ninja HLIL, Ghidra function-size
+   rows, the cgame symbol map, and the reconstructed `cg_servercmds.c` source.
+2. Promoted the missing `sub_...` aliases for `CG_HeadModelVoiceChats`,
+   `CG_GetVoiceChat`, `CG_VoiceChatListForClient`, `CG_PlayVoiceChat`,
+   `CG_PlayBufferedVoiceChats`, `CG_AddBufferedVoiceChat`, and
+   `CG_VoiceChatLocal` alongside the existing `FUN_...` aliases.
+3. Confirmed the source queue/playback contract already matches retail,
+   including `CHAN_VOICE` local playback, order prompt/`voiceMenu` wiring,
+   `1000` millisecond buffered playback delay, and the forced-overflow path
+   that increments `cg.voiceChatBufferOut` without immediate modulo wrapping.
+4. Strengthened cgame sound parity gates around the promoted aliases, Ghidra
+   row sizes, Binary Ninja HLIL anchors, and source queue behavior.
+5. Documented the remaining boundary that `CG_VoiceChatLocal` message-format
+   mode reconstruction needs a deeper dedicated pass before any source rewrite.
+
+### Task A377: Map raw stop-background native import row [COMPLETED]
+Priority: High
+Primary areas: `tests/test_botlib_cgame_native_import_slab_parity.py`,
+`tests/test_ui_menu_files.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_516.md`
+Parity estimate: **before 92% -> after 98%** for focused raw
+stop-background native import row confidence, **before 96% -> after 98%**
+for focused cgame/UI sound bridge evidence confidence, and overall
+sound-system wiring reconstruction parity **92.7% -> 92.8%**.
+
+Completed work:
+
+1. Rechecked the raw retail cgame/UI stop-background table slot against Binary
+   Ninja HLIL, the Ghidra function inventory, and the promoted sound alias map.
+2. Confirmed `sub_4AFED0` remains the named start-background native wrapper
+   and `sub_4DB030` remains the shared `S_StopBackgroundTrack` engine body,
+   while the cgame/UI stop-background table slot is the raw pointer
+   `0x4B02F0`.
+3. Preserved `0x4B02F0` as mapped-only because the committed Ghidra corpus has
+   no stable function row at `004b02f0`; no fake `QL*Import_S_StopBackgroundTrack`
+   alias was promoted.
+4. Strengthened cgame and UI parity gates around the retail table-neighbor
+   rows and the no-alias/no-row boundary for the raw stop-background thunk.
+5. Documented the mapping and remaining promotion boundary in Round 516.
+
+### Task A376: Reconstruct Steam PLYR_EVENTS match-report merge [COMPLETED]
+Priority: High
+Primary areas: `src/code/server/sv_client.c`,
+`src/code/server/sv_game.c`, `src/code/server/server.h`,
+`tests/test_platform_services.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_515.md`
+Parity estimate: **before 0% -> after 76%** for focused `PLYR_EVENTS`
+match-report merge reconstruction confidence, **before 35% -> after 78%**
+for focused Steam stats match-report owner coverage, and overall Steam
+launch/runtime integration confidence **91.2% -> 91.3%**.
+
+Completed work:
+
+1. Rechecked retail `sub_468ee0` against Binary Ninja HLIL and the Ghidra
+   companion around the `PLYR_EVENTS` attachment and pending-array clear.
+2. Confirmed `data_e30380` cached `PLAYER_DEATH` events are inserted into the
+   report root under `PLYR_EVENTS`, with nested `STEAM_ID` normalized to `ID`
+   in the report-side event objects.
+3. Converted `SV_SteamStats_ProcessMatchReport()` into a prepare-and-return
+   hook so the shared publication path forwards the augmented payload when the
+   source-side serialized JSON proxy can be safely spliced.
+4. Added bounded JSON append, escape, root-object close, and cached death-event
+   serialization helpers in the retained Steam stats owner.
+5. Updated `SV_SubmitMatchReport()` to stage the prepared report in a local
+   `MAX_MSGLEN` buffer and publish that prepared pointer through ZMQ.
+6. Strengthened static parity gates for retail `PLYR_EVENTS` evidence,
+   nested `ID`/`POWERUPS` serialization, prepared-report ordering, and
+   build-disabled stub behavior.
+
+### Task A375: Reconstruct silent malformed-WAV parser failures [COMPLETED]
+Priority: High
+Primary areas: `src/code/client/snd_mem.c`,
+`tests/test_client_sound_voice_parity.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_514.md`
+Parity estimate: **before 68% -> after 96%** for focused malformed-WAV
+parser diagnostic-surface confidence, **before 94% -> after 97%** for focused
+sound-effect loader error ownership confidence, and overall sound-system wiring
+reconstruction parity **92.6% -> 92.7%**.
+
+Completed work:
+
+1. Rechecked retail `S_FindWavChunk`, `GetWavinfo`, `S_LoadWavSound`, and
+   `S_LoadSound` against Binary Ninja HLIL, Ghidra function-size metadata, and
+   the promoted sound helper alias map.
+2. Confirmed retail `GetWavinfo` returns zero for missing or malformed RIFF,
+   WAVE, `fmt `, PCM, and `data` chunk conditions without the inherited GPL
+   parser-level `Com_Printf` diagnostics.
+3. Confirmed the visible loader diagnostics remain owned by `S_LoadWavSound`
+   and the shared PCM load path: non-mono WAVs use the retail fatal mono error,
+   while non-16-bit and non-22 kHz assets use the retained `WAV_Load:`
+   developer diagnostics.
+4. Removed the source-only malformed-WAV parser messages from `GetWavinfo`
+   while preserving the existing return-zero control flow and loader-level
+   diagnostics.
+5. Strengthened the OGG/WAV helper parity gate so the legacy parser strings are
+   absent from both the retail HLIL and reconstructed source.
+6. Documented the mapping and validation in Round 514.
+
+### Task A374: Reconstruct background raw-tail stop ownership [COMPLETED]
+Priority: High
+Primary areas: `src/code/client/snd_dma.c`,
+`tests/test_client_sound_voice_parity.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_513.md`
+Parity estimate: **before 70% -> after 96%** for focused
+`S_StopBackgroundTrack` raw-tail reset ownership confidence, **before 88% ->
+after 95%** for focused background/raw-stream continuity wiring confidence, and
+overall sound-system wiring reconstruction parity **92.5% -> 92.6%**.
+
+Completed work:
+
+1. Rechecked retail `S_StopBackgroundTrack`, `S_StartBackgroundTrack`, and
+   `S_UpdateBackgroundTrack` against Binary Ninja HLIL, Ghidra function-size
+   metadata, and the promoted sound alias map.
+2. Confirmed retail stop gates `data_13e1850` raw-tail clearing behind an
+   active background stream, while start/restart closes old OGG state without
+   clearing the raw tail.
+3. Reconstructed the source stop path with a local `stopped` sentinel so
+   `s_rawend` is reset only when a legacy background file or OGG stream was
+   actually closed.
+4. Strengthened the background track parity gate to pin the retail conditional
+   reset anchors, source ordering, and absence of raw-tail clearing from the
+   start/restart path.
+5. Documented the mapping and validation in Round 513.
+
+### Task A373: Reconstruct Steam PLAYER_DEATH event cache [COMPLETED]
+Priority: High
+Primary areas: `src/code/game/g_main.c`,
+`src/code/server/sv_client.c`, `src/code/server/sv_game.c`,
+`tests/test_platform_services.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_512.md`
+Parity estimate: **before 8% -> after 68%** for focused `PLAYER_DEATH`
+pending-event cache reconstruction confidence, **before 82% -> after 85%**
+for bounded `SteamStats_ProcessEvent` source coverage, and overall Steam
+launch/runtime integration confidence **91.1% -> 91.2%**.
+
+Completed work:
+
+1. Rechecked retail `sub_468030` against Binary Ninja HLIL and the Ghidra
+   decompile companion around `0x0046826b` through `0x00468623`.
+2. Confirmed the `PLAYER_DEATH` branch appends into `data_e30380` while the
+   pending event count is below `0x3e8`, copies root `TIME` and `MOD`, copies
+   nested `KILLER` / `VICTIM` identity, team, and `POWERUPS` fields, and is
+   later attached to match reports as `PLYR_EVENTS`.
+3. Cross-checked retail qagame death publishing and corrected the source root
+   death payload field to `MOD`, while adding the missing nested `POWERUPS`
+   array to the shared player summary object.
+4. Added bounded source-side `PLAYER_DEATH` cache storage plus nested
+   string/int/array payload readers, and wired the cache before SteamID/session
+   gates in `SV_SteamStats_ProcessEvent()`.
+5. Added `SV_SteamStats_ProcessMatchReport()` so `SV_SubmitMatchReport()`
+   notifies the Steam stats owner before ZMQ publication and clears cached
+   death events at the match-report boundary.
+6. Strengthened static parity gates for retail HLIL/Ghidra anchors, qagame
+   payload shape, cache bounds, pre-session dispatch order, match-report
+   ordering, and build-disabled stubs.
+
+### Task A372: Reconstruct botlib tutorial tour-point resolver and spawn gate [COMPLETED]
+Priority: High
+Primary areas: `src/code/game/ai_dmq3.c`,
+`src/code/game/ai_dmq3.h`,
+`tests/test_botlib_qagame_ai_dmq3_deathmatch_setup_parity.py`,
+`docs/reverse-engineering/botlib-qagame-tour-point-resolver-reconstruction-2026-06-11.md`
+Parity estimate: **before 0% -> after 91%** for focused
+`BotResolveTourPoint` source reconstruction confidence, **before 0% -> after
+96%** for focused `BotCanSpawnTourPoint` source reconstruction confidence,
+**before 82% -> after 94%** for focused tutorial tour-point helper mapping
+confidence, and overall botlib plus qagame AI execution wiring confidence
+**99.1% -> 99.2%**.
+
+Completed work:
+
+1. Rechecked retail `BotResolveTourPoint` (`0x1001FEC0`) against Binary Ninja
+   HLIL, Ghidra decompile evidence, symbol-map metadata, and existing
+   `info_tour_point` spawn/linkage source support.
+2. Rechecked retail `BotCanSpawnTourPoint` (`0x10020EC0`) against Binary Ninja
+   HLIL, Ghidra function metadata, and the current `gentity_t` layout.
+3. Confirmed the retail resolver splits between current-linked tour-point
+   resolution and fallback spawnflag-1 tour-point resolution, traces the point
+   down by `8192.0`, lifts the selected origin by `16.0`, and resolves the
+   optional linked `info_notnull` target origin.
+4. Confirmed the retail spawn gate scans non-client entity slots up to
+   `ENTITYNUM_MAX_NORMAL`, requiring `!ent->inuse` and `ent->freetime + 2000 <=
+   level.time`.
+5. Reconstructed `BotResolveTourPoint`, `BotCanSpawnTourPoint`, and local
+   classname/trace/target helpers in `ai_dmq3.c`, then exposed the declarations
+   through `ai_dmq3.h`.
+6. Promoted both helpers from mapped-only to source-owned in the deathmatch
+   setup parity gate and documented the remaining mapped-only boundary for
+   `BotSelectTormentTarget`.
+
+### Task A371: Reconstruct start-sound gain ownership [COMPLETED]
+Priority: High
+Primary areas: `src/code/client/snd_dma.c`,
+`tests/test_client_sound_playback_parity.py`,
+`tests/test_engine_cvar_retail_parity.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_512.md`
+Parity estimate: **before 72% -> after 97%** for focused start-sound
+gain reconstruction confidence, **before 74% -> after 94%** for focused
+announcer/voice cvar ownership confidence, and overall sound-system wiring
+reconstruction parity **92.4% -> 92.5%**.
+
+Completed work:
+
+1. Rechecked retail `S_StartSoundVolume` (`sub_4DA050`), `S_StartSound`
+   (`sub_4DA350`), local-sound wrappers, native cgame import thunks, Ghidra
+   function sizes, promoted aliases, and sound cvar cross-references.
+2. Confirmed retail start-sound gain is the caller-provided float multiplied
+   by `127.0`, with identical left/right master-volume writes and no
+   engine-side `CHAN_ANNOUNCER` or `CHAN_VOICE` cvar branch in the start path.
+3. Removed the non-retail engine channel-volume helper layer from
+   `snd_dma.c`, made the shared start helper accept a float gain, routed
+   fixed-volume starts through `1.0f`, and forwarded explicit volume starts
+   directly.
+4. Strengthened playback and cvar parity guards so cgame-owned announcer
+   volume calls remain explicit, voice cvar use stays in the mixer path, and
+   the removed helper layer cannot re-enter the start-sound core unnoticed.
+5. Documented the mapping and validation in Round 512.
+
+### Task A370: Reconstruct botlib offscreen enemy acceptance [COMPLETED]
+Priority: High
+Primary areas: `src/code/game/ai_dmq3.c`,
+`src/code/game/ai_main.c`, `src/code/game/ai_main.h`,
+`tests/test_botlib_qagame_ai_dmq3_deathmatch_setup_parity.py`,
+`tests/test_botlib_qagame_ai_dmq3_visibility_parity.py`,
+`tests/test_botlib_qagame_ai_dmq3_support_parity.py`,
+`tests/test_botlib_qagame_ai_dmq3_activate_obstacle_parity.py`,
+`tests/test_botlib_qagame_ai_main_lifecycle_training_parity.py`,
+`docs/reverse-engineering/botlib-offscreen-enemy-reconstruction-2026-06-11.md`
+Parity estimate: **before 0% -> after 84%** for focused
+`BotAcceptOffscreenEnemyCandidate` source reconstruction confidence,
+**before 90% -> after 96%** for focused `BotFindEnemy`/event/telemetry
+wiring confidence, and overall botlib plus qagame AI execution wiring
+confidence **99.0% -> 99.1%**.
+
+Completed work:
+
+1. Rechecked retail `BotFindEnemy` (`0x10019290`) and
+   `BotAcceptOffscreenEnemyCandidate` (`0x10020C10`) against Binary Ninja HLIL,
+   Ghidra function sizes, symbol-map entries, and qagame native import slots.
+2. Confirmed the helper is called only after failed visibility and gates unseen
+   candidates through no-current-enemy, no-retreat, wants-chase, top/second
+   goal-stack, skill>=4, and heard-client-mask checks.
+3. Reconstructed the source helper, supporting goal classifier, event-fed
+   heard-client mask, `BotFindEnemy` marker wiring, selected-bot `eh` telemetry
+   publication, and the `BotWantsToChase` invalid-enemy guard.
+4. Strengthened static parity gates for source anchors, HLIL flow, import
+   wiring, bot-state fields, and selected-bot debug output.
+5. Documented the reconstruction and updated adjacent visibility, support,
+   event, telemetry, deathmatch setup, and qagame symbol-map notes.
+
+### Task A369: Reconstruct looping sound compatibility frame stamp [COMPLETED]
+Priority: High
+Primary areas: `src/code/client/snd_dma.c`,
+`tests/test_client_sound_playback_parity.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_511.md`
+Parity estimate: **before 65% -> after 95%** for focused compatibility
+real-loop frame-state reconstruction confidence, **before 88% -> after 98%**
+for focused native/legacy loop clear and merge wiring, and overall
+sound-system wiring reconstruction parity **92.3% -> 92.4%**.
+
+Completed work:
+
+1. Rechecked retail looping-sound helpers against promoted aliases, Ghidra
+   function sizes, and Binary Ninja HLIL around `sub_4DA3E0`, `sub_4DA490`,
+   `sub_4DA4C0`, the `004da522` loop-state setup block, and `sub_4DA6F0`.
+2. Confirmed native frame clear only clears loop active flags, native kill-all
+   routes through the full sound-buffer clear, and legacy cgame syscall traffic
+   still reaches `S_ClearLoopingSounds()` / `S_AddRealLoopingSound()`.
+3. Confirmed the retail loop-state setup path writes the client frame counter
+   into each initialized loop entry after origin, velocity, sfx, active,
+   doppler, and scale fields are populated.
+4. Reconstructed that frame-counter stamp in the source
+   `S_AddRealLoopingSound()` compatibility path.
+5. Strengthened static parity coverage for the native/legacy clear split,
+   compatibility real-loop dispatch, `S_AddLoopSounds` merge/clamp behavior,
+   and the non-promotion of unstable `004da522` as a standalone Ghidra row,
+   and documented the round in Round 511.
+
+### Task A368: Reconstruct Steam PLAYER_MEDAL stat and MVP gate [COMPLETED]
+Priority: High
+Primary areas: `src/code/server/sv_client.c`,
+`tests/test_platform_services.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_510.md`
+Parity estimate: **before 18% -> after 86%** for focused `PLAYER_MEDAL`
+medal-stat and `AW_MVP` achievement-gate source reconstruction confidence,
+**before 78% -> after 82%** for bounded `SteamStats_ProcessEvent` source
+coverage, and overall Steam launch/runtime integration confidence
+**91.0% -> 91.1%**.
+
+Completed work:
+
+1. Rechecked retail `sub_468030` against Binary Ninja HLIL and the Ghidra
+   decompile companion around `0x00468d09` through `0x00468ea6`.
+2. Confirmed the branch reads payload field `MEDAL`, walks the 16-entry retail
+   medal token table at `data_561b80`/`data_561b84`, increments the mapped
+   stat, flushes through `sub_4670c0`, then checks achievement id `0x2e`.
+3. Matched the MVP support-total gate to stat offsets `0x824`, `0x840`, and
+   `0x85c`, which correspond to `medal_capture`, `medal_assist`, and
+   `medal_defense`, with threshold `0x3e8`.
+4. Added bounded source-side parsing for flat string fields and reconstructed
+   the `PLAYER_MEDAL` event processor with a retail medal table plus narrow
+   aliases for source-side `HUMILIATION`, `DEFENDS`, `ASSISTS`, and
+   `CAPTURES` tokens.
+5. Wired `PLAYER_MEDAL` into `SV_SteamStats_ProcessEvent()` and strengthened
+   static gates for HLIL/Ghidra evidence, qagame payload shape, medal-stat
+   mapping, dispatch ordering, and the support-total `AW_MVP` branch.
+
+### Task A367: Map sound mixer paint pipeline stage order [COMPLETED]
+Priority: High
+Primary areas: `src/code/client/snd_mix.c`,
+`tests/test_client_sound_voice_parity.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_509.md`
+Parity estimate: **before 84% -> after 98%** for focused
+`S_PaintChannels` mixer stage-order reconstruction confidence, **before 80%
+-> after 96%** for focused mixer transfer-helper mapping, and overall
+sound-system wiring reconstruction parity **92.2% -> 92.3%**.
+
+Completed work:
+
+1. Rechecked promoted Binary Ninja aliases and Ghidra sizes for
+   `S_TransferStereo16`, `S_TransferPaintBuffer`, `S_PaintChannelFrom16`, and
+   `S_PaintChannels`.
+2. Mapped retail `sub_4DC350` stage order from HLIL: raw/background paint,
+   background-underrun clear, Steam voice overlay, dynamic channels, loop
+   channels, final paintbuffer transfer, and painted-time advancement.
+3. Cross-checked retail data roots for raw samples, paintbuffer, voice lanes,
+   dynamic channels, loop channels, and the painted-time global.
+4. Confirmed the current `snd_mix.c` reconstruction preserves that order,
+   including the Quake Live background-underrun diagnostic and the voice ring
+   overlay before normal channel painting.
+5. Strengthened static parity coverage for the mixer helper aliases, transfer
+   helper bodies, 16-bit paint helper behavior, channel compression dispatch,
+   and loop-channel modulo path, and documented the round in Round 509.
+
+### Task A366: Reconstruct Steam PLAYER_KILL speed achievement gate [COMPLETED]
+Priority: High
+Primary areas: `src/code/server/sv_client.c`,
+`tests/test_platform_services.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_508.md`
+Parity estimate: **before 15% -> after 84%** for focused `PLAYER_KILL`
+`AW_SPEED_KILLS` achievement-gate source reconstruction confidence, **before
+75% -> after 78%** for bounded `SteamStats_ProcessEvent` source coverage, and
+overall Steam launch/runtime integration confidence **90.9% -> 91.0%**.
+
+Completed work:
+
+1. Rechecked retail `sub_468030` against Binary Ninja HLIL and the Ghidra
+   decompile companion around `0x004688b4` through `0x00468b20`.
+2. Confirmed the branch handles `PLAYER_KILL`, skips suicide/teamkill cases,
+   checks retained achievement id `1`, reads nested payload field
+   `KILLER.SPEED`, requires it to be greater than `0x1f4`, then calls
+   `sub_467e00` for achievement id `1`.
+3. Cross-checked the source qagame publisher and confirmed the JSON proxy
+   emits `TEAMKILL`, `SUICIDE`, and a nested `KILLER` object with float
+   `SPEED`.
+4. Added bounded source-side payload helpers for flat booleans and nested
+   float fields.
+5. Reconstructed the `PLAYER_KILL` `AW_SPEED_KILLS` gate while leaving the
+   adjacent weapon-stat lookup tables mapped-only for a later, table-focused
+   pass.
+6. Strengthened static gates for the retail address sequence, qagame payload
+   shape, source predicates, and `PLAYER_KILL` dispatch ordering, and
+   documented the round in Round 508.
+
+### Task A365: Reconstruct Steam PLAYER_STATS training achievement gate [COMPLETED]
+Priority: High
+Primary areas: `src/code/server/sv_client.c`,
+`tests/test_platform_services.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_507.md`
+Parity estimate: **before 18% -> after 87%** for focused `PLAYER_STATS`
+`AW_TRAINING_3_2` achievement-gate source reconstruction confidence,
+**before 72% -> after 75%** for bounded `SteamStats_ProcessEvent` source
+coverage, and overall Steam launch/runtime integration confidence **90.8% ->
+90.9%**.
+
+Completed work:
+
+1. Rechecked retail `sub_468030` against Binary Ninja HLIL and the Ghidra
+   decompile companion around `0x004686f2` through `0x004687b9`.
+2. Confirmed the branch checks retained achievement id `9`, compares the
+   current `mapname` cvar to `qztraining`, requires `g_training > 0`, tests
+   payload field `WIN` for truthiness, then calls `sub_467e00` for achievement
+   id `9`.
+3. Added named source constants for `AW_TRAINING_3_2` and the recovered
+   training map name.
+4. Reconstructed the `PLAYER_STATS` `qztraining`/`g_training`/`WIN` gate after
+   the recovered stat flush and before the existing `AW_WICKED` score gate, so
+   the source event-processor order matches retail.
+5. Strengthened static gates for the retail address sequence, source cvar and
+   payload predicates, and branch ordering, and documented the round in Round
+   507.
+
+### Task A364: Reconstruct Steam PLAYER_STATS WICKED score achievement gate [COMPLETED]
+Priority: High
+Primary areas: `src/code/server/sv_client.c`,
+`tests/test_platform_services.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_506.md`
+Parity estimate: **before 20% -> after 86%** for focused `PLAYER_STATS`
+`AW_WICKED` achievement-gate source reconstruction confidence, **before 68%
+-> after 72%** for bounded `SteamStats_ProcessEvent` source coverage, and
+overall Steam launch/runtime integration confidence **90.7% -> 90.8%**.
+
+Completed work:
+
+1. Rechecked retail `sub_468030` against Binary Ninja HLIL and the Ghidra
+   decompile companion around `0x004687d5` through `0x00468863`.
+2. Confirmed the branch checks retained achievement id `0x0e`, gates on
+   `g_gametype == 5`, compares payload field `SCORE` to constant `0x29a`,
+   then calls `sub_467e00` for achievement id `0x0e`.
+3. Added named source constants for `AW_WICKED`, the recovered score value,
+   and the gametype gate.
+4. Added session-level achievement cache and unlock helpers that mirror
+   `sub_467f70`/`sub_467e00` without issuing a fresh achievement query.
+5. Reconstructed the `PLAYER_STATS` `SCORE == 666` `AW_WICKED` branch after
+   the recovered win/loss/played stat flush.
+6. Strengthened static gates for the retail address sequence, helper behavior,
+   and source ordering, and documented the round in Round 506.
+
+### Task A363: Reconstruct qagame instagib AI node and deathmatch wiring [COMPLETED]
+Priority: High
+Primary areas: `src/code/game/ai_dmnet.c`,
+`src/code/game/ai_dmq3.c`,
+`src/code/game/ai_main.h`,
+`tests/test_botlib_qagame_ai_dmnet_tutorial_tail_parity.py`,
+`tests/test_botlib_qagame_ai_dmq3_deathmatch_setup_parity.py`,
+`docs/reverse-engineering/botlib-qagame-instagib-node-reconstruction-2026-06-11.md`
+Parity estimate: **before 0% -> after 88%** for focused instagib
+node source reconstruction confidence, and overall botlib plus qagame AI
+execution wiring confidence **98.9% -> 99.0%**.
+
+Completed work:
+
+1. Rechecked `AIEnter_InstaGib`, `AINode_InstaGib`, and the
+   `BotDeathmatchAI` callsite against Binary Ninja HLIL and Ghidra decompile
+   anchors in the committed `qagamex86.dll` corpus.
+2. Named retail LTG value `0x15` as `LTG_INSTAGIB` and updated the selected-bot
+   debug label path to use the named constant.
+3. Reconstructed the instagib entry/node pair in `ai_dmnet.c`, including the
+   `0x011C0FBE` travel mask, target-goal stack path, Beyond Reality travel
+   helper call, movement/blocked handling, and movement-view/weapon tail.
+4. Wired `BotDeathmatchAI` to enter the instagib node when retail instagib
+   mode is active and the bot is unordered with no current enemy.
+5. Strengthened static parity coverage for the tutorial-tail source body,
+   deathmatch callsite, symbol-map comments, and the existing instagib
+   target-goal seam.
+
+### Task A362: Reconstruct Steam PLAYER_STATS win/loss/played event updates [COMPLETED]
+Priority: High
+Primary areas: `src/code/server/sv_client.c`,
+`tests/test_platform_services.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_505.md`
+Parity estimate: **before 35% -> after 82%** for focused `PLAYER_STATS`
+win/loss/played branch source reconstruction confidence, **before 62% -> after
+68%** for bounded `SteamStats_ProcessEvent` source coverage, and overall Steam
+launch/runtime integration confidence **90.6% -> 90.7%**.
+
+Completed work:
+
+1. Rechecked retail `sub_468030` against Binary Ninja HLIL and the promoted
+   `SteamStats_ProcessEvent` alias, focusing on the `PLAYER_STATS` branch.
+2. Confirmed the branch calls `sub_467d40` for stat IDs `0x51`, `0x52`, and
+   `0x53`, sourced from payload fields `WIN`, `LOSE`, and a constant played
+   value of `1`, then flushes through `sub_4670c0`.
+3. Added named source constants for the recovered `wins`, `losses`, and
+   `played` stat indices.
+4. Added a bounded flat integer payload reader for the source-side JSON proxy
+   emitted by qagame ranking events.
+5. Added a session-level stat delta helper that applies `sub_467d40`-style
+   updates to the retained Steam stats session.
+6. Reconstructed the `PLAYER_STATS` event branch to update wins, losses, and
+   played, then force a store pass through the retained flush helper.
+7. Strengthened static gates for the retail address sequence and source helper
+   ordering, and documented the round in Round 505.
+
+### Task A361: Restore Steam stats report-event bridge before ZMQ publication [COMPLETED]
+Priority: High
+Primary areas: `src/code/server/sv_game.c`,
+`src/code/server/sv_client.c`,
+`src/code/server/server.h`,
+`tests/test_platform_services.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_504.md`
+Parity estimate: **before 58% -> after 90%** for focused
+`SV_ReportPlayerEvent` Steam-stats bridge reconstruction confidence, **before
+35% -> after 62%** for bounded `SteamStats_ProcessEvent` source coverage, and
+overall Steam launch/runtime integration confidence **90.5% -> 90.6%**.
+
+Completed work:
+
+1. Rechecked retail `sub_4E2640` and `sub_468030` against Binary Ninja HLIL,
+   the Ghidra function inventory, and the promoted alias corpus.
+2. Confirmed that retail `SV_ReportPlayerEvent` calls
+   `SteamStats_ProcessEvent` before forwarding the same typed payload to the
+   ZMQ player-event publisher.
+3. Added the source-level `SV_SteamStats_ProcessEvent()` owner boundary in the
+   Steam stats lifecycle module, with a default-disabled stub under the
+   existing online-service policy.
+4. Wired `SV_ReportPlayerEvent()` through the Steam stats event owner before
+   `Zmq_ReportPlayerEvent()`, preserving the retail call order without enabling
+   live services in default builds.
+5. Strengthened static gates for the `PLAYER_STATS`, `PLAYER_KILL`,
+   `PLAYER_DEATH`, and `PLAYER_MEDAL` branches visible in retail
+   `sub_468030`, plus the source call ordering.
+6. Documented the bounded bridge reconstruction in Round 504.
+
+### Task A360: Pin Steam direct achievement unlock dispatch [COMPLETED]
+Priority: High
+Primary areas: `src/code/server/sv_client.c`,
+`tests/test_platform_services.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_503.md`
+Parity estimate: **before 86% -> after 98%** for focused direct
+achievement-unlock dispatch reconstruction confidence, and overall Steam
+launch/runtime integration confidence **90.4% -> 90.5%**.
+
+Completed work:
+
+1. Rechecked retail `sub_467e00` against the Binary Ninja HLIL and the
+   previously mapped `sub_4672d0` server achievement setter.
+2. Confirmed that the server-owned high-level unlock path directly dispatches
+   through `sub_4672d0` after the retained session/gameplay gates, then marks
+   the local achievement-owned bit only when the setter returns true.
+3. Removed the reconstructed unlock path's non-retail server-side
+   `GetUserAchievement`/baseline preflight and duplicate early return.
+4. Strengthened static parity coverage so `sub_467e00` stays separate from the
+   passive `sub_467f70` query helper and the source unlock path cannot regress
+   into a live backend read.
+5. Documented the direct unlock dispatch reconstruction in Round 503.
+
+### Task A359: Reconstruct qagame botlib dynamic-skill update island [COMPLETED]
+Priority: High
+Primary areas: `src/code/game/ai_main.c`,
+`src/code/game/ai_main.h`,
+`references/symbol-maps/qagame.json`,
+`tests/test_botlib_qagame_ai_main_lifecycle_training_parity.py`,
+`docs/reverse-engineering/botlib-qagame-dynamic-skill-reconstruction-2026-06-11.md`
+Parity estimate: **before 0% -> after 94%** for focused
+`BotAppendDynamicSkillSample` source reconstruction confidence, **before 0% ->
+after 86%** for focused `BotUpdateDynamicSkill` source reconstruction
+confidence, **before 95% -> after 98%** for focused ai_main
+training/dynamic-skill source coverage, and overall botlib plus qagame AI
+execution wiring confidence **99.3% -> 99.4%**.
+
+Completed work:
+
+1. Rechecked retail qagame rows `0x10024700` and `0x100247C0` against Binary
+   Ninja HLIL, Ghidra `functions.csv`, the decompiler hint corpus, the curated
+   qagame symbol map, and promoted aliases.
+2. Added named dynamic-skill history fields to `bot_state_t`, including the
+   capped 32-entry score-delta, skill, and timestamp sample ring.
+3. Reconstructed `BotAppendDynamicSkillSample`, preserving the retail capped
+   history behavior and append count semantics.
+4. Reconstructed `BotUpdateDynamicSkill`, preserving the retail cvar gates,
+   warmup guard, five-second throttle, local-client activity gate, score-delta
+   feedback thresholds, 30-second stall cancellation, skill clamp, userinfo
+   refresh, character reload, item/weapon-weight reload, walker update, and
+   `g_spSkill` mirror.
+5. Wired `BotAIStartFrame` through `BotUpdateDynamicSkill( time )` before
+   `BotUpdateTrainingState()`.
+6. Updated parity gates, qagame symbol-map comments, and reconstruction notes
+   so the dynamic-skill island is no longer treated as mapped-only.
+
+### Task A358: Pin Steam passive achievement-query cache read [COMPLETED]
+Priority: High
+Primary areas: `src/code/server/sv_client.c`,
+`tests/test_platform_services.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_502.md`
+Parity estimate: **before 74% -> after 96%** for focused passive
+achievement-query reconstruction confidence, and overall Steam launch/runtime
+integration confidence **90.3% -> 90.4%**.
+
+Completed work:
+
+1. Rechecked retail `sub_467f70` against Binary Ninja HLIL and the existing
+   Steam stats wrapper mapping notes from rounds 03 and 04.
+2. Confirmed that retail treats `SteamStats_HasAchievement` as a passive cache
+   read: zero SteamID, missing session, or unset ready flag returns false, and a
+   ready session returns the local achievement bit.
+3. Changed `SV_SteamStats_HasAchievement()` so it no longer creates a stats
+   session or calls the live `GetUserAchievement` backend query from the qagame
+   read path.
+4. Reused the existing SteamID-keyed retained-session lookup so the source path
+   mirrors retail's tree lookup ownership rather than relying only on client
+   slot identity.
+5. Added static parity assertions for `sub_467f70` and for the source rule that
+   the public query wrapper is a side-effect-free cache read.
+
+### Task A357: Pin Steam server achievement-set ready guard [COMPLETED]
+Priority: High
+Primary areas: `src/code/server/sv_client.c`,
+`tests/test_platform_services.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_501.md`
+Parity estimate: **before 82% -> after 97%** for focused server
+achievement-set reconstruction confidence, and overall Steam launch/runtime
+integration confidence **90.2% -> 90.3%**.
+
+Completed work:
+
+1. Rechecked retail `sub_4672d0` against Binary Ninja HLIL and the existing
+   Steam stats mapping notes, including the ready flag at `arg1 + 0x20`,
+   `SteamGameServerStats()->SetUserAchievement` slot `0x1c`, and the shared
+   `sub_4670c0` store helper.
+2. Added `SV_SteamStats_SetAchievement()` as the source-level counterpart to
+   the retail server achievement setter, keeping it behind the existing
+   `QL_BUILD_ONLINE_SERVICES` Steam stats owner.
+3. Added a narrow forced-store path to `SV_SteamStats_FlushPendingValues()` so
+   a successful achievement set mirrors retail's store-after-set behavior even
+   when no queued stat deltas are pending.
+4. Changed `SV_SteamStats_UnlockAchievement()` so the local achievement cache is
+   only updated after the baseline load succeeds and the server achievement
+   setter returns true.
+5. Strengthened the Steam stats parity test with address-level HLIL assertions
+   for `sub_4670c0`, `sub_4672d0`, and the high-level `sub_467e00` caller.
+
+### Task A356: Reconstruct qagame botlib training-state toggle helper [COMPLETED]
+Priority: High
+Primary areas: `src/code/game/ai_main.c`,
+`src/code/game/ai_main.h`,
+`references/symbol-maps/qagame.json`,
+`tests/test_botlib_qagame_ai_main_lifecycle_training_parity.py`,
+`docs/reverse-engineering/botlib-qagame-training-state-toggle-reconstruction-2026-06-11.md`
+Parity estimate: **before 0% -> after 93%** for focused
+`BotSetTrainingBotState` source reconstruction confidence, **before 93% ->
+after 95%** for focused ai_main training-helper source coverage, and overall
+botlib plus qagame AI execution wiring confidence **99.2% -> 99.3%**.
+
+Completed work:
+
+1. Rechecked retail qagame row `0x100245C0` against Binary Ninja HLIL,
+   Ghidra `functions.csv`, the curated qagame symbol map, and the existing
+   promoted alias corpus.
+2. Mapped the retail writes to current source layout: `gentity_t.flags`,
+   `client->ps.ammo[WP_ROCKET_LAUNCHER]`,
+   `client->ps.ammo[WP_SHOTGUN]`, and
+   `client->ps.stats[STAT_WEAPONS]`.
+3. Reconstructed `BotSetTrainingBotState` in `ai_main.c`, preserving the
+   retail enable/disable flag masks, rocket-launcher ammo grant, weapon-bit
+   updates, and shotgun-ammo restore.
+4. Added local names for the retail-only training entity flag groups and the
+   extra training weapon bit rather than promoting unstable global gameplay
+   names.
+5. Widened the focused parity test and documented the remaining mapped-only
+   dynamic-skill history/update island.
+
+### Task A355: Pin Steam GSStatsStored validation refresh [COMPLETED]
+Priority: High
+Primary areas: `src/code/server/sv_client.c`,
+`tests/test_platform_services.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_500.md`
+Parity estimate: **before 84% -> after 97%** for focused GSStatsStored
+validation-refresh path, and **before 90.1% -> after 90.2%** for overall
+Steam launch/runtime integration.
+
+Completed work:
+
+1. Rechecked retail `sub_467360` in Binary Ninja HLIL, including result `1`
+   success, result `8` partial validation, generic failure, and the synthetic
+   call into `sub_4671d0`.
+2. Factored the successful stats-received warmup into
+   `SV_SteamStats_PrimeReceivedValues()`.
+3. Routed both `GSStatsReceived_t` success and `GSStatsStored_t` result `8`
+   through the shared local warmup helper.
+4. Removed the reconstructed result-`8` re-request behavior so partial
+   validation no longer calls `SV_SteamStats_RequestCurrentValues()`.
+5. Strengthened static parity assertions for the HLIL address sequence and the
+   source-side no-re-request rule.
+6. Documented the evidence, reconstruction, validation, confidence, and parity
+   estimate in Steam mapping round 500.
+
+### Task A354: Pin Steam GSStatsReceived session warmup [COMPLETED]
+Priority: High
+Primary areas: `src/code/server/sv_client.c`,
+`tests/test_platform_services.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_499.md`
+Parity estimate: **before 83% -> after 96%** for focused GameServer stats
+received-session warmup, and **before 90.0% -> after 90.1%** for overall
+Steam launch/runtime integration.
+
+Completed work:
+
+1. Rechecked retail `sub_4671d0` in Binary Ninja HLIL, including the failed
+   result branch, mapped stat value slot reads, and ready-flag write at
+   `00467283`.
+2. Corrected `SV_SteamStats_RequestCurrentValues()` so issuing a
+   `RequestUserStats` call no longer marks the stats backend available.
+3. Added cold-state guards for stat and achievement reads until a successful
+   `GSStatsReceived_t` callback warms the session.
+4. Updated reconnect requery and stats-received failure paths to clear the
+   local warm-state flags.
+5. Added success-path stat priming from the received callback through the
+   mapped GameServerStats stat loaders.
+6. Strengthened static parity tests and documented the evidence, validation,
+   confidence, and parity estimate in Steam mapping round 499.
+
+### Task A353: Reconstruct qagame botlib beyondreality travel flag helper [COMPLETED]
+Priority: High
+Primary areas: `src/code/game/ai_dmq3.c`,
+`src/code/game/ai_dmq3.h`,
+`references/symbol-maps/qagame.json`,
+`tests/test_botlib_qagame_ai_dmq3_aim_attack_parity.py`,
+`tests/test_botlib_qagame_ai_main_lifecycle_training_parity.py`,
+`docs/reverse-engineering/botlib-qagame-beyondreality-travel-flags-reconstruction-2026-06-11.md`
+Parity estimate: **before 0% -> after 96%** for focused
+`BotApplyBeyondRealityTravelFlags` source reconstruction confidence, **before
+94% -> after 98%** for focused `BotMapScripts` map-specific travel-flag
+wiring, and overall botlib plus qagame AI execution wiring confidence
+**99.1% -> 99.2%**.
+
+Completed work:
+
+1. Rechecked retail qagame row `0x10024E10` against Binary Ninja HLIL,
+   Ghidra `functions.csv`, the curated qagame symbol map, and the existing
+   promoted alias corpus.
+2. Reconstructed `BotApplyBeyondRealityTravelFlags` in `ai_dmq3.c`, preserving
+   the serverinfo `mapname` lookup and the `beyondreality` `TFL_FUNCBOB`
+   clearing behavior.
+3. Wired `BotMapScripts` through the new helper for the retail
+   `beyondreality` branch while leaving the `q3tourney6` crusher-button script
+   inline.
+4. Corrected the qagame symbol-map comment for the helper so it states that
+   `TFL_FUNCBOB` is cleared when the map matches `beyondreality`.
+5. Widened the focused botlib parity tests and documented the dynamic-skill
+   history/update island that Task A359 later reconstructed.
+
+### Task A352: Pin Steam GameServer stats logged-on request gate [COMPLETED]
+Priority: High
+Primary areas: `src/common/platform/platform_steamworks.c`,
+`tests/steamworks_harness.c`, `tests/test_platform_services.py`,
+`tests/test_steamworks_harness.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_498.md`
+Parity estimate: **before 87% -> after 98%** for focused Steam GameServer
+stats logged-on request gate, and **before 89.9% -> after 90.0%** for overall
+Steam launch/runtime integration.
+
+Completed work:
+
+1. Rechecked the retail `sub_467190` HLIL sequence for
+   `SteamGameServerStats()` acquisition, `SteamGameServer()->BLoggedOn`, and
+   `RequestUserStats` vtable slot `0x00` dispatch.
+2. Reordered `QL_Steamworks_ServerRequestUserStats()` so the stats interface
+   owner is probed before the logged-on gate, then reacquired before dispatch
+   to mirror retail.
+3. Extended the Steamworks harness with GameServerStats availability and
+   acquisition counters.
+4. Added a focused executable regression for cold pre-init, missing stats
+   owner, false logged-on, and successful request paths.
+5. Added static Ghidra import and Binary Ninja HLIL assertions for the mapped
+   retail address sequence.
+6. Documented the evidence, reconstruction, validation, confidence, and parity
+   estimate in Steam mapping round 498.
+
+### Task A351: Reconstruct qagame botlib entity bounds gap helper [COMPLETED]
+Priority: High
+Primary areas: `src/code/game/ai_main.c`,
+`src/code/game/ai_main.h`,
+`tests/test_botlib_qagame_ai_main_lifecycle_training_parity.py`,
+`docs/reverse-engineering/botlib-qagame-entity-bounds-gap-reconstruction-2026-06-11.md`
+Parity estimate: **before 0% -> after 88%** for focused
+`BotEntityBoundsGap` source reconstruction confidence, **before 89% -> after
+91%** for focused ai_main training-helper source coverage, and overall botlib
+plus qagame AI execution wiring confidence **99.0% -> 99.1%**.
+
+Completed work:
+
+1. Rechecked retail qagame row `0x100243D0` against Binary Ninja HLIL,
+   Ghidra `functions.csv`, the curated qagame symbol map, and the existing
+   promoted alias corpus.
+2. Matched the retail AAS entity-info snapshots to named `aas_entityinfo_t`
+   `origin`, `mins`, and `maxs` fields in `be_aas.h`.
+3. Reconstructed `BotEntityBoundsGap` in `ai_main.c` as a positive separating
+   bbox-gap helper with the observed horizontal `4.0f` spacing cushion and a
+   zero return for overlap/close-enough cases.
+4. Added the prototype and widened the focused ai_main lifecycle/training
+   parity gate to pin the source body, header declaration, retail metadata,
+   HLIL anchors, Ghidra anchors, and import wiring.
+5. Documented the dynamic-skill history/update island that Task A359 later
+   reconstructed.
+
+### Task A350: Pin Steam GameServer UGC owner selection [COMPLETED]
+Priority: High
+Primary areas: `tests/test_platform_services.py`,
+`tests/test_steamworks_harness.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_497.md`
+Parity estimate: **before 88% -> after 98%** for focused Steam GameServer
+UGC owner selection, and **before 89.8% -> after 89.9%** for overall Steam
+launch/runtime integration.
+
+Completed work:
+
+1. Rechecked the retail GameServer bootstrap HLIL branch that chooses
+   `SteamUGC()` for listen/non-dedicated mode and `SteamGameServerUGC()` for
+   dedicated mode after `SteamGameServer_Init` succeeds.
+2. Added static assertions for the dedicated check, both Steam UGC owners, the
+   cached owner write, and the later dedicated-state publication.
+3. Strengthened `QL_Steamworks_GetUGCInterface()` parity checks so the source
+   owner fallback order stays aligned with the retail branch.
+4. Added a fresh listen-server harness regression proving workshop
+   subscribe/download calls stay on the client UGC owner and do not touch
+   `SteamGameServerUGC`.
+5. Documented the evidence, validation, confidence, and parity estimate in
+   Steam mapping round 497.
+
+### Task A349: Pin Steam GameServer init signature and failure state [COMPLETED]
+Priority: High
+Primary areas: `tests/steamworks_harness.c`,
+`tests/test_platform_services.py`, `tests/test_steamworks_harness.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_496.md`
+Parity estimate: **before 86% -> after 98%** for focused Steam GameServer
+init signature and failure-state mapping, and **before 89.7% -> after 89.8%**
+for overall Steam launch/runtime integration.
+
+Completed work:
+
+1. Rechecked the retail `SteamGameServer_Init` import and HLIL bootstrap call
+   around `sub_466DB0`, including Steam port `0`, query port `0xffff`, secure
+   mode, stored result, and fatal failure branch.
+2. Exposed the Steamworks harness' retained Steam-port and query-port records
+   so executable tests can verify the full init signature.
+3. Extended the GameServer init harness regression for repeated-init no-reentry
+   while confirming the active UGC owner can switch back to the client UGC
+   path without calling Steam's init entry again.
+4. Added a failure-state regression proving failed GameServer init leaves the
+   server runtime cold: no initialized flag, no GameServer callback pump, no
+   GameServer UGC routing, and no shutdown call.
+5. Documented the evidence, validation, confidence, and parity estimate in
+   Steam mapping round 496.
+
+### Task A348: Reconstruct qagame botlib tutorial/training leaf helpers [COMPLETED]
+Priority: High
+Primary areas: `src/code/game/ai_dmnet.c`,
+`src/code/game/ai_dmnet.h`, `src/code/game/ai_main.c`,
+`src/code/game/ai_main.h`,
+`tests/test_botlib_qagame_ai_dmnet_tutorial_tail_parity.py`,
+`tests/test_botlib_qagame_ai_main_lifecycle_training_parity.py`,
+`docs/reverse-engineering/botlib-qagame-training-leaf-reconstruction-2026-06-11.md`
+Parity estimate: **before 0% -> after 96%** for focused
+`BotSetLeadTeamGoal` source reconstruction confidence, **before 0% -> after
+97%** for focused `BotSetIdealViewAnglesToPoint` source reconstruction
+confidence, and overall botlib plus qagame AI execution wiring confidence
+**98.9% -> 99.0%**.
+
+Completed work:
+
+1. Rechecked retail qagame rows `0x1000F7F0` and `0x10024530` against
+   Binary Ninja HLIL, Ghidra `functions.csv`, the curated qagame symbol map,
+   and the existing promoted alias corpus.
+2. Reconstructed `BotSetLeadTeamGoal` in `ai_dmnet.c`, preserving the retail
+   origin/areanum copy and normal player goal bounds without adding unrelated
+   `bot_goal_t` writes.
+3. Reconstructed `BotSetIdealViewAnglesToPoint` in `ai_main.c`, preserving the
+   retail target-minus-origin direction, `vectoangles` conversion, and roll
+   halving.
+4. Added prototypes and widened the focused botlib parity tests to pin source
+   bodies, headers, retail metadata, HLIL anchors, Ghidra anchors, and import
+   wiring.
+5. Documented the dynamic-skill helper island that Task A359 later
+   reconstructed.
+
+### Task A347: Pin Steam non-GameServer callback owner bits [COMPLETED]
+Priority: High
+Primary areas: `tests/test_platform_services.py`,
+`tests/test_steamworks_harness.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_495.md`
+Parity estimate: **before 84% -> after 98%** for focused non-GameServer
+callback owner-bit mapping, and **before 89.6% -> after 89.7%** for overall
+Steam launch/runtime integration.
+
+Completed work:
+
+1. Rechecked the Ghidra RTTI/vtable symbol surface for normal Steam callback
+   owners whose callback template parameter is `0`.
+2. Rechecked Binary Ninja HLIL constructors for the client, avatar, lobby,
+   microtransaction, and workshop callback bundles, including zero owner-byte
+   setup and retail callback IDs.
+3. Pinned every non-server `QL_Steamworks_PrepareCallbackObject` call site to
+   `qfalse`, complementing the GameServer-owned `qtrue` checks from Task A345.
+4. Added harness coverage that queues client/lobby/micro/workshop events,
+   runs the GameServer callback pump first, and verifies those events remain
+   pending until the client callback pump runs.
+5. Documented the evidence, validation, confidence, and parity estimate in
+   Steam mapping round 495.
+
+### Task A346: Reconstruct qagame Instagib target-goal helpers [COMPLETED]
+Priority: High
+Primary areas: `src/code/game/ai_dmq3.c`,
+`src/code/game/ai_dmq3.h`,
+`references/analysis/quakelive_symbol_aliases.json`,
+`tests/test_botlib_qagame_instagib_target_goal_parity.py`,
+`docs/reverse-engineering/botlib-qagame-instagib-target-goal-reconstruction-2026-06-11.md`
+Parity estimate: **before 0% -> after 100%** for focused Instagib
+target-goal alias-corpus coverage, **before 0% -> after 92%** for focused
+source reconstruction confidence, and overall botlib plus qagame AI execution
+wiring confidence **98.8% -> 98.9%**.
+
+Completed work:
+
+1. Rechecked retail rows `0x10020200`, `0x10020600`, and `0x10020730`
+   against Binary Ninja HLIL, Ghidra metadata, and the curated qagame symbol
+   map.
+2. Promoted `BotFindInstaGibTarget`, `BotRefreshInstaGibTargetGoal`, and
+   `BotGetInstaGibTargetGoal` aliases into the shared alias corpus.
+3. Reconstructed the three helpers in `ai_dmq3.c` using existing
+   `bot_state_t` fields: `ltg_time`, `enemy`, `ltgtype`, `teamgoal`, and
+   `teamgoal_time`.
+4. Added a focused parity regression for source anchors, retail HLIL/Ghidra
+   anchors, row metadata, prototypes, and AAS route/import bridge wiring.
+5. Documented the then-remaining boundary that the larger retail-only
+   `AINode_InstaGib` tutorial body needed a separate tutorial-tail
+   reconstruction pass; Task A363 now source-backs that node, with only the raw
+   cleanup offsets still open.
+
+### Task A345: Restore Steam callback GameServer flag and pump split [COMPLETED]
+Priority: High
+Primary areas: `src/common/platform/platform_steamworks.c`,
+`tests/steamworks_harness.c`, `tests/test_platform_services.py`,
+`tests/test_steamworks_harness.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_494.md`
+Parity estimate: **before 78% -> after 98%** for focused Steam callback
+GameServer flag and pump-owner mapping, and **before 89.4% -> after 89.6%**
+for overall Steam launch/runtime integration.
+
+Completed work:
+
+1. Rechecked retail client and GameServer callback pumps against HLIL
+   `sub_461D40` and `sub_466850`.
+2. Rechecked the `SteamServerCallbacks` constructor at `sub_466DB0`, including
+   the repeated `callbackFlags = 2` writes before `SteamAPI_RegisterCallback`.
+3. Updated the retained Steam callback object preparation path so server-owned
+   callback objects preserve the retail GameServer flag before registration.
+4. Split the Steamworks harness callback queue by pump owner so client and
+   GameServer pumps no longer consume the other side's queued events.
+5. Added static and executable tests for the callback flag evidence, the shared
+   P2P callback ID owner split, and the wrong-pump preservation behavior.
+6. Documented the evidence, validation, and scoped parity estimate in mapping
+   round 494.
+
+### Task A344: Map Steam GameServer shutdown callback boundary [COMPLETED]
+Priority: High
+Primary areas: `tests/test_platform_services.py`,
+`tests/test_steamworks_harness.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_493.md`
+Parity estimate: **before 88% -> after 98%** for focused GameServer shutdown
+callback-boundary mapping, and **before 89.3% -> after 89.4%** for overall
+Steam launch/runtime integration.
+
+Completed work:
+
+1. Rechecked retail `sub_465D30`, `SteamGameServer_Shutdown` import evidence,
+   `FUN_00465d30`, the adjacent `FUN_00466db0` server callback constructor,
+   and imported `SteamServerCallbacks` `CCallback` symbols.
+2. Confirmed the direct retail GameServer shutdown helper calls
+   `SteamGameServer_Shutdown()` and clears the retained initialized flag
+   without unregistering callback objects.
+3. Hardened static platform-service parity tests around the retail shutdown
+   slice, Ghidra anchors, and source boundary.
+4. Added Steamworks harness coverage that separates direct server shutdown
+   from full platform shutdown callback cleanup.
+5. Documented the evidence, validation, and scoped parity estimate in mapping
+   round 493.
+
+### Task A343: Pin qagame bot voice-command and spawn wiring [COMPLETED]
+Priority: High
+Primary areas: `references/analysis/quakelive_symbol_aliases.json`,
+`tests/test_botlib_qagame_voice_spawn_wiring_parity.py`,
+`docs/reverse-engineering/botlib-qagame-voice-spawn-wiring-mapping-2026-06-11.md`
+Parity estimate: **before 35% -> after 96%** for focused qagame
+voice-command alias and dispatcher coverage, **before 72% -> after 98%** for
+focused bot spawn/bootstrap alias and source-anchor coverage, and overall
+botlib plus qagame AI execution wiring confidence **98.6% -> 98.8%**.
+
+Completed work:
+
+1. Rechecked the qagame voice-command band `0x1002B9B0..0x1002C7D0` and bot
+   spawn/bootstrap band `0x100367C0..0x10037E10` against Binary Ninja HLIL,
+   Ghidra metadata, and the qagame symbol map.
+2. Promoted missing voice-command and spawn/bootstrap aliases so Ghidra
+   `FUN_...`, Binary Ninja `sub_...`, and source-level names resolve through
+   the shared alias corpus.
+3. Added a parity regression pinning source anchors in `ai_vcmd.c` and
+   `g_bot.c`, retail dispatcher/spawn HLIL anchors, selected Ghidra decompile
+   anchors, and the botlib qagame import bridge in `g_syscalls.c` and
+   `ql_game_imports.inc`.
+4. Documented the trainer bootstrap confidence boundary: retail HLIL proves
+   `Trainer`, `5000`, and `loaddeferred`, while exact skill provenance remains
+   ambiguous enough to avoid a source rewrite.
+
+### Task A342: Reconstruct Steam callback unregister local-state fallback [COMPLETED]
+Priority: High
+Primary areas: `src/common/platform/platform_steamworks.c`,
+`tests/steamworks_harness.c`, `tests/test_steamworks_harness.py`,
+`tests/test_platform_services.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_492.md`
+Parity estimate: **before 84% -> after 98%** for focused callback unregister
+local-state fallback parity, and **before 89.2% -> after 89.3%** for overall
+Steam launch/runtime integration.
+
+Completed work:
+
+1. Rechecked retail callback destructor evidence at `0x00467430` and
+   `0x00467560`, the Ghidra import for `SteamAPI_UnregisterCallback`, and the
+   imported `CCallback` symbol families for `SteamCallbacks`,
+   `SteamServerCallbacks`, and `idSteamStats`.
+2. Preserved the retail `SteamAPI_UnregisterCallback` runtime call when the
+   dynamic export is available while making `QL_Steamworks_UnregisterCallbackObject`
+   clear retained local callback flags even when that optional export is
+   unavailable.
+3. Added Steamworks harness probes and functional coverage for the missing
+   unregister-symbol fallback on a representative client callback object.
+4. Hardened static platform-service parity tests with Ghidra import anchors,
+   HLIL destructor-order anchors, and source ordering assertions.
+5. Documented the evidence, validation, and scoped parity estimate in mapping
+   round 492.
+
+### Task A341: Map native cgame sound slab ABI split [COMPLETED]
+Priority: High
+Primary areas: `tests/test_botlib_cgame_native_import_slab_parity.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_491.md`
+Parity estimate: **before 90% -> after 98%** for focused native cgame sound
+slab ABI mapping, **before 76% -> after 98%** for focused direct-volume versus
+legacy fixed-volume sound coverage, and overall sound-system wiring
+reconstruction parity **92.1% -> 92.2%**.
+
+Completed work:
+
+1. Rechecked the native cgame sound import band `data_5659EC..data_565A18`
+   against the retail Binary Ninja HLIL table and Ghidra-backed aliases.
+2. Confirmed that retail direct volume helpers occupy native slots `38` and
+   `40` without adding matching legacy `CG_S_*_VOLUME` syscall IDs.
+3. Added a dedicated regression test that binds native slot order, legacy
+   syscall remapping, native `trap_QL_*Volume` calls, QVM fixed-volume
+   fallbacks, host-side direct providers, and legacy fixed-volume wrappers.
+4. Documented the evidence, confidence, and scoped parity estimate in mapping
+   round 491.
+
+### Task A340: Reconstruct Steam UGC call-result rebind lifecycle [COMPLETED]
+Priority: High
+Primary areas: `src/common/platform/platform_steamworks.c`,
+`tests/steamworks_harness.c`, `tests/test_steamworks_harness.py`,
+`tests/test_platform_services.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_490.md`
+Parity estimate: **before 86% -> after 98%** for focused UGC call-result
+rebind lifecycle parity, and **before 89% -> after 89.2%** for overall Steam
+launch/runtime integration.
+
+Completed work:
+
+1. Rechecked the retail `SteamWorkshop_GetAllUGC` path at `0x00460DC0`, the
+   `SteamCallbacks` call-result constructor at `0x004613A0`, Ghidra import
+   ownership, and the imported `SteamUGCQueryCompleted_t` `CCallResult`
+   symbols.
+2. Preserved the retail unregister-before-register call-result order while
+   making `QL_Steamworks_UnbindCallResultObject` clear retained local handle
+   state even when the optional dynamic unregister export is unavailable.
+3. Added Steamworks harness probes and functional coverage for the missing
+   unregister-symbol fallback.
+4. Hardened static platform-service parity tests with Ghidra import anchors,
+   HLIL call-order anchors, and source ordering assertions.
+5. Documented the evidence, validation, and scoped parity estimate in mapping
+   round 490.
+
+### Task A339: Map UI sound import bridge wiring [COMPLETED]
+Priority: High
+Primary areas: `tests/test_ui_menu_files.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_489.md`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_21.md`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_22.md`
+Parity estimate: **before 86% -> after 98%** for focused UI sound import
+bridge mapping, **before 89% -> after 97%** for focused UI/native sound
+regression coverage, and overall sound-system wiring reconstruction parity
+**92.0% -> 92.1%**.
+
+Completed work:
+
+1. Rechecked the UI local-sound and background-track bridge against retail
+   `quakelive_steam.exe` HLIL table entries, Ghidra function sizes, and the
+   promoted alias map.
+2. Added a dedicated regression test that binds the legacy UI syscall enum,
+   recovered native UI import slots, `UI_MapNativeImport`, client dispatcher
+   cases, native host wrappers, and `uiInfo.uiDC` sound callbacks together.
+3. Updated older sound mapping notes so their `S_StartLocalSound` descriptions
+   include the retail stopped/muted guard order before handle validation.
+4. Documented the evidence, confidence, and scoped parity estimate in mapping
+   round 489.
+
+### Task A338: Reconstruct local sound stopped/muted guard order [COMPLETED]
+Priority: High
+Primary areas: `src/code/client/snd_dma.c`,
+`tests/test_client_sound_playback_parity.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_488.md`
+Parity estimate: **before 70% -> after 98%** for focused local-sound
+stopped/muted guard parity, **before 88% -> after 97%** for focused client
+sound warning-path regression coverage, and overall client sound-system
+reconstruction parity **91.9% -> 92.0%**.
+
+Completed work:
+
+1. Rechecked `sub_4DA380 -> S_StartLocalSoundVolume` and
+   `sub_4DB3F0 -> S_StartLocalSound` against retail HLIL, Ghidra function
+   sizes, and the alias map.
+2. Reconstructed the retail guard order so both local-sound wrappers return
+   silently when the sound system is stopped or muted before validating the
+   sound handle.
+3. Hardened playback parity tests with HLIL anchors and ordered source
+   assertions for guard -> warning -> start-call flow in both wrappers.
+4. Documented the evidence, validation, and scoped parity estimate in mapping
+   round 488.
+
+### Task A337: Reconstruct WinMain tooltip common-control shell [COMPLETED]
+Priority: High
+Primary areas: `src/code/win32/win_main.c`,
+`tests/test_application_initialization_mapping.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_487.md`
+Parity estimate: **before 0% -> after 92%** for the focused WinMain
+tooltip common-control shell, **before 98.0% -> after 98.4%** for the scoped
+application-initialization wiring lane, and **before 88% -> after 89%** for
+overall Steam launch/runtime integration.
+
+Completed work:
+
+1. Rechecked retail `WinMain @ 0x004ED830` around the low-level keyboard hook,
+   `tooltips_class32` common-control shell, and adjacent
+   `asset://ql/index.html` web-menu launch.
+2. Reconstructed the native tooltip shell with `ICC_BAR_CLASSES`,
+   `TOOLTIPS_CLASSA`, the observed popup tooltip style, default coordinates,
+   `HWND_NOTOPMOST` placement, desktop-wide empty `TOOLINFOA`,
+   `TTM_ADDTOOLA`, and inactive `TTM_ACTIVATE`.
+3. Added dynamic `comctl32.dll` initialization and shutdown cleanup so the
+   source mirrors retail behavior without adding a new project-level link
+   dependency.
+4. Extended application-initialization parity tests to pin the HLIL constants,
+   source call order, common-control loader, tooltip messages, and error/quit
+   shutdown ordering.
+5. Documented the evidence, policy boundary, validation, and parity estimate in
+   mapping round 487.
+
+### Task A336: Reconstruct cgame native loop-sound import wiring [COMPLETED]
+Priority: High
+Primary areas: `src/code/cgame/cg_ents.c`,
+`tests/test_cgame_sound_wiring_parity.py`,
+`references/symbol-maps/cgame.json`,
+`docs/reverse-engineering/cgame-mapping.md`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_486.md`
+Parity estimate: **before 74% -> after 98%** for focused
+`CG_EntityEffects` loop-sound import parity, **before 88% -> after 97%** for
+focused cgame entity/missile sound wiring regression coverage, and overall
+cgame sound-wiring reconstruction parity **94.2% -> 94.6%**.
+
+Completed work:
+
+1. Rechecked `FUN_10015500 -> CG_EntityEffects`,
+   `FUN_100175f0 -> CG_Missile`, and `FUN_10018ae0 -> CG_AddCEntity` against
+   the retail cgame HLIL and Ghidra function table.
+2. Removed the old Quake III speaker-specific `trap_S_AddRealLoopingSound`
+   branch from `CG_EntityEffects`; retail native cgame routes every
+   continuous entity `loopSound` through the `+0xac` `trap_S_AddLoopingSound`
+   import.
+3. Hardened cgame sound wiring tests around the native loop import, missile
+   velocity loop-sound submission, and `CG_AddCEntity` effects-before-render
+   order while preserving the compatibility `CG_S_ADDREALLOOPINGSOUND` syscall
+   surface for legacy VM callers.
+4. Corrected stale mapping prose in `references/symbol-maps/cgame.json` and
+   `docs/reverse-engineering/cgame-mapping.md`, then documented the evidence
+   and validation in mapping round 486.
+
+### Task A335: Reconstruct real looping-sound doppler scale reset [COMPLETED]
+Priority: High
+Primary areas: `src/code/client/snd_dma.c`,
+`tests/test_client_sound_playback_parity.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_484.md`
+Parity estimate: **before 72% -> after 96%** for focused
+`S_AddRealLoopingSound` stale-state parity, **before 88% -> after 97%** for
+focused loop-record initialization regression coverage, and overall client
+sound-system reconstruction parity **91.8% -> 91.9%**.
+
+Completed work:
+
+1. Rechecked the retail loop-record initialization evidence around
+   `sub_4DA4C0 -> S_AddLoopingSound` and the adjacent `0x004DA522` HLIL body.
+2. Updated the legacy `S_AddRealLoopingSound` compatibility path so clearing
+   doppler also resets `oldDopplerScale` and `dopplerScale` to `1.0`, avoiding
+   stale scale leakage from a previous doppler loop on the same entity slot.
+3. Added HLIL-backed parity assertions for the doppler false write, retail
+   `1.0` scale load, and both scale stores.
+4. Documented the evidence, compatibility boundary, and parity estimate in
+   mapping round 484.
 
 ### Task A334: Pin qagame ai_team modal order and leader dispatcher wiring [COMPLETED]
 Priority: High
@@ -255,9 +2282,8 @@ Completed work:
    entry/flow anchors, Ghidra decompiler anchors for the larger retail-only
    helpers, and the botlib lifecycle, EA, chat, move, goal, weapon, entity,
    and user-command import wiring used by the slice.
-4. Documented the source-reconstruction boundary for the retail-only
-   dynamic-skill island, where names and call sites are now pinned but exact
-   C reconstruction remains open.
+4. Documented the source-reconstruction boundary for the dynamic-skill island,
+   which Task A359 later closed with source reconstruction.
 
 ### Task A326: Pin ZMQ own_t owned pointer-set lifecycle wiring [COMPLETED]
 Priority: High
@@ -16320,3 +18346,76 @@ Steam callback payload/result fields, and updated the source callbacks to
 ignore the adapter payload while preserving the wrapper signatures. The
 evidence is recorded in
 `docs/reverse-engineering/quakelive_steam_mapping_round_464.md`.
+
+### Task 147: Steam GameServer orphaned auth-session cleanup reconstruction [COMPLETED]
+Parity estimate: **before 48% -> after 91%** for the scoped server-spawn
+auth-session cleanup lane. This pass rechecked retail `sub_466B90` and its
+`SV_SpawnServer` callsite at `0x004E3547`, confirmed the cleanup runs
+immediately after the `Server: %s` startup log and before map-loading/client
+shutdown, and reconstructed a source owner that ends retained Steam auth
+sessions whose Steam IDs no longer belong to a live server client. The evidence
+is recorded in
+`docs/reverse-engineering/quakelive_steam_mapping_round_473.md`.
+
+### Task 148: Steam GameServer bootstrap terminal success log reconstruction [COMPLETED]
+Parity estimate: **before 86% -> after 99%** for the scoped Steam GameServer
+bootstrap terminal diagnostic lane. This pass rechecked retail `sub_466ED0`,
+confirmed the `Steam Gameserver initialized.` log occurs after logon or
+anonymous logon, heartbeat disable, product publication, and `baseq3` game-dir
+publication, and added the matching source terminal marker to
+`Com_InitSteamGameServer`. The evidence is recorded in
+`docs/reverse-engineering/quakelive_steam_mapping_round_475.md`.
+
+### Task 149: SteamClient_Init failed SteamAPI diagnostic reconstruction [COMPLETED]
+Parity estimate: **before 74% -> after 96%** for the scoped Steam-enabled
+failed-client-bootstrap diagnostic lane. This pass rechecked retail
+`sub_461500`, confirmed the `SteamAPI_Init()` failure branch prints
+`Steam API not present.` and returns before callback allocation, lobby/micro
+bootstrap, command registration, main-menu rich presence, or the terminal
+success log, and added the matching source diagnostic only inside the
+Steamworks-enabled failure path. The evidence is recorded in
+`docs/reverse-engineering/quakelive_steam_mapping_round_477.md`.
+
+### Task 150: SteamID homepath native module extraction mapping hardening [COMPLETED]
+Parity estimate: **before 88% -> after 97%** for the scoped
+Steam-launch native module root and `baseq3/bin.pk3` extraction lane. This
+pass rechecked retail `FS_Startup` and `Sys_LoadDll` evidence, pinned the
+`fs_homepath = fs_basepath/<SteamID>` derivation and the retail
+`fs_basepath -> fs_homepath -> fs_cdpath` DLL probe order, and hardened the
+source-side policy-adjusted loader coverage that prefers the SteamID-scoped
+homepath for replacement launches while extracting only `uix86.dll`,
+`cgamex86.dll`, and `qagamex86.dll` from `baseq3/bin.pk3`. The evidence is
+recorded in `docs/reverse-engineering/quakelive_steam_mapping_round_479.md`.
+
+### Task 151: Steam client startup fatal-guard boundary mapping [COMPLETED]
+Parity estimate: **before 86% -> after 97%** for the scoped Steam client
+startup fatal-guard boundary, and **before 85% -> after 86%** for overall
+Steam launch/runtime integration. This pass rechecked retail `sub_461500`,
+`sub_460510`, and the `Com_Init` guard at `0x004CC5FD`, pinned the
+`dedicated -> SteamClient_Init -> com_build -> CL_Init -> initialized/com_build/dedicated`
+guard order, and hardened the source tests that document SRP's non-fatal
+compatibility fallback where retail would abort with `Failed to initialize
+Steam.`. The evidence is recorded in
+`docs/reverse-engineering/quakelive_steam_mapping_round_481.md`.
+
+### Task 152: Pre-filesystem SteamID homepath boundary mapping [COMPLETED]
+Parity estimate: **before 90% -> after 98%** for the scoped
+pre-filesystem SteamID homepath boundary, and **before 86% -> after 87%** for
+overall Steam launch/runtime integration. This pass rechecked retail
+`sub_461500`, `sub_460550`, and `FS_Startup` at `0x004D30A0`, pinned the
+common-startup Steam bootstrap before filesystem startup, and hardened the
+source tests that keep `SteamClient_InitForFilesystem` side-effect-light while
+allowing `FS_ResolveHomePath` to select `fs_basepath/<SteamID>` for Steam
+replacement launches. The evidence is recorded in
+`docs/reverse-engineering/quakelive_steam_mapping_round_483.md`.
+
+### Task 153: Steamworks loader import launch-contract mapping [COMPLETED]
+Parity estimate: **before 88% -> after 97%** for the scoped Steamworks
+loader/import launch contract, and **before 87% -> after 88%** for overall
+Steam launch/runtime integration. This pass rechecked retail
+`STEAM_API.DLL` imports and HLIL import-table symbols, pinned SRP's dynamic
+loader split between required client exports and optional callback/GameServer
+exports, confirmed retail export names are tried before SDK aliases, and
+documented that neither retail nor SRP uses `SteamAPI_RestartAppIfNecessary`
+for self-relaunch. The evidence is recorded in
+`docs/reverse-engineering/quakelive_steam_mapping_round_485.md`.

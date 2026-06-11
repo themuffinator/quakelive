@@ -1,10 +1,22 @@
 from __future__ import annotations
 
+import csv
+import json
 from pathlib import Path
 
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 CG_MAIN = REPO_ROOT / "src" / "code" / "cgame" / "cg_main.c"
+SYMBOL_ALIASES = REPO_ROOT / "references" / "analysis" / "quakelive_symbol_aliases.json"
+CGAME_FUNCTIONS = (
+	REPO_ROOT
+	/ "references"
+	/ "reverse-engineering"
+	/ "ghidra"
+	/ "cgamex86"
+	/ "functions.csv"
+)
+CGAME_HLIL = REPO_ROOT / "references" / "hlil" / "quakelive" / "cgamex86.dll" / "cgamex86.dll_hlil.txt"
 
 
 def _block_from_marker(source: str, marker: str) -> str:
@@ -22,6 +34,64 @@ def _block_from_marker(source: str, marker: str) -> str:
 				return source[start:index + 1]
 
 	raise AssertionError(f"Unbalanced block for marker: {marker}")
+
+
+def _function_rows() -> dict[str, dict[str, str]]:
+	return {
+		row["entry"].lower(): row
+		for row in csv.DictReader(CGAME_FUNCTIONS.read_text(encoding="utf-8").splitlines())
+	}
+
+
+def test_cgame_register_sounds_alias_and_hlil_cover_retail_registration_slice() -> None:
+	aliases = json.loads(SYMBOL_ALIASES.read_text(encoding="utf-8"))["cgame"]
+	rows = _function_rows()
+	hlil = CGAME_HLIL.read_text(encoding="utf-8")
+
+	assert aliases["FUN_10020e70"] == "CG_RegisterSounds"
+	assert aliases["sub_10020e70"] == "CG_RegisterSounds"
+	assert rows["10020e70"]["name"] == "FUN_10020e70"
+	assert rows["10020e70"]["size"] == "8324"
+
+	for expected in (
+		"10020e70    int32_t sub_10020e70()",
+		"10021141      int32_t eax_51 = (*(data_1074cccc + 0xb8))(\"sound/feedback/hit_teammate.ogg\")",
+		"10021159      int32_t eax_53 = (*(edx_11 + 0xb8))(\"sound/teamplay/flagreturn_yourte",
+		"1002118f      int32_t eax_57 = (*(esi_14 + 0xb8))(sub_10020dd0(\"prepare_your_team.ogg\"))",
+		"100211ad      int32_t eax_59 = (*(esi_15 + 0xb8))(sub_10020dd0(\"red_leads.ogg\"))",
+		"100211cb      int32_t eax_61 = (*(esi_16 + 0xb8))(sub_10020dd0(\"blue_leads.ogg\"))",
+		"100211e9      int32_t eax_64 = (*(esi_17 + 0xb8))(sub_10020dd0(\"teams_tied.ogg\"))",
+		"10021207      int32_t eax_66 = (*(esi_18 + 0xb8))(sub_10020dd0(\"red_scores.ogg\"))",
+		"10021225      int32_t eax_68 = (*(esi_19 + 0xb8))(sub_10020dd0(\"blue_scores.ogg\"))",
+		"10021681                      (*(esi_42 + 0xb8))(sub_10020dd0(\"blue_flag_returned.ogg\"))",
+		"100216bd                      (*(esi_44 + 0xb8))(sub_10020dd0(\"red_flag_returned.ogg\"))",
+		"10021756                      (*(esi_49 + 0xb8))(sub_10020dd0(\"the_enemy_has_flag.ogg\"))",
+		"10021776                  data_10a5fb04 = (*(esi_50 + 0xb8))(sub_10020dd0(\"your_team_has_flag.ogg\"))",
+		"100217a9                      (*(data_1074cccc + 0xb8))(sub_10020dd0(\"you_have_flag.ogg\"))",
+		"100217c9                  data_10a5fb10 = (*(esi_52 + 0xb8))(sub_10020dd0(\"holy_shit.ogg\"))",
+		"10021857                  data_10a5fb0c = (*(esi_53 + 0xb8))(sub_10020dd0(\"base_attack.ogg\"))",
+		"10021880                      (*(data_1074cccc + 0xb8))(sub_10020dd0(\"attack_the_flag.ogg\"))",
+		"100218a0                  data_10a5fb50 = (*(esi_55 + 0xb8))(sub_10020dd0(\"defend_the_flag.ogg\"))",
+		"10021963  data_10a5f800 = (*(ecx_45 + 0xb8))(\"sound/items/wearoff.ogg\")",
+		"10022158  int32_t eax_342 = (*(esi_91 + 0xb8))(sub_10020dd0(\"lead_taken.ogg\"))",
+		"10022179  int32_t eax_344 = (*(esi_92 + 0xb8))(sub_10020dd0(\"lead_tied.ogg\"))",
+		"10022197  int32_t eax_346 = (*(esi_93 + 0xb8))(sub_10020dd0(\"lead_lost.ogg\"))",
+		"100221b5  int32_t eax_349 = (*(esi_94 + 0xb8))(sub_10020dd0(\"vote_now.ogg\"))",
+		"100221d3  int32_t eax_351 = (*(esi_95 + 0xb8))(sub_10020dd0(\"vote_passed.ogg\"))",
+		"100221f1  int32_t eax_353 = (*(esi_96 + 0xb8))(sub_10020dd0(\"vote_failed.ogg\"))",
+		"1002220f  int32_t eax_356 = (*(esi_97 + 0xb8))(sub_10020dd0(\"you_win.ogg\"))",
+		"10022237  data_10a5f908 = (*(esi_98 + 0xb8))(sub_10020dd0(\"you_lose.ogg\"))",
+		"10022507  char const* const var_498_13 = \"battlesuit.ogg\"",
+		"1002277d  char const* const var_498_16 = \"quad_damage.ogg\"",
+		"10022bdb  int32_t eax_464 = (*(data_1074cccc + 0xb8))(\"sound/items/flight.ogg\")",
+		"10022bf3  int32_t eax_466 = (*(edx_128 + 0xb8))(\"sound/items/use_medkit.ogg\")",
+		"10022c0d  data_10a5f7f0 = (*(ecx_132 + 0xb8))(\"sound/items/damage3.ogg\")",
+		"10022d88  int32_t eax_494 = (*(data_1074cccc + 0xb8))(\"sound/items/kam_explode.ogg\")",
+		"10022da0  int32_t eax_496 = (*(edx_140 + 0xb8))(\"sound/items/kam_implode.ogg\")",
+		"10022dba  data_10a5f8e0 = (*(ecx_144 + 0xb8))(\"sound/items/kam_explode_far.ogg\")",
+		"10022dcf  int32_t eax_499 = (*(data_1074cccc + 0xb8))(\"sound/misc/yousuck.ogg\")",
+	):
+		assert expected in hlil
 
 
 def test_cgame_register_sounds_restores_retail_weapon_and_item_effect_ogg_paths() -> None:

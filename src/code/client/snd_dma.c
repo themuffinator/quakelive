@@ -132,46 +132,6 @@ void S_SoundInfo_f(void) {
 }
 
 /*
-====================
-S_ChannelVolumeScale
-====================
-*/
-static float S_ChannelVolumeScale( int entchannel ) {
-	float	scale;
-
-	scale = 1.0f;
-
-	if ( entchannel == CHAN_ANNOUNCER && s_announcerVolume ) {
-		scale = Com_Clamp( 0.0f, 2.0f, s_announcerVolume->value );
-	} else if ( entchannel == CHAN_VOICE && s_voiceVolume ) {
-		scale = Com_Clamp( 0.0f, 2.0f, s_voiceVolume->value );
-	}
-
-	return scale;
-}
-
-/*
-====================
-S_ChannelMasterVolume
-====================
-*/
-static int S_ChannelMasterVolume( int entchannel ) {
-	return (int)Com_Clamp( 0.0f, 255.0f, 127.0f * S_ChannelVolumeScale( entchannel ) );
-}
-
-/*
-==========================
-S_ChannelMasterVolumeScaled
-==========================
-*/
-static int S_ChannelMasterVolumeScaled( int entchannel, float volumeScale ) {
-	float	scale;
-
-	scale = Com_Clamp( 0.0f, 2.0f, volumeScale ) * S_ChannelVolumeScale( entchannel );
-	return (int)Com_Clamp( 0.0f, 255.0f, 127.0f * scale );
-}
-
-/*
 ================
 S_Init
 ================
@@ -549,11 +509,11 @@ void S_SpatializeOrigin (vec3_t origin, int master_vol, int *left_vol, int *righ
 ====================
 S_StartSoundInternal
 
-Common channel-start path shared by the fixed-volume and retail volume-aware
+Common channel-start path shared by the fixed-gain and retail volume-aware
 entry points.
 ====================
 */
-static void S_StartSoundInternal( vec3_t origin, int entityNum, int entchannel, sfxHandle_t sfxHandle, int masterVol ) {
+static void S_StartSoundInternal( vec3_t origin, int entityNum, int entchannel, sfxHandle_t sfxHandle, float volume ) {
 	channel_t	*ch;
 	sfx_t		*sfx;
 	int			i;
@@ -638,11 +598,7 @@ static void S_StartSoundInternal( vec3_t origin, int entityNum, int entchannel, 
 		ch->fixed_origin = qfalse;
 	}
 
-	if ( masterVol < 0 ) {
-		ch->master_vol = S_ChannelMasterVolume( entchannel );
-	} else {
-		ch->master_vol = masterVol;
-	}
+	ch->master_vol = (int)( volume * 127.0f );
 	ch->entnum = entityNum;
 	ch->thesfx = sfx;
 	ch->startSample = START_SAMPLE_IMMEDIATE;
@@ -662,7 +618,7 @@ Entchannel 0 will never override a playing sound
 ====================
 */
 void S_StartSound( vec3_t origin, int entityNum, int entchannel, sfxHandle_t sfxHandle ) {
-	S_StartSoundInternal( origin, entityNum, entchannel, sfxHandle, -1 );
+	S_StartSoundInternal( origin, entityNum, entchannel, sfxHandle, 1.0f );
 }
 
 /*
@@ -674,10 +630,7 @@ volume scalar.
 ====================
 */
 void S_StartSoundVolume( vec3_t origin, int entityNum, int entchannel, sfxHandle_t sfxHandle, float volume ) {
-	int masterVol;
-
-	masterVol = S_ChannelMasterVolumeScaled( entchannel, volume );
-	S_StartSoundInternal( origin, entityNum, entchannel, sfxHandle, masterVol );
+	S_StartSoundInternal( origin, entityNum, entchannel, sfxHandle, volume );
 }
 
 /*
@@ -686,6 +639,10 @@ S_StartLocalSound
 ==================
 */
 void S_StartLocalSound( sfxHandle_t sfxHandle, int channelNum ) {
+	if ( !s_soundStarted || s_soundMuted ) {
+		return;
+	}
+
 	if ( sfxHandle < 0 || sfxHandle >= s_numSfx ) {
 		Com_Printf( S_COLOR_YELLOW "S_StartLocalSound: handle %i out of range\n", sfxHandle );
 		return;
@@ -700,6 +657,10 @@ S_StartLocalSoundVolume
 ========================
 */
 void S_StartLocalSoundVolume( sfxHandle_t sfxHandle, int channelNum, float volume ) {
+	if ( !s_soundStarted || s_soundMuted ) {
+		return;
+	}
+
 	if ( sfxHandle < 0 || sfxHandle >= s_numSfx ) {
 		Com_Printf( S_COLOR_YELLOW "S_StartLocalSound: handle %i out of range\n", sfxHandle );
 		return;
@@ -959,10 +920,9 @@ void S_AddLoopingSound( int entityNum, const vec3_t origin, const vec3_t velocit
 
 /*
 ==================
-S_AddLoopingSound
+S_AddRealLoopingSound
 
-Called during entity generation for a frame
-Include velocity in case I get around to doing doppler...
+Compatibility looping-sound path for legacy VM callers.
 ==================
 */
 void S_AddRealLoopingSound( int entityNum, const vec3_t origin, const vec3_t velocity, sfxHandle_t sfxHandle ) {
@@ -992,6 +952,9 @@ void S_AddRealLoopingSound( int entityNum, const vec3_t origin, const vec3_t vel
 	loopSounds[entityNum].active = qtrue;
 	loopSounds[entityNum].kill = qfalse;
 	loopSounds[entityNum].doppler = qfalse;
+	loopSounds[entityNum].oldDopplerScale = 1.0;
+	loopSounds[entityNum].dopplerScale = 1.0;
+	loopSounds[entityNum].framenum = cls.framecount;
 }
 
 
@@ -1650,16 +1613,23 @@ S_StopBackgroundTrack
 ======================
 */
 void S_StopBackgroundTrack( void ) {
+	qboolean	stopped;
+
+	stopped = qfalse;
 	if ( s_backgroundFile ) {
 		Sys_EndStreamedFile( s_backgroundFile );
 		FS_FCloseFile( s_backgroundFile );
 		s_backgroundFile = 0;
+		stopped = qtrue;
 	}
 	if ( S_OggStreamActive( &s_backgroundOgg ) ) {
 		S_OggStreamClose( &s_backgroundOgg );
+		stopped = qtrue;
 	}
 	s_backgroundIsOgg = qfalse;
-	s_rawend = 0;
+	if ( stopped ) {
+		s_rawend = 0;
+	}
 }
 
 /*
