@@ -47,6 +47,1566 @@ disabled, until a documented open replacement path exists.
 
 ## Active work
 
+### Task A475: Pin cgame browser widget input consumer bridge [COMPLETED]
+Priority: High
+Primary areas: `references/analysis/quakelive_symbol_aliases.json`,
+`tests/test_cgame_displaycontext_parity.py`,
+`docs/architecture/input-retail-mapping.md`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_606.md`
+Parity estimate: **before 86% -> after 99%** for focused cgame
+browser-widget input evidence coverage, **before 58% -> after 99%** for focused
+browser-widget input alias coverage, **before 94% -> after 99%** for focused
+mouse/key consumer bridge confidence, with repo-wide parity retained at
+**99% -> 99%**.
+
+Completed work:
+
+1. Rechecked retail cgame browser-widget mouse, hover/focus, listbox, slider,
+   text-field, bind, multi, preset-list, out-of-bounds click, and focused-key
+   consumers against Binary Ninja HLIL, Ghidra rows, aliases, and current
+   source.
+2. Promoted missing uppercase Binary Ninja `sub_*` spellings for the focused
+   cgame browser input helpers into the shared alias ledger.
+3. Strengthened the existing cgame browser leaf-wrapper parity gate so aliases,
+   Ghidra rows, HLIL call anchors, and source wrapper calls are tested together.
+4. Confirmed no behavioral C source patch was required; current source already
+   preserves the retail cgame-scoped wrapper structure around shared UI item
+   helpers.
+
+### Task A474: Pin Win32 keyboard and character-input VM bridge [COMPLETED]
+Priority: High
+Primary areas: `references/analysis/quakelive_symbol_aliases.json`,
+`tests/test_win32_raw_input_parity.py`,
+`docs/architecture/input-retail-mapping.md`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_605.md`
+Parity estimate: **before 88% -> after 99%** for focused Win32
+keyboard/character evidence coverage, **before 45% -> after 99%** for focused
+key/char alias coverage, **before 94% -> after 99%** for focused VM key-consumer
+bridge confidence, with repo-wide parity retained at **99% -> 99%**.
+
+Completed work:
+
+1. Rechecked retail `MapKey`, `MainWndProc`, `Sys_QueEvent`, `Sys_GetEvent`,
+   `Com_EventLoop`, `CL_KeyEvent`, and `CL_CharEvent` ownership against Binary
+   Ninja HLIL, Ghidra rows, aliases, and current source.
+2. Rechecked the UI `_UI_KeyEvent` and cgame `CG_KeyEvent` native export
+   wrappers against their module-specific HLIL and current VM bridge source.
+3. Promoted missing host/client key and char `FUN_*`, uppercase `sub_*`, and
+   lowercase `sub_*` spellings into the shared alias ledger while keeping UI and
+   cgame aliases module-scoped.
+4. Added focused parity gates covering key/char queueing, timestamp ownership,
+   engine dispatch, client routing priority, UTF-8 character fanout, and VM
+   native key wrappers.
+
+### Task A473: Pin Win32 joystick and MIDI device input wiring [COMPLETED]
+Priority: High
+Primary areas: `references/analysis/quakelive_symbol_aliases.json`,
+`tests/test_win32_raw_input_parity.py`,
+`tests/test_engine_client_command_parity.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_604.md`
+Parity estimate: **before 86% -> after 98%** for focused non-mouse Win32
+device-input evidence coverage, **before 40% -> after 99%** for focused
+joystick/MIDI alias coverage, **before 94% -> after 99%** for focused input
+event-loop wiring confidence, with repo-wide parity retained at
+**99% -> 99%**.
+
+Completed work:
+
+1. Rechecked retail WinMM joystick startup, axis normalization, polling, and
+   event emission against imports, Binary Ninja HLIL, Ghidra rows, aliases,
+   and current source.
+2. Rechecked retail MIDI note mapping, callback filtering, device enumeration,
+   startup, and shutdown wiring against the same evidence set.
+3. Promoted the missing joystick and MIDI `FUN_*`, uppercase `sub_*`, and
+   lowercase `sub_*` aliases into the shared symbol corpus.
+4. Added focused parity gates tying joystick/MIDI device input to
+   `Com_EventLoop`, `CL_JoystickEvent`, `CL_JoystickMove`, and usercmd
+   construction ordering.
+
+### Task A472: Pin UI/cgame VM mouse consumer bridge [COMPLETED]
+Priority: High
+Primary areas: `tests/test_ui_menu_files.py`,
+`references/symbol-maps/ui.json`,
+`references/symbol-maps/cgame.json`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_603.md`
+Parity estimate: **before 92% -> after 99%** for focused VM mouse consumer
+bridge evidence coverage, **before 70% -> after 99%** for focused UI/cgame
+mouse alias collision confidence, with repo-wide parity retained at
+**99% -> 99%**.
+
+Completed work:
+
+1. Rechecked the retail UI mouse consumer path against Binary Ninja HLIL,
+   Ghidra rows, symbol maps, and current source.
+2. Rechecked the cgame `CG_MOUSE_EVENT` native slot and browser-display
+   mouse fanout against Binary Ninja HLIL, Ghidra rows, symbol maps, and
+   current source.
+3. Corrected stale symbol-map wording so `_UI_MouseEvent` and `CG_MouseEvent`
+   are documented as absolute coordinate consumers rather than inferred delta
+   accumulators.
+4. Added focused parity gates for the UI/cgame `0x100208f0` address collision,
+   native export-table routing, VM native dispatch, coordinate projection,
+   bounds/clamp behavior, and browser-display mouse motion handoff.
+
+### Task A471: Close client mouse routing/filter/math alias bridge [COMPLETED]
+Priority: High
+Primary areas: `references/analysis/quakelive_symbol_aliases.json`,
+`tests/test_engine_client_command_parity.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_602.md`
+Parity estimate: **before 96% -> after 99%** for focused client mouse
+routing/filter/math evidence coverage, **before 70% -> after 99%** for
+focused client mouse alias coverage, with repo-wide parity retained at
+**99% -> 99%**.
+
+Completed work:
+
+1. Rechecked retail `CL_MouseEvent`, `CL_BeginMouseFilter`,
+   `CL_EndMouseFilter`, and `CL_MouseMove` against Binary Ninja HLIL part 04
+   and Ghidra function rows.
+2. Promoted Ghidra `FUN_*` and lowercase Binary Ninja `sub_*` aliases for the
+   four client mouse owners while preserving the existing uppercase mappings.
+3. Confirmed the current source already matches the retail split: event
+   routing in `CL_MouseEvent`, gameplay CPI/accel/filter math in
+   `CL_MouseMove`, and no `cl_viewAccel` multiplier in the mouse owner.
+4. Added focused parity gates tying aliases, HLIL anchors, Ghidra rows, source
+   routing order, filter history, CPI scaling, acceleration, sensitivity cap,
+   and yaw/pitch/command movement together.
+
+### Task A470: Pin Win32 mouse raw-message WndProc bridge [COMPLETED]
+Priority: High
+Primary areas: `src/code/win32/win_wndproc.c`,
+`tests/test_win32_raw_input_parity.py`,
+`references/analysis/quakelive_symbol_aliases.json`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_601.md`
+Parity estimate: **before 95% -> after 99%** for focused Win32 mouse
+message/raw dispatch parity, **before 88% -> after 99%** for focused Win32
+mouse backend alias coverage, with repo-wide parity retained at **99% ->
+99%**.
+
+Completed work:
+
+1. Rechecked retail `MainWndProc` / `sub_4f1750` against Binary Ninja HLIL and
+   Ghidra, including the startup-safe `in_mouse` read and `WM_INPUT` raw-data
+   bridge.
+2. Reconstructed the source WndProc mouse mode guard so early window messages
+   treat a missing `in_mouse` cvar as mode `0`, matching retail behavior.
+3. Promoted the remaining DirectInput/raw mouse helper aliases and the
+   `MainWndProc` alias into the shared symbol corpus.
+4. Added focused parity gates for `WM_INPUT`, `GetRawInputData`, 0x400
+   stack-buffer fallback, raw sample forwarding, and the widened alias set.
+
+### Task A469: Map and tighten Win32 mouse input backend ownership [COMPLETED]
+Priority: High
+Primary areas: `src/code/win32/win_input.c`,
+`src/code/win32/win_local.h`,
+`tests/test_win32_raw_input_parity.py`,
+`references/analysis/quakelive_symbol_aliases.json`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_600.md`
+Parity estimate: **before 97% -> after 99%** for focused Win32 mouse
+acquisition/dispatch parity, with repo-wide parity retained at **99% -> 99%**.
+
+Completed work:
+
+1. Rechecked retail `IN_UpdateWin32MouseClip`, `IN_ActivateWin32Mouse`,
+   `IN_Win32Mouse`, `IN_RawInputAppendSample`, `IN_InitRawInput`,
+   `IN_StartupMouse`, `IN_MouseMove`, `IN_ActivateMouse`, and `IN_Frame`
+   against Binary Ninja HLIL, Ghidra function rows, imports, and current source.
+2. Promoted aliases for the contiguous `0x004EA390..0x004EC4F0` Win32
+   mouse-owner band.
+3. Reconstructed the DirectInput fallback to use the retail DirectInput8
+   interface while preserving raw input as the default backend and Win32 cursor
+   warp as the final fallback.
+4. Added focused parity gates for the DirectInput8 loader, buffered event
+   stream, alias rows, and HLIL anchors.
+
+### Task A468: Close UI script sound verb wiring [COMPLETED]
+Priority: High
+Primary areas: `tests/test_ui_menu_files.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_599.md`
+Parity estimate: **before 72% -> after 98%** for focused UI script sound
+verb wiring confidence, **before 90% -> after 98%** for focused UI sound
+command-table and display-context callback confidence, and overall
+sound-system wiring reconstruction parity **93.58% -> 93.60%**.
+
+Completed work:
+
+1. Rechecked retail `sub_10016cd0`, `sub_10016d20`, and `sub_10016d70`
+   against Binary Ninja HLIL, Ghidra function rows, and the symbol alias map.
+2. Pinned the UI command-table `"play"` and `"playlooped"` rows to the
+   register/start-local and stop/start-background callback paths.
+3. Added a parity gate tying the UI aliases, Ghidra dispatcher row/no-row
+   boundary, reconstructed `ui_shared.c` script helpers, and `_UI_Init`
+   display-context sound callbacks together.
+
+### Task A467: Pin SteamDataSource lifecycle callback boundary [COMPLETED]
+Priority: High
+Primary areas: `tests/test_platform_services.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_598.md`,
+`docs/reverse-engineering/source-file-gap-notes/rw-g01-client-steam-resources.md`
+Parity estimate: **before 92% -> after 99%** for focused
+`SteamDataSource` lifecycle callback confidence, **before 94% -> after 98%**
+for focused Steam resource bridge lifecycle divergence classification, and
+overall Steam launch/runtime integration mapping confidence **93.14% ->
+93.16%**.
+
+Completed work:
+
+1. Rechecked retail `sub_464300` / `FUN_00464300`, `sub_464440` /
+   `FUN_00464440`, and `sub_464510` / `FUN_00464510` against Binary Ninja
+   HLIL and Ghidra, confirming constructor allocation, callback id `0x14e`,
+   unregister guard, retained tree teardown, and deleting-destructor ownership.
+2. Pinned the source boundary that maps the retail lifecycle effects to
+   `CL_InitSteamResources`, `CL_ShutdownSteamResources`, and the platform
+   `QL_Steamworks_RegisterAvatarCallbacks` callback object.
+3. Added a focused parity gate and mapping note so callback registration cannot
+   move out of the Steam resource bridge or teardown after cache destruction
+   without evidence.
+
+### Task A466: Close cgame browser script sound verb wiring [COMPLETED]
+Priority: High
+Primary areas: `tests/test_cgame_sound_wiring_parity.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_597.md`
+Parity estimate: **before 68% -> after 98%** for focused cgame browser
+script sound verb wiring confidence, **before 84% -> after 98%** for focused
+cgame sound script alias/table confidence, and overall sound-system wiring
+reconstruction parity **93.56% -> 93.58%**.
+
+Completed work:
+
+1. Rechecked retail `sub_10059eb0`, `sub_10059f00`, and `sub_10059f50`
+   against Binary Ninja HLIL, Ghidra function rows, and the symbol alias map.
+2. Pinned the `"play"` and `"playlooped"` browser script command-table rows to
+   their one-shot local sound and background-track restart wrappers.
+3. Added a parity gate tying the cgame wrappers to the shared `Script_Play` /
+   `Script_playLooped` helpers and the display-context sound callbacks.
+
+### Task A465: Pin client Steam auth dispatch boundary [COMPLETED]
+Priority: High
+Primary areas: `tests/test_platform_services.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_596.md`,
+`docs/reverse-engineering/source-file-gap-notes/rw-g01-client-auth.md`
+Parity estimate: **before 90% -> after 98%** for focused client Steam auth
+dispatch-boundary confidence, **before 86% -> after 97%** for focused hybrid
+fallback divergence classification confidence, and overall Steam launch/runtime
+integration mapping confidence **93.12% -> 93.14%**.
+
+Completed work:
+
+1. Rechecked retail `sub_4605c0` / `FUN_004605c0` and `sub_4605f0` /
+   `FUN_004605f0` against Binary Ninja HLIL and Ghidra, confirming retained
+   GetAuthSessionTicket/CancelAuthTicket ownership and getchallenge consumers.
+2. Pinned the source boundary that requests a fresh retained Steam ticket
+   before client auth dispatch and keeps the modern `GetAuthTicketForWebApi`
+   lane documented as missing.
+3. Added focused parity gates proving hybrid fallback only handles unavailable
+   or pending Steamworks outcomes and does not turn Steamworks denials into
+   open-adapter successes.
+
+### Task A464: Close cgame browser sound parser wiring [COMPLETED]
+Priority: High
+Primary areas: `tests/test_cgame_sound_wiring_parity.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_595.md`
+Parity estimate: **before 70% -> after 98%** for focused cgame browser
+`focusSound` / `soundLoop` parser wiring confidence, **before 88% -> after
+98%** for focused cgame sound parser alias/table confidence, and overall
+sound-system wiring reconstruction parity **93.54% -> 93.56%**.
+
+Completed work:
+
+1. Rechecked the retail cgame browser sound parser copies at `sub_10060e20`
+   and `sub_10063010` against Binary Ninja HLIL and Ghidra function rows.
+2. Pinned the ownership split between UI parser labels and cgame browser parser
+   aliases so `focusSound`, `text`, and `soundLoop` table evidence remains
+   explicit.
+3. Added a parity gate tying the retail parser table rows to the shared source
+   parser reconstruction, cgame browser parser delegation, background-loop
+   precache/start behavior, and browser focus-sound playback.
+
+### Task A463: Pin GetBotLibAPI core export tail bridge [COMPLETED]
+Priority: High
+Primary areas: `tests/test_botlib_internal_parity.py`,
+`docs/reverse-engineering/botlib-getbotlibapi-export-tail-bridge-recheck-2026-06-11.md`
+Parity estimate: **before 90% -> after 99%** for focused `GetBotLibAPI`
+core export-tail confidence, **before 98% -> after 99%** for focused botlib
+public export/import bridge coverage, and overall botlib plus qagame/server
+wiring reconstruction parity **83.86% -> 83.90%**.
+
+Completed work:
+
+1. Rechecked retail `GetBotLibAPI` / `sub_4A83C0` against Binary Ninja HLIL,
+   confirming the `BOTLIB_API_VERSION == 2` gate, import callback copy, export
+   table clear, and AAS/EA/AI initializer ordering.
+2. Cross-linked the core public export tail from `data_16dda50` through
+   `data_16dda80` with reconstructed `botlib_export_t` field order and
+   `be_botlib_export` assignments.
+3. Added a focused parity gate for the thirteen tail assignments, promoted
+   aliases, available Ghidra function rows, and the unresolved three-byte
+   `sub_4D7970` test-stub boundary.
+4. Confirmed no source-code change was needed because the reconstructed
+   `GetBotLibAPI` tail already matches the retail table order.
+
+### Task A462: Pin SteamDataSource OnRequest avatar boundary [COMPLETED]
+Priority: High
+Primary areas: `tests/test_platform_services.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_594.md`,
+`docs/reverse-engineering/source-file-gap-notes/rw-g01-client-steam-resources.md`
+Parity estimate: **before 88% -> after 99%** for focused
+`SteamDataSource_OnRequest` boundary confidence, **before 93% -> after 97%**
+for focused browser resource bridge divergence classification confidence, and
+overall Steam launch/runtime integration mapping confidence **93.10% ->
+93.12%**.
+
+Completed work:
+
+1. Rechecked retail `sub_4640c0` / `FUN_004640c0` against Binary Ninja HLIL
+   and Ghidra, confirming the avatar-token gate, SteamID filename parse,
+   `SteamFriends()` avatar slot, pending sentinel, and response-thread handoff.
+2. Pinned the source boundary that keeps native SteamDataSource reconstruction
+   limited to avatars while routing non-avatar `steam://` requests to the
+   documented launcher/web fallback owner.
+3. Added a focused parity gate and round note so future source work cannot
+   silently widen live SteamDataSource behavior without a documented replacement
+   path.
+
+### Task A461: Pin native qagame botlib import table bridge [COMPLETED]
+Priority: High
+Primary areas: `tests/test_botlib_server_game_bridge_parity.py`,
+`docs/reverse-engineering/botlib-native-qagame-import-table-bridge-recheck-2026-06-11.md`
+Parity estimate: **before 88% -> after 99%** for focused native qagame botlib
+import-table bridge confidence, **before 98% -> after 99%** for focused
+server/qagame botlib wiring coverage, and overall botlib plus qagame/server
+wiring reconstruction parity **83.82% -> 83.86%**.
+
+Completed work:
+
+1. Rechecked the retail native qagame botlib bridge table in Binary Ninja HLIL,
+   confirming the contiguous slot range `43..184` across table rows
+   `0x0056d02c..0x0056d260`.
+2. Cross-linked the table range with the reconstructed `g_public.h` native
+   import enum and `SV_InitGameImports` source assignments.
+3. Added a whole-range parity gate for all 142 botlib bridge slots, including
+   sentinel rows for update-entity, AAS, debug draw, EA, character/chat, goal,
+   movement, weapon, and genetic-selection boundaries.
+4. Confirmed slot `185` exits the botlib bridge into the qagame match-report
+   import, preserving the retail upper boundary.
+
+### Task A460: Close Win32 DirectSound DMA Ghidra and lowercase alias bridge [COMPLETED]
+Priority: High
+Primary areas: `references/analysis/quakelive_symbol_aliases.json`,
+`tests/test_win32_sound_dma_parity.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_593.md`
+Parity estimate: **before 54% -> after 99%** for focused Win32 DirectSound
+DMA Ghidra/Binary Ninja alias coverage, **before 95% -> after 98%** for
+focused DirectSound backend source/evidence bridge confidence, and overall
+sound-system wiring reconstruction parity **93.52% -> 93.54%**.
+
+Completed work:
+
+1. Rechecked the retail DirectSound DMA helper lane from `DSoundError` through
+   `SNDDMA_Init` against Binary Ninja HLIL and Ghidra function rows.
+2. Promoted Ghidra `FUN_*` aliases and lowercase Binary Ninja aliases for the
+   eight Win32 sound backend helpers while preserving the existing uppercase
+   `sub_*` aliases.
+3. Strengthened the Win32 sound DMA parity gate so the shared symbol corpus,
+   Ghidra row sizes, HLIL diagnostics, and `win_snd.c` source behavior remain
+   tied together.
+
+### Task A459: Pin qagame DMQ3 bot setup cvar registrations [COMPLETED]
+Priority: High
+Primary areas:
+`tests/test_botlib_qagame_ai_dmq3_deathmatch_setup_parity.py`,
+`docs/reverse-engineering/botlib-qagame-dmq3-cvar-registration-bridge-recheck-2026-06-11.md`
+Parity estimate: **before 91% -> after 99%** for focused DMQ3 setup cvar
+registration bridge confidence, **before 96% -> after 99%** for focused
+qagame bot setup coverage, and overall botlib plus qagame/server wiring
+reconstruction parity **83.78% -> 83.82%**.
+
+Completed work:
+
+1. Rechecked retail `BotSetupDeathmatchAI` / `sub_1001f580` against Binary
+   Ninja HLIL and Ghidra, confirming the eight-cvar setup sequence after
+   `g_gametype` and `sv_maxclients` reads.
+2. Confirmed the order, defaults, and flags for `bot_rocketjump`,
+   `bot_grapple`, `bot_fastchat`, `bot_nochat`, `bot_testrchat`,
+   `bot_challenge`, `bot_predictobstacles`, and `g_spSkill`.
+3. Added a focused parity gate that pins the source, HLIL, and Ghidra sequence
+   without changing source code because the reconstruction already matched the
+   retail lane.
+
+### Task A458: Close core sound playback and import wiring lowercase alias bridge [COMPLETED]
+Priority: High
+Primary areas: `references/analysis/quakelive_symbol_aliases.json`,
+`tests/test_client_sound_playback_parity.py`,
+`tests/test_botlib_cgame_native_import_slab_parity.py`,
+`tests/test_ui_menu_files.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_592.md`
+Parity estimate: **before 58% -> after 99%** for focused core sound
+playback/update lowercase Binary Ninja alias coverage, **before 72% -> after
+98%** for focused native cgame/UI sound import wiring evidence bridge
+confidence, and overall sound-system wiring reconstruction parity **93.49% ->
+93.52%**.
+
+Completed work:
+
+1. Rechecked the retail sound lifecycle, playback, spatialization, looping,
+   raw-sample, entity-position, respatialization, scan, stop, timing, update,
+   init, and disable helper corridor against Binary Ninja HLIL and Ghidra rows.
+2. Promoted lowercase Binary Ninja aliases for the core sound playback/update
+   lane, while preserving the known no-`FUN_004da490` boundary for
+   `S_ClearLoopingSoundsFrame`.
+3. Promoted lowercase native cgame sound-import aliases, lowercase
+   `j_sub_4da490` / `j_sub_4da3e0` thunk aliases, and the
+   `FUN_004befb0` / lowercase `sub_4befb0` UI/native local-sound thunk.
+4. Strengthened the client playback, native cgame import slab, and UI sound
+   import parity gates around the newly promoted aliases.
+
+### Task A457: Pin Steam microtransaction authorization callback payload [COMPLETED]
+Priority: High
+Primary areas: `tests/test_platform_services.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_591.md`
+Parity estimate: **before 88% -> after 99%** for focused Steam
+microtransaction authorization payload confidence, **before 98% -> after 99%**
+for focused client Steam callback payload evidence confidence, and overall
+Steam launch/runtime integration mapping confidence **93.08% -> 93.10%**.
+
+Completed work:
+
+1. Rechecked retail `sub_4658a0` / `FUN_004658a0` and `sub_4659e0` /
+   `FUN_004659e0` against Binary Ninja HLIL, Ghidra function rows, RTTI/vtable
+   symbols, and the shared alias corpus.
+2. Confirmed the retail `MicroTxnAuthorizationResponse_t` payload publishes
+   `appid`, `orderid`, and `authorized`, with callback id `0x98`.
+3. Cross-linked the source dispatch path through
+   `QL_Steamworks_DispatchMicroAuthorizationResponse`,
+   `QL_Steamworks_RegisterMicroCallbacks`, `SteamMicroCallbacks_Init`, and
+   `CL_Steam_Micro_OnAuthorizationResponse`.
+4. Added a focused parity gate and mapping note without enabling or widening
+   live Steam online-service behavior.
+
+### Task A456: Reconstruct qagame bot debug cvar ownership [COMPLETED]
+Priority: High
+Primary areas: `src/code/game/g_main.c`, `src/code/game/g_local.h`,
+`src/code/game/ai_main.c`,
+`tests/test_botlib_qagame_cvar_table_parity.py`,
+`tests/test_botlib_qagame_ai_main_lifecycle_training_parity.py`,
+`tests/test_game_native_export_helper_parity.py`,
+`docs/reverse-engineering/botlib-qagame-debug-cvar-owner-bridge-reconstruction-2026-06-11.md`
+Parity estimate: **before 78% -> after 99%** for focused qagame debug
+bot-cvar ownership bridge confidence, **before 94% -> after 99%** for focused
+`BotAISetup` retail registration sequence confidence, and overall botlib plus
+qagame/server wiring reconstruction parity **83.7% -> 83.78%**.
+
+Completed work:
+
+1. Rechecked retail `BotTestAAS` and `BotAISetup` against Binary Ninja HLIL,
+   confirming that `bot_showAreaNumber`, `bot_showAreas`, and
+   `bot_showAvoidSpots` are table-owned cvar mirrors rather than setup-created
+   `CVAR_VM_CREATED` cvars.
+2. Exported the three qagame `gameCvarTable` mirrors from `g_main.c` through
+   `g_local.h` so `ai_main.c` uses the same initialized retail owners.
+3. Removed the duplicate `BotAISetup` registrations for the three debug-display
+   cvars while preserving the rest of the retail setup registration sequence.
+4. Strengthened the botlib cvar-table, ai_main lifecycle, and native export
+   helper parity gates around the shared cvar ownership and HLIL negative
+   evidence, then documented the closure.
+
+### Task A455: Close sound cache/decode/mixer lowercase alias bridge [COMPLETED]
+Priority: High
+Primary areas: `references/analysis/quakelive_symbol_aliases.json`,
+`tests/test_client_sound_voice_parity.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_590.md`
+Parity estimate: **before 68% -> after 99%** for focused sound
+cache/decode/mixer lowercase Binary Ninja alias coverage, **before 94% ->
+after 98%** for focused registration/cache/mixer evidence bridge confidence,
+and overall sound-system wiring reconstruction parity **93.47% -> 93.49%**.
+
+Completed work:
+
+1. Rechecked the sound hash, registration, cache/reset, Vorbis/WAV decode, and
+   mixer transfer/paint helper corridor against Binary Ninja HLIL and Ghidra
+   function rows.
+2. Promoted lowercase Binary Ninja aliases for the retail sound helpers that
+   already had uppercase `sub_*` and Ghidra `FUN_*` symbol-map coverage.
+3. Strengthened the client sound helper, registration, and mixer parity gates
+   so the newly promoted aliases stay tied to retail HLIL text and source
+   owners in `snd_dma.c`, `snd_mem.c`, and `snd_mix.c`.
+
+### Task A454: Pin client P2PSessionRequest tracked-peer accept gate [COMPLETED]
+Priority: High
+Primary areas: `tests/test_platform_services.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_589.md`
+Parity estimate: **before 94% -> after 99%** for focused client
+`P2PSessionRequest_t` admission confidence, **before 98% -> after 99%** for
+focused client callback bundle source/evidence confidence, and overall Steam
+launch/runtime integration mapping confidence **93.05% -> 93.08%**.
+
+Completed work:
+
+1. Rechecked retail `sub_45fef0` / `FUN_0045fef0` against Binary Ninja HLIL and
+   the Ghidra function row, confirming the tracked-peer parse, SteamID word
+   comparison, and SteamNetworking accept tail.
+2. Cross-linked the retail tracked-peer storage with the source
+   `CL_GetServerSteamId` configstring equivalent and the existing
+   `CL_Steam_Client_OnP2PSessionRequest` missing/mismatched peer guards.
+3. Pinned `QL_Steamworks_AcceptP2PSession` to the retail
+   `AcceptP2PSessionWithUser` vtable slot `0x0c / 4`, without introducing a
+   modern SteamNetworkingSockets adapter.
+4. Added a focused parity gate and mapping note documenting that no live online
+   service behavior was enabled or broadened.
+
+### Task A453: Reconstruct qagame bot cvar table bridge [COMPLETED]
+Priority: High
+Primary areas: `src/code/game/g_main.c`,
+`tests/test_botlib_qagame_cvar_table_parity.py`,
+`docs/reverse-engineering/botlib-qagame-cvar-table-bridge-reconstruction-2026-06-11.md`
+Parity estimate: **before 72% -> after 96%** for focused qagame bot
+cvar-table bridge confidence, **before 92% -> after 96%** for focused bot
+training/debug cvar wiring confidence, and overall botlib plus qagame/server
+wiring reconstruction parity **83.58% -> 83.7%**.
+
+Completed work:
+
+1. Rechecked retail qagame `bot_autoReady` through `bot_training` cvar-table
+   rows against Binary Ninja HLIL table addresses, default pointers, string
+   bytes, and flag bytes.
+2. Cross-checked the surrounding bot training/debug consumers against Ghidra
+   function rows, decompile anchors, and the promoted alias corpus.
+3. Restored internal `vmCvar_t` mirrors and `gameCvarTable` rows for the
+   retail bot cvar tranche, including the `CVAR_CHEAT` `bot_hud` row and the
+   `CVAR_GAMERULE` training/debug rows.
+4. Added a focused parity gate and documented the remaining `BotAISetup`
+   `CVAR_VM_CREATED` mirror boundary for later debug-cvar cleanup.
+
+### Task A452: Close background sound command lowercase alias bridge [COMPLETED]
+Priority: High
+Primary areas: `references/analysis/quakelive_symbol_aliases.json`,
+`tests/test_client_sound_voice_parity.py`,
+`tests/test_botlib_cgame_native_import_slab_parity.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_588.md`
+Parity estimate: **before 72% -> after 99%** for focused
+background/console sound lowercase Binary Ninja alias coverage, **before 94%
+-> after 98%** for focused native cgame/background-track evidence bridge
+confidence, and overall sound-system wiring reconstruction parity **93.45% ->
+93.47%**.
+
+Completed work:
+
+1. Rechecked retail `S_SoundInfo_f`, `S_SoundList_f`, `S_Play_f`,
+   `S_Music_f`, `S_StopBackgroundTrack`, `S_StartBackgroundTrack`,
+   `S_UpdateBackgroundTrack`, `S_OpenBackgroundOgg`, `S_CloseBackgroundOgg`,
+   `S_OggUpdateBackgroundTrack`, and `QLCGImport_S_StartBackgroundTrack`
+   against Binary Ninja HLIL and Ghidra function rows.
+2. Promoted the lowercase Binary Ninja aliases for the console-command and
+   background-track helper corridor in the shared symbol corpus.
+3. Promoted lowercase `sub_4afed0` for the native cgame start-background thunk
+   while preserving the documented no-stable-row/no-alias stance for the
+   stop-background native slot.
+4. Strengthened the client sound and native cgame import parity gates around
+   the newly promoted lowercase aliases, then documented the mapping round.
+
+### Task A451: Pin Awesomium stopRefresh compatibility boundary [COMPLETED]
+Priority: High
+Primary areas: `tests/test_awesomium_browser_parity.py`,
+`docs/reverse-engineering/awesomium-stoprefresh-compatibility-boundary-2026-06-11.md`
+Parity estimate: **before 83% -> after 98%** for focused `web_stopRefresh`
+divergence classification, **before 96% -> after 99%** for focused browser
+command-registration and compatibility-owner confidence, and overall
+Awesomium/WebUI launch/runtime integration mapping confidence **99.27% ->
+99.28%**.
+
+Completed work:
+
+1. Rechecked retail `QLWebHost_RegisterCommands` against Ghidra function-row
+   evidence, the alias corpus, and Binary Ninja HLIL command-registration
+   order.
+2. Pinned `web_stopRefresh` as absent from the retail WebUI command owner while
+   retaining the observed `web_showBrowser`, `web_changeHash`,
+   `web_hideBrowser`, `web_showError`, `web_clearCache`, and `web_reload`
+   retail command set.
+3. Cross-linked the source-only `uiScript stopRefresh -> web_stopRefresh`
+   bridge with its default-disabled online-service and provider-unavailable
+   guardrails.
+4. Documented that the live Awesomium path intentionally does not call
+   `WebView::Stop` or latch `refreshStopped`, preserving the retail-style
+   WebCore frame pump during menu launch.
+
+### Task A449: Inflate Steam stats-report packets before WebUI publish [COMPLETED]
+Priority: High
+Primary areas: `src/code/client/cl_main.c`,
+`src/code/qcommon/unzip.c`, `src/code/qcommon/unzip.h`,
+`references/analysis/quakelive_symbol_aliases.json`,
+`tests/test_platform_services.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_585.md`
+Parity estimate: **before 72% -> after 98%** for focused Steam stats-report
+packet payload reconstruction confidence, **before 94% -> after 98%** for
+focused `SteamClient_Frame` channel-0 packet lane confidence, and overall Steam
+launch/runtime integration mapping confidence **92.95% -> 93.05%**.
+
+Completed work:
+
+1. Rechecked retail `SteamClient_Frame` channel-0 packet handling against
+   Binary Ninja HLIL, confirming the `malloc(var_a8)` packet receive,
+   `0x100000` output buffer, `sub_4fda50` inflate call, and
+   `"game.stats.report"` publish order.
+2. Promoted `FUN_004fda50`, `sub_4FDA50`, and `sub_4fda50` to
+   `zlib_uncompress` after cross-checking Ghidra `functions.csv` and the zlib
+   whole-buffer helper HLIL.
+3. Added `QZ_Uncompress` over the bundled qcommon zlib path and changed
+   `CL_Steam_ProcessStatsReportPackets` to inflate channel-0 P2P packets into a
+   retail-sized scratch buffer before publishing the capped browser event.
+4. Strengthened the Steam platform parity gate and documented the mapping round
+   without enabling live Steam/WebUI online-service behavior.
+
+### Task A448: Reconstruct voice sample entry boundary [COMPLETED]
+Priority: High
+Primary areas: `src/code/client/snd_dma.c`,
+`references/analysis/quakelive_symbol_aliases.json`,
+`tests/test_client_sound_voice_parity.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_584.md`
+Parity estimate: **before 88% -> after 98%** for focused
+`S_AddVoiceSamples` source-entry boundary confidence, **before 92% -> after
+99%** for focused voice-sample alias/evidence bridge confidence, and overall
+sound-system wiring reconstruction parity **93.42% -> 93.45%**.
+
+Completed work:
+
+1. Rechecked retail `sub_4dab00` / `FUN_004dab00` against Binary Ninja HLIL
+   part04, Ghidra function-size evidence, and the existing Steam voice receive
+   source path.
+2. Removed the non-retail early guard before `S_AddVoiceSamples` channel
+   selection so the helper enters the five-lane voice lookup like retail.
+3. Promoted the lowercase Binary Ninja `sub_4dab00` alias for
+   `S_AddVoiceSamples`.
+4. Strengthened the voice parity gate around the alias bridge, retail entry
+   order, and absence of the removed guard, then documented the mapping round.
+
+### Task A447: Reconstruct server bot_teamkill cvar precreation [COMPLETED]
+Priority: High
+Primary areas: `src/code/server/sv_bot.c`,
+`tests/test_botlib_server_game_bridge_parity.py`,
+`docs/reverse-engineering/botlib-server-teamkill-cvar-bridge-reconstruction-2026-06-11.md`
+Parity estimate: **before 96% -> after 99%** for focused
+`SV_BotInitCvars` retail cvar-tranche confidence, **before 97% -> after 98%**
+for focused server botlib lifecycle/import bridge confidence, and overall
+botlib plus qagame/server wiring reconstruction parity **83.5% -> 83.58%**.
+
+Completed work:
+
+1. Rechecked retail `SV_BotInitCvars`, `SV_BotInitBotLib`,
+   `BotClientCommand`, `SV_BotFrame`, `SV_BotGetConsoleMessage`,
+   `SV_BotGetSnapshotEntity`, and the native qagame bot wrappers against
+   Binary Ninja HLIL, Ghidra function rows, and the alias corpus.
+2. Restored the missing host-side `bot_teamkill` cvar precreation after
+   `bot_interbreedwrite`, matching the retail `0x004DD6F0` tail order.
+3. Strengthened the server botlib bridge parity gate so the complete
+   `SV_BotInitCvars` bot cvar sequence and the retail HLIL tail anchors are
+   checked together.
+4. Documented that no qagame AI behavior is inferred from this pass; the
+   observed retail evidence proves the server cvar registration surface only.
+
+### Task A446: Pin Awesomium child-process helper SDK/dynamic boundary [COMPLETED]
+Priority: High
+Primary areas: `tests/test_awesomium_browser_parity.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_583.md`
+Parity estimate: **before 91% -> after 99%** for focused child-process helper
+ownership evidence, **before 86% -> after 97%** for focused SDK/dynamic helper
+source-boundary confidence, and overall Awesomium/WebUI launch/runtime
+integration mapping confidence **99.26% -> 99.27%**.
+
+Completed work:
+
+1. Rechecked the committed `awesomium_process.exe` helper corpus against
+   Ghidra metadata, imports, exports, functions, decompile, and the alias
+   ledger.
+2. Pinned the retail helper-owned flow from CRT entry to `FUN_00401000` to
+   `Awesomium::ChildProcessMain`.
+3. Cross-linked the retail helper boundary with the source strict external SDK
+   path and default SDK-free dynamic `awesomium.dll` resolution path.
+4. Added project/resource guardrails for Windows GUI/x86 helper settings,
+   default-disabled online-service switches, and project-owned version
+   metadata.
+
+### Task A445: Pin native sound volume lowercase alias bridge [COMPLETED]
+Priority: High
+Primary areas: `references/analysis/quakelive_symbol_aliases.json`,
+`tests/test_botlib_cgame_native_import_slab_parity.py`,
+`tests/test_client_sound_playback_parity.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_582.md`
+Parity estimate: **before 80% -> after 99%** for focused native sound-volume
+lowercase Binary Ninja alias coverage, **before 96% -> after 98%** for focused
+native cgame/engine start-volume evidence bridge confidence, and overall
+sound-system wiring reconstruction parity **93.4% -> 93.42%**.
+
+Completed work:
+
+1. Rechecked retail `sub_4afe20`, `sub_4afe50`, `sub_4da050`, and
+   `sub_4da380` against Binary Ninja HLIL part04/part07, Ghidra function
+   rows, and the existing native cgame sound import source split.
+2. Promoted the lowercase Binary Ninja aliases for the native volume wrappers
+   and engine volume helpers in the shared symbol corpus.
+3. Strengthened the botlib/native-cgame slab and client sound playback parity
+   gates so lowercase BN aliases are checked alongside the existing uppercase
+   `sub_*` and Ghidra `FUN_*` rows.
+4. Documented that no C source change was required because the retail native
+   host/QVM volume boundary was already reconstructed.
+
+### Task A444: Reconstruct qagame bot command ingestion sender-prefix strip [COMPLETED]
+Priority: High
+Primary areas: `src/code/game/ai_main.c`,
+`tests/test_botlib_qagame_command_ingestion_parity.py`,
+`docs/reverse-engineering/botlib-qagame-command-ingestion-bridge-reconstruction-2026-06-11.md`
+Parity estimate: **before 88% -> after 98%** for focused qagame `BotAI`
+command-ingestion confidence, **before 94% -> after 98%** for focused bot
+usercmd output bridge confidence, and overall botlib plus qagame/server wiring
+reconstruction parity **83.35% -> 83.5%**.
+
+Completed work:
+
+1. Rechecked retail `BotAI`, `RemoveColorEscapeSequences`, `BotUpdateInput`,
+   `BotVoiceChatCommand`, `BotAIStartFrame`, `QL_G_trap_BotGetServerCommand`,
+   and `QL_G_trap_BotUserCommand` against Binary Ninja HLIL, Ghidra function
+   rows, and the alias corpus.
+2. Reconstructed the retail normal-chat command parser detail that strips a
+   leading two-digit sender prefix plus a space before queuing `CMS_CHAT`.
+3. Preserved the retail `"cp "` comparison after command-token splitting and
+   documented it as observed retail behavior rather than a cleanup target.
+4. Added a focused parity gate for qagame command ingestion, `tchat`/voice
+   branch separation, `BotUpdateInput -> BotInputToUserCommand`, frame-tail
+   `trap_BotUserCommand`, and legacy/native host wiring.
+
+### Task A443: Pin Awesomium handler destroyers and shutdown cleanup [COMPLETED]
+Priority: High
+Primary areas: `tests/test_awesomium_browser_parity.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_581.md`
+Parity estimate: **before 84% -> after 98%** for focused Awesomium handler
+cleanup-owner evidence, **before 91% -> after 97%** for focused WebUI
+shutdown/reset source-boundary confidence, and overall Awesomium/WebUI
+launch/runtime integration mapping confidence **99.24% -> 99.26%**.
+
+Completed work:
+
+1. Rechecked retail `sub_4F23B0`, `sub_4F2A60`, `sub_4F2A80`,
+   `sub_4F2AB0`, `sub_4F2AE0`, `sub_4F2B10`, and `sub_4F3130` against
+   Binary Ninja HLIL part05/part06, Ghidra function rows, and the alias corpus.
+2. Pinned the MSVC deleting-destructor pattern for the Awesomium JS, resource,
+   dialog, view, load, and DataPakSource owners: base-vtable restore,
+   `(arg2 & 1)` guard, and conditional `operator delete`.
+3. Cross-linked the retail vtable slots with the source listener mapping table
+   and the guarded `CL_WebHost_ResetRuntime` / `CL_Awesomium_Shutdown`
+   teardown boundary.
+4. Documented that no live online-service behavior was enabled; native
+   Awesomium object lifetime remains a retail evidence lane unless
+   `QL_BUILD_ONLINE_SERVICES` is explicitly opted in.
+
+### Task A442: Pin Steam API import table loader contract [COMPLETED]
+Priority: High
+Primary areas: `src/common/platform/platform_steamworks.c`,
+`src/common/platform/platform_config.h`, `tests/test_platform_services.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_578.md`
+Parity estimate: **before 94% -> after 99%** for focused Steam API
+import-table confidence, **before 96% -> after 98%** for focused Steamworks
+dynamic-loader source-contract confidence, and overall Steam launch/runtime
+integration mapping confidence **92.9% -> 92.95%**.
+
+Completed work:
+
+1. Rechecked the retail Steam API import band against Ghidra `imports.txt` and
+   Binary Ninja HLIL import lookup/name-table rows.
+2. Confirmed the core launch/runtime calls remain limited to
+   `SteamAPI_Init`, `SteamAPI_Shutdown`, `SteamAPI_RunCallbacks`, and callback
+   registration helpers, with no `SteamAPI_RestartAppIfNecessary` import.
+3. Strengthened the Steamworks loader parity gate so exact retail import rows,
+   dynamic-loader ordering, and the default-disabled `QL_BUILD_ONLINE_SERVICES`
+   policy are checked together.
+4. Documented why the current dynamic loader is the source reconstruction
+   boundary instead of adding live launcher behavior.
+
+### Task A441: Restore retail ResampleSfx argument shape [COMPLETED]
+Priority: High
+Primary areas: `src/code/client/snd_mem.c`,
+`tests/test_client_sound_voice_parity.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_580.md`
+Parity estimate: **before 86% -> after 99%** for focused `ResampleSfx`
+argument-shape/source-boundary confidence, **before 93% -> after 95%** for
+focused sound cache load/resample wiring confidence, and overall sound-system
+wiring reconstruction parity **93.35% -> 93.4%**.
+
+Completed work:
+
+1. Rechecked retail `sub_4DBC00` / `FUN_004dbc00` against Binary Ninja HLIL,
+   Ghidra function-size evidence, and the existing alias corpus.
+2. Removed the stale unused GPL-era `compressed` argument from source
+   `ResampleSfx`, matching the retail four-argument helper shape.
+3. Updated the decoded PCM caller in `S_LoadPCMSound` and clarified the
+   adjacent `ResampleSfxRaw` helper header so the source boundaries are no
+   longer ambiguous.
+4. Strengthened the sound cache parity gate with the retail HLIL signature,
+   sample conversion, chunk allocation, WAV/OGG callsite, and source-shape
+   assertions, then documented the mapping round.
+
+### Task A440: Recheck botlib entity-update bridge and QL tail [COMPLETED]
+Priority: High
+Primary areas: `src/code/game/ai_main.c`,
+`src/code/game/botlib.h`, `src/code/game/be_aas.h`,
+`src/code/botlib/be_aas_entity.c`, `src/code/botlib/be_interface.c`,
+`src/code/game/g_syscalls.c`, `src/code/server/sv_game.c`,
+`src/code/server/ql_game_imports.inc`,
+`tests/test_botlib_entity_update_bridge_parity.py`,
+`docs/reverse-engineering/botlib-entity-update-bridge-recheck-2026-06-11.md`
+Parity estimate: **before 93% -> after 98%** for focused botlib
+entity-update bridge confidence, **before 94% -> after 98%** for focused QL
+entity-state/AAS-info tail layout confidence, and overall botlib plus
+qagame/server wiring reconstruction parity **83.2% -> 83.35%**.
+
+Completed work:
+
+1. Rechecked the retail `BotAIStartFrame -> BOTLIB_UPDATENTITY ->
+   QL_G_trap_BotLibUpdateEntity -> Export_BotLibUpdateEntity ->
+   AAS_UpdateEntity` path against Binary Ninja HLIL, Ghidra function rows, and
+   the alias corpus.
+2. Pinned the Quake Live-only entity-state tail copy from qagame source words
+   `0x1c..0x33` into botlib AAS-info words `0x23..0x3a`, including the
+   16-word active-powerup sidecar and the `0xEC` `AAS_EntityInfo` copy size.
+3. Added a focused parity gate covering producer filters, syscall/native import
+   slot `56`, server import-table wiring, botlib export validation, NULL-state
+   unlink behavior, and AAS relink order.
+4. Documented that this slice needs no runtime code change; the reconstructed
+   source already matches the pinned retail bridge, while the tutorial-tail
+   state-node helpers remain mapping-only pending stronger retail evidence.
+
+### Task A439: Crosscheck Awesomium lobby callback event publication [COMPLETED]
+Priority: High
+Primary areas: `tests/test_awesomium_browser_parity.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_579.md`
+Parity estimate: **before 92% -> after 98%** for focused lobby callback
+WebUI publication evidence, **before 90% -> after 97%** for focused
+Awesomium JSArray-to-source event-lane confidence, and overall Awesomium/WebUI
+launch/runtime integration mapping confidence **99.22% -> 99.24%**.
+
+Completed work:
+
+1. Rechecked retail `sub_4645A0`, `sub_464BF0`, `sub_464D90`, and
+   `sub_4652E0` against Binary Ninja HLIL part02, Ghidra function rows, and
+   the alias corpus.
+2. Cross-linked their `lobby.%s.chat`, `lobby.%s.create`,
+   `lobby.%s.enter`, `lobby.%s.user.joined`, `lobby.%s.user.left`, and
+   `lobby.error` publication paths with the retail `sub_4F3260`
+   `QLWebView_PublishEvent` bridge.
+3. Added an Awesomium parity gate tying the retail JSArray callback payload
+   path to the guarded source `CL_Steam_PublishBrowserEvent` /
+   `CL_WebView_PublishEvent` event lane without enabling live online services.
+4. Documented the remaining intentional divergence: retail native Awesomium
+   object lifetime is reconstructed as an offline-safe JSON/string event lane
+   unless `QL_BUILD_ONLINE_SERVICES` is explicitly enabled.
+
+### Task A438: Restore background OGG close owner [COMPLETED]
+Priority: High
+Primary areas: `src/code/client/snd_dma.c`,
+`tests/test_client_sound_voice_parity.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_577.md`
+Parity estimate: **before 78% -> after 98%** for focused
+`S_CloseBackgroundOgg` source-boundary confidence, **before 95% -> after 97%**
+for focused background OGG close/restart wiring confidence, and overall
+sound-system wiring reconstruction parity **93.3% -> 93.35%**.
+
+Completed work:
+
+1. Rechecked the retail `sub_4DCA40` / `FUN_004dca40` helper against
+   Binary Ninja HLIL, Ghidra function size evidence, and the existing alias
+   corpus.
+2. Added a local `S_CloseBackgroundOgg` wrapper in `snd_dma.c` so the source
+   call graph keeps the retail close owner distinct from the generic
+   `snd_ogg_stream.c` abstraction.
+3. Routed invalid OGG metadata, update/decode errors, explicit stops, and
+   restart replacement through the restored close owner while leaving
+   `s_backgroundIsOgg` and `s_rawend` policy state in the caller-owned paths.
+4. Strengthened the focused background-track parity gate and documented the
+   mapping round.
+
+### Task A437: Close tagged info comm-notice alias variants [COMPLETED]
+Priority: High
+Primary areas: `references/analysis/quakelive_symbol_aliases.json`,
+`tests/test_awesomium_browser_parity.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_576.md`
+Parity estimate: **before 76% -> after 99%** for focused tagged
+info-string alias confidence, **before 94% -> after 98%** for focused
+cgame-to-WebUI comm notice source mapping confidence, and overall
+Awesomium/WebUI launch/runtime integration mapping confidence **99.20% ->
+99.22%**.
+
+Completed work:
+
+1. Rechecked retail `0x004BF5D0`, `0x004EC6D0`, and `0x004F2950` against
+   Binary Ninja HLIL part04/part05 and Ghidra function rows.
+2. Promoted missing `FUN_*` and lowercase `sub_*` aliases for
+   `QLWebView_PublishTaggedInfoString` and `QLWebView_InvokeCommNoticeThunk`.
+3. Extended the Awesomium parity gate to tie native cgame import slot `116`,
+   `MSG_TYPE` payload construction, `Info_NextPair` traversal, the comm-notice
+   thunk, `OnCommNotice`, source JSON escaping, and null-client stubs together.
+4. Documented the source boundary: retail invokes `OnCommNotice` through the
+   Awesomium C++ object path, while the guarded source backend publishes the
+   same payload through the retained WebUI event lane by default.
+
+### Task A436: Pin advertisement bridge reserved slot 21C0 [COMPLETED]
+Priority: High
+Primary areas: `src/code/client/cl_cgame.c`,
+`references/analysis/quakelive_symbol_aliases.json`,
+`tests/test_awesomium_browser_parity.py`,
+`tests/test_game_native_export_helper_parity.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_575.md`
+Parity estimate: **before 96% -> after 99%** for focused
+advertisement/WebUI bridge slot-layout confidence, **before 94% -> after 99%**
+for native cgame advertisement bridge import-54 confidence, and overall
+Steam/WebUI launch/runtime integration mapping confidence **99.22% -> 99.24%**.
+
+Completed work:
+
+1. Rechecked Binary Ninja HLIL for `0x004F21C0`, confirming the
+   `data_12d2670` vtable dispatch through slot `+0x40`.
+2. Cross-linked the slot with the native `cgamex86.dll` import-54 call from
+   `CG_LoadHudMenu` and the existing host import wrapper.
+3. Promoted the Binary Ninja aliases to
+   `AdvertisementBridge_Reserved21C0` while leaving `FUN_004f21c0` absent
+   because the committed Ghidra `functions.csv` has no matching row.
+4. Made the source bridge layout explicit with
+   `QL_WEB_BRIDGE_SLOT_RESERVED_21C0 = 0x40` and a compile-time vtable offset
+   assertion.
+5. Added parity gates and mapping documentation for the conservative no-op
+   reconstruction.
+
+### Task A435: Map Awesomium DLL import table to guarded C-export adapter [COMPLETED]
+Priority: High
+Primary areas: `tests/test_awesomium_browser_parity.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_573.md`
+Parity estimate: **before 68% -> after 97%** for focused retail Awesomium
+import-name evidence confidence, **before 88% -> after 98%** for focused
+source C-export adapter substitution confidence, and overall Awesomium/WebUI
+launch/runtime integration mapping confidence **99.15% -> 99.20%**.
+
+Completed work:
+
+1. Rechecked the Binary Ninja HLIL part07 `awesomium.dll` import-name table
+   across the `0x00558b98..0x0055913e` row span.
+2. Cross-linked the import rows with Ghidra listener/data-source vtable names
+   and the existing source-side retail bootstrap/ABI mapping tables.
+3. Added a parity gate that proves the retail decorated C++ imports remain
+   evidence only while `CL_Awesomium_LoadImports` resolves the guarded `_Awe_*`
+   C exports used by the reconstructed Win32 backend.
+4. Documented the source decision to keep live Awesomium use behind
+   `QL_BUILD_ONLINE_SERVICES` and avoid recreating an Awesomium C++ import ABI.
+
+### Task A434: Close advertisement runtime alias corpus drift [COMPLETED]
+Priority: High
+Primary areas: `references/analysis/quakelive_symbol_aliases.json`,
+`tests/test_renderer_internal_helper_mapping_parity.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_572.md`
+Parity estimate: **before 82% -> after 99%** for focused advertisement runtime
+alias-corpus completeness, **before 96% -> after 98%** for renderer-side
+advert source-backed mapping confidence, and overall Steam/WebUI
+launch/runtime integration mapping confidence **92.95% -> 93.0%**.
+
+Completed work:
+
+1. Rechecked the source-backed advertisement runtime cluster from mapping round
+   147 against current Binary Ninja HLIL, Ghidra rows, and renderer source.
+2. Promoted missing `FUN_*` and lower-case `sub_*` aliases for
+   `R_AddAdvertisementSurface`, `R_LoadAdvertisements`,
+   `R_UpdateAdvertisements`, `R_ShutdownAdvertisements`,
+   `R_DebugAdvertisements`, `RB_DrawAdvertisementQueries`, and
+   `R_CullAdvertisementQuad`.
+3. Added a focused parity gate tying Ghidra row sizes, HLIL anchors, round 147
+   evidence, and current renderer source bodies together.
+4. Documented that this was alias-corpus closure only: no live advertisement
+   fetching was enabled and the default-offline `QL_BUILD_ONLINE_SERVICES`
+   policy boundary remains unchanged.
+
+### Task A433: Map Awesomium string and no-engine helper bridge [COMPLETED]
+Priority: High
+Primary areas: `references/analysis/quakelive_symbol_aliases.json`,
+`tests/test_awesomium_browser_parity.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_569.md`
+Parity estimate: **before 88% -> after 99%** for focused Awesomium listener
+no-engine helper alias confidence, **before 72% -> after 96%** for WebUI
+string conversion/helper mapping confidence, and overall Steam/WebUI
+launch/runtime integration mapping confidence **92.9% -> 92.95%**.
+
+Completed work:
+
+1. Rechecked the remaining unmapped WebUI helper pocket at
+   `0x00431660..0x00431d60` against Binary Ninja HLIL, Ghidra rows, and
+   Awesomium listener vtable data.
+2. Promoted no-engine callback aliases for the shared dialog/view listener
+   stub, the view-only no-engine stub, and the resource-interceptor no-engine
+   stub.
+3. Promoted `sub_431cc0` as the MSVC `std::string` `find_last_of` helper used
+   by the resource path split and `sub_431d60` as the Awesomium `WebString` to
+   UTF-8 `std::string` conversion helper used by QLJS/resource handling.
+4. Added a focused parity gate tying aliases, Ghidra row sizes, HLIL bodies,
+   vtable slots, source listener mappings, and the guarded source WebUI bridge
+   boundary together.
+
+### Task A432: Map Awesomium default menu launch bootstrap handoff [COMPLETED]
+Priority: High
+Primary areas: `references/analysis/quakelive_symbol_aliases.json`,
+`tests/test_awesomium_browser_parity.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_568.md`
+Parity estimate: **before 78% -> after 98%** for focused retail default
+WebUI launch handoff confidence, **before 70% -> after 96%** for focused
+source bootstrap/frame-loop equivalence confidence, and overall
+Awesomium/WebUI launch/runtime integration mapping confidence **99.1% ->
+99.15%**.
+
+Completed work:
+
+1. Rechecked retail `WinMain` at `0x004ED830` against Binary Ninja HLIL,
+   Ghidra function rows, and the default WebUI launch literal at
+   `asset://ql/index.html`.
+2. Promoted full `FUN_004ed830`, `sub_4ED830`, and `sub_4ed830` alias
+   coverage for the retail `WinMain` owner used by the browser startup handoff.
+3. Added a focused parity gate tying retail `SteamClient_IsInitialized()`,
+   the `data_1205e28 + 0x30` browser-open guard, `QLWebHost_OpenURL`, tooltip
+   setup, and frame-loop entry to the source `CL_Init`,
+   `CL_WebHost_BootstrapAwesomiumMenu`, `CL_WebHost_Frame`, and
+   `CL_RefreshOnlineServicesBridgeState` reconstruction.
+4. Documented the source boundary: retail opens the default URL directly from
+   `WinMain`, while source defers to post-renderer client bootstrap so the
+   Awesomium view has valid dimensions and remains behind the default-offline
+   online-services policy.
+
+### Task A431: Map Steam UGC call-result and SteamID iterator helpers [COMPLETED]
+Priority: High
+Primary areas: `references/analysis/quakelive_symbol_aliases.json`,
+`tests/test_platform_services.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_567.md`
+Parity estimate: **before 78% -> after 98%** for focused Steam UGC
+call-result wrapper mapping confidence, **before 84% -> after 98%** for
+focused SteamID tree iterator/helper confidence, and overall Steam
+launch/runtime reconstruction parity **92.85% -> 92.9%**.
+
+Completed work:
+
+1. Rechecked the `CCallResult<class SteamCallbacks, struct
+   SteamUGCQueryCompleted_t>` vtable at `0x005327c0` and promoted the two UGC
+   completion runner aliases at `sub_4606b0` and `sub_4606d0`.
+2. Promoted the adjacent SteamID red-black-tree rightmost, leftmost,
+   successor, predecessor, and head-delete helpers used by voice mute and
+   SteamID keyed map/set paths.
+3. Added a focused parity gate tying Ghidra function rows, HLIL body anchors,
+   vtable slots, iterator call sites, source `QL_Steamworks_*` UGC call-result
+   equivalents, and the round documentation together.
+4. Documented the source reconstruction boundary: the UGC call-result bridge is
+   represented in source, while the SteamID iterator helpers remain
+   compiler-generated STL support that should not be hand-cloned into live
+   service code.
+
+### Task A430: Map Awesomium OpenURL bootstrap construction flow [COMPLETED]
+Priority: High
+Primary areas: `references/analysis/quakelive_symbol_aliases.json`,
+`tests/test_awesomium_browser_parity.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_566.md`
+Parity estimate: **before 83% -> after 98%** for focused
+`QLWebHost_OpenURL` bootstrap construction-flow confidence, **before 42% ->
+after 96%** for focused Awesomium `DataPakSource` deleting-destructor alias
+confidence, and overall Awesomium/WebUI launch/runtime integration mapping
+confidence **99.0% -> 99.1%**.
+
+Completed work:
+
+1. Rechecked retail `QLWebHost_OpenURL` at `0x004F2D30` against Binary Ninja
+   HLIL, Ghidra rows, vtable data, current source reconstruction, and the
+   guarded live Awesomium adapter.
+2. Split the retail flow into stable evidence spans for WebCore config/init,
+   existing-view URL load/focus/activation, first-time WebSession/data-source
+   construction, handler/listener installation, and the adjacent
+   `DataPakSource` deleting destructor wrapper.
+3. Promoted `0x004F3130` as `AwesomiumDataPakSource_Destroy` using the HLIL
+   destructor body plus the `Awesomium::DataPakSource::vftable` first slot as
+   independent evidence.
+4. Added a focused parity gate tying retail `web.pak`, `QL`, `steam`,
+   `QLResourceInterceptor`, JS/dialog/view/load handlers, WebURL load,
+   resume/focus, zoom/surface rebuild, `web_browserActive`, cursor activation,
+   and guarded source substitutions together without enabling live online
+   services.
+
+### Task A429: Map Steam server-browser detail and SteamDataSource helpers [COMPLETED]
+Priority: High
+Primary areas: `references/analysis/quakelive_symbol_aliases.json`,
+`tests/test_platform_services.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_565.md`
+Parity estimate: **before 82% -> after 98%** for focused Steam
+server-browser detail helper alias confidence, **before 76% -> after 94%**
+for focused SteamDataSource map-helper confidence, and overall Steam
+launch/runtime reconstruction parity **92.8% -> 92.85%**.
+
+Completed work:
+
+1. Rechecked the retail `JSBrowserDetails` fallback-name and ping-failure
+   helper corridor at `sub_461f10` and `sub_462340` against Binary Ninja HLIL,
+   the `ISteamMatchmakingPingResponse` vtable, Ghidra rows, and current source
+   owners.
+2. Promoted aliases for the remaining SteamID value/map tree helper kernels in
+   the `ResponseThread` / `SteamDataSource` helper band, including
+   left/right rotations, leftmost/rightmost traversal, successor/predecessor
+   traversal, and map destruction.
+3. Added a focused parity gate tying Ghidra rows, vtable slots, HLIL call
+   anchors, fallback server-name formatting, three-terminal-callback release
+   behavior, and source `QL_Steamworks_*` / `CL_SteamBrowser_*` equivalents
+   together.
+4. Documented the source reconstruction boundary: retail uses MSVC STL
+   red-black-tree helpers for SteamDataSource request maps, while source keeps
+   the same observable behavior in guarded, typed wrapper state under the
+   default-offline online-services policy.
+
+### Task A428: Map Awesomium browser control and navigation flow [COMPLETED]
+Priority: High
+Primary areas: `tests/test_awesomium_browser_parity.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_564.md`
+Parity estimate: **before 76% -> after 98%** for focused browser
+control/navigation HLIL-flow confidence, and **before 98.85% -> after 99.0%**
+for focused Awesomium/WebUI launch/runtime integration mapping confidence.
+
+Completed work:
+
+1. Rechecked retail `QLWebView_SetLocationHash`, `QLWebHost_HideBrowser`,
+   `CL_Web_ClearCache_f`, `CL_Web_Reload_f`, `QLWebHost_Shutdown`,
+   `QLWebHost_OpenRelativeURL`, `QLWebHost_NavigateOrOpen`, and
+   `CL_Web_ShowError_f` against committed Binary Ninja HLIL, Ghidra function
+   rows where present, alias ledger spellings, and current source owners.
+2. Pinned `document.location.hash` update flow, browser hide/deactivation,
+   WebSession cache-clear slot `+0x1c`, WebView reload slot `+0x78`, WebView
+   destroy/WebCore shutdown, relative URL construction, hash-navigation
+   fallback, and error publication.
+3. Added a focused parity gate tying retail browser control commands to source
+   hash normalization, current-URL bookkeeping, keycatcher/cursor/cgame overlay
+   clearing, session-state fallback, reload handling, and shutdown reset
+   behavior without enabling live online services.
+
+### Task A427: Map Steam voice mute tree helpers [COMPLETED]
+Priority: High
+Primary areas: `references/analysis/quakelive_symbol_aliases.json`,
+`tests/test_platform_services.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_563.md`
+Parity estimate: **before 57% -> after 98%** for focused Steam voice mute
+tree helper alias confidence, **before 90% -> after 94%** for focused Steam
+voice mute source-equivalence confidence, and overall Steam launch/runtime
+reconstruction parity **92.75% -> 92.8%**.
+
+Completed work:
+
+1. Rechecked the retail Steam client voice mute-set helper band around
+   `sub_4610a0..sub_461ca0` against Binary Ninja HLIL and Ghidra rows.
+2. Promoted missing Ghidra `FUN_*`, upper-case, and lower-case Binary Ninja
+   spellings for the SteamID tree rotations, insert/rebalance, iterator erase,
+   subtree destroy, set clear, insert, and range erase helpers.
+3. Added a focused parity gate tying Ghidra rows, HLIL tree mutation anchors,
+   retail `map/set<T>` guard strings, and source voice mute/filter functions
+   together.
+4. Documented the source reconstruction boundary: retail uses an STL
+   SteamID-keyed set for muted voice peers, while source preserves observable
+   mute behavior with bounded `ql_cgame_mutedIdentitySet[MAX_CLIENTS]` storage.
+
+### Task A426: Map Steam Workshop queue and completion helpers [COMPLETED]
+Priority: High
+Primary areas: `references/analysis/quakelive_symbol_aliases.json`,
+`tests/test_platform_services.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_562.md`
+Parity estimate: **before 61% -> after 98%** for focused Workshop queue
+helper alias confidence, **before 93% -> after 97%** for focused Workshop
+download/finalization source-equivalence confidence, and overall Steam
+launch/runtime reconstruction parity **92.7% -> 92.75%**.
+
+Completed work:
+
+1. Rechecked the retail Steam Workshop download queue helper band around
+   `sub_4692d0..sub_4699c0` against Binary Ninja HLIL and Ghidra rows.
+2. Promoted aliases for the settled-state helper and the retail MSVC list
+   create/remove/push helpers used by queued Workshop downloads.
+3. Added a focused parity gate tying Ghidra rows, HLIL active-download state,
+   queue node mutation, UGC `DownloadItem` slot `0xdc`, frame completion
+   handoff, and source queue/finalization functions together.
+4. Documented the source reconstruction boundary: retail uses an STL list for
+   queued item IDs, while source preserves observable behavior with a bounded
+   `cl_steamWorkshopDownloadState.items[]` queue behind the default-offline
+   online-services policy.
+
+### Task A425: Map idSteamStats callback lifecycle helpers [COMPLETED]
+Priority: High
+Primary areas: `references/analysis/quakelive_symbol_aliases.json`,
+`tests/test_platform_services.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_561.md`
+Parity estimate: **before 74% -> after 99%** for focused `idSteamStats`
+callback lifecycle helper confidence, **before 58% -> after 96%** for focused
+stats-session map rotation helper confidence, **before 96% -> after 98%** for
+server stats callback teardown source-equivalence confidence, and overall
+Steam launch/runtime reconstruction parity **92.65% -> 92.7%**.
+
+Completed work:
+
+1. Rechecked retail `idSteamStats` callback destructor thunks, shutdown flow,
+   init-time callback registration, vtable payload-size buckets, and adjacent
+   stats-session map rotations against Binary Ninja HLIL and Ghidra rows.
+2. Promoted aliases for the `SteamServersConnected_t`,
+   `GSStatsReceived_t`, and `GSStatsStored_t` callback teardown helpers plus
+   the SteamID stats-map left/right rotation helpers used by insert rebalance.
+3. Added a focused parity gate tying callback event IDs `0x65`, `0x708`, and
+   `0x709`, unregister order, vtable payload-size thunks, and source
+   `QL_Steamworks_RegisterServerCallbacks` / unregister behavior together.
+4. Documented the source reconstruction boundary: retail C++ callback
+   subobjects and STL rotations are mapped as binary evidence, while source
+   keeps the generic callback object and bounded session-array equivalents.
+
+### Task A424: Map Awesomium advertisement bridge forwarder slots [COMPLETED]
+Priority: High
+Primary areas: `tests/test_awesomium_browser_parity.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_560.md`
+Parity estimate: **before 74% -> after 98%** for focused advertisement bridge
+forwarder HLIL-flow confidence, **before 98.7% -> after 98.85%** for focused
+Awesomium/WebUI launch/runtime integration mapping confidence, with live
+advert-fetching parity intentionally excluded from default builds under the
+repository online-services policy.
+
+Completed work:
+
+1. Rechecked the retail `data_12d2670` advertisement bridge forwarder band from
+   `AdvertisementBridge_SetActiveAdvert` through
+   `AdvertisementBridge_ClearDelay` against committed Binary Ninja HLIL, Ghidra
+   function rows, alias ledger spellings, and current source owners.
+2. Pinned bridge vtable offsets `+0x08` through `+0x68`, including app
+   activation, frame time, view parameters, visibility callback, map path,
+   cgame/UI init/shutdown, label/list helpers, shader setup/refresh, advert
+   activation, and delay state.
+3. Added a focused parity gate tying retail wrapper fallbacks to the source
+   `ql_web_bridge_vtbl_t` layout, offset assertions, local shader fallback,
+   retained debug labels, public client declarations, and source-owned
+   delay-deadline handling without enabling online services.
+
+### Task A423: Map Awesomium input injection and comm notice flow [COMPLETED]
+Priority: High
+Primary areas: `tests/test_awesomium_browser_parity.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_559.md`
+Parity estimate: **before 70% -> after 96%** for focused input-injection and
+comm-notice HLIL-flow confidence, **before 98.5% -> after 98.7%** for focused
+Awesomium/WebUI launch/runtime integration mapping confidence, with full
+normal-key live `WebKeyboardEvent` source parity retained as an explicit
+follow-up pending a dedicated Win32 key-field reconstruction pass.
+
+Completed work:
+
+1. Rechecked retail `QLWebView_InjectMouseMove`,
+   `QLWebView_InjectMouseDown`, `QLWebView_InjectMouseUp`,
+   `QLWebView_InjectMouseWheel`, `QLWebView_InjectKeyboardEvent`,
+   `QLWebView_InjectActivationKeyboardEvent`, and
+   `QLWebView_InvokeCommNotice` against committed Binary Ninja HLIL, Ghidra
+   function rows, alias ledger spellings, and current source owners.
+2. Pinned the retail input slot offsets `+0xd0`, `+0xd4`, `+0xd8`, `+0xdc`,
+   and `+0xe0`, plus coordinate scaling, cached cursor storage, mouse-button
+   remapping, wheel delta scaling, activation-key constants, and the
+   `OnCommNotice` invocation path.
+3. Added a focused parity gate tying retail input injection to
+   `CL_MouseEvent`, `CL_DispatchBrowserKeyEvent`, source mouse-button mapping,
+   live Awesomium C-export adapters, and the retained comm-notice publication
+   lane without enabling online services.
+
+### Task A422: Map Steam auth and stats session tree helpers [COMPLETED]
+Priority: High
+Primary areas: `references/analysis/quakelive_symbol_aliases.json`,
+`tests/test_platform_services.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_558.md`
+Parity estimate: **before 72% -> after 99%** for focused auth-session
+helper alias confidence, **before 70% -> after 98%** for focused stats-session
+map helper confidence, **before 94% -> after 98%** for focused source
+equivalence confidence around auth/stats session ownership, and overall Steam
+launch/runtime reconstruction parity **92.6% -> 92.65%**.
+
+Completed work:
+
+1. Rechecked the retail auth-session and GameServerStats map helper band at
+   `0x00465eb0..0x00467c50` against Binary Ninja HLIL, Ghidra function rows,
+   and current server source ownership.
+2. Promoted aliases for the active-auth SteamID tree helper set, stats-session
+   map min/max/lower-bound/find/insert/clear helpers, and node allocation
+   helpers.
+3. Added a focused parity gate that pins the helper rows, HLIL traversal and
+   insert/destroy anchors, and the source-level session-array equivalence used
+   by `SV_BeginPlatformAuthSession`, orphan cleanup, and GS stats callbacks.
+4. Documented the deliberate source reconstruction boundary: retail MSVC STL
+   tree helpers are evidence for the binary, while the GPL source retains the
+   same SteamID ownership behavior through bounded server-client/session state.
+
+### Task A421: Map Awesomium JavaScript method-handler dispatch flow [COMPLETED]
+Priority: High
+Primary areas: `tests/test_awesomium_browser_parity.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_556.md`
+Parity estimate: **before 72% -> after 98%** for focused JavaScript
+method-handler dispatch HLIL-flow confidence, **before 98.3% -> after 98.5%**
+for focused Awesomium/WebUI launch/runtime integration mapping confidence, and
+strict Windows Awesomium/WebUI source behavior remains effectively closed for
+the currently reconstructed offline/default build path.
+
+Completed work:
+
+1. Rechecked retail `QLJSHandler_LookupMethodId`,
+   `QLJSHandler_OnMethodCall`, and
+   `QLJSHandler_OnMethodCallWithReturnValue` against committed Binary Ninja
+   HLIL, Ghidra function rows, the alias ledger, and reconstructed source
+   owners.
+2. Pinned the retail method-table scan from `data_55c008` through `0x55c1a0`,
+   the not-found fallback ID, and source method-table entries carrying retail
+   addresses and explicit return-value flags.
+3. Pinned the non-return dispatch corridor for command, URL, clipboard, server
+   browser, lobby, stats, overlay/invite, UGC, key-capture, favorite-server,
+   no-op, and unimplemented-plugin paths.
+4. Pinned the return-value dispatch corridor for file/game/cvar/list/config,
+   cursor, clipboard, and Awesomium `JSValue`/`JSObject` object-return paths.
+
+### Task A420: Map Steam callback base vtable and raw payload ABI [COMPLETED]
+Priority: High
+Primary areas: `references/analysis/quakelive_symbol_aliases.json`,
+`src/common/platform/platform_steamworks.c`, `tests/steamworks_harness.c`,
+`tests/test_platform_services.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_555.md`
+Parity estimate: **before 45% -> after 99%** for focused callback-base vtable
+helper alias confidence, **before 86% -> after 99%** for focused raw callback
+payload ABI parity, **before 94% -> after 99%** for focused Steam callback
+registration/source layout confidence, and overall Steam launch/runtime
+reconstruction parity **92.45% -> 92.6%**.
+
+Completed work:
+
+1. Rechecked the shared retail `CCallbackBase` run helpers and constant
+   callback-size thunks against Binary Ninja HLIL, Ghidra function rows, and
+   callback vtable consumers across client, avatar, lobby, server, stats, and
+   workshop owners.
+2. Promoted aliases for the common callback run/call-result helpers and the
+   remaining 264-, 128-, 20-, 16-, 12-, 8-, and 1-byte payload-size thunks.
+3. Corrected source raw callback payload layouts for friend-rich-presence,
+   avatar-image-loaded, validate-auth-ticket, GS stats, UGC query completion,
+   and workshop download-result payloads so registered sizes match retail
+   callback vtables.
+4. Added compile-time source size guards and extended the platform-services
+   parity gate to pin the full callback-size map.
+
+### Task A419: Map Awesomium event publication and command registration flow [COMPLETED]
+Priority: High
+Primary areas: `tests/test_awesomium_browser_parity.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_554.md`
+Parity estimate: **before 73% -> after 98%** for focused Awesomium/WebUI
+event-publication and command-registration HLIL-flow confidence, **before 98%
+-> after 98.3%** for focused Awesomium/WebUI launch/runtime integration mapping
+confidence, and strict Windows Awesomium/WebUI source behavior remains
+effectively closed.
+
+Completed work:
+
+1. Rechecked retail `QLWebView_PublishEvent`,
+   `QLWebView_PublishGameKey`, `QLWebView_PublishGameError`,
+   `QLWebView_PublishGameEnd`, `QLWebView_PublishCvarChange`,
+   `QLWebView_PublishBindChanged`, `QLWebView_PublishGameStart`,
+   demo/screenshot publication, and `QLWebHost_RegisterCommands` against
+   committed Binary Ninja HLIL, Ghidra function rows, the alias ledger, and the
+   reconstructed source owners.
+2. Pinned the retail `EnginePublish` invocation, cached window-object recovery,
+   game/cvar/bind/demo/screenshot payload keys, rich-presence game-start side
+   effects, browser command registration, and web cvar initialization.
+3. Added a focused parity gate that ties the retail event-publication corridor
+   to the source event queue and live JavaScript dispatch without enabling live
+   online services.
+
+### Task A418: Map Awesomium surface pump and bitmap upload flow [COMPLETED]
+Priority: High
+Primary areas: `tests/test_awesomium_browser_parity.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_553.md`
+Parity estimate: **before 74% -> after 98%** for focused Awesomium/WebUI
+surface-pump and bitmap-upload HLIL-flow confidence, **before 97.5% -> after
+98%** for focused Awesomium/WebUI launch/runtime integration mapping confidence,
+and strict Windows Awesomium/WebUI source behavior remains effectively closed.
+
+Completed work:
+
+1. Rechecked retail `QLWebCore_Update`, `QLWebView_Resize`,
+   `QLWebView_RebuildSurfaceImage`, and `QLWebHost_PumpFrame` against committed
+   Binary Ninja HLIL, Ghidra function rows, the alias ledger, and the
+   reconstructed source/adapter owners.
+2. Pinned the retail surface slot `+0x84`, bitmap width/height extraction,
+   power-of-two texture expansion, `BitmapSurface::CopyTo`, retail `"browser"`
+   texture registration, GL dirty upload, `BitmapSurface::set_is_dirty(false)`,
+   and frame-pump presentation ordering.
+3. Added a focused parity gate that ties the retail surface pump to the
+   source-side `CL_Awesomium_CopySurface`, upload bookkeeping, and frame-order
+   reconstruction without enabling live online services.
+
+### Task A417: Map Awesomium document-ready and resource flow [COMPLETED]
+Priority: High
+Primary areas: `tests/test_awesomium_browser_parity.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_552.md`
+Parity estimate: **before 78% -> after 98%** for focused Awesomium/WebUI
+document-ready, qz binding, resource-response, and load-failure HLIL-flow
+confidence, **before 97% -> after 97.5%** for focused Awesomium/WebUI
+launch/runtime integration mapping confidence, and strict Windows Awesomium/WebUI
+source behavior remains effectively closed.
+
+Completed work:
+
+1. Rechecked retail `QLLoadHandler_OnDocumentReady`,
+   `QLJSHandler_BindQzInstance`, `QLResourceInterceptor_OnRequest`, and
+   `QLLoadHandler_OnFailLoadingFrame` against committed Binary Ninja HLIL,
+   Ghidra function rows, the alias ledger, and the reconstructed source owners.
+2. Pinned the retail order for launcher `js/*.js` script execution,
+   `qz_instance` method/property binding, `web.object.ready` publication,
+   `ql` host resource responses, screenshot mapping, and load-failure browser
+   hide/error-cvar publication.
+3. Added a focused parity gate that keeps these Awesomium/WebUI launch/runtime
+   flow claims executable without enabling live online services.
+
+### Task A416: Map Steam callback payload-size thunks and max-player publisher [COMPLETED]
+Priority: High
+Primary areas: `references/analysis/quakelive_symbol_aliases.json`,
+`src/common/platform/platform_steamworks.c`, `tests/test_platform_services.py`,
+`tests/test_steamworks_harness.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_551.md`
+Parity estimate: **before 40% -> after 99%** for focused callback
+payload-size thunk alias confidence, **before 90% -> after 98%** for focused
+callback raw-payload source ABI parity, **before 82% -> after 99%** for focused
+GameServer max-player publisher mapping confidence, and overall Steam
+launch/runtime reconstruction parity **92.35% -> 92.45%**.
+
+Completed work:
+
+1. Rechecked the retail callback-size thunk island at
+   `0x00465680..0x00465ea0` against Binary Ninja HLIL, Ghidra function rows,
+   and callback vtable consumers.
+2. Promoted aliases for the 24-byte, 32-byte, and 4-byte callback payload-size
+   thunks plus the adjacent `SteamGameServer` slot `0x30` max-player publisher.
+3. Corrected the raw Steam server connect-failure callback payload to the
+   retail 4-byte shape while keeping the public event field compatibility
+   defaulted.
+4. Added a focused parity gate tying the retail size thunks and max-player
+   helper to the source callback-size abstraction, server publication path, and
+   Steamworks harness.
+
+### Task A415: Map Awesomium imported ABI and listener graph [COMPLETED]
+Priority: High
+Primary areas: `tests/test_awesomium_browser_parity.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_550.md`,
+`references/analysis/quakelive_symbol_aliases.json`
+Parity estimate: **before 76% -> after 98%** for focused Awesomium/WebUI
+imported ABI and listener-graph evidence confidence, **before 96% -> after
+97%** for focused Awesomium/WebUI launch/runtime integration mapping
+confidence, and strict Windows Awesomium/WebUI source behavior remains
+effectively closed.
+
+Completed work:
+
+1. Rechecked the retail Awesomium imported SDK extern table, listener/data-source
+   RTTI and vtables, `QLWebHost_OpenURL` construction graph, and
+   `awesomium_process.exe` helper corpus against committed Binary Ninja HLIL and
+   Ghidra evidence.
+2. Pinned the WebConfig/WebCore/WebSession/DataPakSource/SteamDataSource,
+   ResourceInterceptor, JS method handler, and Dialog/View/Load listener startup
+   graph to the source adapter and helper-process owners.
+3. Added a focused parity gate that verifies HLIL import externs, HLIL startup
+   construction anchors, Ghidra RTTI/vtable symbols, helper metadata/row
+   ownership, and source-side adapter bindings without enabling live online
+   services.
+
+### Task A414: Map Steam server command and VM bridge aliases [COMPLETED]
+Priority: High
+Primary areas: `references/analysis/quakelive_symbol_aliases.json`,
+`tests/test_platform_services.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_549.md`
+Parity estimate: **before 66% -> after 99%** for focused server Steam
+command/VM bridge alias confidence, **before 86% -> after 97%** for focused
+Game VM/workshop operator HLIL evidence coverage, and overall Steam
+launch/runtime reconstruction parity **92.3% -> 92.35%**.
+
+Completed work:
+
+1. Rechecked the retail `0x004df010..0x004df0d0` workshop operator command
+   handlers and `0x004e2620..0x004e2920` server qagame Steam bridge helpers
+   against Binary Ninja HLIL, committed Ghidra rows, and current source anchors.
+2. Promoted missing Ghidra `FUN_*` aliases and lower-case Binary Ninja
+   spellings for Steam workshop commands, match-report/player-event forwards,
+   client Steam ID, stats, achievement, and auth-session bridge helpers.
+3. Added a focused parity gate that cross-checks alias spelling groups, Ghidra
+   metadata, HLIL command registration/import-table anchors, and source-side
+   offline-safe reconstruction without enabling live Steam services.
+4. Documented the remaining retail-native versus compatibility-source ABI delta
+   for Steam ID and auth validation so future source reconstruction can handle
+   it intentionally instead of by assumption.
+
+### Task A413: Map Steam client command and voice runtime aliases [COMPLETED]
+Priority: High
+Primary areas: `references/analysis/quakelive_symbol_aliases.json`,
+`tests/test_platform_services.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_548.md`
+Parity estimate: **before 70% -> after 99%** for focused client Steam
+command/voice alias confidence, **before 88% -> after 97%** for focused Steam
+voice/overlay/wrapper HLIL evidence coverage, and overall Steam launch/runtime
+reconstruction parity **92.25% -> 92.3%**.
+
+Completed work:
+
+1. Rechecked the retail `0x004603f0..0x00461c00` Steam command, voice,
+   wrapper, overlay, and UGC query-registration corridor against Binary Ninja
+   HLIL, committed Ghidra function/import rows, callback vtable symbols, and
+   the reconstructed client Steam source.
+2. Promoted missing Ghidra-style `FUN_*` aliases and lower-case Binary Ninja
+   spellings for voice start/stop, subscription/workshop/country wrappers,
+   outgoing and incoming voice helpers, the retained UGC query owner, and the
+   client social-overlay command dispatcher.
+3. Added a focused parity gate that cross-checks alias promotion, Ghidra
+   metadata, Steam import coverage, HLIL function starts/call anchors, and
+   source-side voice/overlay/UGC/frame-pump reconstruction anchors without
+   enabling live online services.
+
+### Task A412: Map Awesomium/WebUI Ghidra alias bridge [COMPLETED]
+Priority: High
+Primary areas: `references/analysis/quakelive_symbol_aliases.json`,
+`tests/test_awesomium_browser_parity.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_547.md`
+Parity estimate: **before 70% -> after 98%** for focused Awesomium/WebUI
+Ghidra/Binary Ninja alias bridge confidence, **before 93% -> after 96%** for
+focused Awesomium/WebUI launch/runtime integration mapping confidence, and
+overall Awesomium/WebUI source reconstruction parity remains effectively closed
+for the strict Windows replacement target.
+
+Completed work:
+
+1. Rechecked the retail WebUI listener/resource owners, advertisement bridge
+   wrappers, WebCore/WebView runtime owners, input/event publication path, and
+   `awesomium_process.exe` helper corpus against committed Ghidra and Binary
+   Ninja evidence.
+2. Promoted missing row-backed `FUN_*` aliases and lower-case Binary Ninja
+   spellings for the stable Awesomium/WebUI integration band, while leaving
+   no-row wrappers as `sub_*` aliases only.
+3. Added a focused Awesomium parity gate for Ghidra row names/sizes, HLIL
+   anchors, no-row wrapper boundaries, and the retained reserved bridge slot.
+
+### Task A411: Map Steam browser/resource owner aliases [COMPLETED]
+Priority: High
+Primary areas: `references/analysis/quakelive_symbol_aliases.json`,
+`tests/test_platform_services.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_546.md`
+Parity estimate: **before 68% -> after 99%** for focused Steam
+browser/resource Ghidra alias confidence, **before 90% -> after 98%** for
+focused JSBrowser/SteamDataSource HLIL evidence coverage, and overall Steam
+launch/runtime reconstruction parity **92.2% -> 92.25%**.
+
+Completed work:
+
+1. Rechecked the retail `0x00461f70..0x00464540` Steam browser,
+   JSBrowserDetails, ResponseThread, SteamDataSource, and CSteamID helper band
+   against Binary Ninja HLIL, committed Ghidra function-size rows, RTTI/vtable
+   symbols, and the reconstructed client Steam browser/resource source.
+2. Promoted missing Ghidra-style `FUN_*` aliases and lower-case Binary Ninja
+   spellings for server-browser list/detail owners, avatar response-thread
+   helpers, SteamDataSource lifecycle/callback owners, and the retained
+   SteamID-map helper cluster.
+3. Added a focused parity gate that cross-checks alias promotion, Ghidra
+   address/size metadata, HLIL function starts, RTTI/vtable anchors, and
+   source-side browser/resource reconstruction anchors without enabling live
+   online services.
+
 ### Task A410: Map Steam client helper aliases [COMPLETED]
 Priority: High
 Primary areas: `references/analysis/quakelive_symbol_aliases.json`,

@@ -118,6 +118,22 @@ MFL_TELEPORTED = 32
 MFL_GRAPPLEPULL = 64
 MFL_WALK = 512
 
+BOTLIB_EXPORT_CORE_TAIL = (
+	("BotLibSetup", "Export_BotLibSetup", "4A7CE0", "data_16dda50", "004a8427", None),
+	("BotLibShutdown", "Export_BotLibShutdown", "4A7DC0", "data_16dda54", "004a8431", None),
+	("BotLibVarSet", "Export_BotLibVarSet", "4A7E40", "data_16dda58", "004a843b", 23),
+	("BotLibVarGet", "Export_BotLibVarGet", "4A7E60", "data_16dda5c", "004a8445", 46),
+	("PC_AddGlobalDefine", "PC_AddGlobalDefine", "4AD200", "data_16dda60", "004a844f", 42),
+	("PC_LoadSourceHandle", "PC_LoadSourceHandle", "4AC260", "data_16dda64", "004a8459", 230),
+	("PC_FreeSourceHandle", "PC_FreeSourceHandle", "4AC350", "data_16dda68", "004a8463", 59),
+	("PC_ReadTokenHandle", "PC_ReadTokenHandle", "4ACB10", "data_16dda6c", "004a846d", 163),
+	("PC_SourceFileAndLine", "PC_SourceFileAndLine", "4AC390", "data_16dda70", "004a8477", 100),
+	("BotLibStartFrame", "Export_BotLibStartFrame", "4A7E90", "data_16dda74", "004a8481", 57),
+	("BotLibLoadMap", "Export_BotLibLoadMap", "4A7ED0", "data_16dda78", "004a848b", 99),
+	("BotLibUpdateEntity", "Export_BotLibUpdateEntity", "4A7F40", "data_16dda7c", "004a8495", 102),
+	("Test", "BotExportTest", "4D7970", "data_16dda80", "004a849f", 3),
+)
+
 
 class BotGoal(ctypes.Structure):
 	_fields_ = [
@@ -1187,6 +1203,96 @@ def test_botlib_export_table_aliases_cover_aas_ea_and_top_level_helpers() -> Non
 		"004a849f  data_16dda80 = sub_4d7970",
 	):
 		assert assignment in ql_steam_hlil
+
+
+def test_get_botlib_api_core_export_tail_matches_retail_table_order() -> None:
+	botlib_h = BOTLIB_H.read_text(encoding="utf-8")
+	be_interface = BOTLIB_INTERFACE.read_text(encoding="utf-8")
+	ql_steam_hlil = QL_STEAM_HLIL_PART03.read_text(encoding="utf-8")
+	ghidra_functions = QL_STEAM_GHIDRA_FUNCTIONS.read_text(encoding="utf-8")
+	aliases = json.loads(SYMBOL_ALIASES.read_text(encoding="utf-8"))["quakelive_steam_srp"]
+
+	botlib_export = _extract_function_block(botlib_h, "typedef struct botlib_export_s")
+	get_api = _extract_function_block(be_interface, "botlib_export_t *GetBotLibAPI(int apiVersion, botlib_import_t *import)")
+
+	for source_anchor in (
+		"#define\tBOTLIB_API_VERSION\t\t2",
+		"typedef struct botlib_export_s",
+		"aas_export_t aas;",
+		"ea_export_t ea;",
+		"ai_export_t ai;",
+	):
+		assert source_anchor in botlib_h
+
+	for source_anchor in (
+		"assert(import);",
+		"botimport = *import;",
+		"assert(botimport.Print);",
+		"Com_Memset( &be_botlib_export, 0, sizeof( be_botlib_export ) );",
+		"if ( apiVersion != BOTLIB_API_VERSION )",
+		'Mismatched BOTLIB_API_VERSION: expected %i, got %i\\n',
+		"return NULL;",
+		"Init_AAS_Export(&be_botlib_export.aas);",
+		"Init_EA_Export(&be_botlib_export.ea);",
+		"Init_AI_Export(&be_botlib_export.ai);",
+		"return &be_botlib_export;",
+	):
+		assert source_anchor in get_api
+
+	previous_source_index = -1
+	for source_anchor in (
+		"Com_Memset( &be_botlib_export, 0, sizeof( be_botlib_export ) );",
+		"if ( apiVersion != BOTLIB_API_VERSION )",
+		"Init_AAS_Export(&be_botlib_export.aas);",
+		"Init_EA_Export(&be_botlib_export.ea);",
+		"Init_AI_Export(&be_botlib_export.ai);",
+	):
+		source_index = get_api.index(source_anchor)
+		assert previous_source_index < source_index
+		previous_source_index = source_index
+
+	for evidence in (
+		"004a83c0    int32_t sub_4a83c0(int32_t arg1, int32_t arg2)",
+		"004a83de  __builtin_memcpy(dest: &data_16dd800, src: arg2, n: 0x58)",
+		"004a83e0  sub_4c95e0(&data_16dd860, 0, 0x224)",
+		"004a83f0  if (arg1 != 2)",
+		'004a83fc      data_16dd800(3, "Mismatched BOTLIB_API_VERSION: e',
+		"004a8408      return 0",
+		"004a840e  sub_4a7fc0(&data_16dd860)",
+		"004a8418  sub_4a8060(&data_16dd8b8)",
+		"004a8422  sub_4a8110(&data_16dd91c)",
+		"004a84af  return &data_16dd860",
+	):
+		assert evidence in ql_steam_hlil
+
+	assert aliases["sub_4A83C0"] == "GetBotLibAPI"
+	assert "FUN_004a83c0,004a83c0,240,0,unknown" in ghidra_functions
+
+	previous_field_index = botlib_export.index("ai_export_t ai;")
+	previous_assignment_index = get_api.index("Init_AI_Export(&be_botlib_export.ai);")
+	previous_hlil_index = ql_steam_hlil.index("004a8422  sub_4a8110(&data_16dd91c)")
+	for field_name, source_name, address, table_slot, hlil_address, ghidra_size in BOTLIB_EXPORT_CORE_TAIL:
+		field_index = botlib_export.index(f"(*{field_name})")
+		assert previous_field_index < field_index
+		previous_field_index = field_index
+
+		assignment = f"be_botlib_export.{field_name} = {source_name};"
+		assignment_index = get_api.index(assignment)
+		assert previous_assignment_index < assignment_index
+		previous_assignment_index = assignment_index
+
+		hlil_assignment = f"{hlil_address}  {table_slot} = sub_{address.lower()}"
+		hlil_index = ql_steam_hlil.index(hlil_assignment)
+		assert previous_hlil_index < hlil_index
+		previous_hlil_index = hlil_index
+
+		if field_name == "Test":
+			assert f"sub_{address}" not in aliases
+		else:
+			assert aliases[f"sub_{address}"] == source_name
+
+		if ghidra_size is not None:
+			assert f"FUN_00{address.lower()},00{address.lower()},{ghidra_size},0,unknown" in ghidra_functions
 
 
 def test_botlib_lifecycle_parser_and_aas_internal_aliases_match_retail_references() -> None:

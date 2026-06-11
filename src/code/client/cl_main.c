@@ -22,6 +22,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 // cl_main.c  -- client main loop
 
 #include "client.h"
+#include "../qcommon/unzip.h"
 #include "../qcommon/vm_local.h"
 #include "../../game/match_state_keys.h"
 #include "../../common/auth_credentials.h"
@@ -761,6 +762,7 @@ static qboolean cl_statsClearRegistered;
 #define CL_STEAM_BROWSER_REFRESH_TIMEOUT_MSEC 15000
 #define CL_STEAM_BROWSER_DETAILS_TIMEOUT_MSEC 5000
 #define CL_STEAM_STATS_REPORT_CHANNEL 0
+#define CL_STEAM_STATS_REPORT_DECOMPRESSED_BYTES 0x100000
 #define CL_STEAM_VOICE_CHANNEL 1
 #define CL_STEAM_VOICE_SAMPLE_RATE 22050u
 #define CL_STEAM_VOICE_MAX_COMPRESSED 0x4000
@@ -6615,7 +6617,10 @@ static void CL_Steam_ProcessStatsReportPackets( void ) {
 		CSteamID	remoteId;
 		char		reportPayload[CL_STEAM_BROWSER_EVENT_PAYLOAD_LENGTH];
 		char		*packetData;
+		char		*decompressedPayload;
+		unsigned long	decompressedBytes;
 		size_t		payloadBytes;
+		int		decompressResult;
 
 		if ( packetSize == 0u ) {
 			break;
@@ -6631,15 +6636,34 @@ static void CL_Steam_ProcessStatsReportPackets( void ) {
 			continue;
 		}
 
-		payloadBytes = (size_t)bytesRead;
+		decompressedPayload = malloc( CL_STEAM_STATS_REPORT_DECOMPRESSED_BYTES );
+		if ( !decompressedPayload ) {
+			free( packetData );
+			return;
+		}
+
+		decompressedBytes = CL_STEAM_STATS_REPORT_DECOMPRESSED_BYTES;
+		decompressResult = QZ_Uncompress(
+			(unsigned char *)decompressedPayload,
+			&decompressedBytes,
+			(const unsigned char *)packetData,
+			bytesRead );
+		if ( decompressResult != 0 ) {
+			free( decompressedPayload );
+			free( packetData );
+			continue;
+		}
+
+		payloadBytes = (size_t)decompressedBytes;
 		if ( payloadBytes >= sizeof( reportPayload ) ) {
 			payloadBytes = sizeof( reportPayload ) - 1;
 		}
 
-		Com_Memcpy( reportPayload, packetData, payloadBytes );
+		Com_Memcpy( reportPayload, decompressedPayload, payloadBytes );
 		reportPayload[payloadBytes] = '\0';
 		CL_Steam_PublishBrowserEvent( "game.stats.report", reportPayload );
 
+		free( decompressedPayload );
 		free( packetData );
 	}
 }

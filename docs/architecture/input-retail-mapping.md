@@ -63,6 +63,18 @@ The same owner now applies the recovered demo-playback shortcuts while
 `timescale`, left/wheel-down decrements timescale, right/wheel-up increments or
 single-steps a frozen demo, and delete toggles `cg_drawDemoHUD`.
 
+The host keyboard and character-input bridge is pinned from the Win32 message
+layer through the VM consumers. `MapKey` extracts the scan code and extended-key
+bit from `lParam`, keeps the retail keypad remaps, and feeds `MainWndProc`
+`SE_KEY` events for key up/down while `WM_CHAR` queues `SE_CHAR` with the
+OS-produced character payload. `Sys_GetEvent` records the Win32 message
+timestamp before `TranslateMessage` and dispatch, `Sys_QueEvent` owns queue
+overflow cleanup and timestamp fallback, and `Com_EventLoop` dispatches the
+result into `CL_KeyEvent` or `CL_CharEvent`. The client handlers then route
+browser, UI, cgame, console, message, disconnected-console, and binding paths in
+the retail priority order; the UI and cgame DLLs expose matching native
+key-event wrappers around `_UI_KeyEvent` and `CG_KeyEvent`.
+
 The gameplay side of `CL_MouseMove` uses the more specific retail movement
 formula recovered from `sub_4B5800`: raw counts are first scaled by
 `2.5399999618530273 / m_cpi` when CPI is enabled, rate calculation then
@@ -70,6 +82,54 @@ multiplies by `1000`, CPI-enabled yaw/pitch application uses the retail
 `45.45454545454546` axis multiplier, and signed `cl_mouseAccel` either adds to
 or subtracts from sensitivity before the cap check. The retained `m_filter`
 cvar is also a view-angle history filter, not a two-frame raw-delta average.
+The client owner band is pinned as `CL_MouseEvent` (`0x004B54E0`),
+`CL_BeginMouseFilter` (`0x004B5640`), `CL_EndMouseFilter` (`0x004B5710`), and
+`CL_MouseMove` (`0x004B5800`), with Ghidra `FUN_*`, uppercase Binary Ninja
+`sub_*`, and lowercase Binary Ninja `sub_*` aliases all present in the shared
+symbol ledger.
+
+The VM consumer bridge is pinned on both DLL sides. UI `_UI_MouseEvent`
+projects host screen coordinates into 640x480 virtual cursor space, bounds
+checks that virtual cursor, and forwards valid motion into `Display_MouseMove`.
+Cgame seeds `cgDC` from the retained `cgs` cursor in both the `CG_MOUSE_EVENT`
+vmMain case and the native export wrapper, then `CG_MouseEvent` projects,
+clamps, updates cursor-shape state, and routes motion through
+`CG_BrowserDisplayMouseMove`. The shared alias ledger deliberately keeps
+`uix86.dll` `FUN_100208f0` as `Menu_OverActiveItem` while
+`cgamex86.dll` `sub_100208f0` remains `CG_MouseEvent`; the same virtual address
+belongs to different retail modules and must not be merged by address alone.
+The cgame browser-widget consumer band is now pinned as the next input layer:
+`CG_BrowserDisplayMouseMove` and `CG_BrowserHandleMouseMove` feed overlay roots,
+while focus, hover, listbox, slider, text-field, bind, multi, preset-list,
+out-of-bounds click, and overlay key handlers retain their cgame-scoped wrapper
+owners. This keeps browser overlay motion and key dispatch tied to the retail
+`0x1005a1a0..0x100638e0` owner band instead of collapsing it into generic UI
+item helpers.
+
+The Windows backend ownership is now mapped across the retail host band around
+`0x004EA390..0x004EC4F0`. Raw input remains the default (`in_mouse 2`), the
+DirectInput fallback uses the retail `DINPUT8.DLL!DirectInput8Create` interface
+and a `0x200` buffered event stream, and the classic Win32 lane is retained as
+the final fallback for center-relative gameplay deltas or absolute client
+coordinates when a UI/browser/cgame catcher owns the cursor.
+The raw-message handoff is pinned at `MainWndProc` / `sub_4f1750`: retail reads
+the `in_mouse` cvar pointer defensively, handles `WM_INPUT` with
+`GetRawInputData`, uses a `0x400` stack buffer before heap fallback, and then
+forwards mouse packets into the retained raw-sample appender. The source keeps
+that packet parsing in `IN_RawInputEvent`, but the routing and guard semantics
+now match the retail owner.
+
+The remaining Win32 device input lane is mapped through the same owner band.
+`IN_StartupJoystick` probes WinMM joystick devices with `joyGetNumDevs`,
+`joyGetPosEx`, and `joyGetDevCapsA`, publishes `ui_joyavail`, and
+`IN_JoyMove` translates buttons into `K_JOY*`, hat/secondary axes into
+direction keys, side/forward analog motion into `SE_JOYSTICK_AXIS`, and R/U
+look axes into ordinary `SE_MOUSE` events. `Com_EventLoop` then dispatches
+`SE_JOYSTICK_AXIS` into `CL_JoystickEvent`, and `CL_CreateCmd` applies stored
+axis state after mouse movement through `CL_JoystickMove`. The adjacent MIDI
+bridge is also pinned: `MidiInProc` gates note messages by `in_midichannel`,
+maps notes from middle C into the `K_AUX*` key range, and opens WinMM through
+`IN_StartupMIDI` only when `in_midi` is enabled.
 
 ### Captured retail samples
 

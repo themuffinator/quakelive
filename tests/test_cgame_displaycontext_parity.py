@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 import re
 
@@ -34,6 +35,7 @@ MATCH_STATE_KEYS = REPO_ROOT / "src" / "game" / "match_state_keys.h"
 CG_BG_PLAN = REPO_ROOT / "docs" / "reverse-engineering" / "cgame-bg-parity-implementation-plan.md"
 CG_OWNERDRAW_INDEX = REPO_ROOT / "docs" / "reverse-engineering" / "cg-ownerdrawtype-parity-index.md"
 CG_CLIENTINFO_DOC = REPO_ROOT / "docs" / "reverse-engineering" / "cgame-clientinfo.md"
+SYMBOL_ALIASES = REPO_ROOT / "references" / "analysis" / "quakelive_symbol_aliases.json"
 CL_CGAME = REPO_ROOT / "src" / "code" / "client" / "cl_cgame.c"
 G_CLIENT = REPO_ROOT / "src" / "code" / "game" / "g_client.c"
 G_CMDS = REPO_ROOT / "src" / "code" / "game" / "g_cmds.c"
@@ -56,6 +58,14 @@ CGAME_GHIDRA_DECOMPILE = (
 	/ "ghidra"
 	/ "cgamex86"
 	/ "decompile_top_functions.c"
+)
+CGAME_GHIDRA_FUNCTIONS = (
+	REPO_ROOT
+	/ "references"
+	/ "reverse-engineering"
+	/ "ghidra"
+	/ "cgamex86"
+	/ "functions.csv"
 )
 QAGAME_GHIDRA_DECOMPILE = (
 	REPO_ROOT
@@ -16390,6 +16400,169 @@ def test_cgame_browser_leaf_wrappers_restore_remaining_retail_owner_slice() -> N
 	newdraw_source = CG_NEWDRAW.read_text(encoding="utf-8")
 	main_source = CG_MAIN.read_text(encoding="utf-8")
 	local_source = CG_LOCAL.read_text(encoding="utf-8")
+	aliases = json.loads(SYMBOL_ALIASES.read_text(encoding="utf-8"))["cgame"]
+	function_rows = CGAME_GHIDRA_FUNCTIONS.read_text(encoding="utf-8")
+	hlil_source = CGAME_HLIL.read_text(encoding="utf-8")
+
+	expected_input_aliases = {
+		"FUN_10058ca0": "CG_ClearBrowserFocus",
+		"sub_10058CA0": "CG_ClearBrowserFocus",
+		"sub_10058ca0": "CG_ClearBrowserFocus",
+		"FUN_1005a1a0": "CG_SetBrowserFocus",
+		"sub_1005A1A0": "CG_SetBrowserFocus",
+		"sub_1005a1a0": "CG_SetBrowserFocus",
+		"FUN_1005a370": "CG_BrowserListMaxScroll",
+		"sub_1005A370": "CG_BrowserListMaxScroll",
+		"sub_1005a370": "CG_BrowserListMaxScroll",
+		"FUN_1005a3d0": "CG_BrowserListThumbPosition",
+		"sub_1005A3D0": "CG_BrowserListThumbPosition",
+		"sub_1005a3d0": "CG_BrowserListThumbPosition",
+		"FUN_1005a4f0": "CG_BrowserListThumbDrawPosition",
+		"sub_1005A4F0": "CG_BrowserListThumbDrawPosition",
+		"sub_1005a4f0": "CG_BrowserListThumbDrawPosition",
+		"FUN_1005a5f0": "CG_BrowserSliderThumbPosition",
+		"sub_1005A5F0": "CG_BrowserSliderThumbPosition",
+		"sub_1005a5f0": "CG_BrowserSliderThumbPosition",
+		"FUN_1005a6e0": "CG_BrowserSliderOverControl",
+		"sub_1005A6E0": "CG_BrowserSliderOverControl",
+		"sub_1005a6e0": "CG_BrowserSliderOverControl",
+		"FUN_1005a750": "CG_BrowserListOverLB",
+		"sub_1005A750": "CG_BrowserListOverLB",
+		"sub_1005a750": "CG_BrowserListOverLB",
+		"FUN_1005aa60": "CG_SetBrowserMouseOver",
+		"sub_1005AA60": "CG_SetBrowserMouseOver",
+		"sub_1005aa60": "CG_SetBrowserMouseOver",
+		"FUN_1005abb0": "CG_BrowserMouseEnter",
+		"sub_1005ABB0": "CG_BrowserMouseEnter",
+		"sub_1005abb0": "CG_BrowserMouseEnter",
+		"FUN_1005ad30": "CG_BrowserMouseLeave",
+		"sub_1005AD30": "CG_BrowserMouseLeave",
+		"sub_1005ad30": "CG_BrowserMouseLeave",
+		"FUN_1005ad70": "CG_BrowserListKeyEvent",
+		"sub_1005AD70": "CG_BrowserListKeyEvent",
+		"sub_1005ad70": "CG_BrowserListKeyEvent",
+		"FUN_1005b280": "CG_BrowserYesNoHandleKey",
+		"sub_1005B280": "CG_BrowserYesNoHandleKey",
+		"sub_1005b280": "CG_BrowserYesNoHandleKey",
+		"FUN_1005b550": "CG_BrowserMultiHandleKey",
+		"sub_1005B550": "CG_BrowserMultiHandleKey",
+		"sub_1005b550": "CG_BrowserMultiHandleKey",
+		"FUN_1005b860": "CG_BrowserPresetListHandleKey",
+		"sub_1005B860": "CG_BrowserPresetListHandleKey",
+		"sub_1005b860": "CG_BrowserPresetListHandleKey",
+		"FUN_1005ba50": "CG_BrowserTextFieldHandleKey",
+		"sub_1005BA50": "CG_BrowserTextFieldHandleKey",
+		"sub_1005ba50": "CG_BrowserTextFieldHandleKey",
+		"FUN_1005be30": "CG_BrowserListRepeatScroll",
+		"sub_1005BE30": "CG_BrowserListRepeatScroll",
+		"sub_1005be30": "CG_BrowserListRepeatScroll",
+		"FUN_1005bea0": "CG_BrowserListDragThumb",
+		"sub_1005BEA0": "CG_BrowserListDragThumb",
+		"sub_1005bea0": "CG_BrowserListDragThumb",
+		"FUN_1005c050": "CG_BrowserSliderApplyFromCursor",
+		"sub_1005C050": "CG_BrowserSliderApplyFromCursor",
+		"sub_1005c050": "CG_BrowserSliderApplyFromCursor",
+		"FUN_1005c1f0": "CG_BrowserStartCapture",
+		"sub_1005C1F0": "CG_BrowserStartCapture",
+		"sub_1005c1f0": "CG_BrowserStartCapture",
+		"FUN_1005c370": "CG_BrowserSliderHandleKey",
+		"sub_1005C370": "CG_BrowserSliderHandleKey",
+		"sub_1005c370": "CG_BrowserSliderHandleKey",
+		"FUN_1005c540": "CG_BrowserWidgetHandleKey",
+		"sub_1005C540": "CG_BrowserWidgetHandleKey",
+		"sub_1005c540": "CG_BrowserWidgetHandleKey",
+		"FUN_1005c6a0": "CG_SetPrevBrowserCursorItem",
+		"sub_1005C6A0": "CG_SetPrevBrowserCursorItem",
+		"sub_1005c6a0": "CG_SetPrevBrowserCursorItem",
+		"FUN_1005c7a0": "CG_SetNextBrowserCursorItem",
+		"sub_1005C7A0": "CG_SetNextBrowserCursorItem",
+		"sub_1005c7a0": "CG_SetNextBrowserCursorItem",
+		"FUN_1005ca00": "CG_BrowserHandleOOBClick",
+		"sub_1005CA00": "CG_BrowserHandleOOBClick",
+		"sub_1005ca00": "CG_BrowserHandleOOBClick",
+		"FUN_1005cc70": "CG_BrowserHandleKey",
+		"sub_1005CC70": "CG_BrowserHandleKey",
+		"sub_1005cc70": "CG_BrowserHandleKey",
+		"FUN_1005ebe0": "CG_BrowserBindHandleKey",
+		"sub_1005EBE0": "CG_BrowserBindHandleKey",
+		"sub_1005ebe0": "CG_BrowserBindHandleKey",
+		"FUN_10060610": "CG_GetFocusedBrowserOverlay",
+		"sub_10060610": "CG_GetFocusedBrowserOverlay",
+		"FUN_10060820": "CG_BrowserHandleMouseMove",
+		"sub_10060820": "CG_BrowserHandleMouseMove",
+		"FUN_10063830": "CG_BrowserDisplayMouseMove",
+		"sub_10063830": "CG_BrowserDisplayMouseMove",
+		"FUN_100638e0": "CG_BrowserOverActiveItem",
+		"sub_100638E0": "CG_BrowserOverActiveItem",
+		"sub_100638e0": "CG_BrowserOverActiveItem",
+	}
+	for raw_name, normalized_name in expected_input_aliases.items():
+		assert aliases[raw_name] == normalized_name
+
+	for expected_row in (
+		"FUN_10058ca0,10058ca0,378,0,unknown",
+		"FUN_1005a1a0,1005a1a0,461,0,unknown",
+		"FUN_1005a370,1005a370,88,0,unknown",
+		"FUN_1005a3d0,1005a3d0,275,0,unknown",
+		"FUN_1005a4f0,1005a4f0,250,0,unknown",
+		"FUN_1005a5f0,1005a5f0,226,0,unknown",
+		"FUN_1005a6e0,1005a6e0,102,0,unknown",
+		"FUN_1005a750,1005a750,777,0,unknown",
+		"FUN_1005aa60,1005aa60,332,0,unknown",
+		"FUN_1005abb0,1005abb0,376,0,unknown",
+		"FUN_1005ad30,1005ad30,55,0,unknown",
+		"FUN_1005ad70,1005ad70,1284,0,unknown",
+		"FUN_1005b280,1005b280,255,0,unknown",
+		"FUN_1005b550,1005b550,412,0,unknown",
+		"FUN_1005b860,1005b860,492,0,unknown",
+		"FUN_1005ba50,1005ba50,981,0,unknown",
+		"FUN_1005bea0,1005bea0,421,0,unknown",
+		"FUN_1005c050,1005c050,411,0,unknown",
+		"FUN_1005c1f0,1005c1f0,358,0,unknown",
+		"FUN_1005c370,1005c370,463,0,unknown",
+		"FUN_1005c540,1005c540,282,0,unknown",
+		"FUN_1005c6a0,1005c6a0,245,0,unknown",
+		"FUN_1005c7a0,1005c7a0,246,0,unknown",
+		"FUN_1005ca00,1005ca00,448,0,unknown",
+		"FUN_1005cc70,1005cc70,1072,0,unknown",
+		"FUN_1005ebe0,1005ebe0,583,0,unknown",
+		"FUN_10060610,10060610,58,0,unknown",
+		"FUN_10060820,10060820,426,0,unknown",
+		"FUN_10063830,10063830,173,0,unknown",
+		"FUN_100638e0,100638e0,249,0,unknown",
+	):
+		assert expected_row in function_rows
+
+	for expected in (
+		"10060820    void sub_10060820(int32_t arg1, float arg2, float arg3)",
+		"10060864  if (eax != 0 && (*(eax + 0x48) & 0x100004) != 0 && data_1074ccf4 == 0",
+		"1006098c                                      edx = sub_1005ad30(esi_1)",
+		"10060955                                          st0_3, eax_4, edx = sub_1005abb0(eax_3, edx,",
+		"10060978                                              st0_4, eax_5, edx = sub_1005a1a0(eax_4, edx,",
+		"1005c540    int32_t __convention(\"regparm\") sub_1005c540(int32_t arg1, int32_t arg2, float* arg3, int32_t arg4, int32_t arg5)",
+		"1005c58f          arg3, arg2 = sub_1005c1f0(esi, arg1)",
+		"1005c5b7                  st0, eax_3 = sub_1005ad70(esi)",
+		"1005c621                      st0_3, eax_9 = sub_1005c370(arg1, esi)",
+		"1005c5ce                  return sub_1005b280(arg3, arg1, esi)",
+		"1005c5d1                  st0_1, eax_5 = sub_1005b550(arg1, esi)",
+		"1005c64c                  st0_4, eax_12 = sub_1005b860(eax_2, arg2, arg1, esi)",
+		"1005ca00    int32_t sub_1005ca00(void* arg1 @ edi, int32_t arg2, int32_t arg3, int32_t arg4)",
+		"1005ca90              eax_2, edx_1 = sub_100638e0(esi_1 - 0x130, float.s(*(eax_1 + 0xf0)),",
+		"1005cb39                  sub_10060820(esi_1 - 0x130, float.s(*(eax_6 + 0xf0)),",
+		"1005cb5a                  sub_1005cc70(esi_1 - 0x130, arg2, arg3, arg4)",
+		"1005cc70    void sub_1005cc70(float* arg1, int32_t arg2, int32_t arg3, int32_t arg4)",
+		"1005cced  eax_1 = sub_1005ba50(arg2, arg4)",
+		"1005ce14                  sub_1005ca00(ebx, arg2, arg3, arg4)",
+		"1005ce73                  eax_8, edx_2 = sub_1005c540(arg2, arg4, edi, arg3, arg4)",
+		"10063830    int32_t __convention(\"regparm\") sub_10063830(int32_t arg1)",
+		"1006383d  int32_t eax = sub_10060610()",
+		"1006386c      sub_10060820(eax, float.s(ebx), float.s(arg1))",
+		"100638bb          sub_10060820(esi_1, var_20_2, var_1c_2)",
+		"100638e0    void sub_100638e0(float* arg1, float arg2, float arg3)",
+		"10063911      st0_1, eax_1 = sub_10058e20(eax, edx, arg1, fconvert.s(fconvert.t(arg2)),",
+		"1006398b                          edx = sub_1005cbd0(edi_1)",
+	):
+		assert expected in hlil_source
 
 	list_max_block = _block_from_marker(newdraw_source, "static int CG_BrowserListMaxScroll")
 	list_thumb_block = _block_from_marker(newdraw_source, "static int CG_BrowserListThumbPosition")

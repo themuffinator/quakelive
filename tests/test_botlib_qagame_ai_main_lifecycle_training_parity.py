@@ -629,6 +629,14 @@ def test_qagame_ai_main_lifecycle_aliases_metadata_and_source_are_pinned() -> No
 		for anchor in source_anchors:
 			assert anchor in block, normalized_name
 
+	bot_ai_setup = _extract_function_block(ai_main, "int BotAISetup( int restart )")
+	for duplicate_debug_register in (
+		'trap_Cvar_Register(&bot_showAreaNumber, "bot_showAreaNumber", "0", CVAR_VM_CREATED);',
+		'trap_Cvar_Register(&bot_showAreas, "bot_showAreas", "0", CVAR_VM_CREATED);',
+		'trap_Cvar_Register(&bot_showAvoidSpots, "bot_showAvoidSpots", "0", CVAR_VM_CREATED);',
+	):
+		assert duplicate_debug_register not in bot_ai_setup
+
 	for expected in (
 		"#define BOT_TRAINING_ENTITY_GODMODE_FLAGS\t\t(FL_GODMODE | 0x00010000)",
 		"#define BOT_TRAINING_ENTITY_NO_KNOCKBACK_FLAGS\t(FL_NO_KNOCKBACK | 0x00020000)",
@@ -674,6 +682,18 @@ def test_qagame_ai_main_lifecycle_hlil_and_ghidra_are_pinned() -> None:
 
 	for expected in HLIL_FLOW_ANCHORS:
 		assert expected in hlil
+
+	bot_ai_setup_hlil = hlil[
+		hlil.index("100241c0    int32_t sub_100241c0") : hlil.index("10024380    int32_t sub_10024380")
+	]
+	for expected in (
+		'10024291  (*(data_104b13ac + 0x44))(0x105e35a0, "bot_testsolid", &data_1007d0a8, 0x200)',
+		'100242b0  (*(data_104b13ac + 0x44))(0x105e36c0, "bot_testclusters", &data_1007d0a8, 0x200)',
+		'100242d2  (*(data_104b13ac + 0x44))(0x105e3120, "bot_developer", &data_1007d0a8, 0x200)',
+	):
+		assert expected in bot_ai_setup_hlil
+	for table_owned_debug_cvar in ("bot_showAreaNumber", "bot_showAreas", "bot_showAvoidSpots"):
+		assert table_owned_debug_cvar not in bot_ai_setup_hlil
 
 	for expected in GHIDRA_DECOMPILE_ANCHORS:
 		assert expected in decompile_top

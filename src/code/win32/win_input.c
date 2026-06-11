@@ -37,6 +37,7 @@ typedef struct {
 	qboolean	mouseActive;
 	qboolean	mouseInitialized;
 	qboolean	mouseStartupDelayed; // delay mouse init to try again when we have a window
+	qboolean	cursorCaptured;
 } WinMouseVars_t;
 
 static WinMouseVars_t s_wmv;
@@ -165,6 +166,106 @@ void IN_UpdateSystemCursor( void ) {
 }
 
 /*
+================
+IN_GetClampedWindowRect
+
+Returns the game window rect clipped to the same virtual-screen bounds used by
+the retail Win32 mouse activation path.
+================
+*/
+static qboolean IN_GetClampedWindowRect( RECT *window_rect ) {
+	int	width, height;
+
+	if ( !window_rect || !g_wv.hWnd ) {
+		return qfalse;
+	}
+
+	width = GetSystemMetrics( SM_CXVIRTUALSCREEN );
+	height = GetSystemMetrics( SM_CYVIRTUALSCREEN );
+
+	GetWindowRect( g_wv.hWnd, window_rect );
+	if ( window_rect->left < 0 ) {
+		window_rect->left = 0;
+	}
+	if ( window_rect->top < 0 ) {
+		window_rect->top = 0;
+	}
+	if ( window_rect->right >= width ) {
+		window_rect->right = width - 1;
+	}
+	if ( window_rect->bottom >= height - 1 ) {
+		window_rect->bottom = height - 1;
+	}
+
+	return qtrue;
+}
+
+/*
+================
+IN_CursorCaptureRequested
+
+Returns qtrue for UI/browser/cgame cursor lanes that need the host cursor
+confined to the game window without enabling relative gameplay mouse deltas.
+================
+*/
+static qboolean IN_CursorCaptureRequested( void ) {
+	if ( !in_appactive || !g_wv.hWnd ) {
+		return qfalse;
+	}
+
+	if ( in_nograb && in_nograb->integer ) {
+		return qfalse;
+	}
+
+	return ( cls.keyCatchers & ( KEYCATCH_UI | KEYCATCH_CGAME | KEYCATCH_BROWSER ) ) ? qtrue : qfalse;
+}
+
+/*
+================
+IN_ActivateCursorCapture
+================
+*/
+static void IN_ActivateCursorCapture( void ) {
+	RECT	window_rect;
+
+	if ( !IN_GetClampedWindowRect( &window_rect ) ) {
+		return;
+	}
+
+	SetCapture( g_wv.hWnd );
+	ClipCursor( &window_rect );
+	s_wmv.cursorCaptured = qtrue;
+}
+
+/*
+================
+IN_DeactivateCursorCapture
+================
+*/
+static void IN_DeactivateCursorCapture( void ) {
+	if ( !s_wmv.cursorCaptured ) {
+		return;
+	}
+
+	ClipCursor( NULL );
+	ReleaseCapture();
+	s_wmv.cursorCaptured = qfalse;
+}
+
+/*
+================
+IN_UpdateCursorCapture
+================
+*/
+static void IN_UpdateCursorCapture( void ) {
+	if ( IN_CursorCaptureRequested() ) {
+		IN_ActivateCursorCapture();
+	} else {
+		IN_DeactivateCursorCapture();
+	}
+}
+
+/*
 ============================================================
 
 WIN32 MOUSE CONTROL
@@ -195,21 +296,12 @@ IN_ActivateWin32Mouse
 ================
 */
 void IN_ActivateWin32Mouse( void ) {
-	int			width, height;
 	RECT		window_rect;
 
-	width = GetSystemMetrics (SM_CXVIRTUALSCREEN);
-	height = GetSystemMetrics (SM_CYVIRTUALSCREEN);
+	if ( !IN_GetClampedWindowRect( &window_rect ) ) {
+		return;
+	}
 
-	GetWindowRect ( g_wv.hWnd, &window_rect);
-	if (window_rect.left < 0)
-		window_rect.left = 0;
-	if (window_rect.top < 0)
-		window_rect.top = 0;
-	if (window_rect.right >= width)
-		window_rect.right = width-1;
-	if (window_rect.bottom >= height-1)
-		window_rect.bottom = height-1;
 	window_center_x = (window_rect.right + window_rect.left)/2;
 	window_center_y = (window_rect.top + window_rect.bottom)/2;
 
@@ -219,6 +311,7 @@ void IN_ActivateWin32Mouse( void ) {
 
 	SetCapture ( g_wv.hWnd );
 	ClipCursor (&window_rect);
+	s_wmv.cursorCaptured = qtrue;
 	while (ShowCursor (FALSE) >= 0)
 		;
 }
@@ -230,8 +323,7 @@ IN_DeactivateWin32Mouse
 */
 void IN_DeactivateWin32Mouse( void ) 
 {
-	ClipCursor (NULL);
-	ReleaseCapture ();
+	IN_DeactivateCursorCapture();
 	while (ShowCursor (TRUE) < 0)
 		;
 	IN_UpdateSystemCursor();
@@ -609,12 +701,13 @@ DEFINE_GUID(GUID_ZAxis,   0xA36D02E2,0xC9F3,0x11CF,0xBF,0xC7,0x44,0x45,0x53,0x54
 #ifndef DIMOFS_BUTTON7
 #define DIMOFS_BUTTON7              (DIMOFS_BUTTON0 + 7)
 #endif
-#define iDirectInputCreate(a,b,c,d)	pDirectInputCreate(a,b,c,d)
+#define iDirectInput8Create(a,b,c,d,e)	pDirectInput8Create(a,b,c,d,e)
 
-HRESULT (WINAPI *pDirectInputCreate)(HINSTANCE hinst, DWORD dwVersion,
-	LPDIRECTINPUT * lplpDirectInput, LPUNKNOWN punkOuter);
+typedef HRESULT (WINAPI *DirectInput8CreateProc_t)(HINSTANCE hinst, DWORD dwVersion,
+	REFIID riidltf, LPVOID *ppvOut, LPUNKNOWN punkOuter);
 
 static HINSTANCE hInstDI;
+static DirectInput8CreateProc_t pDirectInput8Create;
 
 typedef struct MYDATA {
 	LONG  lX;                   // X axis goes here
@@ -656,8 +749,12 @@ static DIDATAFORMAT	df = {
 	rgodf,                      // and here they are
 };
 
-static LPDIRECTINPUT		g_pdi;
-static LPDIRECTINPUTDEVICE	g_pMouse;
+static LPDIRECTINPUT8		g_pdi;
+static LPDIRECTINPUTDEVICE8	g_pMouse;
+
+static const GUID ql_IID_IDirectInput8A = {
+	0xBF798030, 0x483A, 0x4DA2, { 0xAA, 0x99, 0x5D, 0x64, 0xED, 0x36, 0x97, 0x00 }
+};
 
 void IN_DIMouse( int *mx, int *my );
 
@@ -682,34 +779,33 @@ qboolean IN_InitDIMouse( void ) {
 	Com_Printf( "Initializing DirectInput...\n");
 
 	if (!hInstDI) {
-		hInstDI = LoadLibrary("dinput.dll");
+		hInstDI = LoadLibrary("dinput8.dll");
 		
 		if (hInstDI == NULL) {
-			Com_Printf ("Couldn't load dinput.dll\n");
+			Com_Printf ("Couldn't load dinput8.dll\n");
 			return qfalse;
 		}
 	}
 
-	if (!pDirectInputCreate) {
-		pDirectInputCreate = (long (__stdcall *)(void *,unsigned long ,struct IDirectInputA ** ,struct IUnknown *))
-			GetProcAddress(hInstDI,"DirectInputCreateA");
+	if (!pDirectInput8Create) {
+		pDirectInput8Create = (DirectInput8CreateProc_t)GetProcAddress(hInstDI,"DirectInput8Create");
 
-		if (!pDirectInputCreate) {
-			Com_Printf ("Couldn't get DI proc addr\n");
+		if (!pDirectInput8Create) {
+			Com_Printf ("Couldn't get DI8 proc addr\n");
 			return qfalse;
 		}
 	}
 
 	// register with DirectInput and get an IDirectInput to play with.
-	hr = iDirectInputCreate( g_wv.hInstance, DIRECTINPUT_VERSION, &g_pdi, NULL);
+	hr = iDirectInput8Create( g_wv.hInstance, DIRECTINPUT_VERSION, &ql_IID_IDirectInput8A, (LPVOID *)&g_pdi, NULL);
 
 	if (FAILED(hr)) {
-		Com_Printf ("iDirectInputCreate failed\n");
+		Com_Printf ("DirectInput8Create failed\n");
 		return qfalse;
 	}
 
 	// obtain an interface to the system mouse device.
-	hr = IDirectInput_CreateDevice(g_pdi, &GUID_SysMouse, &g_pMouse, NULL);
+	hr = IDirectInput8_CreateDevice(g_pdi, &GUID_SysMouse, &g_pMouse, NULL);
 
 	if (FAILED(hr)) {
 		Com_Printf ("Couldn't open DI mouse device\n");
@@ -717,7 +813,7 @@ qboolean IN_InitDIMouse( void ) {
 	}
 
 	// set the data format to "mouse format".
-	hr = IDirectInputDevice_SetDataFormat(g_pMouse, &df);
+	hr = IDirectInputDevice8_SetDataFormat(g_pMouse, &df);
 
 	if (FAILED(hr)) 	{
 		Com_Printf ("Couldn't set DI mouse format\n");
@@ -725,7 +821,7 @@ qboolean IN_InitDIMouse( void ) {
 	}
 
 	// set the cooperativity level.
-	hr = IDirectInputDevice_SetCooperativeLevel(g_pMouse, g_wv.hWnd,
+	hr = IDirectInputDevice8_SetCooperativeLevel(g_pMouse, g_wv.hWnd,
 			DISCL_EXCLUSIVE | DISCL_FOREGROUND);
 
 	// https://zerowing.idsoftware.com/bugzilla/show_bug.cgi?id=50
@@ -737,7 +833,7 @@ qboolean IN_InitDIMouse( void ) {
 
 	// set the buffer size to DINPUT_BUFFERSIZE elements.
 	// the buffer size is a DWORD property associated with the device
-	hr = IDirectInputDevice_SetProperty(g_pMouse, DIPROP_BUFFERSIZE, &dipdw.diph);
+	hr = IDirectInputDevice8_SetProperty(g_pMouse, DIPROP_BUFFERSIZE, &dipdw.diph);
 
 	if (FAILED(hr)) {
 		Com_Printf ("Couldn't set DI buffersize\n");
@@ -760,12 +856,12 @@ IN_ShutdownDIMouse
 */
 void IN_ShutdownDIMouse( void ) {
     if (g_pMouse) {
-		IDirectInputDevice_Release(g_pMouse);
+		IDirectInputDevice8_Release(g_pMouse);
 		g_pMouse = NULL;
 	}
 
     if (g_pdi) {
-		IDirectInput_Release(g_pdi);
+		IDirectInput8_Release(g_pdi);
 		g_pdi = NULL;
 	}
 }
@@ -783,7 +879,7 @@ void IN_ActivateDIMouse( void ) {
 	}
 
 	// we may fail to reacquire if the window has been recreated
-	hr = IDirectInputDevice_Acquire( g_pMouse );
+	hr = IDirectInputDevice8_Acquire( g_pMouse );
 	if (FAILED(hr)) {
 		if ( !IN_InitDIMouse() ) {
 			Com_Printf( "Falling back on raw input...\n" );
@@ -807,7 +903,7 @@ void IN_DeactivateDIMouse( void ) {
 	if (!g_pMouse) {
 		return;
 	}
-	IDirectInputDevice_Unacquire( g_pMouse );
+	IDirectInputDevice8_Unacquire( g_pMouse );
 }
 
 
@@ -834,9 +930,9 @@ void IN_DIMouse( int *mx, int *my ) {
 	for ( ;; ) {
 		dwElements = DINPUT_BUFFERSIZE;
 
-		hr = IDirectInputDevice_GetDeviceData( g_pMouse, sizeof( DIDEVICEOBJECTDATA ), od, &dwElements, 0 );
+		hr = IDirectInputDevice8_GetDeviceData( g_pMouse, sizeof( DIDEVICEOBJECTDATA ), od, &dwElements, 0 );
 		if ((hr == DIERR_INPUTLOST) || (hr == DIERR_NOTACQUIRED)) {
-			IDirectInputDevice_Acquire(g_pMouse);
+			IDirectInputDevice8_Acquire(g_pMouse);
 			return;
 		}
 
@@ -938,9 +1034,11 @@ Called when the window loses focus
 */
 void IN_DeactivateMouse( void ) {
 	if (!s_wmv.mouseInitialized ) {
+		IN_DeactivateCursorCapture();
 		return;
 	}
 	if (!s_wmv.mouseActive ) {
+		IN_DeactivateCursorCapture();
 		return;
 	}
 	s_wmv.mouseActive = qfalse;
@@ -1197,17 +1295,28 @@ void IN_Frame (void) {
 	IN_JoyMove();
 
 	if ( !s_wmv.mouseInitialized ) {
-    if (s_wmv.mouseStartupDelayed && g_wv.hWnd)
-		{
-			Com_Printf("Proceeding with delayed mouse init\n");
-      IN_StartupMouse();
-			s_wmv.mouseStartupDelayed = qfalse;
+		if ( g_wv.hWnd && ( s_wmv.mouseStartupDelayed || ( in_mouse && in_mouse->integer != 0 ) ) ) {
+			if ( s_wmv.mouseStartupDelayed ) {
+				Com_Printf( "Proceeding with delayed mouse init\n" );
+			} else if ( in_debugMouse && in_debugMouse->integer ) {
+				Com_Printf( "Retrying mouse init now that a window is available\n" );
+			}
+			IN_StartupMouse();
 		}
-		return;
+
+		if ( !s_wmv.mouseInitialized ) {
+			IN_UpdateCursorCapture();
+			IN_UpdateSystemCursor();
+			if ( cls.keyCatchers & ( KEYCATCH_UI | KEYCATCH_CGAME | KEYCATCH_BROWSER ) ) {
+				IN_WindowMouse();
+			}
+			return;
+		}
 	}
 
 	if ( cls.keyCatchers & ~( KEYCATCH_MESSAGE | KEYCATCH_RETAIL_MOUSEPASS ) ) {
 		IN_DeactivateMouse();
+		IN_UpdateCursorCapture();
 		IN_UpdateSystemCursor();
 		IN_MouseMove();
 		return;
@@ -1215,6 +1324,7 @@ void IN_Frame (void) {
 
 	if ( in_nograb && in_nograb->integer ) {
 		IN_DeactivateMouse();
+		IN_DeactivateCursorCapture();
 		IN_UpdateSystemCursor();
 		IN_MouseMove();
 		return;
@@ -1222,6 +1332,7 @@ void IN_Frame (void) {
 
 	if ( !in_appactive ) {
 		IN_DeactivateMouse();
+		IN_DeactivateCursorCapture();
 		IN_UpdateSystemCursor();
 		IN_MouseMove();
 		return;

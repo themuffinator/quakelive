@@ -384,6 +384,26 @@ static int MapKey (int key)
 }
 
 
+extern cvar_t *in_mouse;
+extern cvar_t *in_logitechbug;
+
+/*
+====================
+WIN_GetMouseInputMode
+
+Returns the retail-safe mouse mode value for window-message routing.
+====================
+*/
+static int WIN_GetMouseInputMode( void )
+{
+	if ( !in_mouse )
+	{
+		return 0;
+	}
+
+	return in_mouse->integer;
+}
+
 /*
 ====================
 MainWndProc
@@ -391,8 +411,6 @@ MainWndProc
 main window procedure
 ====================
 */
-extern cvar_t *in_mouse;
-extern cvar_t *in_logitechbug;
 LONG WINAPI MainWndProc (
     HWND    hWnd,
     UINT    uMsg,
@@ -401,13 +419,16 @@ LONG WINAPI MainWndProc (
 {
 	static qboolean flip = qtrue;
 	int zDelta, i;
+	int mouseInputMode;
+
+	mouseInputMode = WIN_GetMouseInputMode();
 
 	// http://msdn.microsoft.com/library/default.asp?url=/library/en-us/winui/winui/windowsuserinterface/userinput/mouseinput/aboutmouseinput.asp
 	// Windows 95, Windows NT 3.51 - uses MSH_MOUSEWHEEL
 	// only relevant for non-DI input
 	//
 	// NOTE: not sure how reliable this is anymore, might trigger double wheel events
-	if (in_mouse->integer != 1)
+	if ( mouseInputMode != 1 )
 	{
 		if ( uMsg == MSH_MOUSEWHEEL )
 		{
@@ -457,7 +478,7 @@ LONG WINAPI MainWndProc (
 		// Windows 98/Me, Windows NT 4.0 and later - uses WM_MOUSEWHEEL
 		// only relevant for non-DI input and when console is toggled in window mode
 		//   if console is toggled in window mode (KEYCATCH_CONSOLE) then mouse is released and DI doesn't see any mouse wheel
-		if (in_mouse->integer != 1 || (!r_fullscreen->integer && (cls.keyCatchers & KEYCATCH_CONSOLE)))
+		if ( mouseInputMode != 1 || (!r_fullscreen->integer && (cls.keyCatchers & KEYCATCH_CONSOLE)))
 		{
 			if ( IN_RawInputIsActive() )
 			{

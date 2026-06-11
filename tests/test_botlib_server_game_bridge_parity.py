@@ -127,6 +127,22 @@ EXPECTED_NATIVE_GAME_IMPORT_ASSIGNMENTS = (
 )
 
 
+NATIVE_BOTLIB_BRIDGE_SLOT_PATTERN = re.compile(
+	r"\b("
+	r"G_QL_IMPORT_(?:"
+	r"BOT_ALLOCATE_CLIENT|BOT_FREE_CLIENT|GET_USERCMD|GET_ENTITY_TOKEN|"
+	r"DEBUG_POLYGON_CREATE|DEBUG_POLYGON_DELETE|BOTLIB_[A-Z0-9_]+"
+	r")"
+	r")\s*=\s*(\d+),"
+)
+NATIVE_BOTLIB_BRIDGE_TABLE_BASE = 0x56CF80
+NATIVE_BOTLIB_BRIDGE_FIRST_SLOT = 43
+NATIVE_BOTLIB_BRIDGE_LAST_SLOT = 184
+NATIVE_BOTLIB_BRIDGE_EXPECTED_COUNT = (
+	NATIVE_BOTLIB_BRIDGE_LAST_SLOT - NATIVE_BOTLIB_BRIDGE_FIRST_SLOT + 1
+)
+
+
 def _read(path: Path) -> str:
 	return path.read_text(encoding="utf-8")
 
@@ -163,6 +179,16 @@ def _extract_function_block(source: str, signature: str) -> str:
 	raise AssertionError(f"unterminated function block: {signature}")
 
 
+def _native_botlib_bridge_slots(g_public: str) -> list[tuple[int, str]]:
+	rows = [
+		(int(slot), name)
+		for name, slot in NATIVE_BOTLIB_BRIDGE_SLOT_PATTERN.findall(g_public)
+		if NATIVE_BOTLIB_BRIDGE_FIRST_SLOT <= int(slot) <= NATIVE_BOTLIB_BRIDGE_LAST_SLOT
+	]
+	rows.sort()
+	return rows
+
+
 def test_server_game_botlib_bridge_aliases_and_rows_are_pinned() -> None:
 	aliases = _aliases()
 	rows = _function_rows()
@@ -191,6 +217,7 @@ def test_server_bot_source_matches_retail_bridge_lifecycle_shape() -> None:
 	frame = _extract_function_block(sv_bot, "void SV_BotFrame")
 	setup = _extract_function_block(sv_bot, "int SV_BotLibSetup")
 	shutdown = _extract_function_block(sv_bot, "int SV_BotLibShutdown")
+	cvars = _extract_function_block(sv_bot, "void SV_BotInitCvars")
 	init = _extract_function_block(sv_bot, "void SV_BotInitBotLib")
 	console = _extract_function_block(sv_bot, "int SV_BotGetConsoleMessage")
 	snapshot = _extract_function_block(sv_bot, "int SV_BotGetSnapshotEntity")
@@ -250,6 +277,46 @@ def test_server_bot_source_matches_retail_bridge_lifecycle_shape() -> None:
 		"return botlib_export->BotLibShutdown();",
 	):
 		assert anchor in shutdown
+
+	retail_cvar_sequence = (
+		'Cvar_Get("bot_enable", "1", CVAR_ROM);',
+		'Cvar_Get("bot_developer", "0", CVAR_CHEAT);',
+		'Cvar_Get("bot_debug", "0", CVAR_CHEAT);',
+		'Cvar_Get("bot_maxdebugpolys", "2", 0);',
+		'Cvar_Get("bot_groundonly", "1", 0);',
+		'Cvar_Get("bot_reachability", "0", 0);',
+		'Cvar_Get("bot_visualizejumppads", "0", CVAR_CHEAT);',
+		'Cvar_Get("bot_forceclustering", "0", 0);',
+		'Cvar_Get("bot_forcereachability", "0", 0);',
+		'Cvar_Get("bot_forcewrite", "0", 0);',
+		'Cvar_Get("bot_aasoptimize", "0", 0);',
+		'Cvar_Get("bot_saveroutingcache", "0", 0);',
+		'Cvar_Get("bot_thinktime", "100", 0);',
+		'Cvar_Get("bot_reloadcharacters", "0", 0);',
+		'Cvar_Get("bot_testichat", "0", 0);',
+		'Cvar_Get("bot_testrchat", "0", 0);',
+		'Cvar_Get("bot_testsolid", "0", CVAR_CHEAT);',
+		'Cvar_Get("bot_testclusters", "0", CVAR_CHEAT);',
+		'Cvar_Get("bot_fastchat", "0", 0);',
+		'Cvar_Get("bot_nochat", "0", 0);',
+		'Cvar_Get("bot_pause", "0", CVAR_CHEAT);',
+		'Cvar_Get("bot_report", "0", CVAR_CHEAT);',
+		'Cvar_Get("bot_grapple", "1", 0);',
+		'Cvar_Get("bot_rocketjump", "1", 0);',
+		'Cvar_Get("bot_challenge", "0", 0);',
+		'Cvar_Get("bot_minplayers", "0", 0);',
+		'Cvar_Get("bot_interbreedchar", "", CVAR_CHEAT);',
+		'Cvar_Get("bot_interbreedbots", "10", CVAR_CHEAT);',
+		'Cvar_Get("bot_interbreedcycle", "20", CVAR_CHEAT);',
+		'Cvar_Get("bot_interbreedwrite", "", CVAR_CHEAT);',
+		'Cvar_Get("bot_teamkill", "0", 0);',
+	)
+	last_offset = -1
+	for anchor in retail_cvar_sequence:
+		offset = cvars.find(anchor)
+		assert offset != -1, anchor
+		assert offset > last_offset, anchor
+		last_offset = offset
 
 	for anchor in (
 		"botlib_import.Print = BotImport_Print;",
@@ -353,6 +420,53 @@ def test_native_qagame_import_slots_bind_full_botlib_bridge_surface() -> None:
 		assert wrapper_anchor in ql_imports
 
 
+def test_native_qagame_botlib_import_table_is_complete_and_contiguous() -> None:
+	g_public = _read(GAME_PUBLIC)
+	sv_game = _read(SERVER_SV_GAME)
+	table_hlil = _read(QL_STEAM_HLIL_PART07)
+	init_imports = _extract_function_block(sv_game, "static void SV_InitGameImports")
+	rows = _native_botlib_bridge_slots(g_public)
+
+	assert len(rows) == NATIVE_BOTLIB_BRIDGE_EXPECTED_COUNT
+	assert [slot for slot, _ in rows] == list(
+		range(NATIVE_BOTLIB_BRIDGE_FIRST_SLOT, NATIVE_BOTLIB_BRIDGE_LAST_SLOT + 1)
+	)
+
+	for slot, name in rows:
+		table_address = NATIVE_BOTLIB_BRIDGE_TABLE_BASE + slot * 4
+		table_anchor = f"{table_address:08x}  void* data_{table_address:x} = "
+		assert table_anchor in table_hlil, name
+		assert f"ql_game_imports[{name}] = (ql_import_f)" in init_imports, name
+
+	for slot, name, target in (
+		(43, "G_QL_IMPORT_BOT_ALLOCATE_CLIENT", "j_sub_4dcd30"),
+		(49, "G_QL_IMPORT_BOTLIB_SETUP", "j_sub_4dd6a0"),
+		(56, "G_QL_IMPORT_BOTLIB_UPDATE_ENTITY", "sub_4e17a0"),
+		(61, "G_QL_IMPORT_BOTLIB_AAS_BBOX_AREAS", "sub_4e18a0"),
+		(83, "G_QL_IMPORT_BOTLIB_AI_DRAW_DEBUG_AREAS", "sub_4e2680"),
+		(85, "G_QL_IMPORT_BOTLIB_EA_SAY", "sub_4e19d0"),
+		(110, "G_QL_IMPORT_BOTLIB_AI_LOAD_CHARACTER", "sub_4e1c80"),
+		(137, "G_QL_IMPORT_BOTLIB_AI_RESET_GOAL_STATE", "sub_4e1ff0"),
+		(166, "G_QL_IMPORT_BOTLIB_AI_RESET_MOVE_STATE", "sub_4e23b0"),
+		(178, "G_QL_IMPORT_BOTLIB_AI_CHOOSE_BEST_FIGHT_WEAPON", "sub_4e2550"),
+		(184, "G_QL_IMPORT_BOTLIB_AI_GENETIC_PARENTS_AND_CHILD_SELECTION", "sub_4e2600"),
+	):
+		table_address = NATIVE_BOTLIB_BRIDGE_TABLE_BASE + slot * 4
+		assert (slot, name) in rows
+		assert f"{table_address:08x}  void* data_{table_address:x} = {target}" in table_hlil
+
+	previous_offset = -1
+	for _, name in rows:
+		offset = init_imports.index(f"ql_game_imports[{name}] = (ql_import_f)")
+		assert offset > previous_offset, name
+		previous_offset = offset
+
+	assert "0056d264  void* data_56d264 = sub_4e2620" in table_hlil
+	assert init_imports.index("G_QL_IMPORT_BOTLIB_AI_GENETIC_PARENTS_AND_CHILD_SELECTION") < init_imports.index(
+		"G_QL_IMPORT_SUBMIT_MATCH_REPORT"
+	)
+
+
 def test_server_game_botlib_bridge_hlil_shapes_are_pinned() -> None:
 	server_hlil = _read(QL_STEAM_HLIL_PART04)
 	game_hlil = _read(QL_STEAM_HLIL_PART05)
@@ -378,6 +492,10 @@ def test_server_game_botlib_bridge_hlil_shapes_are_pinned() -> None:
 		"004dd6cc      jump(*(eax_1 + 0x1f0))",
 		"004dd6d0    int32_t sub_4dd6d0()",
 		"004dd6e3      jump(*(eax_2 + 0x1f4))",
+		"004dd6f0    void** sub_4dd6f0()",
+		'004dd6fc  sub_4ce0d0(x87_r0, "bot_enable", U"1", 0x40)',
+		'004dd916  sub_4ce0d0(x87_r2, "bot_interbreedwrite", &data_54f9da, 0x200)',
+		'004dd932  return sub_4ce0d0(x87_r4, "bot_teamkill", U"0", 0)',
 		"004dda50    int32_t sub_4dda50(int32_t arg1, int32_t arg2, int32_t arg3)",
 		"004dda62  void* eax_2 = arg1 * 0x25b68 + data_13337ac",
 		"004ddaa7          sub_4d8f40(arg2, ecx_4 + eax_2 + 0x404, arg3)",

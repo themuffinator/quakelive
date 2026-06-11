@@ -14,7 +14,10 @@ The client auth owner cleanly reconstructs the dispatcher and ticket lifetime, b
 
 - Steam auth requests are blocked entirely when `CL_SteamServicesEnabled()` is false.
 - Standalone launcher auth is blocked when `CL_OnlineServicesEnabled()` is false.
-- Hybrid dispatch explicitly falls back to the open adapter whenever the Steamworks lane does not accept the credential.
+- `QL_Auth_ExecuteRequest` requests a fresh retained Steam ticket before dispatch
+  through the retail-style `SteamClient_GetAuthSessionTicket` wrapper.
+- Hybrid dispatch falls back to the open adapter only when Steamworks is
+  unavailable or returns `QL_AUTH_RESULT_PENDING`.
 - The surrounding platform-service cvar surface now publishes the same permanent bounded divergence through `cl_onlineServicesParityScope` and `cl_onlineServicesParityReason`.
 
 ## Function-by-function status
@@ -36,7 +39,7 @@ The client auth owner cleanly reconstructs the dispatcher and ticket lifetime, b
 | `QL_ClientAuth_HandleSteamworksTicket` | `divergence owner` | Dispatches into the heuristic Steamworks backend. |
 | `QL_ClientAuth_HandleOpenSteamTicket` | `divergence owner` | Dispatches into the heuristic open-adapter Steam fallback path. |
 | `QL_ClientAuth_HandleStandaloneToken` | `divergence owner` | Dispatches standalone launcher tokens into the same bounded open-adapter lane. |
-| `QL_ClientAuth_HandleHybridSteam` | `divergence owner` | Explicitly encodes the hybrid compatibility fallback from Steamworks to the open adapter. |
+| `QL_ClientAuth_HandleHybridSteam` | `divergence owner` | Explicitly encodes the hybrid compatibility fallback from Steamworks to the open adapter for unavailable or pending results while preserving Steamworks denials. |
 | `QL_ClientAuth_DispatchSteam` | `divergence owner` | Selects between Steamworks, open-adapter, and hybrid compatibility providers. |
 | `QL_Auth_ExecuteRequest` | `divergence owner` | Top-level auth request path remains gated by build/runtime policy and bounded providers. |
 

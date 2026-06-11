@@ -117,12 +117,14 @@ typedef struct {
 } ql_steam_game_server_change_requested_raw_t;
 
 typedef struct {
-	CSteamID steamIDFriend;
+	uint32_t steamIDFriendLow;
+	uint32_t steamIDFriendHigh;
 	uint32_t appId;
 } ql_steam_friend_rich_presence_update_raw_t;
 
 typedef struct {
-	CSteamID steamID;
+	uint32_t steamIDLow;
+	uint32_t steamIDHigh;
 	int image;
 	int wide;
 	int tall;
@@ -134,7 +136,6 @@ typedef struct {
 	uint32_t numResultsReturned;
 	uint32_t totalMatchingResults;
 	qboolean cachedData;
-	char nextCursor[256];
 } ql_steam_ugc_query_completed_raw_t;
 
 typedef struct {
@@ -150,6 +151,7 @@ typedef struct {
 	uint32_t itemIdLow;
 	uint32_t itemIdHigh;
 	int result;
+	uint32_t resultPadding;
 } ql_steam_download_item_result_raw_t;
 
 typedef struct {
@@ -214,7 +216,6 @@ typedef struct {
 
 typedef struct {
 	int result;
-	qboolean stillRetrying;
 } ql_steam_server_connect_failure_raw_t;
 
 typedef struct {
@@ -223,19 +224,53 @@ typedef struct {
 
 typedef struct {
 	int result;
-	CSteamID steamId;
+	uint32_t steamIdLow;
+	uint32_t steamIdHigh;
 } ql_steam_gs_stats_received_raw_t;
 
 typedef struct {
 	int result;
-	CSteamID steamId;
+	uint32_t steamIdLow;
+	uint32_t steamIdHigh;
 } ql_steam_gs_stats_stored_raw_t;
 
 typedef struct {
-	CSteamID steamId;
+	uint32_t steamIdLow;
+	uint32_t steamIdHigh;
 	int authSessionResponse;
-	CSteamID ownerSteamId;
+	uint32_t ownerSteamIdLow;
+	uint32_t ownerSteamIdHigh;
 } ql_steam_validate_auth_ticket_response_raw_t;
+
+#define QL_STEAMWORKS_STATIC_ASSERT_SIZE( name, type, size ) typedef char name[( sizeof( type ) == ( size ) ) ? 1 : -1]
+
+QL_STEAMWORKS_STATIC_ASSERT_SIZE( ql_steam_size_game_rich_presence_join_requested_raw, ql_steam_game_rich_presence_join_requested_raw_t, 0x108 );
+QL_STEAMWORKS_STATIC_ASSERT_SIZE( ql_steam_size_user_stats_received_raw, ql_steam_user_stats_received_raw_t, 0x18 );
+QL_STEAMWORKS_STATIC_ASSERT_SIZE( ql_steam_size_persona_state_change_raw, ql_steam_persona_state_change_raw_t, 0x10 );
+QL_STEAMWORKS_STATIC_ASSERT_SIZE( ql_steam_size_p2p_session_request_raw, ql_steam_p2p_session_request_raw_t, 0x08 );
+QL_STEAMWORKS_STATIC_ASSERT_SIZE( ql_steam_size_game_server_change_requested_raw, ql_steam_game_server_change_requested_raw_t, 0x80 );
+QL_STEAMWORKS_STATIC_ASSERT_SIZE( ql_steam_size_friend_rich_presence_update_raw, ql_steam_friend_rich_presence_update_raw_t, 0x0c );
+QL_STEAMWORKS_STATIC_ASSERT_SIZE( ql_steam_size_avatar_image_loaded_raw, ql_steam_avatar_image_loaded_raw_t, 0x14 );
+QL_STEAMWORKS_STATIC_ASSERT_SIZE( ql_steam_size_ugc_query_completed_raw, ql_steam_ugc_query_completed_raw_t, 0x18 );
+QL_STEAMWORKS_STATIC_ASSERT_SIZE( ql_steam_size_item_installed_raw, ql_steam_item_installed_raw_t, 0x10 );
+QL_STEAMWORKS_STATIC_ASSERT_SIZE( ql_steam_size_download_item_result_raw, ql_steam_download_item_result_raw_t, 0x18 );
+QL_STEAMWORKS_STATIC_ASSERT_SIZE( ql_steam_size_lobby_created_raw, ql_steam_lobby_created_raw_t, 0x10 );
+QL_STEAMWORKS_STATIC_ASSERT_SIZE( ql_steam_size_lobby_enter_raw, ql_steam_lobby_enter_raw_t, 0x18 );
+QL_STEAMWORKS_STATIC_ASSERT_SIZE( ql_steam_size_lobby_chat_update_raw, ql_steam_lobby_chat_update_raw_t, 0x20 );
+QL_STEAMWORKS_STATIC_ASSERT_SIZE( ql_steam_size_lobby_chat_message_raw, ql_steam_lobby_chat_message_raw_t, 0x18 );
+QL_STEAMWORKS_STATIC_ASSERT_SIZE( ql_steam_size_lobby_data_update_raw, ql_steam_lobby_data_update_raw_t, 0x18 );
+QL_STEAMWORKS_STATIC_ASSERT_SIZE( ql_steam_size_lobby_game_created_raw, ql_steam_lobby_game_created_raw_t, 0x18 );
+QL_STEAMWORKS_STATIC_ASSERT_SIZE( ql_steam_size_lobby_kicked_raw, ql_steam_lobby_kicked_raw_t, 0x18 );
+QL_STEAMWORKS_STATIC_ASSERT_SIZE( ql_steam_size_game_lobby_join_requested_raw, ql_steam_game_lobby_join_requested_raw_t, 0x10 );
+QL_STEAMWORKS_STATIC_ASSERT_SIZE( ql_steam_size_microtxn_authorization_response_raw, ql_steam_microtxn_authorization_response_raw_t, 0x18 );
+QL_STEAMWORKS_STATIC_ASSERT_SIZE( ql_steam_size_servers_connected_raw, ql_steam_servers_connected_raw_t, 0x01 );
+QL_STEAMWORKS_STATIC_ASSERT_SIZE( ql_steam_size_server_connect_failure_raw, ql_steam_server_connect_failure_raw_t, 0x04 );
+QL_STEAMWORKS_STATIC_ASSERT_SIZE( ql_steam_size_servers_disconnected_raw, ql_steam_servers_disconnected_raw_t, 0x04 );
+QL_STEAMWORKS_STATIC_ASSERT_SIZE( ql_steam_size_validate_auth_ticket_response_raw, ql_steam_validate_auth_ticket_response_raw_t, 0x14 );
+QL_STEAMWORKS_STATIC_ASSERT_SIZE( ql_steam_size_gs_stats_received_raw, ql_steam_gs_stats_received_raw_t, 0x0c );
+QL_STEAMWORKS_STATIC_ASSERT_SIZE( ql_steam_size_gs_stats_stored_raw, ql_steam_gs_stats_stored_raw_t, 0x0c );
+
+#undef QL_STEAMWORKS_STATIC_ASSERT_SIZE
 
 typedef struct {
 	uint64_t gameId;
@@ -1811,9 +1846,9 @@ static void QL_Steamworks_DispatchFriendRichPresenceUpdate( void *context, const
 
 	raw = (const ql_steam_friend_rich_presence_update_raw_t *)payload;
 	memset( &event, 0, sizeof( event ) );
-	event.steamId = raw->steamIDFriend;
+	event.steamId = QL_Steamworks_CombineIdentityWords( raw->steamIDFriendLow, raw->steamIDFriendHigh );
 	event.appId = raw->appId;
-	QL_Steamworks_GetFriendSummary( (uint32_t)( raw->steamIDFriend.value & 0xffffffffu ), (uint32_t)( raw->steamIDFriend.value >> 32 ), &event.summary );
+	QL_Steamworks_GetFriendSummary( raw->steamIDFriendLow, raw->steamIDFriendHigh, &event.summary );
 	callbackState->bindings.onFriendRichPresenceUpdate( callbackState->bindings.context, &event );
 }
 
@@ -1834,7 +1869,7 @@ static void QL_Steamworks_DispatchAvatarImageLoaded( void *context, const void *
 
 	raw = (const ql_steam_avatar_image_loaded_raw_t *)payload;
 	memset( &event, 0, sizeof( event ) );
-	event.steamId = raw->steamID;
+	event.steamId = QL_Steamworks_CombineIdentityWords( raw->steamIDLow, raw->steamIDHigh );
 	event.image = raw->image;
 	event.width = raw->wide;
 	event.height = raw->tall;
@@ -2228,7 +2263,7 @@ static void QL_Steamworks_DispatchServerConnectFailure( void *context, const voi
 	raw = (const ql_steam_server_connect_failure_raw_t *)payload;
 	memset( &event, 0, sizeof( event ) );
 	event.result = raw->result;
-	event.stillRetrying = raw->stillRetrying ? qtrue : qfalse;
+	event.stillRetrying = qfalse;
 	callbackState->bindings.onConnectFailure( callbackState->bindings.context, &event );
 }
 
@@ -2292,8 +2327,8 @@ static void QL_Steamworks_DispatchValidateAuthTicketResponse( void *context, con
 
 	raw = (const ql_steam_validate_auth_ticket_response_raw_t *)payload;
 	memset( &event, 0, sizeof( event ) );
-	event.steamId = raw->steamId;
-	event.ownerSteamId = raw->ownerSteamId;
+	event.steamId = QL_Steamworks_CombineIdentityWords( raw->steamIdLow, raw->steamIdHigh );
+	event.ownerSteamId = QL_Steamworks_CombineIdentityWords( raw->ownerSteamIdLow, raw->ownerSteamIdHigh );
 	event.authSessionResponse = (EAuthSessionResponse)raw->authSessionResponse;
 	callbackState->bindings.onValidateAuthTicketResponse( callbackState->bindings.context, &event );
 }
@@ -2359,7 +2394,7 @@ static void QL_Steamworks_DispatchGSStatsReceived( void *context, const void *pa
 	raw = (const ql_steam_gs_stats_received_raw_t *)payload;
 	memset( &event, 0, sizeof( event ) );
 	event.result = raw->result;
-	event.steamId = raw->steamId;
+	event.steamId = QL_Steamworks_CombineIdentityWords( raw->steamIdLow, raw->steamIdHigh );
 	callbackState->bindings.onGSStatsReceived( callbackState->bindings.context, &event );
 }
 
@@ -2392,7 +2427,7 @@ static void QL_Steamworks_DispatchGSStatsStored( void *context, const void *payl
 	raw = (const ql_steam_gs_stats_stored_raw_t *)payload;
 	memset( &event, 0, sizeof( event ) );
 	event.result = raw->result;
-	event.steamId = raw->steamId;
+	event.steamId = QL_Steamworks_CombineIdentityWords( raw->steamIdLow, raw->steamIdHigh );
 	callbackState->bindings.onGSStatsStored( callbackState->bindings.context, &event );
 }
 

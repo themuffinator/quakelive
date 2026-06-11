@@ -842,12 +842,74 @@ static qboolean GLW_InitDriver( const char *drivername, int colorbits )
 	return qtrue;
 }
 
+#define	WINDOW_STYLE	(WS_OVERLAPPEDWINDOW|WS_VISIBLE)
+
+/*
+** GLW_RegisterWindowClass
+*/
+static void GLW_RegisterWindowClass( void ) {
+	WNDCLASSW	wc;
+	DWORD		error;
+
+	if ( s_classRegistered ) {
+		return;
+	}
+
+	memset( &wc, 0, sizeof( wc ) );
+
+	wc.style         = 0;
+	wc.lpfnWndProc   = (WNDPROC) glw_state.wndproc;
+	wc.cbClsExtra    = 0;
+	wc.cbWndExtra    = 0;
+	wc.hInstance     = g_wv.hInstance;
+	wc.hIcon         = LoadIconA( g_wv.hInstance, MAKEINTRESOURCEA( IDI_ICON1 ) );
+	wc.hCursor       = NULL;
+	wc.hbrBackground = (void *)COLOR_GRAYTEXT;
+	wc.lpszMenuName  = 0;
+	wc.lpszClassName = WINDOW_CLASS_NAME;
+
+	SetLastError( ERROR_SUCCESS );
+	if ( !RegisterClassW( &wc ) ) {
+		error = GetLastError();
+		if ( error != ERROR_CLASS_ALREADY_EXISTS ) {
+			ri.Error( ERR_FATAL, "GLW_CreateWindow: could not register window class" );
+		}
+	}
+
+	s_classRegistered = qtrue;
+	ri.Printf( PRINT_ALL, "...registered window class\n" );
+}
+
+/*
+** GLW_UnregisterWindowClass
+*/
+static void GLW_UnregisterWindowClass( void ) {
+	DWORD	error;
+
+	if ( !s_classRegistered ) {
+		return;
+	}
+
+	SetLastError( ERROR_SUCCESS );
+	if ( UnregisterClassW( WINDOW_CLASS_NAME, g_wv.hInstance ) ) {
+		s_classRegistered = qfalse;
+		return;
+	}
+
+	error = GetLastError();
+	if ( error == ERROR_CLASS_DOES_NOT_EXIST ) {
+		s_classRegistered = qfalse;
+		return;
+	}
+
+	ri.Printf( PRINT_WARNING, "...could not unregister window class (err %lu)\n", error );
+}
+
 /*
 ** GLW_CreateWindow
 **
 ** Responsible for creating the Win32 window and initializing the OpenGL driver.
 */
-#define	WINDOW_STYLE	(WS_OVERLAPPEDWINDOW|WS_VISIBLE)
 static qboolean GLW_CreateWindow( const char *drivername, int width, int height, int colorbits, qboolean cdsFullscreen )
 {
 	RECT			r;
@@ -859,30 +921,7 @@ static qboolean GLW_CreateWindow( const char *drivername, int width, int height,
 	//
 	// register the window class if necessary
 	//
-	if ( !s_classRegistered )
-	{
-		WNDCLASSW wc;
-
-		memset( &wc, 0, sizeof( wc ) );
-
-		wc.style         = 0;
-		wc.lpfnWndProc   = (WNDPROC) glw_state.wndproc;
-		wc.cbClsExtra    = 0;
-		wc.cbWndExtra    = 0;
-		wc.hInstance     = g_wv.hInstance;
-		wc.hIcon         = LoadIconA( g_wv.hInstance, MAKEINTRESOURCEA( IDI_ICON1 ) );
-		wc.hCursor       = NULL;
-		wc.hbrBackground = (void *)COLOR_GRAYTEXT;
-		wc.lpszMenuName  = 0;
-		wc.lpszClassName = WINDOW_CLASS_NAME;
-
-		if ( !RegisterClassW( &wc ) )
-		{
-			ri.Error( ERR_FATAL, "GLW_CreateWindow: could not register window class" );
-		}
-		s_classRegistered = qtrue;
-		ri.Printf( PRINT_ALL, "...registered window class\n" );
-	}
+	GLW_RegisterWindowClass();
 
 	//
 	// create the HWND if one does not already exist
@@ -989,8 +1028,7 @@ static qboolean GLW_CreateWindow( const char *drivername, int width, int height,
 		ShowWindow( g_wv.hWnd, SW_HIDE );
 		DestroyWindow( g_wv.hWnd );
 		g_wv.hWnd = NULL;
-		UnregisterClassW( WINDOW_CLASS_NAME, g_wv.hInstance );
-		s_classRegistered = qfalse;
+		GLW_UnregisterWindowClass();
 
 		return qfalse;
 	}
@@ -2150,11 +2188,7 @@ void GLimp_Shutdown( void )
 		glw_state.pixelFormatSet = qfalse;
 	}
 
-	if ( s_classRegistered )
-	{
-		UnregisterClassW( WINDOW_CLASS_NAME, g_wv.hInstance );
-		s_classRegistered = qfalse;
-	}
+	GLW_UnregisterWindowClass();
 
 	// close the r_logFile
 	if ( glw_state.log_fp )

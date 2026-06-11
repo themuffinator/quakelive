@@ -3106,10 +3106,10 @@
       "raw_name": "sub_100208f0",
       "normalized_name": "CG_MouseEvent",
       "status": "matched",
-      "signature": "void CG_MouseEvent(int dx, int dy)",
+      "signature": "void CG_MouseEvent(int x, int y)",
       "string_refs": [],
       "relocation_refs": [],
-      "comment": "HLIL-only native entry-table wrapper for the retail mouse-input export: it copies the live cursor globals into the cgDC cursor fields and tail-jumps into the shared HUD mouse handler, matching the CG_MOUSE_EVENT path in the source vmMain."
+      "comment": "HLIL-only native export-table entry for the retail mouse path: it copies the live cursor globals into the cgDC cursor fields before the shared HUD mouse handler consumes the host coordinates, matching the CG_MOUSE_EVENT path in the source vmMain."
     },
     {
       "address": "0x10020910",

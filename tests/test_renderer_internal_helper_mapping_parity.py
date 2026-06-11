@@ -1450,6 +1450,126 @@ def test_renderer_bsp_loader_tracks_quakelive_advertisement_brush_models() -> No
 	assert 'ri.Cmd_RemoveCommand( "advertlist" );' in tr_init
 
 
+def test_renderer_advert_runtime_alias_variants_track_round_147_source_closure() -> None:
+	aliases = json.loads(_read("references/analysis/quakelive_symbol_aliases.json"))["quakelive_steam_srp"]
+	functions_csv = _read("references/reverse-engineering/ghidra/quakelive_steam/functions.csv")
+	hlil_part01 = _read(
+		"references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part01.txt"
+	)
+	hlil_part02 = _read(
+		"references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part02.txt"
+	)
+	round147 = _read("docs/reverse-engineering/quakelive_steam_mapping_round_147.md")
+	round572 = _read("docs/reverse-engineering/quakelive_steam_mapping_round_572.md")
+	tr_bsp = _read("src/code/renderer/tr_bsp.c")
+	tr_world = _read("src/code/renderer/tr_world.c")
+	tr_backend = _read("src/code/renderer/tr_backend.c")
+	tr_main = _read("src/code/renderer/tr_main.c")
+
+	expected_aliases = {
+		"FUN_00434bc0": "R_AddAdvertisementSurface",
+		"sub_434BC0": "R_AddAdvertisementSurface",
+		"sub_434bc0": "R_AddAdvertisementSurface",
+		"FUN_00434c80": "R_LoadAdvertisements",
+		"sub_434C80": "R_LoadAdvertisements",
+		"sub_434c80": "R_LoadAdvertisements",
+		"FUN_00434e40": "R_UpdateAdvertisements",
+		"sub_434E40": "R_UpdateAdvertisements",
+		"sub_434e40": "R_UpdateAdvertisements",
+		"FUN_00434fa0": "R_ShutdownAdvertisements",
+		"sub_434FA0": "R_ShutdownAdvertisements",
+		"sub_434fa0": "R_ShutdownAdvertisements",
+		"FUN_00435070": "R_DebugAdvertisements",
+		"sub_435070": "R_DebugAdvertisements",
+		"FUN_00436a90": "RB_DrawAdvertisementQueries",
+		"sub_436A90": "RB_DrawAdvertisementQueries",
+		"sub_436a90": "RB_DrawAdvertisementQueries",
+		"FUN_0044b130": "R_CullAdvertisementQuad",
+		"sub_44B130": "R_CullAdvertisementQuad",
+		"sub_44b130": "R_CullAdvertisementQuad",
+	}
+	for symbol, alias in expected_aliases.items():
+		assert aliases[symbol] == alias
+
+	for row in (
+		"FUN_00434bc0,00434bc0,182,0,unknown",
+		"FUN_00434c80,00434c80,447,0,unknown",
+		"FUN_00434e40,00434e40,322,0,unknown",
+		"FUN_00434fa0,00434fa0,123,0,unknown",
+		"FUN_00435070,00435070,566,0,unknown",
+		"FUN_00436a90,00436a90,448,0,unknown",
+		"FUN_0044b130,0044b130,169,0,unknown",
+	):
+		assert row in functions_csv
+
+	for doc_anchor in (
+		"| `sub_434bc0` | `R_AddAdvertisementSurface` |",
+		"| `sub_434c80` | `R_LoadAdvertisements` |",
+		"| `sub_434e40` | `R_UpdateAdvertisements` |",
+		"| `sub_434fa0` | `R_ShutdownAdvertisements` |",
+		"| `sub_435070` | `R_DebugAdvertisements` |",
+		"| `sub_436a90` | `RB_DrawAdvertisementQueries` |",
+		"| `sub_44b130` | `R_CullAdvertisementQuad` |",
+	):
+		assert doc_anchor in round572
+
+	for prior_anchor in (
+		"| 1 | `sub_434BC0` | `182` | engine-owned | `R_AddAdvertisementSurface` |",
+		"| 2 | `sub_436A90` | `448` | engine-owned | `RB_DrawAdvertisementQueries` |",
+		"| 3 | `sub_44B130` | `169` | engine-owned | `R_CullAdvertisementQuad` |",
+	):
+		assert prior_anchor in round147
+
+	for hlil_anchor in (
+		"00434bc0    void __convention(\"regparm\") sub_434bc0(int32_t arg1, int32_t arg2, void* arg3)",
+		"00434bd3  int32_t* esi = *(*(arg3 + 4) + 0x18)",
+		"00434c40          if (sub_44b130(arg3 + 0x20) != 2)",
+		"00434c65              sub_44cd40(esi[3], esi[1], esi[2], ebx)",
+		"00434c80    int32_t sub_434c80(int32_t arg1, uint32_t arg2)",
+		"00434c99      data_1740d24(1, \"R_LoadAdvertisements: funny lump",
+		"00434e40    void sub_434e40()",
+		"00434eb5              st0_1, eax_3 = sub_434bc0(0, edx_1, esi_1 - 0x50)",
+		"00434fa0    int32_t sub_434fa0()",
+		"00435070    void* sub_435070(float arg1 @ esi, float arg2 @ edi)",
+		"00436a90    void* sub_436a90(void* arg1)",
+		"00436b4b          data_16e3aa4(0x207)",
+		"00436b59          data_16e3ae0(0x8914, *esi_2)",
+		"00436b9c          sub_435020(&var_14, esi_2[2])",
+	):
+		assert hlil_anchor in hlil_part01
+
+	for hlil_anchor in (
+		"0044b130    int32_t sub_44b130(void* arg1)",
+		"0044b1bf  for (int32_t* i = &data_1717614; i s< &data_1717664; i = &i[5])",
+		"0044b1db                  return 2",
+		"0044d77b      sub_434e40()",
+		"0044d7dc  return sub_435070(arg1, arg2) __tailcall",
+	):
+		assert hlil_anchor in hlil_part02
+
+	for source_anchor in (
+		"static int R_AddAdvertisementSurface( qlAdvertisement_t *advertisement ) {",
+		"VectorSubtract( tr.refdef.vieworg, advertisement->center, viewDelta );",
+		"if ( DotProduct( advertisement->normal, viewDelta ) <= 0.0f ) {",
+		"cull = R_CullAdvertisementQuad( advertisement->points );",
+		"R_AddDrawSurf( surface->data, surface->shader, surface->fogIndex, qfalse );",
+		"void R_UpdateAdvertisements( void ) {",
+		"void R_ShutdownAdvertisements( void ) {",
+		"void R_DebugAdvertisements( void ) {",
+		"ri.AdvertisementBridge_GetCellLabel( advertisement->cellId, buffer, sizeof( buffer ) );",
+	):
+		assert source_anchor in tr_world
+
+	assert "static void R_LoadAdvertisements( lump_t *l ) {" in tr_bsp
+	assert "R_UpdateAdvertisements();" in tr_main
+	assert "const void *RB_DrawAdvertisementQueries( const void *data ) {" in tr_backend
+	assert "qglBeginQueryARB( GL_SAMPLES_PASSED_ARB, cmd->entries[i].occlusionQueryIds[0] );" in tr_backend
+	assert "qglBeginQueryARB( GL_SAMPLES_PASSED_ARB, cmd->entries[i].occlusionQueryIds[1] );" in tr_backend
+	assert "This pass does" in round572
+	assert "not enable live advertisement fetching or change the default-offline" in round572
+	assert "online-services boundary." in round572
+
+
 def test_renderer_model_surface_limits_match_retail_quakelive_loader_caps() -> None:
 	qcommon_qfiles = _read("src/code/qcommon/qfiles.h")
 	bspc_q3files = _read("src/code/bspc/q3files.h")

@@ -159,12 +159,15 @@ def test_native_ui_and_cgame_receive_retail_packed_glconfig() -> None:
 def test_native_cgame_import_slot_54_preserves_retail_ad_bridge_callout() -> None:
 	cgame_public = _read("src/code/cgame/cg_public.h")
 	cl_cgame = _read("src/code/client/cl_cgame.c")
+	aliases = _read("references/analysis/quakelive_symbol_aliases.json")
 	engine_hlil = _read("references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part05.txt")
 	cgame_hlil = _read("references/hlil/quakelive/cgamex86.dll/cgamex86.dll_hlil.txt")
 	import_block = _extract_block(cl_cgame, "static void CL_InitCGameImports")
 	wrapper_block = _extract_block(cl_cgame, "static void QDECL QL_CG_trap_AdvertisementBridge_Reserved21C0")
 
 	assert "CG_QL_IMPORT_ADVERTISEMENTBRIDGE_RESERVED_21C0 = 54," in cgame_public
+	assert '"sub_4F21C0": "AdvertisementBridge_Reserved21C0"' in aliases
+	assert '"sub_4f21c0": "AdvertisementBridge_Reserved21C0"' in aliases
 	assert "004f21c0    void sub_4f21c0()" in engine_hlil
 	assert "jump(*(*ecx + 0x40))" in engine_hlil
 	assert "10029139  int32_t ecx = *(data_1074cccc + 0xd8)" in cgame_hlil
@@ -369,6 +372,8 @@ def test_freeze_visibility_helper_matches_retail_export_boundary() -> None:
 
 def test_qagame_native_import_table_uses_public_header_count() -> None:
 	public_h = _read("src/code/game/g_public.h")
+	g_local_h = _read("src/code/game/g_local.h")
+	g_main = _read("src/code/game/g_main.c")
 	g_syscalls = _read("src/code/game/g_syscalls.c")
 	ai_main = _read("src/code/game/ai_main.c")
 	sv_game = _read("src/code/server/sv_game.c")
@@ -766,6 +771,11 @@ def test_qagame_native_import_table_uses_public_header_count() -> None:
 	assert 'char const (* data_1008d9b4)[0x13] = data_100875ac {"bot_showAreaNumber"}' in qagame_hlil_cvars
 	assert 'char const (* data_1008d9cc)[0xe] = data_1008759c {"bot_showAreas"}' in qagame_hlil_cvars
 	assert 'char const (* data_1008d9e4)[0x13] = data_1007dc8c {"bot_showAvoidSpots"}' in qagame_hlil_cvars
+	bot_ai_setup_hlil = qagame_hlil[
+		qagame_hlil.index("100241c0    int32_t sub_100241c0") : qagame_hlil.index("10024380    int32_t sub_10024380")
+	]
+	for table_owned_cvar in ("bot_showAreaNumber", "bot_showAreas", "bot_showAvoidSpots"):
+		assert table_owned_cvar not in bot_ai_setup_hlil
 	assert "(**(code **)(DAT_104b13ac + 0xd8))(fStack_ec);" in qagame_ghidra
 	assert "(**(code **)(DAT_104b13ac + 0xe0))(iVar1,0);" in qagame_ghidra
 	assert "(**(code **)(DAT_104b13ac + 0x164))" in qagame_ghidra
@@ -820,9 +830,11 @@ def test_qagame_native_import_table_uses_public_header_count() -> None:
 	assert "(**(code **)(iVar4 + 0x2b8))()" in qagame_ghidra
 	assert "trap_BotLibStartFrame((float) time / 1000);" in bot_ai_start_frame
 	assert "trap_BotLibUpdateEntity(i, NULL);" in bot_ai_start_frame
-	assert 'trap_Cvar_Register(&bot_showAreaNumber, "bot_showAreaNumber", "0", CVAR_VM_CREATED);' in ai_main
-	assert 'trap_Cvar_Register(&bot_showAreas, "bot_showAreas", "0", CVAR_VM_CREATED);' in ai_main
-	assert 'trap_Cvar_Register(&bot_showAvoidSpots, "bot_showAvoidSpots", "0", CVAR_VM_CREATED);' in ai_main
+	for exported_debug_cvar in ("bot_showAreaNumber", "bot_showAreas", "bot_showAvoidSpots"):
+		assert f"vmCvar_t\t{exported_debug_cvar};" in g_main
+		assert f"extern\tvmCvar_t\t{exported_debug_cvar};" in g_local_h
+		assert f'static vmCvar_t\t{exported_debug_cvar};' not in g_main
+		assert f'trap_Cvar_Register(&{exported_debug_cvar}, "{exported_debug_cvar}", "0", CVAR_VM_CREATED);' not in ai_main
 	assert "trap_Cvar_Update(&bot_testsolid);" in bot_test_aas
 	assert "trap_Cvar_Update(&bot_testclusters);" in bot_test_aas
 	assert "trap_Cvar_Update(&bot_showAreas);" in bot_test_aas

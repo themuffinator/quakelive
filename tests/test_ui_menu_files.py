@@ -46,6 +46,25 @@ QL_STEAM_FUNCTIONS = (
     / "quakelive_steam"
     / "functions.csv"
 )
+UI_FUNCTIONS = (
+    REPO_ROOT
+    / "references"
+    / "reverse-engineering"
+    / "ghidra"
+    / "uix86"
+    / "functions.csv"
+)
+CGAME_HLIL = REPO_ROOT / "references" / "hlil" / "quakelive" / "cgamex86.dll" / "cgamex86.dll_hlil.txt"
+CGAME_FUNCTIONS = (
+    REPO_ROOT
+    / "references"
+    / "reverse-engineering"
+    / "ghidra"
+    / "cgamex86"
+    / "functions.csv"
+)
+UI_SYMBOL_MAP = REPO_ROOT / "references" / "symbol-maps" / "ui.json"
+CGAME_SYMBOL_MAP = REPO_ROOT / "references" / "symbol-maps" / "cgame.json"
 SYMBOL_ALIASES = REPO_ROOT / "references" / "analysis" / "quakelive_symbol_aliases.json"
 
 
@@ -1930,7 +1949,10 @@ def test_ui_native_import_table_matches_recovered_retail_slots() -> None:
 
     for alias, name in {
         "sub_4BEFB0": "QLCGImport_S_StartLocalSound",
+        "sub_4befb0": "QLCGImport_S_StartLocalSound",
+        "FUN_004befb0": "QLCGImport_S_StartLocalSound",
         "sub_4AFEC0": "QLCGImport_S_RegisterSound",
+        "sub_4afec0": "QLCGImport_S_RegisterSound",
         "sub_4AFED0": "QLCGImport_S_StartBackgroundTrack",
         "sub_4DB030": "S_StopBackgroundTrack",
     }.items():
@@ -2056,7 +2078,10 @@ def test_ui_sound_import_wiring_matches_retail_native_and_vm_paths() -> None:
 
     for alias, name in {
         "sub_4BEFB0": "QLCGImport_S_StartLocalSound",
+        "sub_4befb0": "QLCGImport_S_StartLocalSound",
+        "FUN_004befb0": "QLCGImport_S_StartLocalSound",
         "sub_4AFED0": "QLCGImport_S_StartBackgroundTrack",
+        "sub_4afed0": "QLCGImport_S_StartBackgroundTrack",
         "sub_4DB030": "S_StopBackgroundTrack",
         "sub_4DB060": "S_StartBackgroundTrack",
     }.items():
@@ -2098,6 +2123,74 @@ def test_ui_sound_import_wiring_matches_retail_native_and_vm_paths() -> None:
     assert "case UI_S_STARTLOCALSOUND: return UI_QL_IMPORT_S_REGISTERSOUND;" not in ui_syscalls
     assert "case UI_S_STOPBACKGROUNDTRACK: return UI_QL_IMPORT_UNUSED_85;" not in ui_syscalls
     assert "ql_ui_imports[85] = (ql_import_f)QL_UI_trap_S_StopBackgroundTrack;" not in cl_ui
+
+
+def test_ui_script_sound_verbs_match_retail_hlil_and_display_context_callbacks() -> None:
+    ui_shared = (REPO_ROOT / "src/code/ui/ui_shared.c").read_text(encoding="utf-8")
+    ui_main = (REPO_ROOT / "src/code/ui/ui_main.c").read_text(encoding="utf-8")
+    ui_hlil = UI_HLIL_PART01.read_text(encoding="utf-8", errors="ignore")
+    aliases = json.loads(SYMBOL_ALIASES.read_text(encoding="utf-8"))["ui"]
+    function_rows = {
+        row["entry"].lower(): row
+        for row in csv.DictReader(UI_FUNCTIONS.read_text(encoding="utf-8").splitlines())
+    }
+
+    script_play_block = _extract_function_block(
+        ui_shared, "void Script_Play(itemDef_t *item, char **args) {"
+    )
+    script_looped_block = _extract_function_block(
+        ui_shared, "void Script_playLooped(itemDef_t *item, char **args) {"
+    )
+    item_run_script_block = _extract_function_block(
+        ui_shared, "void Item_RunScript(itemDef_t *item, const char *s) {"
+    )
+    init_display_block = _extract_function_block(ui_main, "void _UI_Init( qboolean inGameLoad ) {")
+    command_list_block = ui_shared.split("commandDef_t commandList[] =", 1)[1].split(
+        "int scriptCommandCount = sizeof(commandList) / sizeof(commandDef_t);", 1
+    )[0]
+
+    assert aliases["sub_10016cd0"] == "Script_Play"
+    assert aliases["sub_10016d20"] == "Script_playLooped"
+    assert aliases["FUN_10016d70"] == "Item_RunScript"
+    assert function_rows["10016d70"]["name"] == "FUN_10016d70"
+    assert function_rows["10016d70"]["size"] == "246"
+    assert "10016cd0" not in function_rows
+    assert "10016d20" not in function_rows
+
+    for expected in (
+        "10016cd0    int32_t sub_10016cd0(int32_t* arg1)",
+        "10016cd7  int32_t result = sub_10001500(arg1, 0)",
+        "10016cec  int32_t* eax = sub_10014560()",
+        "10016d0b  return (*(ecx_1 + 0x74))((*(ecx_1 + 0xac))(eax, 6))",
+        "10016d20    int32_t sub_10016d20(int32_t* arg1)",
+        "10016d27  int32_t result = sub_10001500(arg1, 0)",
+        "10016d3c  int32_t* eax = sub_10014560()",
+        "10016d4f  (*(data_106b40d0 + 0xb4))()",
+        "10016d5e  return (*(data_106b40d0 + 0xb0))(eax, eax)",
+        "10016d70    int32_t __convention(\"regparm\") sub_10016d70",
+        "10016e04              char* eax_3 = (&data_1002a018)[esi_1 * 2]",
+        "10016e46                  (&data_1002a01c)[esi_1 * 2](arg4, &var_808)",
+        "10016e32                  (*(data_106b40d0 + 0x50))(&var_808)",
+        "1002a0b0  char const (* data_1002a0b0)[0x5] = data_10028e74 {\"play\"}",
+        "1002a0b4  void* data_1002a0b4 = sub_10016cd0",
+        "1002a0b8  char const (* data_1002a0b8)[0xb] = data_10028e68 {\"playlooped\"}",
+        "1002a0bc  void* data_1002a0bc = sub_10016d20",
+    ):
+        assert expected in ui_hlil
+
+    assert "{\"play\", &Script_Play}" in command_list_block
+    assert "{\"playlooped\", &Script_playLooped}" in command_list_block
+    assert "String_Parse(args, &val)" in script_play_block
+    assert "DC->startLocalSound(DC->registerSound(val, qfalse), CHAN_LOCAL_SOUND);" in script_play_block
+    assert "DC->stopBackgroundTrack();" in script_looped_block
+    assert "DC->startBackgroundTrack(val, val);" in script_looped_block
+    assert "char script[UI_SCRIPT_BUFFER_SIZE], *p;" in item_run_script_block
+    assert "(commandList[i].handler(item, &p));" in item_run_script_block
+    assert "DC->runScript(&p);" in item_run_script_block
+    assert "uiInfo.uiDC.registerSound = &trap_S_RegisterSound;" in init_display_block
+    assert "uiInfo.uiDC.startLocalSound = &trap_S_StartLocalSound;" in init_display_block
+    assert "uiInfo.uiDC.startBackgroundTrack = &trap_S_StartBackgroundTrack;" in init_display_block
+    assert "uiInfo.uiDC.stopBackgroundTrack = &trap_S_StopBackgroundTrack;" in init_display_block
 
 
 def test_ui_import_t_legacy_surface_has_complete_retail_native_remap() -> None:
@@ -2630,6 +2723,130 @@ def test_ui_mouse_event_projects_screen_coords_like_retail() -> None:
 
     assert "(unsigned int)uiInfo.uiDC.cursorx <= SCREEN_WIDTH" in block
     assert "(unsigned int)uiInfo.uiDC.cursory <= SCREEN_HEIGHT" in block
+
+
+def test_vm_mouse_consumer_bridge_pins_ui_and_cgame_retail_owners() -> None:
+    alias_maps = json.loads(SYMBOL_ALIASES.read_text(encoding="utf-8"))
+    ui_aliases = alias_maps["ui"]
+    cgame_aliases = alias_maps["cgame"]
+    ui_symbol_map = json.loads(UI_SYMBOL_MAP.read_text(encoding="utf-8"))
+    cgame_symbol_map = json.loads(CGAME_SYMBOL_MAP.read_text(encoding="utf-8"))
+    ui_hlil = UI_HLIL_PART01.read_text(encoding="utf-8")
+    cgame_hlil = CGAME_HLIL.read_text(encoding="utf-8")
+    ui_functions = UI_FUNCTIONS.read_text(encoding="utf-8")
+    cgame_functions = CGAME_FUNCTIONS.read_text(encoding="utf-8")
+    ui_main = (REPO_ROOT / "src/code/ui/ui_main.c").read_text(encoding="utf-8")
+    ui_shared = (REPO_ROOT / "src/code/ui/ui_shared.c").read_text(encoding="utf-8")
+    cgame_main = (REPO_ROOT / "src/code/cgame/cg_main.c").read_text(encoding="utf-8")
+    cgame_newdraw = (REPO_ROOT / "src/code/cgame/cg_newdraw.c").read_text(encoding="utf-8")
+    vm_source = (REPO_ROOT / "src/code/qcommon/vm.c").read_text(encoding="utf-8")
+
+    assert ui_aliases["sub_10010000"] == "_UI_MouseEvent"
+    assert ui_aliases["FUN_1001d600"] == "Menu_HandleMouseMove"
+    assert ui_aliases["FUN_10020740"] == "Display_MouseMove"
+    assert ui_aliases["FUN_100208f0"] == "Menu_OverActiveItem"
+    assert "sub_100208f0" not in ui_aliases
+
+    assert cgame_aliases["sub_100208f0"] == "CG_MouseEvent"
+    assert cgame_aliases["FUN_10063830"] == "CG_BrowserDisplayMouseMove"
+    assert cgame_aliases["sub_10063830"] == "CG_BrowserDisplayMouseMove"
+    assert "FUN_100208f0" not in cgame_aliases
+
+    ui_mouse_entry = next(entry for entry in ui_symbol_map["functions"] if entry["raw_name"] == "sub_10010000")
+    cgame_mouse_entry = next(entry for entry in cgame_symbol_map["functions"] if entry["raw_name"] == "sub_100208f0")
+    assert "Projects host screen coordinates into the 640x480 UI cursor space" in ui_mouse_entry["comment"]
+    assert "Accumulates cursor deltas" not in ui_mouse_entry["comment"]
+    assert cgame_mouse_entry["signature"] == "void CG_MouseEvent(int x, int y)"
+    assert "native export-table entry for the retail mouse path" in cgame_mouse_entry["comment"]
+
+    for expected in (
+        "FUN_1001d600,1001d600,426,0,unknown",
+        "FUN_10020740,10020740,173,0,unknown",
+        "FUN_100208f0,100208f0,249,0,unknown",
+    ):
+        assert expected in ui_functions
+    assert "FUN_10063830,10063830,173,0,unknown" in cgame_functions
+
+    for expected in (
+        "10010000    int32_t sub_10010000(int32_t arg1, int32_t arg2)",
+        "1001002a      x87_r7_2 = x87_r7 * fconvert.t(640.0) / float.t(data_10758248)",
+        "1001003b  data_10746430 = eax",
+        "1001004d  int32_t result = sub_10021270(float.t(arg2) * fconvert.t(480.0) / float.t(data_1075824c))",
+        "10010059  data_10746434 = result",
+        "1001006d  if (not(cond:1) && eax u<= 0x280 && result u<= 0x1e0)",
+        "1001006f      return sub_10020740(result)",
+        "10020740    int32_t __convention(\"regparm\") sub_10020740(int32_t arg1)",
+        "1002077c      sub_1001d600(eax, float.s(ebx), float.s(arg1))",
+        "100207cb          sub_1001d600(esi_1, var_20_2, var_1c_2)",
+        "1002aeb0  void* data_1002aeb0 = sub_10010000",
+    ):
+        assert expected in ui_hlil
+
+    for expected in (
+        "10063830    int32_t __convention(\"regparm\") sub_10063830(int32_t arg1)",
+        "1006383d  int32_t eax = sub_10060610()",
+        "1006386c      sub_10060820(eax, float.s(ebx), float.s(arg1))",
+        "100638bb          sub_10060820(esi_1, var_20_2, var_1c_2)",
+        "100769c8  void* data_100769c8 = 0x100208f0",
+    ):
+        assert expected in cgame_hlil
+
+    assert "case UI_MOUSE_EVENT:\n\t\t_UI_MouseEvent( arg0, arg1 );" in ui_main
+    assert "[UI_NATIVE_EXPORT_MOUSE_EVENT] = _UI_MouseEvent," in ui_main
+    ui_mouse_block = _extract_function_block(ui_main, "void _UI_MouseEvent( int x, int y )\n{")
+    for expected in (
+        "uiInfo.uiDC.cursorx = UI_ConvertScreenCursorXToVirtual( x );",
+        "uiInfo.uiDC.cursory = UI_ConvertScreenCursorYToVirtual( y );",
+        "Display_MouseMove( NULL, uiInfo.uiDC.cursorx, uiInfo.uiDC.cursory );",
+    ):
+        assert expected in ui_mouse_block
+    assert "uiInfo.uiDC.cursorx += x;" not in ui_mouse_block
+    assert "uiInfo.uiDC.cursory += y;" not in ui_mouse_block
+
+    ui_move_block = _extract_function_block(ui_shared, "qboolean Display_MouseMove(void *p, int x, int y)")
+    assert "Menu_HandleMouseMove(menu, x, y);" in ui_move_block
+    assert "Menu_HandleMouseMove(&Menus[i], x, y);" in ui_move_block
+    assert "Menu_UpdatePosition(menu);" not in ui_move_block
+
+    assert "case CG_MOUSE_EVENT:\n\t\tcgDC.cursorx = cgs.cursorX;\n\t\tcgDC.cursory = cgs.cursorY;\n\t\tCG_MouseEvent( arg0, arg1 );" in cgame_main
+    assert "[CG_NATIVE_EXPORT_MOUSE_EVENT] = CG_NativeMouseEvent," in cgame_main
+    cgame_native_mouse_block = _extract_function_block(cgame_main, "static void CG_NativeMouseEvent( int dx, int dy ) {")
+    assert "cgDC.cursorx = cgs.cursorX;" in cgame_native_mouse_block
+    assert "cgDC.cursory = cgs.cursorY;" in cgame_native_mouse_block
+    assert "CG_MouseEvent( dx, dy );" in cgame_native_mouse_block
+
+    cgame_mouse_block = _extract_function_block(cgame_newdraw, "void CG_MouseEvent( int x, int y ) {")
+    for expected in (
+        "if ( cg_ignoreMouseInput.integer ) {",
+        "allowSpectatorUi = CG_ShouldCaptureSpectatorUi();",
+        "cgs.cursorX = CG_ConvertScreenCursorXToVirtual( x );",
+        "cgs.cursorY = CG_ConvertScreenCursorYToVirtual( y );",
+        "cgDC.cursorx = cgs.cursorX;",
+        "cgDC.cursory = cgs.cursorY;",
+        "n = CG_BrowserDisplayCursorType( cgs.cursorX, cgs.cursorY );",
+        "CG_BrowserDisplayMouseMove( NULL, cgs.cursorX, cgs.cursorY );",
+    ):
+        assert expected in cgame_mouse_block
+    assert "cgs.cursorX += x;" not in cgame_mouse_block
+    assert "cgs.cursorY += y;" not in cgame_mouse_block
+    assert "Display_MouseMove(" not in cgame_mouse_block
+
+    cgame_browser_move_block = _extract_function_block(
+        cgame_newdraw, "static qboolean CG_BrowserDisplayMouseMove( void *overlay, int x, int y ) {"
+    )
+    assert "CG_BrowserHandleMouseMove( overlay, (float)x, (float)y );" in cgame_browser_move_block
+    assert "return Display_MouseMove( overlay, x, y );" in cgame_browser_move_block
+
+    native_bridge_block = _extract_function_block(
+        vm_source, "static int VM_CallNativeExports( vm_t *vm, int callnum, const int *args ) {"
+    )
+    assert "int uiExportIndex = callnum;" in native_bridge_block
+    assert "uiExportIndex = callnum - 1;" in native_bridge_block
+    assert "case UI_MOUSE_EVENT:" in native_bridge_block
+    assert "exportFunc = dllExports[uiExportIndex];" in native_bridge_block
+    assert "case CG_MOUSE_EVENT:" in native_bridge_block
+    assert "dllExports[CG_NATIVE_EXPORT_MOUSE_EVENT]" in native_bridge_block
+    assert native_bridge_block.count("((void (QDECL *)( int, int ))exportFunc)( args[0], args[1] );") >= 2
 
 
 def test_ui_retail_item_font_runtime_compatibility_restored() -> None:

@@ -50,6 +50,32 @@ CORE_SOUND_ALIASES = {
 	"sub_4DBAD0": ("S_DisableSounds", "FUN_004dbad0", "59"),
 }
 
+CORE_SOUND_LOWERCASE_BN_ALIASES = {
+	"sub_4d9c50": "S_ChannelSetup",
+	"sub_4d9ca0": "S_Shutdown",
+	"sub_4d9ef0": "S_SpatializeOrigin",
+	"sub_4da050": "S_StartSoundVolume",
+	"sub_4da350": "S_StartSound",
+	"sub_4da380": "S_StartLocalSoundVolume",
+	"sub_4da3e0": "S_ClearSoundBuffer",
+	"sub_4da490": "S_ClearLoopingSoundsFrame",
+	"sub_4da4c0": "S_AddLoopingSound",
+	"sub_4da6f0": "S_AddLoopSounds",
+	"sub_4da840": "S_RawSamples",
+	"sub_4dac80": "S_UpdateEntityPosition",
+	"sub_4dacd0": "S_Respatialize",
+	"sub_4dae30": "S_ScanChannelStarts",
+	"sub_4db3f0": "S_StartLocalSound",
+	"sub_4db450": "S_StopAllSounds",
+	"sub_4db490": "S_GetSoundtime",
+	"sub_4db570": "S_Update_",
+	"sub_4db680": "S_Update",
+	"sub_4db870": "S_Init",
+	"sub_4dbad0": "S_DisableSounds",
+	"j_sub_4da490": "QLCGImport_S_ClearLoopingSoundsFrame",
+	"j_sub_4da3e0": "QLCGImport_S_ClearLoopingSoundsKillAll",
+}
+
 
 def _read(path: Path) -> str:
 	return path.read_text(encoding="utf-8")
@@ -97,7 +123,11 @@ def test_sound_playback_aliases_cover_retail_core_entrypoints() -> None:
 		assert aliases[ghidra_name] == name
 		assert rows[ghidra_name]["size"] == size
 
+	for alias, name in CORE_SOUND_LOWERCASE_BN_ALIASES.items():
+		assert aliases[alias] == name
+
 	assert aliases["sub_4DA490"] == "S_ClearLoopingSoundsFrame"
+	assert "FUN_004da490" not in aliases
 	assert aliases["j_sub_4DA490"] == "QLCGImport_S_ClearLoopingSoundsFrame"
 	assert aliases["j_sub_4DA3E0"] == "QLCGImport_S_ClearLoopingSoundsKillAll"
 

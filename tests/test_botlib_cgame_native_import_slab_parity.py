@@ -147,6 +147,19 @@ EXPECTED_NATIVE_SOUND_GHIDRA_ALIASES = {
 	"4AFED0": "QLCGImport_S_StartBackgroundTrack",
 }
 
+EXPECTED_NATIVE_SOUND_LOWERCASE_BN_ALIASES = {
+	"sub_4afe10": "QLCGImport_S_StartSound",
+	"sub_4afe20": "QLCGImport_S_StartSoundVolume",
+	"sub_4afe50": "QLCGImport_S_StartLocalSoundVolume",
+	"j_sub_4da490": "QLCGImport_S_ClearLoopingSoundsFrame",
+	"j_sub_4da3e0": "QLCGImport_S_ClearLoopingSoundsKillAll",
+	"sub_4afe90": "QLCGImport_S_AddLoopingSound",
+	"sub_4afea0": "QLCGImport_S_UpdateEntityPosition",
+	"sub_4afeb0": "QLCGImport_S_Respatialize",
+	"sub_4afec0": "QLCGImport_S_RegisterSound",
+	"sub_4afed0": "QLCGImport_S_StartBackgroundTrack",
+}
+
 EXPECTED_PC_SOURCE_HANDLE_GHIDRA_ALIASES = {
 	"4B0270": "QLUIImport_PC_LoadSource",
 	"4B0290": "QLUIImport_PC_FreeSource",
@@ -291,6 +304,9 @@ def test_native_cgame_import_slab_aliases_and_rows_are_pinned() -> None:
 		assert aliases[f"FUN_00{address.lower()}"] == name
 		expected_size = EXPECTED_NATIVE_SLAB_ALIASES[address][1]
 		assert rows[address] == f"FUN_00{address.lower()},00{address.lower()},{expected_size},0,unknown"
+
+	for alias, name in EXPECTED_NATIVE_SOUND_LOWERCASE_BN_ALIASES.items():
+		assert aliases[alias] == name
 
 	for address, name in EXPECTED_PC_SOURCE_HANDLE_GHIDRA_ALIASES.items():
 		assert aliases[f"FUN_00{address.lower()}"] == name

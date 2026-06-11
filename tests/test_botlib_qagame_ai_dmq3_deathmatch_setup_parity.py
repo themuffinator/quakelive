@@ -32,6 +32,14 @@ QAGAME_HLIL_PART01 = (
 	/ "qagamex86.dll.bndb_hlil_split"
 	/ "qagamex86.dll.bndb_hlil_part01.txt"
 )
+QAGAME_GHIDRA_DECOMPILE = (
+	REPO_ROOT
+	/ "references"
+	/ "reverse-engineering"
+	/ "ghidra"
+	/ "qagamex86"
+	/ "decompile_top_functions.c"
+)
 
 
 SOURCE_OWNED_FUNCTIONS = (
@@ -102,9 +110,13 @@ SOURCE_HELPERS = {
 			'trap_Cvar_VariableIntegerValue("g_gametype");',
 			'trap_Cvar_VariableIntegerValue("sv_maxclients");',
 			'trap_Cvar_Register(&bot_rocketjump, "bot_rocketjump", "1", 0);',
+			'trap_Cvar_Register(&bot_grapple, "bot_grapple", "1", 0);',
+			'trap_Cvar_Register(&bot_fastchat, "bot_fastchat", "0", 0);',
 			'trap_Cvar_Register(&bot_nochat, "bot_nochat", "0", CVAR_CLOUD);',
+			'trap_Cvar_Register(&bot_testrchat, "bot_testrchat", "0", 0);',
 			'trap_Cvar_Register(&bot_challenge, "bot_challenge", "0", CVAR_CLOUD);',
 			'trap_Cvar_Register(&bot_predictobstacles, "bot_predictobstacles", "1", 0);',
+			'trap_Cvar_Register(&g_spSkill, "g_spSkill", "2", 0);',
 			'trap_BotGetLevelItemGoal(-1, "Red Flag", &ctf_redflag)',
 			'BotAI_Print(PRT_WARNING, "One Flag CTF without Neutral Flag\\n");',
 			'BotAI_Print(PRT_WARNING, "Harvester without neutral obelisk\\n");',
@@ -464,6 +476,50 @@ HLIL_FLOW_ANCHORS = (
 )
 
 
+BOT_SETUP_DEATHMATCH_CVAR_SEQUENCE = (
+	(
+		'trap_Cvar_Register(&bot_rocketjump, "bot_rocketjump", "1", 0);',
+		'1001f5e1  edx_1(0x105e3fa0, "bot_rocketjump", &data_1007d1d8, 0)',
+		'(**(code **)(DAT_104b13ac + 0x44))(&DAT_105e3fa0,"bot_rocketjump",&DAT_1007d1d8,0);',
+	),
+	(
+		'trap_Cvar_Register(&bot_grapple, "bot_grapple", "1", 0);',
+		'1001f5fc  (*(data_104b13ac + 0x44))(0x105e4280, "bot_grapple", &data_1007d1d8, 0)',
+		'(**(code **)(DAT_104b13ac + 0x44))(&DAT_105e4280,"bot_grapple",&DAT_1007d1d8,0);',
+	),
+	(
+		'trap_Cvar_Register(&bot_fastchat, "bot_fastchat", "0", 0);',
+		'1001f618  (*(data_104b13ac + 0x44))(0x105e4980, "bot_fastchat", &data_1007d0a8, 0)',
+		'(**(code **)(DAT_104b13ac + 0x44))(&DAT_105e4980,"bot_fastchat",&DAT_1007d0a8,0);',
+	),
+	(
+		'trap_Cvar_Register(&bot_nochat, "bot_nochat", "0", CVAR_CLOUD);',
+		'1001f637  (*(data_104b13ac + 0x44))(0x105e3d20, "bot_nochat", &data_1007d0a8, 0x80000)',
+		'(**(code **)(DAT_104b13ac + 0x44))(&DAT_105e3d20,"bot_nochat",&DAT_1007d0a8,0x80000);',
+	),
+	(
+		'trap_Cvar_Register(&bot_testrchat, "bot_testrchat", "0", 0);',
+		'1001f655  ecx_4(0x105e4160, "bot_testrchat", var_8c, var_88_1)',
+		'(**(code **)(DAT_104b13ac + 0x44))(&DAT_105e4160,"bot_testrchat",&DAT_1007d0a8,0);',
+	),
+	(
+		'trap_Cvar_Register(&bot_challenge, "bot_challenge", "0", CVAR_CLOUD);',
+		'1001f674  (*(data_104b13ac + 0x44))(0x105e3e80, "bot_challenge", &data_1007d0a8, 0x80000)',
+		'(**(code **)(DAT_104b13ac + 0x44))(&DAT_105e3e80,"bot_challenge",&DAT_1007d0a8,0x80000);',
+	),
+	(
+		'trap_Cvar_Register(&bot_predictobstacles, "bot_predictobstacles", "1", 0);',
+		'1001f690  (*(data_104b13ac + 0x44))(0x105e43c0, "bot_predictobstacles", &data_1007d1d8, 0)',
+		'(**(code **)(DAT_104b13ac + 0x44))(&DAT_105e43c0,"bot_predictobstacles",&DAT_1007d1d8,0);',
+	),
+	(
+		'trap_Cvar_Register(&g_spSkill, "g_spSkill", "2", 0);',
+		'1001f6ab  (*(data_104b13ac + 0x44))(0x105e44e0, "g_spSkill", &data_1007d53c, 0)',
+		'(**(code **)(DAT_104b13ac + 0x44))(&DAT_105e44e0,"g_spSkill",&DAT_1007d53c,0);',
+	),
+)
+
+
 def _read(path: Path) -> str:
 	return path.read_text(encoding="utf-8")
 
@@ -494,6 +550,14 @@ def _extract_function_block(text: str, signature: str) -> str:
 def _function_rows_by_entry(path: Path) -> dict[str, dict[str, str]]:
 	with path.open(newline="", encoding="utf-8") as file:
 		return {row["entry"].lower(): row for row in csv.DictReader(file)}
+
+
+def _assert_ordered(text: str, anchors: tuple[str, ...]) -> None:
+	position = -1
+	for anchor in anchors:
+		next_position = text.find(anchor, position + 1)
+		assert next_position != -1, anchor
+		position = next_position
 
 
 def test_qagame_ai_dmq3_deathmatch_setup_aliases_metadata_and_source_are_pinned() -> None:
@@ -536,6 +600,27 @@ def test_qagame_ai_dmq3_deathmatch_setup_aliases_metadata_and_source_are_pinned(
 	assert "int BotResolveTourPoint(int currentEntnum, vec3_t origin, vec3_t targetOrigin);" in _read(GAME_AI_DMQ3_H)
 	assert "int BotSelectTormentTarget(bot_state_t *bs, float maxDist);" in _read(GAME_AI_DMQ3_H)
 	assert "int BotCanSpawnTourPoint(void);" in _read(GAME_AI_DMQ3_H)
+
+
+def test_bot_setup_deathmatch_ai_cvar_registration_sequence_matches_retail() -> None:
+	source_block = _extract_function_block(_read(GAME_AI_DMQ3), "void BotSetupDeathmatchAI(void)")
+	hlil = _read(QAGAME_HLIL_PART01)
+	ghidra = _read(QAGAME_GHIDRA_DECOMPILE)
+	source_rows = tuple(row[0] for row in BOT_SETUP_DEATHMATCH_CVAR_SEQUENCE)
+	hlil_rows = tuple(row[1] for row in BOT_SETUP_DEATHMATCH_CVAR_SEQUENCE)
+	ghidra_rows = tuple(row[2] for row in BOT_SETUP_DEATHMATCH_CVAR_SEQUENCE)
+
+	_assert_ordered(
+		source_block,
+		(
+			'trap_Cvar_VariableIntegerValue("g_gametype");',
+			'trap_Cvar_VariableIntegerValue("sv_maxclients");',
+			*source_rows,
+			'if (gametype == GT_CTF)',
+		),
+	)
+	_assert_ordered(hlil, hlil_rows)
+	_assert_ordered(ghidra, ghidra_rows)
 
 
 def test_qagame_ai_dmq3_deathmatch_setup_hlil_and_import_wiring_are_pinned() -> None:

@@ -92,9 +92,6 @@ vmCvar_t bot_pause;
 vmCvar_t bot_report;
 vmCvar_t bot_testsolid;
 vmCvar_t bot_testclusters;
-vmCvar_t bot_showAreas;
-vmCvar_t bot_showAreaNumber;
-vmCvar_t bot_showAvoidSpots;
 vmCvar_t bot_developer;
 vmCvar_t bot_log;
 vmCvar_t bot_interbreedchar;
@@ -1488,6 +1485,11 @@ int BotAI(int client, float thinktime) {
 			//remove first and last quote from the chat message
 			memmove(args, args+1, strlen(args));
 			args[strlen(args)-1] = '\0';
+			//retail strips the leading two-digit sender prefix from normal chat
+			if (args[0] >= '0' && args[0] <= '9' &&
+					args[1] >= '0' && args[1] <= '9' && args[2] == ' ') {
+				args += 3;
+			}
 			trap_BotQueueConsoleMessage(bs->cs, CMS_CHAT, args);
 		}
 		else if (!Q_stricmp(buf, "tchat")) {
@@ -2190,9 +2192,6 @@ int BotAISetup( int restart ) {
 	trap_Cvar_Register(&bot_report, "bot_report", "0", CVAR_CHEAT);
 	trap_Cvar_Register(&bot_testsolid, "bot_testsolid", "0", CVAR_CHEAT);
 	trap_Cvar_Register(&bot_testclusters, "bot_testclusters", "0", CVAR_CHEAT);
-	trap_Cvar_Register(&bot_showAreaNumber, "bot_showAreaNumber", "0", CVAR_VM_CREATED);
-	trap_Cvar_Register(&bot_showAreas, "bot_showAreas", "0", CVAR_VM_CREATED);
-	trap_Cvar_Register(&bot_showAvoidSpots, "bot_showAvoidSpots", "0", CVAR_VM_CREATED);
 	trap_Cvar_Register(&bot_developer, "bot_developer", "0", CVAR_CHEAT);
 	trap_Cvar_Register(&bot_interbreedchar, "bot_interbreedchar", "", 0);
 	trap_Cvar_Register(&bot_interbreedbots, "bot_interbreedbots", "10", 0);

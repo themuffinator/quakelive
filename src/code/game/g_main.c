@@ -757,6 +757,25 @@ vmCvar_t	g_playermodelOverride;
 vmCvar_t	g_playerheadmodelOverride;
 vmCvar_t	g_training;
 vmCvar_t	g_skipTrainingEnable;
+static vmCvar_t	bot_autoReady;
+static vmCvar_t	bot_breakPoint;
+static vmCvar_t	bot_debugVar;
+static vmCvar_t	bot_dynamicSkill;
+static vmCvar_t	bot_followDist;
+static vmCvar_t	bot_followMe;
+static vmCvar_t	bot_gauntlet;
+static vmCvar_t	bot_gauntletOnly;
+static vmCvar_t	bot_hud;
+static vmCvar_t	bot_instaGibAimSkill;
+static vmCvar_t	bot_itemDelayTime;
+static vmCvar_t	bot_teamkill;
+vmCvar_t	bot_showAreaNumber;
+vmCvar_t	bot_showAreas;
+vmCvar_t	bot_showAvoidSpots;
+static vmCvar_t	bot_showPath;
+static vmCvar_t	bot_showTourPoints;
+static vmCvar_t	bot_startingSkill;
+static vmCvar_t	bot_training;
 vmCvar_t	g_lagHaxHistory;
 vmCvar_t	g_lagHaxMs;
 vmCvar_t	g_botsFile;
@@ -1031,6 +1050,25 @@ static cvarTable_t		gameCvarTable[] = {
 	{ &g_playerModelScale, "g_playerModelScale", "1.1", GAME_CVAR_FLAG_RETAIL_10000 | CVAR_GAMERULE, 0, qfalse, qfalse, "Applies a global scale multiplier to server-enforced player models." },
 	{ &g_autoAction, "g_autoAction", "0", 0, 0, qfalse, qfalse, "Comma or semicolon separated list of event:command pairs executed automatically (match_start, match_end, player_connect, player_disconnect)." },
 	{ &g_skipTrainingEnable, "g_skipTrainingEnable", "0", CVAR_SYSTEMINFO | CVAR_ROM, 0, qfalse, qfalse, "Retail read-only training skip latch reset by the training command path." },
+	{ &bot_autoReady, "bot_autoReady", "1", CVAR_GAMERULE, 0, qfalse, qfalse, "Retail bot auto-ready toggle retained for qagame cvar-table parity." },
+	{ &bot_breakPoint, "bot_breakPoint", "0", 0, 0, qfalse, qfalse, "Retail bot AI debug breakpoint latch retained for cvar-table parity." },
+	{ &bot_debugVar, "bot_debugVar", "0", 0, 0, qfalse, qfalse, "Retail bot AI debug selector retained for cvar-table parity." },
+	{ &bot_dynamicSkill, "bot_dynamicSkill", "0", CVAR_GAMERULE, 0, qfalse, qfalse, "Enable retail bot training dynamic skill updates when non-zero." },
+	{ &bot_followDist, "bot_followDist", "250", CVAR_GAMERULE, 0, qfalse, qfalse, "Distance the retail training bot keeps from the local player." },
+	{ &bot_followMe, "bot_followMe", "", CVAR_GAMERULE, 0, qfalse, qfalse, "Retail training follow-state cvar mirrored by the bot state update path." },
+	{ &bot_gauntlet, "bot_gauntlet", "0", CVAR_GAMERULE, 0, qfalse, qfalse, "Retail training gauntlet toggle reset by the training skip path." },
+	{ &bot_gauntletOnly, "bot_gauntletOnly", "0", CVAR_GAMERULE, 0, qfalse, qfalse, "Retail bot gauntlet-only toggle retained for qagame cvar-table parity." },
+	{ &bot_hud, "bot_hud", "-1", CVAR_CHEAT, 0, qfalse, qfalse, "Retail bot HUD debug selector retained as a cheat-protected cvar." },
+	{ &bot_instaGibAimSkill, "bot_instaGibAimSkill", "0.4", CVAR_GAMERULE, 0, qfalse, qfalse, "Retail instagib bot aim-skill scalar retained for qagame cvar-table parity." },
+	{ &bot_itemDelayTime, "bot_itemDelayTime", "0", CVAR_GAMERULE, 0, qfalse, qfalse, "Seconds before the retail training bot re-enables item pickup prediction." },
+	{ &bot_teamkill, "bot_teamkill", "0", CVAR_GAMERULE, 0, qfalse, qfalse, "Retail qagame bot teamkill cvar retained alongside the server botlib precreation." },
+	{ &bot_showAreaNumber, "bot_showAreaNumber", "0", CVAR_GAMERULE, 0, qfalse, qfalse, "Retail debug area-number cvar mirrored by BotTestAAS." },
+	{ &bot_showAreas, "bot_showAreas", "0", CVAR_GAMERULE, 0, qfalse, qfalse, "Retail debug-area draw toggle mirrored by BotTestAAS." },
+	{ &bot_showAvoidSpots, "bot_showAvoidSpots", "0", CVAR_GAMERULE, 0, qfalse, qfalse, "Retail avoid-spot draw toggle mirrored by BotTestAAS." },
+	{ &bot_showPath, "bot_showPath", "0", CVAR_GAMERULE, 0, qfalse, qfalse, "Retail botlib path debug cvar also mirrored into the botlib libvar table." },
+	{ &bot_showTourPoints, "bot_showTourPoints", "0", CVAR_GAMERULE, 0, qfalse, qfalse, "Retail training tour-point debug toggle retained for cvar-table parity." },
+	{ &bot_startingSkill, "bot_startingSkill", "1", CVAR_GAMERULE, 0, qfalse, qfalse, "Starting bot skill cvar updated by the retail training skill path." },
+	{ &bot_training, "bot_training", "0", CVAR_GAMERULE, 0, qfalse, qfalse, "Retail bot training phase cvar mirrored by the training state machine." },
 	{ &g_floodprot_maxcount, "g_floodprot_maxcount", "10", 0, 0, qfalse, qfalse, "Maximum chat or command bursts allowed before retail flood protection drops clients on overflow; 0 disables the limiter." },
 	{ &g_floodprot_decay, "g_floodprot_decay", "1000", 0, 0, qfalse, qfalse, "Milliseconds required before a flood point decays back off the counter; maxcount is the limiter on/off switch." },
 	{ &g_startingHealth, "g_startingHealth", "100", CVAR_SERVERINFO | CVAR_GAMERULE, 0, qfalse, qfalse, "Health awarded to players when they spawn." },

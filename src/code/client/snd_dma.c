@@ -686,10 +686,6 @@ void S_AddVoiceSamples( int clientNum, int samples, const short *data ) {
 	int				count;
 	int				room;
 
-	if ( !s_soundStarted || s_soundMuted || !data || samples <= 0 ) {
-		return;
-	}
-
 	channelIndex = -1;
 	for ( i = 0; i < MAX_VOICE_CHANNELS; ++i ) {
 		if ( s_voiceChannels[i].clientNum == clientNum ) {
@@ -1542,6 +1538,17 @@ static void S_SetOggTrackPath( const char *source, char *dest, int destSize ) {
 
 /*
 ============
+S_CloseBackgroundOgg
+
+Releases the active background OGG decoder.
+============
+*/
+static void S_CloseBackgroundOgg( void ) {
+	S_OggStreamClose( &s_backgroundOgg );
+}
+
+/*
+============
 S_OpenBackgroundOgg
 
 Initializes the Vorbis decoder for the requested music track.
@@ -1561,7 +1568,7 @@ static qboolean S_OpenBackgroundOgg( const char *name ) {
 	s_backgroundInfo.samples = 0;
 
 	if ( s_backgroundInfo.channels <= 0 || s_backgroundInfo.width <= 0 || s_backgroundInfo.rate <= 0 ) {
-		S_OggStreamClose( &s_backgroundOgg );
+		S_CloseBackgroundOgg();
 		s_backgroundIsOgg = qfalse;
 		return qfalse;
 	}
@@ -1600,7 +1607,7 @@ static int S_OggUpdateBackgroundTrack( byte *buffer, int bytesToRead ) {
 	result = S_OggStreamRead( &s_backgroundOgg, buffer, bytesToRead );
 	if ( result < 0 ) {
 		Com_Printf( S_COLOR_YELLOW "OGG_UpdateBackgroundTrack: %i\n", result );
-		S_OggStreamClose( &s_backgroundOgg );
+		S_CloseBackgroundOgg();
 		return 0;
 	}
 
@@ -1623,7 +1630,7 @@ void S_StopBackgroundTrack( void ) {
 		stopped = qtrue;
 	}
 	if ( S_OggStreamActive( &s_backgroundOgg ) ) {
-		S_OggStreamClose( &s_backgroundOgg );
+		S_CloseBackgroundOgg();
 		stopped = qtrue;
 	}
 	s_backgroundIsOgg = qfalse;
@@ -1662,7 +1669,7 @@ void S_StartBackgroundTrack( const char *intro, const char *loop ){
 		s_backgroundFile = 0;
 	}
 	if ( S_OggStreamActive( &s_backgroundOgg ) ) {
-		S_OggStreamClose( &s_backgroundOgg );
+		S_CloseBackgroundOgg();
 	}
 	s_backgroundIsOgg = qfalse;
 

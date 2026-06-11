@@ -213,6 +213,9 @@ _HYBRID_FALLBACK_PROBE = textwrap.dedent(
 #define QL_STEAMWORKS_INIT_RESULT 1
 #endif
 
+static int auth_ticket_request_count;
+static char auth_ticket_last_payload[128];
+
 /*
 =============
 QL_Steamworks_Init
@@ -237,6 +240,9 @@ QL_Steamworks_RequestAuthTicket
 qboolean QL_Steamworks_RequestAuthTicket( char *ticketBuffer, size_t ticketBufferSize, int *ticketLength, uint32_t *ticketHandle ) {
 const char *stubTicket = "retry:TICKET-HYBRID-FALLBACK";
 
+++auth_ticket_request_count;
+Q_strncpyz( auth_ticket_last_payload, stubTicket, (int)sizeof( auth_ticket_last_payload ) );
+
 if ( ticketBuffer && ticketBufferSize > 0 ) {
 Q_strncpyz( ticketBuffer, stubTicket, (int)ticketBufferSize );
 }
@@ -245,7 +251,10 @@ if ( ticketLength && ticketBuffer ) {
 *ticketLength = (int)strlen( ticketBuffer );
 }
 
-(void)ticketHandle;
+if ( ticketHandle ) {
+*ticketHandle = 0x5151u;
+}
+
 return qtrue;
 }
 
@@ -447,6 +456,9 @@ qboolean CL_SteamServicesEnabled( void ) {
         printf("result=%d\\n", response.result);
         printf("outcome=%d\\n", response.outcome);
         printf("message=%s\\n", response.message);
+        printf("request_calls=%d\\n", auth_ticket_request_count);
+        printf("requested_ticket=%s\\n", auth_ticket_last_payload);
+        printf("caller_ticket=%s\\n", credential.value);
         return 0;
     }
     """
@@ -945,7 +957,37 @@ def test_hybrid_fallback_accepts_when_steam_pending(tmp_path) -> None:
     assert details["handled"] == "1"
     assert details["result"] == str(QL_AUTH_RESULT_ACCEPTED := 1)
     assert details["outcome"] == str(QL_AUTH_OUTCOME_SUCCESS := 0)
+    assert details["request_calls"] == "1"
+    assert details["requested_ticket"] == "retry:TICKET-HYBRID-FALLBACK"
+    assert details["caller_ticket"] == "retry:TICKET-ABCDEFGHIJKLMNOP"
     assert "Hybrid fallback accepted credential via heuristic open adapter" in details["message"]
+    assert "BACK" in details["message"]
+    assert "MNOP" not in details["message"]
+
+
+def test_hybrid_auth_denials_do_not_fallback_to_open_adapter(tmp_path) -> None:
+    denied_probe = _HYBRID_FALLBACK_PROBE.replace(
+        'const char *stubTicket = "retry:TICKET-HYBRID-FALLBACK";',
+        'const char *stubTicket = "denied:TICKET-HYBRID-REJECTED";',
+    )
+    workdir = tmp_path / "hybrid_denied"
+    output = _compile_and_run(
+        workdir,
+        denied_probe,
+        {"QL_BUILD_ONLINE_SERVICES": 1, "QL_BUILD_STEAMWORKS": 1, "QL_BUILD_OPEN_STEAM": 1},
+        include_client_stub=True,
+    )
+
+    details = dict(line.split("=", 1) for line in output.strip().splitlines())
+
+    assert details["handled"] == "1"
+    assert details["result"] == str(QL_AUTH_RESULT_DENIED := 2)
+    assert details["outcome"] == str(QL_AUTH_OUTCOME_FAILURE := 2)
+    assert details["request_calls"] == "1"
+    assert details["requested_ticket"] == "denied:TICKET-HYBRID-REJECTED"
+    assert details["message"] == "Steamworks heuristic compatibility backend denied the ticket"
+    assert "Hybrid fallback accepted" not in details["message"]
+    assert "Open adapter" not in details["message"]
 
 
 def test_platform_service_table_respects_runtime_external_disable_env(tmp_path) -> None:
@@ -1573,6 +1615,196 @@ def test_client_steam_callback_owner_reconstructs_retail_frame_pump_and_lifecycl
     assert 'CL_LogStatsServiceIgnored( "stats_clear", "clear request failed" );' in stats_clear_block
 
 
+def test_client_stats_report_packet_lane_inflates_retail_zlib_payload() -> None:
+    aliases = json.loads(
+        (REPO_ROOT / "references/analysis/quakelive_symbol_aliases.json").read_text(encoding="utf-8")
+    )["quakelive_steam_srp"]
+    functions_csv = (
+        REPO_ROOT / "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+    ).read_text(encoding="utf-8")
+    hlil_part02 = (
+        REPO_ROOT
+        / "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part02.txt"
+    ).read_text(encoding="utf-8")
+    hlil_part05 = (
+        REPO_ROOT
+        / "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part05.txt"
+    ).read_text(encoding="utf-8")
+    cl_main = (REPO_ROOT / "src/code/client/cl_main.c").read_text(encoding="utf-8")
+    unzip_h = (REPO_ROOT / "src/code/qcommon/unzip.h").read_text(encoding="utf-8")
+    unzip_c = (REPO_ROOT / "src/code/qcommon/unzip.c").read_text(encoding="utf-8")
+    mapping_round = (
+        REPO_ROOT / "docs/reverse-engineering/quakelive_steam_mapping_round_585.md"
+    ).read_text(encoding="utf-8")
+
+    stats_report_block = _extract_function_block(cl_main, "static void CL_Steam_ProcessStatsReportPackets( void ) {")
+    qz_uncompress_block = _extract_function_block(
+        unzip_c,
+        "int QZ_Uncompress( unsigned char *dest, unsigned long *destLen, const unsigned char *source, unsigned long sourceLen ) {",
+    )
+
+    assert aliases["FUN_004fda50"] == "zlib_uncompress"
+    assert aliases["sub_4FDA50"] == "zlib_uncompress"
+    assert aliases["sub_4fda50"] == "zlib_uncompress"
+    assert "FUN_004fda50,004fda50,175,0,unknown" in functions_csv
+
+    frame_anchors = (
+        "00461d8f      if ((*(*SteamNetworking() + 4))(&var_a8, 0) != 0)",
+        "00461db0              int32_t edi_1 = malloc(var_a8)",
+        "00461de8              if (edx_4(edi_1, var_a8, &var_ac, &var_b8, 0) != 0)",
+        "00461df3                  int32_t var_b0 = 0x100000",
+        "00461e03                  class Awesomium::JSArray* esi_1 = malloc(0x100000)",
+        "00461e1f                  if (sub_4fda50(esi_1, &var_b0, edi_1, var_ac) == 0)",
+        '00461e99                      sub_4f3260(esi_1, edi_1, "game.stats.report", &var_c8)',
+        "00461eb8                  free(esi_1)",
+        "00461ec8              free(edi_1)",
+        "00461ee2              i = (*(*SteamNetworking() + 4))(&var_a8, 0)",
+        "00461eed      result = sub_461a60()",
+    )
+    last_index = -1
+    for anchor in frame_anchors:
+        index = hlil_part02.find(anchor)
+        assert index > last_index
+        last_index = index
+
+    zlib_anchors = (
+        "004fda50    int32_t sub_4fda50(int32_t arg1, int32_t* arg2, int32_t arg3, int32_t arg4)",
+        '004fda92  int32_t eax_2 = sub_4fdce0(&var_38, "1.2.3", 0x38)',
+        "004fdaa6  int32_t eax_3 = sub_4fde10(&var_38, 4)",
+        "004fdaef      *arg2 = var_24",
+        "004fdaf1      return sub_4ff400(&var_38)",
+    )
+    last_index = -1
+    for anchor in zlib_anchors:
+        index = hlil_part05.find(anchor)
+        assert index > last_index
+        last_index = index
+
+    assert '#include "../qcommon/unzip.h"' in cl_main
+    assert "#define CL_STEAM_STATS_REPORT_CHANNEL 0" in cl_main
+    assert "#define CL_STEAM_STATS_REPORT_DECOMPRESSED_BYTES 0x100000" in cl_main
+    assert "CL_STEAM_BROWSER_EVENT_PAYLOAD_LENGTH 65536" in cl_main
+    assert "Com_Memcpy( reportPayload, packetData" not in stats_report_block
+
+    source_anchors = (
+        "while ( QL_Steamworks_IsP2PPacketAvailable( &packetSize, CL_STEAM_STATS_REPORT_CHANNEL ) ) {",
+        "packetData = malloc( packetSize );",
+        "QL_Steamworks_ReadP2PPacket( packetData, packetSize, &bytesRead, &remoteId, CL_STEAM_STATS_REPORT_CHANNEL )",
+        "decompressedPayload = malloc( CL_STEAM_STATS_REPORT_DECOMPRESSED_BYTES );",
+        "decompressedBytes = CL_STEAM_STATS_REPORT_DECOMPRESSED_BYTES;",
+        "decompressResult = QZ_Uncompress(",
+        "(const unsigned char *)packetData,",
+        "bytesRead );",
+        "if ( decompressResult != 0 ) {",
+        "payloadBytes = (size_t)decompressedBytes;",
+        "Com_Memcpy( reportPayload, decompressedPayload, payloadBytes );",
+        'CL_Steam_PublishBrowserEvent( "game.stats.report", reportPayload );',
+        "free( decompressedPayload );",
+        "free( packetData );",
+    )
+    last_index = -1
+    for anchor in source_anchors:
+        index = stats_report_block.find(anchor, last_index + 1)
+        assert index > last_index
+        last_index = index
+
+    assert "extern int QZ_Uncompress( unsigned char *dest, unsigned long *destLen, const unsigned char *source, unsigned long sourceLen );" in unzip_h
+    assert "zmemzero( &stream, sizeof( stream ) );" in qz_uncompress_block
+    assert "stream.next_in = (unsigned char *)source;" in qz_uncompress_block
+    assert "stream.avail_in = (uInt)sourceLen;" in qz_uncompress_block
+    assert "stream.next_out = dest;" in qz_uncompress_block
+    assert "stream.avail_out = (uInt)*destLen;" in qz_uncompress_block
+    assert "err = inflateInit2( &stream, DEF_WBITS );" in qz_uncompress_block
+    assert "err = inflate( &stream, Z_FINISH );" in qz_uncompress_block
+    assert "*destLen = stream.total_out;" in qz_uncompress_block
+    assert "err = inflateEnd( &stream );" in qz_uncompress_block
+
+    for doc_anchor in (
+        "# Quake Live Steam Mapping Round 585: Stats Report Zlib Packet Inflate",
+        "`0x004FDA50`: `zlib_uncompress`",
+        "`CL_STEAM_STATS_REPORT_DECOMPRESSED_BYTES` as `0x100000`",
+        "`QZ_Uncompress`",
+        "Overall Steam launch/runtime integration mapping confidence: **92.95% -> 93.05%**.",
+    ):
+        assert doc_anchor in mapping_round
+
+
+def test_client_p2p_session_request_tracks_retail_peer_accept_gate() -> None:
+    aliases = json.loads(
+        (REPO_ROOT / "references/analysis/quakelive_symbol_aliases.json").read_text(encoding="utf-8")
+    )["quakelive_steam_srp"]
+    functions_csv = (
+        REPO_ROOT / "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+    ).read_text(encoding="utf-8")
+    hlil_part02 = (
+        REPO_ROOT
+        / "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part02.txt"
+    ).read_text(encoding="utf-8")
+    cl_main = (REPO_ROOT / "src/code/client/cl_main.c").read_text(encoding="utf-8")
+    steamworks = (REPO_ROOT / "src/common/platform/platform_steamworks.c").read_text(encoding="utf-8")
+    mapping_round = (
+        REPO_ROOT / "docs/reverse-engineering/quakelive_steam_mapping_round_589.md"
+    ).read_text(encoding="utf-8")
+
+    get_server_steam_id_block = _extract_function_block(
+        cl_main, "static qboolean CL_GetServerSteamId( uint32_t *steamIdLow, uint32_t *steamIdHigh )"
+    )
+    p2p_callback_block = _extract_function_block(
+        cl_main, "static void CL_Steam_Client_OnP2PSessionRequest( void *context, const ql_steam_p2p_session_request_t *event )"
+    )
+    accept_p2p_block = _extract_function_block(
+        steamworks, "qboolean QL_Steamworks_AcceptP2PSession( const CSteamID *steamId )"
+    )
+
+    assert aliases["FUN_0045fef0"] == "SteamCallbacks_OnP2PSessionRequest"
+    assert aliases["sub_45FEF0"] == "SteamCallbacks_OnP2PSessionRequest"
+    assert aliases["sub_45fef0"] == "SteamCallbacks_OnP2PSessionRequest"
+    assert "FUN_0045fef0,0045fef0,93,0,unknown" in functions_csv
+
+    retail_anchors = (
+        "0045fef0    int32_t __stdcall sub_45fef0(int32_t* arg1)",
+        "0045fef6  int32_t ecx = data_146dafc",
+        '0045ff15  sscanf(ecx + 0x146dfd4, "%llu", &var_c)',
+        "0045ff1e  int32_t result = *arg1",
+        "0045ff2e  if (result != var_c || arg1[1] != var_8)",
+        "0045ff4a      return result",
+        "0045ff30  int32_t eax = SteamNetworking()",
+        "0045ff44  return (*(*eax + 0xc))(*arg1, arg1[1])",
+    )
+    last_index = -1
+    for anchor in retail_anchors:
+        index = hlil_part02.find(anchor, last_index + 1)
+        assert index > last_index
+        last_index = index
+
+    assert "CL_STEAM_SERVER_ID_CONFIGSTRING" in get_server_steam_id_block
+    assert "CL_ParseSteamIdString( CL_GetConfigStringValue( CL_STEAM_SERVER_ID_CONFIGSTRING ), steamIdLow, steamIdHigh )" in get_server_steam_id_block
+    assert 'CL_LogMatchmakingCallbackLifecycle( "p2p_session_request", "ignored null callback payload" );' in p2p_callback_block
+    assert "CL_Steam_FormatSteamId( event->remoteId.value, remoteId, sizeof( remoteId ) );" in p2p_callback_block
+    assert "CL_GetServerSteamId( &serverIdLow, &serverIdHigh ) || !( serverIdLow | serverIdHigh )" in p2p_callback_block
+    assert 'Com_sprintf( detail, sizeof( detail ), "ignored %s; missing tracked peer", remoteId );' in p2p_callback_block
+    assert "trackedSteamId = ( (uint64_t)serverIdHigh << 32 ) | serverIdLow;" in p2p_callback_block
+    assert "if ( event->remoteId.value != trackedSteamId ) {" in p2p_callback_block
+    assert "CL_Steam_FormatSteamId( trackedSteamId, trackedId, sizeof( trackedId ) );" in p2p_callback_block
+    assert 'Com_sprintf( detail, sizeof( detail ), "ignored %s; expected tracked peer %s", remoteId, trackedId );' in p2p_callback_block
+    assert 'if ( !QL_Steamworks_AcceptP2PSession( &event->remoteId ) ) {' in p2p_callback_block
+    assert '"accept failed for tracked peer %s"' in p2p_callback_block
+    assert '"accepted tracked peer %s"' in p2p_callback_block
+
+    assert "QL_Steamworks_GetNetworkingInterface();" in accept_p2p_block
+    assert "acceptSession = (QL_SteamNetworking_AcceptP2PSessionWithUserFn)vtable[0x0c / 4];" in accept_p2p_block
+    assert "return acceptSession( networking, NULL, *steamId ) ? qtrue : qfalse;" in accept_p2p_block
+
+    for doc_anchor in (
+        "# Quake Live Steam Mapping Round 589: Client P2P Session Request Peer Gate",
+        "`sub_45fef0` / `FUN_0045fef0`",
+        "`sscanf(ecx + 0x146dfd4, \"%llu\", &var_c)`",
+        "`AcceptP2PSessionWithUser` at SteamNetworking vtable slot `0x0c`",
+        "Focused client P2P session-request admission confidence: **before 94% -> after 99%**.",
+    ):
+        assert doc_anchor in mapping_round
+
+
 def test_client_steam_id_owner_reconstructs_retail_homepath_and_identity_gate() -> None:
     aliases = json.loads(
         (REPO_ROOT / "references/analysis/quakelive_symbol_aliases.json").read_text(encoding="utf-8")
@@ -1708,7 +1940,17 @@ def test_client_steam_id_owner_reconstructs_retail_homepath_and_identity_gate() 
     assert "return qfalse;" in null_filesystem_init_block
     assert "return 0ull;" in null_steam_id_block
     assert "return ( (unsigned long long)steamIdHigh << 32 ) | steamIdLow;" in harness_steam_id_block
+    assert "if ( !SteamClient_IsInitialized() ) {" in web_identity_block
+    assert "SteamClient_InitForFilesystem();" in web_identity_block
     assert "return SteamClient_GetSteamID() != 0ull ? qtrue : qfalse;" in web_identity_block
+    assert web_identity_block.index("if ( !SteamClient_IsInitialized() ) {") < web_identity_block.index(
+        "return SteamClient_GetSteamID() != 0ull ? qtrue : qfalse;"
+    )
+    assert "if ( CL_SteamServicesEnabled() && !SteamClient_IsInitialized() ) {" in web_bootstrap_block
+    assert "SteamClient_InitForFilesystem();" in web_bootstrap_block
+    assert web_bootstrap_block.index("SteamClient_InitForFilesystem();") < web_bootstrap_block.index(
+        "steamId = SteamClient_GetSteamID();"
+    )
     assert "steamId = SteamClient_GetSteamID();" in web_bootstrap_block
     assert "cl_webHost.steamIdLow = (uint32_t)( steamId & 0xffffffffull );" in web_bootstrap_block
     assert "steamId = SteamClient_GetSteamID();" in auth_ticket_block
@@ -1778,6 +2020,235 @@ def test_client_steam_helper_alias_bridge_tracks_ghidra_and_hlil_rows() -> None:
     assert "static void SteamClient_SyncPersonaNameCvar( void ) {" in cl_main
     assert "void SteamClient_Frame( void ) {" in cl_main
     assert "qhandle_t SteamClient_GetAvatarImageHandle( unsigned int identityLow, unsigned int identityHigh ) {" in cl_steam_resources
+
+
+def test_steam_browser_and_datasource_alias_bridge_tracks_ghidra_and_hlil_rows() -> None:
+    aliases = json.loads(
+        (REPO_ROOT / "references/analysis/quakelive_symbol_aliases.json").read_text(encoding="utf-8")
+    )["quakelive_steam_srp"]
+    functions_csv = (
+        REPO_ROOT / "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+    ).read_text(encoding="utf-8")
+    analysis_symbols = (
+        REPO_ROOT / "references/reverse-engineering/ghidra/quakelive_steam/analysis_symbols.txt"
+    ).read_text(encoding="utf-8")
+    hlil_part02 = (
+        REPO_ROOT
+        / "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part02.txt"
+    ).read_text(encoding="utf-8")
+    hlil_part06 = (
+        REPO_ROOT
+        / "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part06.txt"
+    ).read_text(encoding="utf-8")
+    cl_main = (REPO_ROOT / "src/code/client/cl_main.c").read_text(encoding="utf-8")
+    steam_resources = (REPO_ROOT / "src/code/client/cl_steam_resources.c").read_text(encoding="utf-8")
+
+    expected_browser_resource_aliases = (
+        (0x00461F70, 107, "JSBrowserDetails_RequestServerDetails"),
+        (0x00461FE0, 863, "JSBrowserDetails_OnServerResponded"),
+        (0x00462360, 295, "JSBrowserDetails_OnRuleResponded"),
+        (0x00462490, 263, "JSBrowserDetails_OnRulesFailed"),
+        (0x004625A0, 263, "JSBrowserDetails_OnRulesRefreshComplete"),
+        (0x004626B0, 375, "JSBrowserDetails_OnPlayerResponded"),
+        (0x00462830, 266, "JSBrowserDetails_OnPlayersFailed"),
+        (0x00462940, 266, "JSBrowserDetails_OnPlayersRefreshComplete"),
+        (0x00462A50, 860, "JSBrowser_OnServerResponded"),
+        (0x00462DB0, 167, "JSBrowser_OnServerFailedToRespond"),
+        (0x00462E60, 22, "JSBrowser_OnRefreshComplete"),
+        (0x00462E80, 34, "SteamBrowser_RefreshList"),
+        (0x00462EB0, 451, "JSBrowser_RequestServers"),
+        (0x00463090, 20, "SteamBrowser_RequestServers"),
+        (0x004630B0, 87, "SteamBrowser_RequestServerDetails"),
+        (0x00463110, 103, "ResponseThread_PNGWriteCallback"),
+        (0x00463180, 287, "ResponseThread_EncodeAvatarPNG"),
+        (0x00463440, 263, "ResponseThread_Run"),
+        (0x00463550, 164, "SteamDataSource_StartResponseThread"),
+        (0x00463670, 592, "std_tree_erase_steamid_map_node_iter"),
+        (0x004638D0, 170, "std_tree_equal_range_steamid_map_node"),
+        (0x00463980, 592, "std_tree_erase_steamid_value_node_iter"),
+        (0x00463BE0, 56, "std_tree_destroy_steamid_value_subtree"),
+        (0x00463C20, 268, "std_tree_insert_steamid_map_node"),
+        (0x00463D30, 77, "std_tree_clear_steamid_value_map"),
+        (0x00463D80, 403, "std_tree_insert_steamid_value_node"),
+        (0x00463F20, 158, "std_tree_erase_steamid_map_node"),
+        (0x00463FC0, 158, "std_tree_erase_steamid_value_node"),
+        (0x004640C0, 450, "SteamDataSource_OnRequest"),
+        (0x00464290, 102, "SteamDataSource_OnAvatarImageLoaded"),
+        (0x00464300, 311, "SteamDataSource_Init"),
+        (0x00464440, 194, "SteamDataSource_Shutdown"),
+        (0x00464510, 33, "SteamDataSource_Destroy"),
+        (0x00464540, 92, "CSteamID_IsValid"),
+    )
+    for address, size, source_name in expected_browser_resource_aliases:
+        function_name = f"FUN_{address:08x}"
+        assert aliases[function_name] == source_name
+        assert f"{function_name},{address:08x},{size},0,unknown" in functions_csv
+        for sub_name in {f"sub_{address & 0xffffff:06X}", f"sub_{address & 0xffffff:06x}"}:
+            assert aliases[sub_name] == source_name
+
+    for hlil_start in (
+        "00461f70    int32_t __thiscall sub_461f70",
+        "00461fe0    struct _EXCEPTION_REGISTRATION_RECORD** __thiscall sub_461fe0",
+        "00462360    int32_t __thiscall sub_462360",
+        "00462490    int32_t __fastcall sub_462490",
+        "004625a0    int32_t __fastcall sub_4625a0",
+        "004626b0    int32_t __thiscall sub_4626b0",
+        "00462830    int32_t __fastcall sub_462830",
+        "00462940    int32_t __fastcall sub_462940",
+        "00462a50    int32_t __stdcall sub_462a50",
+        "00462db0    int32_t __stdcall std::locale::_Locimp::_Locimp_dtor",
+        "00462e60    int32_t __fastcall sub_462e60",
+        "00462e80    void sub_462e80()",
+        "00462eb0    int32_t __thiscall sub_462eb0",
+        "00463090    int32_t sub_463090",
+        "004630b0    int32_t sub_4630b0",
+        "00463110    int32_t sub_463110",
+        "00463180    int32_t __stdcall sub_463180",
+        "00463440    int32_t __fastcall sub_463440",
+        "00463550    int32_t __thiscall sub_463550",
+        "00463670    int32_t* __thiscall sub_463670",
+        "004638d0    void** __thiscall sub_4638d0",
+        "00463980    int32_t* __thiscall sub_463980",
+        "00463be0    void __stdcall sub_463be0",
+        "00463c20    void*** __thiscall sub_463c20",
+        "00463d30    void* __fastcall sub_463d30",
+        "00463d80    void** __thiscall sub_463d80",
+        "00463f20    int32_t* __thiscall sub_463f20",
+        "00463fc0    int32_t* __thiscall sub_463fc0",
+        "004640c0    void* __thiscall sub_4640c0",
+        "00464290    int32_t __thiscall sub_464290",
+        "00464300    struct Awesomium::DataSource::SteamDataSource::VTable** __fastcall sub_464300",
+        "00464440    int32_t __fastcall sub_464440",
+        "00464510    struct Awesomium::DataSource::SteamDataSource::VTable** __thiscall sub_464510",
+        "00464540    int32_t __fastcall sub_464540",
+    ):
+        assert hlil_start in hlil_part02
+
+    for retail_symbol in (
+        "ISteamMatchmakingPlayersResponse::vftable",
+        "ISteamMatchmakingPingResponse::vftable",
+        "ResponseThread::vftable",
+        "CCallback<class_SteamDataSource,struct_AvatarImageLoaded_t,0>::vftable",
+        "SteamDataSource::vftable",
+    ):
+        assert retail_symbol in analysis_symbols
+
+    assert "00532b28  struct ISteamMatchmakingRulesResponse::JSBrowserDetails::VTable" in hlil_part06
+    assert "00532b44  struct idSysThread::ResponseThread::VTable ResponseThread::`vftable'" in hlil_part06
+    assert "00532b80  struct Awesomium::DataSource::SteamDataSource::VTable SteamDataSource::`vftable'" in hlil_part06
+
+    assert "qboolean CL_Steam_RequestServers( int requestMode ) {" in cl_main
+    assert "qboolean CL_Steam_RequestServerDetails( unsigned int serverIp, unsigned short serverPort ) {" in cl_main
+    assert "qboolean CL_Steam_RefreshServerList( void ) {" in cl_main
+    assert "QL_Steamworks_BeginServerBrowserOwnerRequestForApp" in cl_main
+    assert "QL_Steamworks_BeginServerBrowserDetailRequest" in cl_main
+    assert "CL_SteamBrowser_PublishNativeServerResponse( &response );" in cl_main
+    assert "CL_SteamBrowser_PublishNativeRuleResponse( &response );" in cl_main
+    assert "CL_SteamBrowser_PublishNativePlayerResponse( &response );" in cl_main
+    assert "CL_SteamBrowser_CompleteNativeDetailTerminal( detail );" in cl_main
+
+    assert '{ "SteamDataSource", "OnRequest", 0x00532B80u, 0x04u, 0x004640C0u, "CL_SteamDataSource_Request", CL_STEAM_DATA_SOURCE_SCOPE_COMPATIBILITY_OWNER },' in steam_resources
+    assert '{ "SteamDataSource", "StartResponseThread", 0u, 0u, 0x00463550u, "CL_SteamResources_RequestAvatarRGBA", CL_STEAM_DATA_SOURCE_SCOPE_ASYNC_BOUNDARY },' in steam_resources
+    assert '{ "SteamDataSource", "Init", 0u, 0u, 0x00464300u, "CL_InitSteamResources", CL_STEAM_DATA_SOURCE_SCOPE_LIFECYCLE_BOUNDARY },' in steam_resources
+    assert '{ "SteamDataSource", "Shutdown", 0u, 0u, 0x00464440u, "CL_ShutdownSteamResources", CL_STEAM_DATA_SOURCE_SCOPE_LIFECYCLE_BOUNDARY },' in steam_resources
+    assert '{ "CCallback<class SteamDataSource, struct AvatarImageLoaded_t, 0>", "callback target", 0x00532B68u, 0x10u, 0x00464290u, "CL_SteamResources_OnAvatarImageLoaded", CL_STEAM_DATA_SOURCE_SCOPE_AVATAR_CALLBACK },' in steam_resources
+    assert '{ "ResponseThread", "run", CL_STEAM_RESPONSE_THREAD_RETAIL_VTABLE, 0x04u, 0x00463440u, CL_STEAM_RESPONSE_THREAD_MIME_TYPE, "CL_SteamResources_RequestAvatarRGBA", CL_STEAM_RESPONSE_THREAD_SCOPE_ASYNC_BOUNDARY },' in steam_resources
+    assert '{ "ResponseThread", "PNGWriteCallback", 0u, 0u, 0x00463110u, CL_STEAM_RESPONSE_THREAD_WRITE_ERROR, "CL_SteamResources_RequestAvatarRGBA", CL_STEAM_RESPONSE_THREAD_SCOPE_PNG_HELPER },' in steam_resources
+    assert '{ "ResponseThread", "EncodeAvatarPNG", 0u, 0u, 0x00463180u, CL_STEAM_RESPONSE_THREAD_PNG_VERSION, "CL_SteamResources_RequestAvatarRGBA", CL_STEAM_RESPONSE_THREAD_SCOPE_PNG_HELPER },' in steam_resources
+
+
+def test_steam_browser_detail_datasource_helper_aliases_track_retail_reference_rows() -> None:
+    aliases = json.loads(
+        (REPO_ROOT / "references/analysis/quakelive_symbol_aliases.json").read_text(encoding="utf-8")
+    )["quakelive_steam_srp"]
+    functions_csv = (
+        REPO_ROOT / "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+    ).read_text(encoding="utf-8")
+    hlil_part02 = (
+        REPO_ROOT
+        / "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part02.txt"
+    ).read_text(encoding="utf-8")
+    hlil_part06 = (
+        REPO_ROOT
+        / "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part06.txt"
+    ).read_text(encoding="utf-8")
+    cl_main = (REPO_ROOT / "src/code/client/cl_main.c").read_text(encoding="utf-8")
+    steamworks = (REPO_ROOT / "src/common/platform/platform_steamworks.c").read_text(encoding="utf-8")
+    mapping_note = (
+        REPO_ROOT / "docs/reverse-engineering/quakelive_steam_mapping_round_565.md"
+    ).read_text(encoding="utf-8")
+
+    helper_aliases = (
+        (0x00461F10, 92, "SteamBrowser_FormatServerListFallbackName"),
+        (0x00462340, 20, "JSBrowserDetails_OnServerFailedToRespond"),
+        (0x004632A0, 87, "std_tree_rotate_right_steamid_value_node"),
+        (0x00463300, 29, "std_tree_rightmost_steamid_value_node"),
+        (0x00463320, 28, "std_tree_leftmost_steamid_value_node"),
+        (0x00463340, 72, "std_tree_next_steamid_map_node"),
+        (0x00463390, 72, "std_tree_next_steamid_value_node"),
+        (0x004633E0, 84, "std_tree_prev_steamid_map_node"),
+        (0x00463610, 83, "std_tree_rotate_left_steamid_value_node"),
+        (0x00464060, 96, "std_tree_destroy_steamid_map"),
+    )
+    for address, size, source_name in helper_aliases:
+        function_name = f"FUN_{address:08x}"
+        assert aliases[function_name] == source_name
+        assert f"{function_name},{address:08x},{size},0,unknown" in functions_csv
+        for sub_name in {f"sub_{address & 0xffffff:06X}", f"sub_{address & 0xffffff:06x}"}:
+            assert aliases[sub_name] == source_name
+        assert f"| `sub_{address & 0xffffff:06x}` | `{source_name}` |" in mapping_note
+
+    for hlil_anchor in (
+        "00461f10    int32_t __fastcall sub_461f10",
+        '_snprintf((data_e30330 << 6) + 0xe30230, 0x40, "%u.%u.%u.%u:%i"',
+        "0046204a              eax_5 = sub_461f10(arg2)",
+        "00462340    void* __fastcall sub_462340",
+        "0046234a  if (*(arg1 + 0x4c) == 3)",
+        "004632a0    void* __thiscall sub_4632a0",
+        "00463300    void* sub_463300",
+        "00463320    int32_t* sub_463320",
+        "00463340    int32_t* __fastcall sub_463340",
+        "00463390    int32_t* __fastcall sub_463390",
+        "004633e0    int32_t* __fastcall sub_4633e0",
+        "00463610    void** __thiscall sub_463610",
+        "00463b42                      sub_4632a0(ecx_9, esi)",
+        "00463ae0                      sub_463610(ecx_9, esi)",
+        "00464060    int32_t __fastcall sub_464060",
+        "0046409f  sub_463f20(arg1, &var_18, *eax_3, eax_3)",
+    ):
+        assert hlil_anchor in hlil_part02
+
+    assert "00532b0c      int32_t (* const _purecall)() = sub_461fe0" in hlil_part06
+    assert "00532b10      int32_t (* const _purecall)() = sub_462340" in hlil_part06
+
+    fallback_name_block = _extract_function_block(
+        steamworks,
+        "static void QL_Steamworks_FormatServerListFallbackName( char *buffer, size_t bufferSize, const ql_steam_gameserveritem_raw_t *raw ) {",
+    )
+    copy_display_name_block = _extract_function_block(
+        steamworks,
+        "static void QL_Steamworks_CopyServerListDisplayName( ql_steam_server_item_t *outServer, const ql_steam_gameserveritem_raw_t *raw ) {",
+    )
+    complete_callback_block = _extract_function_block(
+        steamworks,
+        "qboolean QL_Steamworks_CompleteServerBrowserDetailRequestCallback( ql_steam_server_browser_detail_request_t *request, qboolean *outReleaseReady ) {",
+    )
+    native_ping_failed_block = _extract_function_block(
+        cl_main,
+        "static void CL_SteamBrowser_NativePingFailedImpl( clSteamNativeServerPingResponse_t *self ) {",
+    )
+    native_detail_complete_block = _extract_function_block(
+        cl_main,
+        "static void CL_SteamBrowser_CompleteNativeDetailTerminal( clSteamNativeServerDetail_t *detail ) {",
+    )
+
+    assert '"%u.%u.%u.%u:%i"' in fallback_name_block
+    assert "( raw->ip >> 24 ) & 0xffu" in fallback_name_block
+    assert "QL_Steamworks_FormatServerListFallbackName( outServer->displayName, sizeof( outServer->displayName ), raw );" in copy_display_name_block
+    assert "QL_Steamworks_CompleteServerBrowserDetailCallback( &request->lifecycle, &releaseReady )" in complete_callback_block
+    assert "request->queriesActive = qfalse;" in complete_callback_block
+    assert "CL_SteamBrowser_CompleteNativeDetailTerminal( CL_SteamBrowser_NativeDetailFromPing( self ) );" in native_ping_failed_block
+    assert "QL_Steamworks_CompleteServerBrowserDetailRequestCallback( &detail->request, &releaseReady )" in native_detail_complete_block
 
 
 def test_platform_steamworks_reconstructs_retail_callback_bundle_registration_surface() -> None:
@@ -2093,12 +2564,19 @@ def test_platform_steamworks_reconstructs_retail_callback_bundle_registration_su
 def test_platform_steamworks_loader_reconstructs_retail_import_surface_and_launch_contract() -> None:
     steamworks = (REPO_ROOT / "src/common/platform/platform_steamworks.c").read_text(encoding="utf-8")
     steamworks_h = (REPO_ROOT / "src/common/platform/platform_steamworks.h").read_text(encoding="utf-8")
+    platform_config = (REPO_ROOT / "src/common/platform/platform_config.h").read_text(encoding="utf-8")
     imports_txt = (
         REPO_ROOT / "references/reverse-engineering/ghidra/quakelive_steam/imports.txt"
+    ).read_text(encoding="utf-8")
+    hlil_full = (
+        REPO_ROOT / "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil.txt"
     ).read_text(encoding="utf-8")
     hlil_part06 = (
         REPO_ROOT
         / "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part06.txt"
+    ).read_text(encoding="utf-8")
+    mapping_round = (
+        REPO_ROOT / "docs/reverse-engineering/quakelive_steam_mapping_round_578.md"
     ).read_text(encoding="utf-8")
 
     load_block = _extract_function_block(steamworks, "qboolean QL_Steamworks_LoadLibrary( void ) {")
@@ -2144,6 +2622,48 @@ def test_platform_steamworks_loader_reconstructs_retail_import_surface_and_launc
     for import_name in retail_imports:
         assert f"STEAM_API.DLL!{import_name} @" in imports_txt
 
+    expected_steam_api_import_rows = [
+        (
+            "00558508  uint32_t __import_lookup_table_6(steam_api:SteamAPI_Shutdown) = 0x1591cc",
+            "005591cc  uint16_t __export_name_ptr_table_6(steam_api:SteamAPI_Shutdown) = 0x27e",
+            '005591ce  char __import_name_6(steam_api:SteamAPI_Shutdown)[0x12] = "SteamAPI_Shutdown", 0',
+        ),
+        (
+            "00558510  uint32_t __import_lookup_table_6(steam_api:SteamAPI_RegisterCallResult) = 0x1591ec",
+            "005591ec  uint16_t __export_name_ptr_table_6(steam_api:SteamAPI_RegisterCallResult) = 0x277",
+            '005591ee  char __import_name_6(steam_api:SteamAPI_RegisterCallResult)[0x1c] = "SteamAPI_RegisterCallResult", 0',
+        ),
+        (
+            "00558514  uint32_t __import_lookup_table_6(steam_api:SteamAPI_UnregisterCallResult) = 0x15920a",
+            "0055920a  uint16_t __export_name_ptr_table_6(steam_api:SteamAPI_UnregisterCallResult) = 0x27f",
+            '0055920c  char __import_name_6(steam_api:SteamAPI_UnregisterCallResult)[0x1e] = "SteamAPI_UnregisterCallResult", 0',
+        ),
+        (
+            "00558518  uint32_t __import_lookup_table_6(steam_api:SteamAPI_UnregisterCallback) = 0x15922a",
+            "0055922a  uint16_t __export_name_ptr_table_6(steam_api:SteamAPI_UnregisterCallback) = 0x280",
+            '0055922c  char __import_name_6(steam_api:SteamAPI_UnregisterCallback)[0x1c] = "SteamAPI_UnregisterCallback", 0',
+        ),
+        (
+            "0055851c  uint32_t __import_lookup_table_6(steam_api:SteamAPI_RegisterCallback) = 0x159248",
+            "00559248  uint16_t __export_name_ptr_table_6(steam_api:SteamAPI_RegisterCallback) = 0x278",
+            '0055924a  char __import_name_6(steam_api:SteamAPI_RegisterCallback)[0x1a] = "SteamAPI_RegisterCallback", 0',
+        ),
+        (
+            "00558524  uint32_t __import_lookup_table_6(steam_api:SteamAPI_RunCallbacks) = 0x159274",
+            "00559274  uint16_t __export_name_ptr_table_6(steam_api:SteamAPI_RunCallbacks) = 0x27a",
+            '00559276  char __import_name_6(steam_api:SteamAPI_RunCallbacks)[0x16] = "SteamAPI_RunCallbacks", 0',
+        ),
+        (
+            "00558554  uint32_t __import_lookup_table_6(steam_api:SteamAPI_Init) = 0x159264",
+            "00559264  uint16_t __export_name_ptr_table_6(steam_api:SteamAPI_Init) = 0x274",
+            '00559266  char __import_name_6(steam_api:SteamAPI_Init)[0xe] = "SteamAPI_Init", 0',
+        ),
+    ]
+    for lookup_row, export_row, name_row in expected_steam_api_import_rows:
+        assert lookup_row in hlil_full
+        assert export_row in hlil_full
+        assert name_row in hlil_full
+
     for import_name in [
         "SteamAPI_Init",
         "SteamAPI_RunCallbacks",
@@ -2158,9 +2678,14 @@ def test_platform_steamworks_loader_reconstructs_retail_import_surface_and_launc
         assert f"steam_api:{import_name}" in hlil_part06
 
     assert "SteamAPI_RestartAppIfNecessary" not in imports_txt
+    assert "SteamAPI_RestartAppIfNecessary" not in hlil_full
     assert "SteamAPI_RestartAppIfNecessary" not in hlil_part06
     assert "SteamAPI_RestartAppIfNecessary" not in steamworks
 
+    assert "#define QL_BUILD_ONLINE_SERVICES 0" in platform_config
+    assert "#undef QL_BUILD_STEAMWORKS" in platform_config
+    assert "#define QL_BUILD_STEAMWORKS 0" in platform_config
+    assert "#if QL_BUILD_STEAMWORKS" in steamworks
     assert '#define QL_STEAMWORKS_LIB_PRIMARY "steam_api.dll"' in steamworks
     assert '#define QL_STEAMWORKS_LIB_SECONDARY "steam_api64.dll"' in steamworks
     assert '#define QL_STEAMWORKS_OPEN( name ) LoadLibraryA( name )' in steamworks
@@ -2214,7 +2739,16 @@ def test_platform_steamworks_loader_reconstructs_retail_import_surface_and_launc
         assert optional_alias in load_block
 
     assert load_block.index('QL_Steamworks_LoadSymbol( (void **)&state.SteamAPI_Init, "SteamAPI_Init" )') < load_block.index(
+        'QL_Steamworks_LoadSymbol( (void **)&state.SteamAPI_Shutdown, "SteamAPI_Shutdown" )'
+    )
+    assert load_block.index('QL_Steamworks_LoadSymbol( (void **)&state.SteamAPI_Shutdown, "SteamAPI_Shutdown" )') < load_block.index(
         'QL_Steamworks_LoadSymbol( (void **)&state.SteamAPI_RunCallbacks, "SteamAPI_RunCallbacks" )'
+    )
+    assert load_block.index('QL_Steamworks_LoadSymbol( (void **)&state.SteamAPI_RunCallbacks, "SteamAPI_RunCallbacks" )') < load_block.index(
+        'QL_Steamworks_LoadOptionalSymbol( (void **)&state.SteamAPI_RegisterCallback, "SteamAPI_RegisterCallback" );'
+    )
+    assert load_block.index('QL_Steamworks_LoadOptionalSymbol( (void **)&state.SteamAPI_RegisterCallback, "SteamAPI_RegisterCallback" );') < load_block.index(
+        'QL_Steamworks_LoadOptionalSymbol( (void **)&state.SteamAPI_UnregisterCallResult, "SteamAPI_UnregisterCallResult" );'
     )
     assert load_block.index('QL_Steamworks_LoadOptionalSymbol( (void **)&state.SteamAPI_RegisterCallback, "SteamAPI_RegisterCallback" );') < load_block.index(
         'QL_Steamworks_LoadSymbolAlias( (void **)&state.SteamUser, "SteamUser", "SteamAPI_SteamUser" )'
@@ -2239,6 +2773,15 @@ def test_platform_steamworks_loader_reconstructs_retail_import_surface_and_launc
     assert "state.initialised = qtrue;" in init_block
     assert init_block.index("state.SteamAPI_Init()") < init_block.index("state.initialised = qtrue;")
     assert "return qfalse;" in disabled_load_block
+    for doc_anchor in [
+        "# Quake Live Steam Mapping Round 578: Steam API Import Table Loader Contract",
+        "`0x00558508`",
+        "`0x00558554`",
+        "`SteamAPI_RestartAppIfNecessary` remains absent",
+        "`QL_BUILD_ONLINE_SERVICES` remains default-disabled",
+        "Overall Steam launch/runtime integration mapping confidence: **92.9% -> 92.95%**.",
+    ]:
+        assert doc_anchor in mapping_round
 
 
 def test_launcher_resource_bridge_reconstructs_retail_web_fallback_owner() -> None:
@@ -2905,6 +3448,403 @@ def test_client_steam_wrapper_cluster_reconstructs_retail_subscription_workshop_
     assert "SteamUtils_GetIPCountry( country, sizeof( country ) )" in country_seed_block
 
 
+def test_client_steam_command_voice_and_runtime_alias_bridge_tracks_ghidra_hlil_rows() -> None:
+    aliases = json.loads(
+        (REPO_ROOT / "references/analysis/quakelive_symbol_aliases.json").read_text(encoding="utf-8")
+    )["quakelive_steam_srp"]
+    functions_csv = (
+        REPO_ROOT / "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+    ).read_text(encoding="utf-8")
+    imports_txt = (
+        REPO_ROOT / "references/reverse-engineering/ghidra/quakelive_steam/imports.txt"
+    ).read_text(encoding="utf-8")
+    analysis_symbols = (
+        REPO_ROOT / "references/reverse-engineering/ghidra/quakelive_steam/analysis_symbols.txt"
+    ).read_text(encoding="utf-8")
+    hlil_part02 = (
+        REPO_ROOT
+        / "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part02.txt"
+    ).read_text(encoding="utf-8")
+    hlil_part04 = (
+        REPO_ROOT
+        / "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part04.txt"
+    ).read_text(encoding="utf-8")
+    cl_main = (REPO_ROOT / "src/code/client/cl_main.c").read_text(encoding="utf-8")
+
+    expected_aliases = {
+        "FUN_004603f0": "CL_VoiceStartRecording_f",
+        "sub_4603F0": "CL_VoiceStartRecording_f",
+        "sub_4603f0": "CL_VoiceStartRecording_f",
+        "FUN_00460490": "CL_VoiceStopRecording_f",
+        "sub_460490": "CL_VoiceStopRecording_f",
+        "sub_460540": "SteamAPI_Shutdown",
+        "FUN_00460590": "SteamApps_BIsSubscribedApp",
+        "sub_460590": "SteamApps_BIsSubscribedApp",
+        "FUN_00460660": "SteamUGC_GetItemDownloadInfo",
+        "sub_460660": "SteamUGC_GetItemDownloadInfo",
+        "FUN_00460690": "SteamUtils_GetIPCountry",
+        "sub_460690": "SteamUtils_GetIPCountry",
+        "FUN_00460d10": "SteamVoice_SendCapturedPacket",
+        "sub_460D10": "SteamVoice_SendCapturedPacket",
+        "sub_460d10": "SteamVoice_SendCapturedPacket",
+        "FUN_00460dc0": "SteamWorkshop_GetAllUGC",
+        "sub_460DC0": "SteamWorkshop_GetAllUGC",
+        "sub_460dc0": "SteamWorkshop_GetAllUGC",
+        "FUN_00460e60": "CL_Steam_OverlayCommand_f",
+        "sub_460E60": "CL_Steam_OverlayCommand_f",
+        "sub_460e60": "CL_Steam_OverlayCommand_f",
+        "FUN_00461990": "SteamVoice_IsClientMuted",
+        "sub_461990": "SteamVoice_IsClientMuted",
+        "FUN_00461a60": "SteamVoice_ProcessIncomingPackets",
+        "sub_461A60": "SteamVoice_ProcessIncomingPackets",
+        "sub_461a60": "SteamVoice_ProcessIncomingPackets",
+        "FUN_00461c00": "SteamVoice_ToggleClientMute",
+        "sub_461C00": "SteamVoice_ToggleClientMute",
+        "sub_461c00": "SteamVoice_ToggleClientMute",
+    }
+    for alias, owner in expected_aliases.items():
+        assert aliases[alias] == owner
+
+    for row in [
+        "FUN_004603f0,004603f0,152,0,unknown",
+        "FUN_00460490,00460490,121,0,unknown",
+        "SteamAPI_Shutdown,00460540,6,1,unknown",
+        "FUN_00460590,00460590,40,0,unknown",
+        "FUN_00460660,00460660,42,0,unknown",
+        "FUN_00460690,00460690,27,0,unknown",
+        "FUN_00460d10,00460d10,170,0,unknown",
+        "FUN_00460dc0,00460dc0,158,0,unknown",
+        "FUN_00460e60,00460e60,195,0,unknown",
+        "FUN_00461990,00461990,122,0,unknown",
+        "FUN_00461a60,00461a60,400,0,unknown",
+        "FUN_00461c00,00461c00,154,0,unknown",
+    ]:
+        assert row in functions_csv
+
+    for symbol in [
+        "STEAM_API.DLL!SteamAPI_Shutdown",
+        "STEAM_API.DLL!SteamApps",
+        "STEAM_API.DLL!SteamFriends",
+        "STEAM_API.DLL!SteamNetworking",
+        "STEAM_API.DLL!SteamUGC",
+        "STEAM_API.DLL!SteamUser",
+        "STEAM_API.DLL!SteamUtils",
+    ]:
+        assert symbol in imports_txt
+
+    for symbol in [
+        "CCallResult<class_SteamCallbacks,struct_SteamUGCQueryCompleted_t>::vftable",
+        "CCallback<class_SteamCallbacks,struct_GameRichPresenceJoinRequested_t,0>::vftable",
+        "CCallback<class_SteamCallbacks,struct_FriendRichPresenceUpdate_t,0>::vftable",
+    ]:
+        assert symbol in analysis_symbols
+
+    for start in [
+        "004603f0    void sub_4603f0()",
+        "00460490    void sub_460490()",
+        "00460540    int32_t SteamAPI_Shutdown()",
+        "00460590    uint32_t sub_460590(int32_t arg1)",
+        "00460660    uint32_t sub_460660(int32_t arg1, int32_t arg2, int32_t arg3, int32_t arg4)",
+        "00460690    int32_t sub_460690()",
+        "00460d10    void sub_460d10()",
+        "00460dc0    int32_t sub_460dc0(int32_t arg1)",
+        "00460e60    int32_t sub_460e60()",
+        "00461990    int32_t sub_461990(int32_t arg1, int32_t arg2)",
+        "00461a60    int32_t sub_461a60()",
+        "00461c00    int32_t sub_461c00(int32_t arg1, int32_t arg2)",
+    ]:
+        assert start in hlil_part02
+
+    for evidence in [
+        "00460416      int32_t eax_1 = SteamUser()",
+        "00460441      (*(esi_1 + 0x6c))(*eax_4, eax_4[1], 1)",
+        "004604b1      (*(*SteamUser() + 0x20))()",
+        "004605b7      return zx.d((*(*SteamApps() + 0x1c))(arg1))",
+        "00460689  return zx.d((*(*SteamUGC() + 0xd8))(arg1, arg2, arg3, arg4))",
+        "004606a6  jump(*(*SteamUtils() + 0x10))",
+        "00460d8e          if (data_1528ba0 == 8 && (eax u> 0 || var_c u> 0))",
+        "00460e42  *(eax_8 + 0x1c) = sub_45fd00",
+        "00460f12          result = (*(*SteamFriends() + 0x74))(esi_1, var_60, var_5c)",
+        "00461a9d  for (i = (*(*SteamNetworking() + 4))(&var_806c, 1); i != 0;",
+        "00461b92                  if (sub_461990(var_8060, var_805c) == 0)",
+        "00461c65  if (eax_2 != edx)",
+        "00461eed      result = sub_461a60()",
+    ]:
+        assert evidence in hlil_part02
+
+    assert '0046156a      sub_4c81d0("+voice", sub_4603f0)' in hlil_part02
+    assert '00461579      sub_4c81d0("-voice", sub_460490)' in hlil_part02
+    assert '004bcda7  sub_4c81d0("clientviewprofile", sub_460e60)' in hlil_part04
+    assert '004bcdb6  sub_4c81d0("clientfriendinvite", sub_460e60)' in hlil_part04
+    assert "004b0434  return sub_461c00(arg1, arg2)" in hlil_part04
+
+    assert "static void CL_VoiceStartRecording_f( void ) {" in cl_main
+    assert "static void CL_VoiceStopRecording_f( void ) {" in cl_main
+    assert "static void CL_Steam_SendVoicePacket( void ) {" in cl_main
+    assert "static void CL_Steam_ProcessVoicePackets( void ) {" in cl_main
+    assert "static qboolean CL_IsVoiceSenderMuted( int clientNum ) {" in cl_main
+    assert "static void CL_Steam_OverlayCommand_f( void ) {" in cl_main
+    assert "qboolean CL_Steam_RequestAllUGC( int filter ) {" in cl_main
+    assert "CL_Steam_SendVoicePacket();" in _extract_function_block(cl_main, "void SteamClient_Frame( void ) {")
+    assert "CL_Steam_ProcessVoicePackets();" in _extract_function_block(cl_main, "void SteamClient_Frame( void ) {")
+
+
+def test_steam_voice_mute_tree_helpers_track_retail_reference_rows() -> None:
+    aliases = json.loads(
+        (REPO_ROOT / "references/analysis/quakelive_symbol_aliases.json").read_text(encoding="utf-8")
+    )["quakelive_steam_srp"]
+    functions_csv = (
+        REPO_ROOT / "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+    ).read_text(encoding="utf-8")
+    hlil_part02 = (
+        REPO_ROOT
+        / "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part02.txt"
+    ).read_text(encoding="utf-8")
+    hlil_part06 = (
+        REPO_ROOT
+        / "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part06.txt"
+    ).read_text(encoding="utf-8")
+    cl_main = (REPO_ROOT / "src/code/client/cl_main.c").read_text(encoding="utf-8")
+    cl_cgame = (REPO_ROOT / "src/code/client/cl_cgame.c").read_text(encoding="utf-8")
+    client_h = (REPO_ROOT / "src/code/client/client.h").read_text(encoding="utf-8")
+    mapping_round = (
+        REPO_ROOT / "docs/reverse-engineering/quakelive_steam_mapping_round_563.md"
+    ).read_text(encoding="utf-8")
+
+    expected_aliases = {
+        "FUN_004610a0": "std_tree_rotate_right_steamid_node",
+        "sub_4610A0": "std_tree_rotate_right_steamid_node",
+        "sub_4610a0": "std_tree_rotate_right_steamid_node",
+        "FUN_00461110": "std_tree_rotate_left_steamid_node",
+        "sub_461110": "std_tree_rotate_left_steamid_node",
+        "FUN_00461170": "std_tree_insert_steamid_node_rebalance",
+        "sub_461170": "std_tree_insert_steamid_node_rebalance",
+        "FUN_004615e0": "std_tree_erase_steamid_node_iter",
+        "sub_4615E0": "std_tree_erase_steamid_node_iter",
+        "sub_4615e0": "std_tree_erase_steamid_node_iter",
+        "FUN_00461840": "std_tree_destroy_steamid_node_subtree",
+        "sub_461840": "std_tree_destroy_steamid_node_subtree",
+        "FUN_00461880": "std_tree_insert_steamid_node",
+        "sub_461880": "std_tree_insert_steamid_node",
+        "FUN_00461a10": "std_tree_clear_steamid_node_set",
+        "sub_461A10": "std_tree_clear_steamid_node_set",
+        "sub_461a10": "std_tree_clear_steamid_node_set",
+        "FUN_00461ca0": "std_tree_erase_steamid_node",
+        "sub_461CA0": "std_tree_erase_steamid_node",
+        "sub_461ca0": "std_tree_erase_steamid_node",
+    }
+    for symbol, alias in expected_aliases.items():
+        assert aliases[symbol] == alias
+
+    for function_row in (
+        "FUN_004610a0,004610a0,87,0,unknown",
+        "FUN_00461110,00461110,83,0,unknown",
+        "FUN_00461170,00461170,546,0,unknown",
+        "FUN_004615e0,004615e0,592,0,unknown",
+        "FUN_00461840,00461840,56,0,unknown",
+        "FUN_00461880,00461880,268,0,unknown",
+        "FUN_00461990,00461990,122,0,unknown",
+        "FUN_00461a10,00461a10,77,0,unknown",
+        "FUN_00461a60,00461a60,400,0,unknown",
+        "FUN_00461c00,00461c00,154,0,unknown",
+        "FUN_00461ca0,00461ca0,158,0,unknown",
+    ):
+        assert function_row in functions_csv
+
+    for doc_anchor in (
+        "| `sub_4610a0` | `std_tree_rotate_right_steamid_node` |",
+        "| `sub_461110` | `std_tree_rotate_left_steamid_node` |",
+        "| `sub_4615e0` | `std_tree_erase_steamid_node_iter` |",
+        "| `sub_461a10` | `std_tree_clear_steamid_node_set` |",
+        "| `sub_461ca0` | `std_tree_erase_steamid_node` |",
+    ):
+        assert doc_anchor in mapping_round
+
+    assert "004610a0    void* __thiscall sub_4610a0(void* arg1, int32_t* arg2)" in hlil_part02
+    assert "004610ac  *arg2 = *(result + 8)" in hlil_part02
+    assert "004610cc      *(result + 8) = arg2" in hlil_part02
+    assert "00461110    void** __thiscall sub_461110(void* arg1, void* arg2)" in hlil_part02
+    assert "00461116  void** result = *(arg2 + 8)" in hlil_part02
+    assert "0046113c      *result = arg2" in hlil_part02
+    assert "00461170    void** __thiscall sub_461170(void* arg1, void** arg2, char arg3, void** arg4, void* arg5)" in hlil_part02
+    assert "0046117b  if (eax u>= 0x1ffffffe)" in hlil_part02
+    assert '0046118e      eax, arg1 = std::_Xlength_error("map/set<T> too long")' in hlil_part02
+    assert "00461196  *(arg1 + 8) = eax + 1" in hlil_part02
+    assert "0046138c  *(ecx + 0x18) = 1" in hlil_part02
+    assert "004615e0    int32_t* __thiscall sub_4615e0(void* arg1, int32_t* arg2, int32_t* arg3)" in hlil_part02
+    assert "004615f3  if (*(ebx + 0x19) != 0)" in hlil_part02
+    assert '004615fa      std::_Xout_of_range("invalid map/set<T> iterator")' in hlil_part02
+    assert "004617a2                      sub_4610a0(ecx_9, esi)" in hlil_part02
+    assert "004617ea                              sub_461110(ecx_9, eax_9)" in hlil_part02
+    assert "0046180f  operator delete(var_c)" in hlil_part02
+    assert "00461825      *(arg1 + 8) = eax_13 - 1" in hlil_part02
+    assert "00461840    void __stdcall sub_461840(void** arg1)" in hlil_part02
+    assert "00461859          sub_461840(esi[2])" in hlil_part02
+    assert "00461861          operator delete(edi)" in hlil_part02
+    assert "00461880    void*** __thiscall sub_461880(void* arg1, void** arg2, void* arg3, void** arg4)" in hlil_part02
+    assert "00461922          *arg2 = *sub_461170(arg1, &arg4, 1, edi, edx)" in hlil_part02
+    assert "00461964      *arg2 = *sub_461170(arg1, &arg4, var_8, edi, edx)" in hlil_part02
+    assert "00461972  operator delete(edx)" in hlil_part02
+    assert "00461990    int32_t sub_461990(int32_t arg1, int32_t arg2)" in hlil_part02
+    assert "004619ad  while (*(eax + 0x19) == 0)" in hlil_part02
+    assert "00461a10    void* __fastcall sub_461a10(void* arg1)" in hlil_part02
+    assert "00461a29          sub_461840(esi[2])" in hlil_part02
+    assert "00461a52  *(arg1 + 8) = 0" in hlil_part02
+    assert "00461a60    int32_t sub_461a60()" in hlil_part02
+    assert "00461b92                  if (sub_461990(var_8060, var_805c) == 0)" in hlil_part02
+    assert "00461c00    int32_t sub_461c00(int32_t arg1, int32_t arg2)" in hlil_part02
+    assert "00461c7c  sub_461880(&data_e30220, &var_10, sub_465f60(&data_e30220), nullptr)" in hlil_part02
+    assert "00461c8f      sub_4615e0(&data_e30220, &var_c, eax_2)" in hlil_part02
+    assert "00461ca0    int32_t* __thiscall sub_461ca0(void* arg1, int32_t* arg2, int32_t* arg3, int32_t arg4)" in hlil_part02
+    assert "00461cba      sub_461a10(arg1)" in hlil_part02
+    assert "00461d25      sub_4615e0(arg1, &var_8, i_2)" in hlil_part02
+
+    assert '0054f7f0  char const data_54f7f0[0x1c] = "invalid map/set<T> iterator", 0' in hlil_part06
+    assert '0054f820  char const data_54f820[0x14] = "map/set<T> too long", 0' in hlil_part06
+
+    voice_mute_block = _extract_function_block(cl_main, "static qboolean CL_IsVoiceSenderMuted( int clientNum ) {")
+    voice_receive_block = _extract_function_block(cl_main, "static void CL_Steam_ProcessVoicePackets( void ) {")
+    is_identity_muted_block = _extract_function_block(
+        cl_cgame, "qboolean CL_IsSteamIdentityMuted( unsigned int identityLow, unsigned int identityHigh ) {"
+    )
+    toggle_mute_block = _extract_function_block(
+        cl_cgame, "static int QDECL QL_CG_trap_ToggleClientMute( unsigned int identityLow, unsigned int identityHigh ) {"
+    )
+
+    assert "qboolean CL_IsSteamIdentityMuted( unsigned int identityLow, unsigned int identityHigh );" in client_h
+    assert "return CL_IsSteamIdentityMuted( steamIdLow, steamIdHigh );" in voice_mute_block
+    assert "if ( clientNum >= 0 && clientNum < MAX_CLIENTS && !CL_IsVoiceSenderMuted( clientNum ) ) {" in voice_receive_block
+    assert "S_AddVoiceSamples( clientNum, (int)( voiceBytes >> 1 ), decompressedVoice );" in voice_receive_block
+    assert "static uint64_t ql_cgame_mutedIdentitySet[MAX_CLIENTS];" in cl_cgame
+    assert "static int ql_cgame_mutedIdentityCount = 0;" in cl_cgame
+    assert "return QL_CG_FindMutedIdentityIndex( identity ) >= 0 ? qtrue : qfalse;" in is_identity_muted_block
+    assert "--ql_cgame_mutedIdentityCount;" in toggle_mute_block
+    assert "ql_cgame_mutedIdentitySet[index] = ql_cgame_mutedIdentitySet[ql_cgame_mutedIdentityCount];" in toggle_mute_block
+    assert "if ( ql_cgame_mutedIdentityCount >= ARRAY_LEN( ql_cgame_mutedIdentitySet ) ) {" in toggle_mute_block
+    assert "ql_cgame_mutedIdentitySet[ql_cgame_mutedIdentityCount++] = identity;" in toggle_mute_block
+
+
+def test_steam_ugc_call_result_and_steamid_iterator_helpers_track_retail_reference_rows() -> None:
+    aliases = json.loads(
+        (REPO_ROOT / "references/analysis/quakelive_symbol_aliases.json").read_text(encoding="utf-8")
+    )["quakelive_steam_srp"]
+    functions_csv = (
+        REPO_ROOT / "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+    ).read_text(encoding="utf-8")
+    hlil_part02 = (
+        REPO_ROOT
+        / "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part02.txt"
+    ).read_text(encoding="utf-8")
+    hlil_part06 = (
+        REPO_ROOT
+        / "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part06.txt"
+    ).read_text(encoding="utf-8")
+    steamworks = (REPO_ROOT / "src/common/platform/platform_steamworks.c").read_text(encoding="utf-8")
+    mapping_round = (
+        REPO_ROOT / "docs/reverse-engineering/quakelive_steam_mapping_round_567.md"
+    ).read_text(encoding="utf-8")
+
+    expected_aliases = {
+        "FUN_004606b0": "SteamCallbacks_RunUGCQueryCompleted",
+        "sub_4606B0": "SteamCallbacks_RunUGCQueryCompleted",
+        "sub_4606b0": "SteamCallbacks_RunUGCQueryCompleted",
+        "FUN_004606d0": "SteamCallbacks_RunUGCQueryCompletedCallResult",
+        "sub_4606D0": "SteamCallbacks_RunUGCQueryCompletedCallResult",
+        "sub_4606d0": "SteamCallbacks_RunUGCQueryCompletedCallResult",
+        "FUN_00460710": "std_tree_rightmost_steamid_node",
+        "sub_460710": "std_tree_rightmost_steamid_node",
+        "FUN_00460730": "std_tree_leftmost_steamid_node",
+        "sub_460730": "std_tree_leftmost_steamid_node",
+        "FUN_00460750": "std_tree_next_steamid_node",
+        "sub_460750": "std_tree_next_steamid_node",
+        "FUN_004607a0": "std_tree_prev_steamid_node",
+        "sub_4607A0": "std_tree_prev_steamid_node",
+        "sub_4607a0": "std_tree_prev_steamid_node",
+        "FUN_00461100": "std_tree_delete_steamid_node_head",
+        "sub_461100": "std_tree_delete_steamid_node_head",
+    }
+    for symbol, alias in expected_aliases.items():
+        assert aliases[symbol] == alias
+
+    for function_row in (
+        "FUN_004606b0,004606b0,30,0,unknown",
+        "FUN_004606d0,004606d0,49,0,unknown",
+        "FUN_00460710,00460710,29,0,unknown",
+        "FUN_00460730,00460730,28,0,unknown",
+        "FUN_00460750,00460750,72,0,unknown",
+        "FUN_004607a0,004607a0,84,0,unknown",
+        "FUN_00461100,00461100,11,0,unknown",
+    ):
+        assert function_row in functions_csv
+
+    for doc_anchor in (
+        "| `sub_4606b0` | `SteamCallbacks_RunUGCQueryCompleted` |",
+        "| `sub_4606d0` | `SteamCallbacks_RunUGCQueryCompletedCallResult` |",
+        "| `sub_460710` | `std_tree_rightmost_steamid_node` |",
+        "| `sub_460730` | `std_tree_leftmost_steamid_node` |",
+        "| `sub_460750` | `std_tree_next_steamid_node` |",
+        "| `sub_4607a0` | `std_tree_prev_steamid_node` |",
+        "| `sub_461100` | `std_tree_delete_steamid_node_head` |",
+    ):
+        assert doc_anchor in mapping_round
+
+    assert "005327c0  struct CCallbackBase::CCallResult<class SteamCallbacks, struct SteamUGCQueryCompleted_t>::VTable" in hlil_part06
+    assert "005327c0      void* (__thiscall* const vFunc_0)(void* arg1, int32_t arg2, int32_t arg3, int32_t arg4, int32_t arg5) = sub_4606d0" in hlil_part06
+    assert "005327c4      int32_t (__thiscall* const vFunc_1)(void* arg1, int32_t arg2) = sub_4606b0" in hlil_part06
+    assert "005327c8      int32_t (* const vFunc_2)() __pure = sub_465680" in hlil_part06
+
+    assert "004606b0    int32_t __thiscall sub_4606b0(void* arg1, int32_t arg2)" in hlil_part02
+    assert "004606b5  int32_t edx = *(arg1 + 0x1c)" in hlil_part02
+    assert "004606bb  *(arg1 + 0x10) = 0" in hlil_part02
+    assert "004606cb  return edx(arg2, 0)" in hlil_part02
+    assert "004606d0    void* __thiscall sub_4606d0(void* arg1, int32_t arg2, int32_t arg3, int32_t arg4, int32_t arg5)" in hlil_part02
+    assert "004606e3  if (arg4 != *(arg1 + 0x10) || arg5 != *(arg1 + 0x14))" in hlil_part02
+    assert "004606fb  return (*(arg1 + 0x1c))(arg2, arg3)" in hlil_part02
+
+    assert "00460710    void* sub_460710(void* arg1)" in hlil_part02
+    assert "0046071d  while (*(result_1 + 0x19) == 0)" in hlil_part02
+    assert "00460730    int32_t* sub_460730(int32_t* arg1)" in hlil_part02
+    assert "0046073c  while (*(result_1 + 0x19) == 0)" in hlil_part02
+    assert "00460750    int32_t* __fastcall sub_460750(int32_t* arg1)" in hlil_part02
+    assert "0046077a          *arg1 = ecx" in hlil_part02
+    assert "004607a0    int32_t* __fastcall sub_4607a0(int32_t* arg1)" in hlil_part02
+    assert "004607ad      *arg1 = ecx[2]" in hlil_part02
+    assert "004607f3  return arg1" in hlil_part02
+    assert "00461100    int32_t __fastcall sub_461100(void* arg1)" in hlil_part02
+    assert "0046110a  return operator delete(*(arg1 + 4))" in hlil_part02
+
+    for call_anchor in (
+        "00461606  sub_460750(&arg3)",
+        "00461668              eax_5 = sub_460730(edi)",
+        "0046169c              *(ecx_3 + 8) = sub_460710(edi)",
+        "0046192f      sub_4607a0(&arg4)",
+        "00466179      sub_4607a0(&arg4)",
+    ):
+        assert call_anchor in hlil_part02
+
+    bind_ugc_block = _extract_function_block(
+        steamworks, "qboolean QL_Steamworks_BindUGCQueryCallResult( SteamAPICall_t callHandle ) {"
+    )
+    dispatch_ugc_block = _extract_function_block(
+        steamworks,
+        "static void QL_Steamworks_DispatchUGCQueryCompleted( void *context, const void *payload, qboolean ioFailure, SteamAPICall_t callHandle )",
+    )
+    run_call_result_block = _extract_function_block(
+        steamworks,
+        "static void QL_Steamworks_CallbackRunCallResultImpl( ql_steam_callback_base_t *self, void *payload, qboolean ioFailure, SteamAPICall_t callHandle )",
+    )
+
+    assert "self->dispatchCallResult( self->context, payload, ioFailure, callHandle );" in run_call_result_block
+    assert "QL_Steamworks_UnbindCallResultObject( &callbackState->ugcQueryCompleted, &callbackState->ugcCallHandle, &callbackState->ugcCallBound );" in bind_ugc_block
+    assert "state.SteamAPI_RegisterCallResult( &callbackState->ugcQueryCompleted, callHandle );" in bind_ugc_block
+    assert "callbackState->ugcCallHandle = callHandle;" in bind_ugc_block
+    assert "callbackState->ugcCallBound = qtrue;" in bind_ugc_block
+    assert "event.result = ioFailure ? -1 : raw->result;" in dispatch_ugc_block
+    assert "callbackState->bindings.onUGCQueryCompleted( callbackState->bindings.context, &event );" in dispatch_ugc_block
+    assert "SteamID tree iterator helpers are compiler-generated support for the voice" in mapping_round
+    assert "mute set and lobby/auth SteamID maps." in mapping_round
+
+
 def test_steamworks_modern_adapter_gaps_stay_explicit_until_owned() -> None:
     steamworks = (REPO_ROOT / "src/common/platform/platform_steamworks.c").read_text(encoding="utf-8")
     steamworks_header = (REPO_ROOT / "src/common/platform/platform_steamworks.h").read_text(encoding="utf-8")
@@ -3111,6 +4051,132 @@ def test_client_auth_logs_include_provider_and_policy_labels() -> None:
     assert '[auth] %s [%s] payload summary: ticket=%s (len=%zu, api=%s, modern=%s)\\n' in execute_block
     assert "QL_Steamworks_GetAuthTicketApiLabel()" in execute_block
     assert "QL_Steamworks_GetAuthTicketModernGapLabel()" in execute_block
+
+
+def test_client_auth_ticket_dispatch_boundary_tracks_round_596_evidence() -> None:
+    aliases = json.loads(
+        (REPO_ROOT / "references/analysis/quakelive_symbol_aliases.json").read_text(encoding="utf-8")
+    )["quakelive_steam_srp"]
+    functions_csv = (
+        REPO_ROOT / "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+    ).read_text(encoding="utf-8")
+    hlil_part02 = (
+        REPO_ROOT
+        / "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part02.txt"
+    ).read_text(encoding="utf-8")
+    hlil_part04 = (
+        REPO_ROOT
+        / "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part04.txt"
+    ).read_text(encoding="utf-8")
+    hlil_part05 = (
+        REPO_ROOT
+        / "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part05.txt"
+    ).read_text(encoding="utf-8")
+    ql_auth = (REPO_ROOT / "src/code/client/ql_auth.c").read_text(encoding="utf-8")
+    cl_main = (REPO_ROOT / "src/code/client/cl_main.c").read_text(encoding="utf-8")
+    steamworks = (REPO_ROOT / "src/common/platform/platform_steamworks.c").read_text(encoding="utf-8")
+    steamworks_backend = (
+        REPO_ROOT / "src/common/platform/backends/platform_backend_steamworks.c"
+    ).read_text(encoding="utf-8")
+    open_backend = (
+        REPO_ROOT / "src/common/platform/backends/platform_backend_open_steam.c"
+    ).read_text(encoding="utf-8")
+    gap_note = (
+        REPO_ROOT / "docs/reverse-engineering/source-file-gap-notes/rw-g01-client-auth.md"
+    ).read_text(encoding="utf-8")
+    mapping_round = (
+        REPO_ROOT / "docs/reverse-engineering/quakelive_steam_mapping_round_596.md"
+    ).read_text(encoding="utf-8")
+
+    request_ticket_block = _extract_function_block(
+        ql_auth,
+        "static qboolean QL_ClientAuth_RequestSteamTicket( ql_auth_credential_t *credential, char *logBuffer, size_t logBufferSize ) {",
+    )
+    handle_steamworks_block = _extract_function_block(
+        ql_auth,
+        "static qboolean QL_ClientAuth_HandleSteamworksTicket( const ql_client_auth_transport_t *transport, const ql_auth_credential_t *credential, ql_auth_response_t *response ) {",
+    )
+    hybrid_block = _extract_function_block(
+        ql_auth,
+        "static qboolean QL_ClientAuth_HandleHybridSteam( const ql_client_auth_transport_t *transport, const ql_auth_credential_t *credential, ql_auth_response_t *response ) {",
+    )
+    execute_block = _extract_function_block(
+        ql_auth,
+        "qboolean QL_Auth_ExecuteRequest( const ql_auth_credential_t *credential, ql_auth_response_t *response ) {",
+    )
+    steam_ticket_block = _extract_function_block(
+        cl_main,
+        "int SteamClient_GetAuthSessionTicket( char *ticketBuffer, int ticketBufferSize ) {",
+    )
+    validate_ticket_block = _extract_function_block(
+        steamworks,
+        "qboolean QL_Steamworks_ValidateTicket( const char *ticketHex, ql_auth_response_t *response ) {",
+    )
+
+    assert aliases["FUN_004605c0"] == "SteamClient_GetAuthSessionTicket"
+    assert aliases["sub_4605c0"] == "SteamClient_GetAuthSessionTicket"
+    assert aliases["FUN_004605f0"] == "SteamClient_CancelAuthTicket"
+    assert aliases["sub_4605f0"] == "SteamClient_CancelAuthTicket"
+
+    assert "FUN_004605c0,004605c0,43,0,unknown" in functions_csv
+    assert "FUN_004605f0,004605f0,27,0,unknown" in functions_csv
+    assert "004605c0    int32_t __convention(\"regparm\") sub_4605c0" in hlil_part02
+    assert "data_e2c208 = (*(*SteamUser(result) + 0x34))(arg4, arg5, &result)" in hlil_part02
+    assert "004605f0    int32_t sub_4605f0()" in hlil_part02
+    assert "return (*(*result + 0x40))(data_e2c208)" in hlil_part02
+    assert "004b9374              int32_t eax_13 = sub_4605c0(eax_12, &var_1808, ecx_11, &var_1808, 0x1000)" in hlil_part04
+    assert "004b9386              __builtin_strncpy(dest: &var_9804, src: \"getchallenge \", n: 0xd)" in hlil_part04
+    assert "004c9d1d  sub_4605f0()" in hlil_part04
+    assert "sub_4605c0(eax_55, &var_1408, ecx_44, &var_1408, 0x1000)" in hlil_part05
+
+    assert "QL_Steamworks_RequestAuthTicket( ticketBuffer, (size_t)ticketBufferSize, &ticketLength, &ticketHandle )" in steam_ticket_block
+    assert "cl_steamAuthTicketHandle = ticketHandle;" in steam_ticket_block
+    assert "if ( !CL_SteamServicesEnabled() ) {" in request_ticket_block
+    assert request_ticket_block.index("QL_Steamworks_RunCallbacks();") < request_ticket_block.index(
+        "ticketLength = SteamClient_GetAuthSessionTicket( credential->value, (int)sizeof( credential->value ) );"
+    )
+    assert request_ticket_block.index(
+        "ticketLength = SteamClient_GetAuthSessionTicket( credential->value, (int)sizeof( credential->value ) );"
+    ) < request_ticket_block.rindex("QL_Steamworks_RunCallbacks();")
+    assert execute_block.index("QL_InitAuthCredential( &steamCredential );") < execute_block.index(
+        "QL_ClientAuth_RequestSteamTicket( &steamCredential, steamHex, sizeof( steamHex ) )"
+    )
+    assert execute_block.index("activeCredential = &steamCredential;") < execute_block.index(
+        "QL_ClientAuth_LogStage( &transport, \"dispatch\", \"submitting credential\" );"
+    )
+    assert "[auth] %s [%s] payload summary: ticket=%s (len=%zu, api=%s, modern=%s)\\n" in execute_block
+    assert "QL_Steamworks_GetAuthTicketApiLabel()" in execute_block
+    assert "QL_Steamworks_GetAuthTicketModernGapLabel()" in execute_block
+
+    assert "if ( !CL_SteamServicesEnabled() ) {" in handle_steamworks_block
+    assert handle_steamworks_block.index("QL_Steamworks_ValidateTicket") < handle_steamworks_block.index(
+        "QL_ClientAuth_InvokeBackend( QL_PlatformBackendSteamworks_Authenticate"
+    )
+    assert "state.BeginAuthSession( user, ticketData, (int)ticketLength, steamId );" in validate_ticket_block
+    assert "fallbackEligible = !handled || steamResponse.result == QL_AUTH_RESULT_PENDING;" in hybrid_block
+    assert "steamResponse.result == QL_AUTH_RESULT_ACCEPTED" in hybrid_block
+    assert "steamResponse.result == QL_AUTH_RESULT_DENIED" not in hybrid_block
+    assert "Steamworks heuristic compatibility backend reported busy; retry with refreshed ticket" in steamworks_backend
+    assert "Steamworks heuristic compatibility backend denied the ticket" in steamworks_backend
+    assert "Open adapter heuristic compatibility backend respected Steam denial" in open_backend
+
+    for gap_anchor in (
+        "Steam auth requests are blocked entirely when `CL_SteamServicesEnabled()` is false.",
+        "Hybrid dispatch falls back to the open adapter only when Steamworks is",
+        "unavailable or returns `QL_AUTH_RESULT_PENDING`.",
+        "`QL_Auth_ExecuteRequest` requests a fresh retained Steam ticket before dispatch",
+    ):
+        assert gap_anchor in gap_note
+
+    for doc_anchor in (
+        "# Quake Live Steam Mapping Round 596: Client Steam Auth Dispatch Boundary",
+        "`sub_4605c0` / `FUN_004605c0`",
+        "`sub_4605f0` / `FUN_004605f0`",
+        "`retry:TICKET-HYBRID-FALLBACK`",
+        "`denied:TICKET-HYBRID-REJECTED`",
+        "Overall Steam launch/runtime integration mapping confidence: **93.12% -> 93.14%**.",
+    ):
+        assert doc_anchor in mapping_round
 
 
 def test_policy_blocked_auth_requests_surface_online_services_mode_and_policy(tmp_path) -> None:
@@ -4283,7 +5349,12 @@ def test_client_web_host_exports_label_online_service_social_and_ugc_boundaries(
     assert "CL_GetWebHostWorkshopPolicyLabel()" in workshop_log_block
 
     assert "if ( !CL_SteamServicesEnabled() ) {" in steam_identity_block
+    assert "if ( !SteamClient_IsInitialized() ) {" in steam_identity_block
+    assert "SteamClient_InitForFilesystem();" in steam_identity_block
     assert "return SteamClient_GetSteamID() != 0ull ? qtrue : qfalse;" in steam_identity_block
+    assert steam_identity_block.index("if ( !SteamClient_IsInitialized() ) {") < steam_identity_block.index(
+        "return SteamClient_GetSteamID() != 0ull ? qtrue : qfalse;"
+    )
     assert friend_block.index("if ( !CL_WebHost_HasSteamIdentity() ) {") < friend_block.index(
         "friendCount = QL_Steamworks_GetFriendCount( CL_WEB_FRIEND_FLAGS );"
     )
@@ -4363,6 +5434,387 @@ def test_client_browser_event_publication_hooks_reconstruct_runtime_owner() -> N
     assert "CL_WebView_PublishGameDemo( name, name );" in record_block
     assert "CL_WebView_PublishGameDemo" not in stop_record_block
     assert "CL_WebView_PublishGameStart();" in first_snapshot_block
+
+
+def test_client_microtransaction_authorization_callback_tracks_retail_browser_payload() -> None:
+    aliases = json.loads(
+        (REPO_ROOT / "references/analysis/quakelive_symbol_aliases.json").read_text(encoding="utf-8")
+    )["quakelive_steam_srp"]
+    functions_csv = (
+        REPO_ROOT / "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+    ).read_text(encoding="utf-8")
+    analysis_symbols = (
+        REPO_ROOT / "references/reverse-engineering/ghidra/quakelive_steam/analysis_symbols.txt"
+    ).read_text(encoding="utf-8")
+    hlil_part02 = (
+        REPO_ROOT
+        / "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part02.txt"
+    ).read_text(encoding="utf-8")
+    steamworks = (REPO_ROOT / "src/common/platform/platform_steamworks.c").read_text(encoding="utf-8")
+    cl_main = (REPO_ROOT / "src/code/client/cl_main.c").read_text(encoding="utf-8")
+    mapping_round = (
+        REPO_ROOT / "docs/reverse-engineering/quakelive_steam_mapping_round_591.md"
+    ).read_text(encoding="utf-8")
+
+    dispatch_block = _extract_function_block(
+        steamworks,
+        "static void QL_Steamworks_DispatchMicroAuthorizationResponse( void *context, const void *payload )",
+    )
+    register_micro_block = _extract_function_block(
+        steamworks, "qboolean QL_Steamworks_RegisterMicroCallbacks( const ql_steam_micro_callback_bindings_t *bindings ) {"
+    )
+    init_micro_block = _extract_function_block(cl_main, "static qboolean SteamMicroCallbacks_Init( void ) {")
+    log_micro_block = _extract_function_block(
+        cl_main,
+        "static void CL_LogMicroTransactionCallbackLifecycle( const ql_steam_microtxn_authorization_response_t *event ) {",
+    )
+    micro_callback_block = _extract_function_block(
+        cl_main,
+        "static void CL_Steam_Micro_OnAuthorizationResponse( void *context, const ql_steam_microtxn_authorization_response_t *event ) {",
+    )
+
+    expected_aliases = {
+        "FUN_004658a0": "SteamMicroCallbacks_OnAuthorizationResponse",
+        "sub_4658A0": "SteamMicroCallbacks_OnAuthorizationResponse",
+        "sub_4658a0": "SteamMicroCallbacks_OnAuthorizationResponse",
+        "FUN_004659e0": "SteamMicroCallbacks_Init",
+        "sub_4659E0": "SteamMicroCallbacks_Init",
+        "sub_4659e0": "SteamMicroCallbacks_Init",
+    }
+    for retail_name, source_name in expected_aliases.items():
+        assert aliases[retail_name] == source_name
+
+    assert "FUN_004658a0,004658a0,319,0,unknown" in functions_csv
+    assert "FUN_004659e0,004659e0,67,0,unknown" in functions_csv
+    assert "CCallback<class_SteamMicroCallbacks,struct_MicroTxnAuthorizationResponse_t,0>::vftable" in analysis_symbols
+
+    assert "004658a0    int32_t __stdcall sub_4658a0(int32_t* arg1)" in hlil_part02
+    assert "004658e1  sub_429330(&var_40, *arg1)" in hlil_part02
+    assert '004658fd  sub_4296c0(sub_42a110(&var_50, "appid"), &var_40)' in hlil_part02
+    assert "00465913  int32_t var_60_2 = arg1[3]" in hlil_part02
+    assert "00465914  int32_t var_64 = arg1[2]" in hlil_part02
+    assert "0046591a  int32_t eax_6 = sub_4d9220(\"%llu\")" in hlil_part02
+    assert '00465932  sub_429440(sub_42a110(&var_50, "orderid"), eax_6)' in hlil_part02
+    assert "0046593f  sub_429310(&var_40, zx.d(arg1[4].b))" in hlil_part02
+    assert '0046595b  sub_4296c0(sub_42a110(&var_50, "authorized"), &var_40)' in hlil_part02
+    assert '0046598c  sub_4c9ab0("GOT MICRO RESPONSE: appid: %i or' in hlil_part02
+    assert "004659e0    void* sub_4659e0()" in hlil_part02
+    assert "004659e2  void* result = operator new(0x14)" in hlil_part02
+    assert "004659fd  *result = &CCallback<class SteamMicroCallbacks, struct MicroTxnAuthorizationResponse_t, 0>::`vftable'{for `CCallbackBase'}" in hlil_part02
+    assert "00465a06  *(result + 0x10) = sub_4658a0" in hlil_part02
+    assert "00465a19  return SteamAPI_RegisterCallback(result, 0x98)" in hlil_part02
+
+    assert "#define QL_STEAM_CALLBACK_MICROTXN_AUTHORIZATION_RESPONSE 0x98" in steamworks
+    assert "QL_STEAMWORKS_STATIC_ASSERT_SIZE( ql_steam_size_microtxn_authorization_response_raw, ql_steam_microtxn_authorization_response_raw_t, 0x18 );" in steamworks
+    assert "typedef struct {\n\tuint32_t appId;\n\tuint64_t orderId;\n\tqboolean authorized;\n} ql_steam_microtxn_authorization_response_raw_t;" in steamworks
+    assert "event.appId = raw->appId;" in dispatch_block
+    assert "event.orderId = raw->orderId;" in dispatch_block
+    assert "event.authorized = raw->authorized ? qtrue : qfalse;" in dispatch_block
+    assert "callbackState->bindings.onAuthorizationResponse( callbackState->bindings.context, &event );" in dispatch_block
+    assert "QL_STEAM_CALLBACK_MICROTXN_AUTHORIZATION_RESPONSE" in register_micro_block
+    assert "sizeof( ql_steam_microtxn_authorization_response_raw_t )" in register_micro_block
+    assert "QL_Steamworks_PrepareCallbackObject( &callbackState->authorizationResponse, QL_STEAM_CALLBACK_MICROTXN_AUTHORIZATION_RESPONSE, sizeof( ql_steam_microtxn_authorization_response_raw_t ), qfalse, callbackState, QL_Steamworks_DispatchMicroAuthorizationResponse, NULL );" in register_micro_block
+    assert "QL_Steamworks_RegisterCallbackObject( &callbackState->authorizationResponse )" in register_micro_block
+    assert "microBindings.onAuthorizationResponse = CL_Steam_Micro_OnAuthorizationResponse;" in init_micro_block
+    assert "QL_Steamworks_RegisterMicroCallbacks( &microBindings )" in init_micro_block
+    assert init_micro_block.index("microBindings.onAuthorizationResponse") < init_micro_block.index(
+        "QL_Steamworks_RegisterMicroCallbacks( &microBindings )"
+    )
+
+    assert 'Com_sprintf( payload, sizeof( payload ), "{\\"appid\\":%u,\\"orderid\\":\\"%llu\\",\\"authorized\\":%d}", event->appId, (unsigned long long)event->orderId, event->authorized ? 1 : 0 );' in micro_callback_block
+    assert 'CL_Steam_PublishBrowserEvent( "microtxn.authorization", payload );' in micro_callback_block
+    assert 'Com_DPrintf( "GOT MICRO RESPONSE: %s\\n", payload );' not in micro_callback_block
+    assert micro_callback_block.index('Com_sprintf( payload, sizeof( payload ), "{\\"appid\\"') < micro_callback_block.index(
+        "CL_LogMicroTransactionCallbackLifecycle( event );"
+    )
+    assert micro_callback_block.index("CL_LogMicroTransactionCallbackLifecycle( event );") < micro_callback_block.index(
+        'CL_Steam_PublishBrowserEvent( "microtxn.authorization", payload );'
+    )
+    assert 'Com_DPrintf( "microtxn.authorization callback: appid=%u order=%llu authorized=%d (%s [%s])\\n",' in log_micro_block
+    assert "CL_GetSocialOverlayServiceProviderLabel()" in log_micro_block
+    assert "CL_GetSocialOverlayServicePolicyLabel()" in log_micro_block
+
+    for doc_anchor in (
+        "# Quake Live Steam Mapping Round 591: Microtransaction Authorization Payload",
+        "`sub_4658a0` / `FUN_004658a0`",
+        "`appid`, `orderid`, and `authorized`",
+        "`MicroTxnAuthorizationResponse_t` callback id `0x98`",
+        "Overall Steam launch/runtime integration mapping confidence: **93.08% -> 93.10%**.",
+    ):
+        assert doc_anchor in mapping_round
+
+
+def test_steam_datasource_onrequest_avatar_only_boundary_tracks_retail_hlil() -> None:
+    aliases = json.loads(
+        (REPO_ROOT / "references/analysis/quakelive_symbol_aliases.json").read_text(encoding="utf-8")
+    )["quakelive_steam_srp"]
+    functions_csv = (
+        REPO_ROOT / "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+    ).read_text(encoding="utf-8")
+    hlil_part02 = (
+        REPO_ROOT
+        / "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part02.txt"
+    ).read_text(encoding="utf-8")
+    steam_resources = (REPO_ROOT / "src/code/client/cl_steam_resources.c").read_text(encoding="utf-8")
+    gap_note = (
+        REPO_ROOT / "docs/reverse-engineering/source-file-gap-notes/rw-g01-client-steam-resources.md"
+    ).read_text(encoding="utf-8")
+    mapping_round = (
+        REPO_ROOT / "docs/reverse-engineering/quakelive_steam_mapping_round_594.md"
+    ).read_text(encoding="utf-8")
+
+    data_source_block = _extract_function_block(
+        steam_resources,
+        "static qboolean CL_SteamDataSource_Request( const char *url, clSteamDataSourceResponse_t *response ) {",
+    )
+    avatar_request_block = _extract_function_block(
+        steam_resources,
+        "static qboolean CL_SteamResources_RequestAvatarRGBA( const char *url, byte **outPixels, int *outWidth, int *outHeight )",
+    )
+    avatar_callback_block = _extract_function_block(
+        steam_resources,
+        "static void CL_SteamResources_OnAvatarImageLoaded( void *context, const ql_steam_avatar_image_loaded_t *event ) {",
+    )
+    interceptor_block = _extract_function_block(
+        steam_resources,
+        "static qboolean QLResourceInterceptor_OnRequest( const char *url, clSteamDataSourceResponse_t *response ) {",
+    )
+
+    expected_aliases = {
+        "FUN_00463550": "SteamDataSource_StartResponseThread",
+        "sub_463550": "SteamDataSource_StartResponseThread",
+        "FUN_004640c0": "SteamDataSource_OnRequest",
+        "sub_4640C0": "SteamDataSource_OnRequest",
+        "sub_4640c0": "SteamDataSource_OnRequest",
+        "FUN_00464290": "SteamDataSource_OnAvatarImageLoaded",
+        "sub_464290": "SteamDataSource_OnAvatarImageLoaded",
+    }
+    for retail_name, source_name in expected_aliases.items():
+        assert aliases[retail_name] == source_name
+
+    for function_row in (
+        "FUN_00463550,00463550,164,0,unknown",
+        "FUN_004640c0,004640c0,450,0,unknown",
+        "FUN_00464290,00464290,102,0,unknown",
+    ):
+        assert function_row in functions_csv
+
+    assert "004640c0    void* __thiscall sub_4640c0" in hlil_part02
+    assert '0046411e  sub_409ed0(&var_68, &var_30, 0, sub_40a320(&var_68, U"/", 0, 1))' in hlil_part02
+    assert "00464169      &var_4c, Awesomium::WebURL::filename(this: (*(*arg3 + 0xc))(&var_78)))))" in hlil_part02
+    assert '0046418b  sscanf(eax_7, "%llu", &var_70, eax_2)' in hlil_part02
+    assert '004641b6  void* result = sub_406970(eax_8, "avatar", ecx_6)' in hlil_part02
+    assert "004641c5  if (result == 0 && var_20 u>= 6)" in hlil_part02
+    assert "004641de          int32_t edx_3 = *(*SteamFriends() + 0x90)" in hlil_part02
+    assert "004641eb          result = edx_3(var_70, var_6c)" in hlil_part02
+    assert "004641f0          if (result == 0xffffffff)" in hlil_part02
+    assert "004641f9              result = sub_467c50(arg1 + 0xc, &var_70)" in hlil_part02
+    assert "00464201              *result = arg2" in hlil_part02
+    assert "00464210              result = sub_463550(arg1, arg2, result)" in hlil_part02
+    assert "00464290    int32_t __thiscall sub_464290" in hlil_part02
+    assert "004642b5  int32_t* eax_2 = *sub_467c50(arg1 + 0xc, &var_c)" in hlil_part02
+    assert "004642f3  return sub_463550(arg1, eax_2, arg2[2])" in hlil_part02
+
+    assert '{ "SteamDataSource", "OnRequest", 0x00532B80u, 0x04u, 0x004640C0u, "CL_SteamDataSource_Request", CL_STEAM_DATA_SOURCE_SCOPE_COMPATIBILITY_OWNER },' in steam_resources
+    assert '{ "SteamDataSource", "StartResponseThread", 0u, 0u, 0x00463550u, "CL_SteamResources_RequestAvatarRGBA", CL_STEAM_DATA_SOURCE_SCOPE_ASYNC_BOUNDARY },' in steam_resources
+    assert '{ "CCallback<class SteamDataSource, struct AvatarImageLoaded_t, 0>", "callback target", 0x00532B68u, 0x10u, 0x00464290u, "CL_SteamResources_OnAvatarImageLoaded", CL_STEAM_DATA_SOURCE_SCOPE_AVATAR_CALLBACK },' in steam_resources
+    assert 'return "avatar-only SteamDataSource";' in steam_resources
+    assert 'return "missing non-avatar SteamDataSource owner";' in steam_resources
+    assert 'return "QLResourceInterceptor launcher/web fallback";' in steam_resources
+
+    assert "CL_SteamDataSource_ClearResponse( response );" in data_source_block
+    assert "response->fromSteamDataSource = qtrue;" in data_source_block
+    assert "if ( CL_SteamResources_IsAvatarURL( url ) ) {" in data_source_block
+    assert 'CL_LogSteamResourceBridgeUnavailable( url, "keeping launcher/web fallback resource bridge" );' in data_source_block
+    assert "CL_SteamResources_RequestAvatarRGBA( url, &response->rgbaPixels, &response->width, &response->height )" in data_source_block
+    assert "CL_SteamResources_IsPendingAvatarURL( url )" in data_source_block
+    assert 'CL_LogSteamResourceBridgeUnavailable( url, "avatar request deferred pending AvatarImageLoaded callback" );' in data_source_block
+    assert 'Q_strncpyz( response->mimeType, "image/rgba", sizeof( response->mimeType ) );' in data_source_block
+    assert 'CL_LogSteamResourceBridgeUnavailable( url, "non-avatar Steam URI routed to launcher/web fallback owner" );' in data_source_block
+    assert "CL_LauncherRequestData" not in data_source_block
+
+    assert "QL_Steamworks_RequestAvatarImage( idLow, idHigh, size, NULL )" in avatar_request_block
+    assert "avatarState == QL_STEAM_AVATAR_IMAGE_PENDING" in avatar_request_block
+    assert "CL_SteamResources_MarkPendingAvatar( idLow, idHigh );" in avatar_request_block
+    assert "QL_Steamworks_LoadAvatarRGBA( idLow, idHigh, size, &rgbaPixels, &width, &height )" in avatar_request_block
+    assert "CL_SteamResources_ClearPendingAvatar( (uint32_t)steamIdValue, (uint32_t)( steamIdValue >> 32 ) )" in avatar_callback_block
+    assert "pending avatar request may be retried" in avatar_callback_block
+    assert interceptor_block.index("CL_SteamDataSource_Request( url, response )") < interceptor_block.index(
+        "QLResourceInterceptor_RequestRetailHost( url, response )"
+    )
+    assert interceptor_block.index("QLResourceInterceptor_RequestRetailHost( url, response )") < interceptor_block.index(
+        "CL_LauncherRequestData( url, (void **)&response->buffer, &response->bufferLength )"
+    )
+
+    for gap_anchor in (
+        "Non-avatar `steam://` requests are explicitly labeled as routed to the `QLResourceInterceptor launcher/web fallback` owner",
+        "| `CL_GetSteamDataSourceSubsetLabel` | `bounded divergence classifier` | Publishes `avatar-only SteamDataSource`",
+        "| `CL_GetSteamDataSourceNativeGapLabel` | `bounded divergence classifier` | Publishes `missing non-avatar SteamDataSource owner`",
+        "| `CL_SteamDataSource_Request` | `divergence owner` | Live avatar requests still depend on bounded Steam callbacks",
+    ):
+        assert gap_anchor in gap_note
+
+    for doc_anchor in (
+        "# Quake Live Steam Mapping Round 594: SteamDataSource OnRequest Avatar Boundary",
+        "`sub_4640c0` / `FUN_004640c0`",
+        "`SteamFriends()` vtable slot `0x90`",
+        "`0xffffffff`",
+        "`avatar-only SteamDataSource`",
+        "`missing non-avatar SteamDataSource owner`",
+        "Overall Steam launch/runtime integration mapping confidence: **93.10% -> 93.12%**.",
+    ):
+        assert doc_anchor in mapping_round
+
+
+def test_steam_datasource_lifecycle_callback_boundary_tracks_retail_hlil() -> None:
+    aliases = json.loads(
+        (REPO_ROOT / "references/analysis/quakelive_symbol_aliases.json").read_text(encoding="utf-8")
+    )["quakelive_steam_srp"]
+    functions_csv = (
+        REPO_ROOT / "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+    ).read_text(encoding="utf-8")
+    analysis_symbols = (
+        REPO_ROOT / "references/reverse-engineering/ghidra/quakelive_steam/analysis_symbols.txt"
+    ).read_text(encoding="utf-8")
+    hlil_part02 = (
+        REPO_ROOT
+        / "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part02.txt"
+    ).read_text(encoding="utf-8")
+    hlil_part05 = (
+        REPO_ROOT
+        / "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part05.txt"
+    ).read_text(encoding="utf-8")
+    hlil_part06 = (
+        REPO_ROOT
+        / "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part06.txt"
+    ).read_text(encoding="utf-8")
+    steam_resources = (REPO_ROOT / "src/code/client/cl_steam_resources.c").read_text(encoding="utf-8")
+    steamworks = (REPO_ROOT / "src/common/platform/platform_steamworks.c").read_text(encoding="utf-8")
+    harness_py = (REPO_ROOT / "tests/test_steamworks_harness.py").read_text(encoding="utf-8")
+    gap_note = (
+        REPO_ROOT / "docs/reverse-engineering/source-file-gap-notes/rw-g01-client-steam-resources.md"
+    ).read_text(encoding="utf-8")
+    mapping_round = (
+        REPO_ROOT / "docs/reverse-engineering/quakelive_steam_mapping_round_598.md"
+    ).read_text(encoding="utf-8")
+
+    resources_init_block = _extract_function_block(steam_resources, "void CL_InitSteamResources( void ) {")
+    resources_shutdown_block = _extract_function_block(steam_resources, "void CL_ShutdownSteamResources( void ) {")
+    register_avatar_block = _extract_function_block(steam_resources, "static void CL_SteamResources_RegisterAvatarCallbacks( void ) {")
+    unregister_avatar_block = _extract_function_block(steam_resources, "static void CL_SteamResources_UnregisterAvatarCallbacks( void ) {")
+    platform_register_block = _extract_function_block(
+        steamworks,
+        "qboolean QL_Steamworks_RegisterAvatarCallbacks( const ql_steam_avatar_callback_bindings_t *bindings ) {",
+    )
+    platform_unregister_block = _extract_function_block(steamworks, "void QL_Steamworks_UnregisterAvatarCallbacks( void ) {")
+    dispatch_avatar_block = _extract_function_block(
+        steamworks,
+        "static void QL_Steamworks_DispatchAvatarImageLoaded( void *context, const void *payload ) {",
+    )
+
+    expected_aliases = {
+        "FUN_00464300": "SteamDataSource_Init",
+        "sub_464300": "SteamDataSource_Init",
+        "FUN_00464440": "SteamDataSource_Shutdown",
+        "sub_464440": "SteamDataSource_Shutdown",
+        "FUN_00464510": "SteamDataSource_Destroy",
+        "sub_464510": "SteamDataSource_Destroy",
+    }
+    for retail_name, source_name in expected_aliases.items():
+        assert aliases[retail_name] == source_name
+
+    for function_row in (
+        "FUN_00464300,00464300,311,0,unknown",
+        "FUN_00464440,00464440,194,0,unknown",
+        "FUN_00464510,00464510,33,0,unknown",
+    ):
+        assert function_row in functions_csv
+
+    assert "SteamDataSource::vftable" in analysis_symbols
+    assert "CCallback<class_SteamDataSource,struct_AvatarImageLoaded_t,0>::vftable" in analysis_symbols
+    assert "00532b68  struct CCallbackBase::CCallback<class SteamDataSource, struct AvatarImageLoaded_t, 0>::VTable" in hlil_part06
+    assert "00532b80  struct Awesomium::DataSource::SteamDataSource::VTable SteamDataSource::`vftable'" in hlil_part06
+    assert "00532b80      void*** (__thiscall* const vFunc_0)(void*** arg1, char arg2) = sub_464510" in hlil_part06
+    assert "00532b84      void* (__thiscall* const vFunc_1)(void* arg1, int32_t arg2, int32_t* arg3, Awesomium::WebString* arg4) = sub_4640c0" in hlil_part06
+
+    assert "00464300    struct Awesomium::DataSource::SteamDataSource::VTable** __fastcall sub_464300" in hlil_part02
+    assert "0046432d  Awesomium::DataSource::DataSource(this: arg1)" in hlil_part02
+    assert "00464335  *result = &SteamDataSource::`vftable'{for `Awesomium::DataSource'}" in hlil_part02
+    assert "00464343  eax_3, ecx = operator new(0x28)" in hlil_part02
+    assert "00464353  result[4] = eax_3" in hlil_part02
+    assert "0046437a  eax_7, ecx_2 = operator new(0x18)" in hlil_part02
+    assert "00464386  result[8] = eax_7" in hlil_part02
+    assert "004643ad  result[0xc].b = 0" in hlil_part02
+    assert "004643b4  result[0xb] = &CCallback<class SteamDataSource, struct AvatarImageLoaded_t, 0>::`vftable'{for `CCallbackBase'}" in hlil_part02
+    assert "004643bd  result[0xf] = sub_464290" in hlil_part02
+    assert "004643d0  SteamAPI_RegisterCallback(&result[0xb], 0x14e, eax_2)" in hlil_part02
+    assert hlil_part02.index("004643b4  result[0xb]") < hlil_part02.index("004643d0  SteamAPI_RegisterCallback(&result[0xb], 0x14e, eax_2)")
+
+    assert "00464440    int32_t __fastcall sub_464440" in hlil_part02
+    assert "0046446c  *arg1 = &SteamDataSource::`vftable'{for `Awesomium::DataSource'}" in hlil_part02
+    assert "00464479  bool cond:0 = (arg1[0xc].b & 1) == 0" in hlil_part02
+    assert "00464480  arg1[0xb] = &CCallback<class SteamDataSource, struct AvatarImageLoaded_t, 0>::`vftable'{for `CCallbackBase'}" in hlil_part02
+    assert "00464489      SteamAPI_UnregisterCallback(&arg1[0xb], eax_2)" in hlil_part02
+    assert "004644a9  sub_463fc0(&arg1[7], &var_1c, *eax_4, eax_4)" in hlil_part02
+    assert "004644b2  operator delete(arg1[8])" in hlil_part02
+    assert "004644d1  sub_463f20(&arg1[3], &var_18, *eax_5, eax_5)" in hlil_part02
+    assert "004644da  operator delete(arg1[4])" in hlil_part02
+    assert "004644eb  int32_t result = Awesomium::DataSource::~DataSource(this: arg1)" in hlil_part02
+    assert hlil_part02.index("00464489      SteamAPI_UnregisterCallback(&arg1[0xb], eax_2)") < hlil_part02.index(
+        "004644a9  sub_463fc0(&arg1[7], &var_1c, *eax_4, eax_4)"
+    )
+    assert "00464510    struct Awesomium::DataSource::SteamDataSource::VTable** __thiscall sub_464510" in hlil_part02
+    assert "00464516  sub_464440(arg1)" in hlil_part02
+    assert "00464522      operator delete(arg1)" in hlil_part02
+    assert "004f2ead                  eax_12 = sub_464300(eax_11)" in hlil_part05
+
+    assert '{ "SteamDataSource", "destroy", 0x00532B80u, 0x00u, 0x00464510u, "CL_ShutdownSteamResources", CL_STEAM_DATA_SOURCE_SCOPE_DESTRUCTOR },' in steam_resources
+    assert '{ "SteamDataSource", "Init", 0u, 0u, 0x00464300u, "CL_InitSteamResources", CL_STEAM_DATA_SOURCE_SCOPE_LIFECYCLE_BOUNDARY },' in steam_resources
+    assert '{ "SteamDataSource", "Shutdown", 0u, 0u, 0x00464440u, "CL_ShutdownSteamResources", CL_STEAM_DATA_SOURCE_SCOPE_LIFECYCLE_BOUNDARY },' in steam_resources
+    assert '{ "CCallback<class SteamDataSource, struct AvatarImageLoaded_t, 0>", "callback id", 0x00532B68u, 0x14Eu, 0x00464300u, "CL_SteamResources_RegisterAvatarCallbacks", CL_STEAM_DATA_SOURCE_SCOPE_AVATAR_CALLBACK },' in steam_resources
+    assert "cl_steamAvatarCallbacksRegistered = qfalse;" in resources_init_block
+    assert resources_init_block.index("CL_RefreshSteamResourceBridgeCvars();") < resources_init_block.index("if ( !CL_SteamServicesEnabled() ) {")
+    assert resources_init_block.index("if ( !CL_SteamServicesEnabled() ) {") < resources_init_block.index("CL_SteamResources_RegisterAvatarCallbacks();")
+    assert "if ( cl_steamAvatarCallbacksRegistered || !CL_SteamServicesEnabled() ) {" in register_avatar_block
+    assert "bindings.onAvatarImageLoaded = CL_SteamResources_OnAvatarImageLoaded;" in register_avatar_block
+    assert "QL_Steamworks_RegisterAvatarCallbacks( &bindings )" in register_avatar_block
+    assert "cl_steamAvatarCallbacksRegistered = qtrue;" in register_avatar_block
+    assert "if ( !cl_steamAvatarCallbacksRegistered ) {" in unregister_avatar_block
+    assert "QL_Steamworks_UnregisterAvatarCallbacks();" in unregister_avatar_block
+    assert "cl_steamAvatarCallbacksRegistered = qfalse;" in unregister_avatar_block
+    assert resources_shutdown_block.index("CL_SteamResources_UnregisterAvatarCallbacks();") < resources_shutdown_block.index(
+        "CL_ClearSteamResourceCache( qfalse );"
+    )
+
+    assert "QL_Steamworks_PrepareCallbackObject( &callbackState->avatarImageLoaded, QL_STEAM_CALLBACK_AVATAR_IMAGE_LOADED, sizeof( ql_steam_avatar_image_loaded_raw_t ), qfalse, callbackState, QL_Steamworks_DispatchAvatarImageLoaded, NULL );" in platform_register_block
+    assert "QL_Steamworks_RegisterCallbackObject( &callbackState->avatarImageLoaded )" in platform_register_block
+    assert "callbackState->registered = qtrue;" in platform_register_block
+    assert "QL_Steamworks_UnregisterCallbackObject( &callbackState->avatarImageLoaded );" in platform_unregister_block
+    assert "memset( callbackState, 0, sizeof( *callbackState ) );" in platform_unregister_block
+    assert "event.steamId = QL_Steamworks_CombineIdentityWords( raw->steamIDLow, raw->steamIDHigh );" in dispatch_avatar_block
+    assert "event.image = raw->image;" in dispatch_avatar_block
+    assert "event.width = raw->wide;" in dispatch_avatar_block
+    assert "event.height = raw->tall;" in dispatch_avatar_block
+    assert "callbackState->bindings.onAvatarImageLoaded( callbackState->bindings.context, &event );" in dispatch_avatar_block
+    assert "assert lib.QLR_SteamworksMock_QueueAvatarImageLoaded(0x0FEDCBA987654321, 13, 64, 64)" in harness_py
+
+    for gap_anchor in (
+        "`CL_InitSteamResources()` now registers a dedicated avatar-image callback owner when Steam services are available",
+        "`CL_ShutdownSteamResources()` unregisters that owner on teardown",
+        "| `CL_SteamResources_RegisterAvatarCallbacks` | `bounded compatibility` | Mirrors the retail callback registration owner",
+    ):
+        assert gap_anchor in gap_note
+
+    for doc_anchor in (
+        "# Quake Live Steam Mapping Round 598: SteamDataSource Lifecycle Callback Boundary",
+        "`sub_464300` / `FUN_00464300`",
+        "`sub_464440` / `FUN_00464440`",
+        "`sub_464510` / `FUN_00464510`",
+        "`SteamAPI_RegisterCallback(&result[0xb], 0x14e, ...)`",
+        "`QL_Steamworks_RegisterAvatarCallbacks(...)`",
+        "Overall Steam launch/runtime integration mapping confidence: **93.14% -> 93.16%**.",
+    ):
+        assert doc_anchor in mapping_round
 
 
 def test_advert_bridge_callbacks_track_retail_ui_and_cgame_state_paths() -> None:
@@ -5985,12 +7437,12 @@ def test_server_game_server_wrappers_reconstruct_mapped_server_slots() -> None:
     assert 'QL_Steamworks_LogServerCallbackDispatch( "gs_stats_received", "ignored dispatch without registered callback" );' in dispatch_gs_received_block
     assert 'QL_Steamworks_LogServerCallbackDispatch( "gs_stats_received", "ignored dispatch without payload" );' in dispatch_gs_received_block
     assert "event.result = raw->result;" in dispatch_gs_received_block
-    assert "event.steamId = raw->steamId;" in dispatch_gs_received_block
+    assert "event.steamId = QL_Steamworks_CombineIdentityWords( raw->steamIdLow, raw->steamIdHigh );" in dispatch_gs_received_block
     assert 'QL_Steamworks_LogServerCallbackDispatch( "gs_stats_stored", "ignored dispatch without callback state" );' in dispatch_gs_stored_block
     assert 'QL_Steamworks_LogServerCallbackDispatch( "gs_stats_stored", "ignored dispatch without registered callback" );' in dispatch_gs_stored_block
     assert 'QL_Steamworks_LogServerCallbackDispatch( "gs_stats_stored", "ignored dispatch without payload" );' in dispatch_gs_stored_block
     assert "event.result = raw->result;" in dispatch_gs_stored_block
-    assert "event.steamId = raw->steamId;" in dispatch_gs_stored_block
+    assert "event.steamId = QL_Steamworks_CombineIdentityWords( raw->steamIdLow, raw->steamIdHigh );" in dispatch_gs_stored_block
     assert "if ( callbackState->registered ) {" in register_callbacks_block
     assert "QL_Steamworks_UnregisterServerCallbacks();" in register_callbacks_block
     for callback_object, callback_id in (
@@ -13548,6 +15000,172 @@ def test_lobby_social_wrappers_reconstruct_mapped_matchmaking_slots() -> None:
     assert 'return value ? value : "";' in achievement_attr_block
 
 
+def test_steam_callback_payload_size_thunks_and_server_max_players_track_retail_refs() -> None:
+    steamworks = (REPO_ROOT / "src/common/platform/platform_steamworks.c").read_text(encoding="utf-8")
+    sv_main = (REPO_ROOT / "src/code/server/sv_main.c").read_text(encoding="utf-8")
+    aliases = json.loads(
+        (REPO_ROOT / "references/analysis/quakelive_symbol_aliases.json").read_text(encoding="utf-8")
+    )["quakelive_steam_srp"]
+    functions_csv = (
+        REPO_ROOT / "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+    ).read_text(encoding="utf-8")
+    hlil_part02 = (
+        REPO_ROOT
+        / "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part02.txt"
+    ).read_text(encoding="utf-8")
+    hlil_part05 = (
+        REPO_ROOT
+        / "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part05.txt"
+    ).read_text(encoding="utf-8")
+    hlil_part06 = (
+        REPO_ROOT
+        / "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part06.txt"
+    ).read_text(encoding="utf-8")
+
+    callback_size_block = _extract_function_block(
+        steamworks, "static int QL_Steamworks_CallbackGetSizeImpl( ql_steam_callback_base_t *self )"
+    )
+    prepare_callback_block = _extract_function_block(
+        steamworks,
+        "static void QL_Steamworks_PrepareCallbackObject( ql_steam_callback_base_t *object, int callbackId, int payloadSize, qboolean gameServer, void *context,",
+    )
+    register_server_block = _extract_function_block(
+        steamworks, "qboolean QL_Steamworks_RegisterServerCallbacks( const ql_steam_server_callback_bindings_t *bindings )"
+    )
+    register_lobby_block = _extract_function_block(
+        steamworks, "qboolean QL_Steamworks_RegisterLobbyCallbacks( const ql_steam_lobby_callback_bindings_t *bindings )"
+    )
+    dispatch_failure_block = _extract_function_block(
+        steamworks, "static void QL_Steamworks_DispatchServerConnectFailure( void *context, const void *payload )"
+    )
+    max_players_block = _extract_function_block(steamworks, "qboolean QL_Steamworks_ServerSetMaxPlayerCount( int maxPlayers )")
+    publish_block = _extract_function_block(sv_main, "void SV_SteamServerUpdatePublishedState( qboolean fullUpdate )")
+
+    expected_payload_aliases = {
+        "FUN_00461050": "SteamCallback_RunCallResult",
+        "sub_461050": "SteamCallback_RunCallResult",
+        "FUN_00461060": "SteamCallback_GetPayloadSize264",
+        "sub_461060": "SteamCallback_GetPayloadSize264",
+        "FUN_00461070": "SteamCallback_GetPayloadSize16",
+        "sub_461070": "SteamCallback_GetPayloadSize16",
+        "FUN_00461080": "SteamCallback_GetPayloadSize8",
+        "sub_461080": "SteamCallback_GetPayloadSize8",
+        "FUN_00461090": "SteamCallback_GetPayloadSize128",
+        "sub_461090": "SteamCallback_GetPayloadSize128",
+        "FUN_00463600": "SteamCallback_GetPayloadSize20",
+        "sub_463600": "SteamCallback_GetPayloadSize20",
+        "FUN_00465680": "SteamCallback_GetPayloadSize24",
+        "sub_465680": "SteamCallback_GetPayloadSize24",
+        "FUN_00465690": "SteamCallback_GetPayloadSize32",
+        "sub_465690": "SteamCallback_GetPayloadSize32",
+        "FUN_00465a40": "SteamServer_SetMaxPlayerCount",
+        "sub_465A40": "SteamServer_SetMaxPlayerCount",
+        "sub_465a40": "SteamServer_SetMaxPlayerCount",
+        "FUN_00465ea0": "SteamCallback_GetPayloadSize4",
+        "sub_465EA0": "SteamCallback_GetPayloadSize4",
+        "sub_465ea0": "SteamCallback_GetPayloadSize4",
+        "FUN_00467450": "SteamCallback_GetPayloadSize1",
+        "sub_467450": "SteamCallback_GetPayloadSize1",
+        "FUN_00467480": "SteamCallback_GetPayloadSize12",
+        "sub_467480": "SteamCallback_GetPayloadSize12",
+        "FUN_00469310": "SteamCallback_Run",
+        "sub_469310": "SteamCallback_Run",
+    }
+    for retail_name, source_name in expected_payload_aliases.items():
+        assert aliases[retail_name] == source_name
+
+    for function_row in (
+        "FUN_00461050,00461050,14,0,unknown",
+        "FUN_00461060,00461060,6,0,unknown",
+        "FUN_00461070,00461070,6,0,unknown",
+        "FUN_00461080,00461080,6,0,unknown",
+        "FUN_00461090,00461090,6,0,unknown",
+        "FUN_00463600,00463600,6,0,unknown",
+        "FUN_00465680,00465680,6,0,unknown",
+        "FUN_00465690,00465690,6,0,unknown",
+        "FUN_00465a40,00465a40,26,0,unknown",
+        "FUN_00465ea0,00465ea0,6,0,unknown",
+        "FUN_00467450,00467450,6,0,unknown",
+        "FUN_00467480,00467480,6,0,unknown",
+        "FUN_00469310,00469310,21,0,unknown",
+    ):
+        assert function_row in functions_csv
+
+    assert "00461050    int32_t __fastcall sub_461050(void* arg1)" in hlil_part02
+    assert "0046105c  jump(*(arg1 + 0x10))" in hlil_part02
+    assert "00461060    int32_t sub_461060() __pure" in hlil_part02
+    assert "00461065  return 0x108" in hlil_part02
+    assert "00461070    int32_t sub_461070() __pure" in hlil_part02
+    assert "00461075  return 0x10" in hlil_part02
+    assert "00461080    int32_t sub_461080() __pure" in hlil_part02
+    assert "00461085  return 8" in hlil_part02
+    assert "00461090    int32_t sub_461090() __pure" in hlil_part02
+    assert "00461095  return 0x80" in hlil_part02
+    assert "00463600    int32_t sub_463600() __pure" in hlil_part02
+    assert "00463605  return 0x14" in hlil_part02
+    assert "00465680    int32_t sub_465680() __pure" in hlil_part02
+    assert "00465685  return 0x18" in hlil_part02
+    assert "00465690    int32_t sub_465690() __pure" in hlil_part02
+    assert "00465695  return 0x20" in hlil_part02
+    assert "00465a40    int32_t sub_465a40()" in hlil_part02
+    assert "00465a59  return (*(*eax_1 + 0x30))(*(data_13e17ec + 0x30))" in hlil_part02
+    assert "00465ea0    int32_t sub_465ea0() __pure" in hlil_part02
+    assert "00465ea5  return 4" in hlil_part02
+    assert "00467450    int32_t sub_467450() __pure" in hlil_part02
+    assert "00467455  return 1" in hlil_part02
+    assert "00467480    int32_t sub_467480() __pure" in hlil_part02
+    assert "00467485  return 0xc" in hlil_part02
+    assert "00469310    int32_t __thiscall sub_469310(void* arg1, int32_t arg2)" in hlil_part02
+    assert "00469322  return (*(arg1 + 0x10))(arg2)" in hlil_part02
+    assert "004e339e  int32_t eax_15 = sub_465a40()" in hlil_part05
+    assert "005327c8      int32_t (* const vFunc_2)() __pure = sub_465680" in hlil_part06
+    assert "0053283c      int32_t (__thiscall* const vFunc_0)(void* arg1, int32_t arg2) = sub_469310" in hlil_part06
+    assert "00532840      int32_t (__fastcall* const vFunc_1)(void* arg1) = sub_461050" in hlil_part06
+    assert "00532844      int32_t (* const vFunc_2)() = sub_461060" in hlil_part06
+    assert "00532864      int32_t (* const vFunc_2)() = sub_461070" in hlil_part06
+    assert "00532874      int32_t (* const vFunc_2)() = sub_461080" in hlil_part06
+    assert "00532884      int32_t (* const vFunc_2)() = sub_461090" in hlil_part06
+    assert "00532894      int32_t (* const vFunc_2)() __pure = sub_467480" in hlil_part06
+    assert "00532b70      int32_t (* const vFunc_2)() __pure = sub_463600" in hlil_part06
+    assert "00532e8c      int32_t (* const vFunc_2)() __pure = sub_465680" in hlil_part06
+    assert "00532e9c      int32_t (* const vFunc_2)() __pure = sub_465690" in hlil_part06
+    assert "00532f24      int32_t (* const vFunc_2)() __pure = sub_465680" in hlil_part06
+    assert "005332f4      int32_t (* const vFunc_2)() __pure = sub_467450" in hlil_part06
+    assert "00533304      int32_t (* const vFunc_2)() = sub_465ea0" in hlil_part06
+    assert "00533314      int32_t (* const vFunc_2)() = sub_465ea0" in hlil_part06
+    assert "00533324      int32_t (* const vFunc_2)() __pure = sub_463600" in hlil_part06
+    assert "005336d8      int32_t (* const vFunc_2)() __pure = sub_467480" in hlil_part06
+    assert "00533874      int32_t (* const vFunc_2)() __pure = sub_465680" in hlil_part06
+
+    assert "static const ql_steam_callback_vtable_t ql_steam_callback_vtable = {\n\tQL_Steamworks_CallbackRun,\n\tQL_Steamworks_CallbackRunCallResult,\n\tQL_Steamworks_CallbackGetSize\n};" in steamworks
+    assert "return self->payloadSize;" in callback_size_block
+    assert "object->payloadSize = payloadSize;" in prepare_callback_block
+    assert "QL_STEAMWORKS_STATIC_ASSERT_SIZE( ql_steam_size_game_rich_presence_join_requested_raw, ql_steam_game_rich_presence_join_requested_raw_t, 0x108 );" in steamworks
+    assert "QL_STEAMWORKS_STATIC_ASSERT_SIZE( ql_steam_size_friend_rich_presence_update_raw, ql_steam_friend_rich_presence_update_raw_t, 0x0c );" in steamworks
+    assert "QL_STEAMWORKS_STATIC_ASSERT_SIZE( ql_steam_size_avatar_image_loaded_raw, ql_steam_avatar_image_loaded_raw_t, 0x14 );" in steamworks
+    assert "QL_STEAMWORKS_STATIC_ASSERT_SIZE( ql_steam_size_ugc_query_completed_raw, ql_steam_ugc_query_completed_raw_t, 0x18 );" in steamworks
+    assert "QL_STEAMWORKS_STATIC_ASSERT_SIZE( ql_steam_size_download_item_result_raw, ql_steam_download_item_result_raw_t, 0x18 );" in steamworks
+    assert "QL_STEAMWORKS_STATIC_ASSERT_SIZE( ql_steam_size_validate_auth_ticket_response_raw, ql_steam_validate_auth_ticket_response_raw_t, 0x14 );" in steamworks
+    assert "QL_STEAMWORKS_STATIC_ASSERT_SIZE( ql_steam_size_gs_stats_received_raw, ql_steam_gs_stats_received_raw_t, 0x0c );" in steamworks
+    assert "uint32_t steamIDFriendLow;\n\tuint32_t steamIDFriendHigh;\n\tuint32_t appId;\n} ql_steam_friend_rich_presence_update_raw_t;" in steamworks
+    assert "uint32_t steamIDLow;\n\tuint32_t steamIDHigh;\n\tint image;\n\tint wide;\n\tint tall;\n} ql_steam_avatar_image_loaded_raw_t;" in steamworks
+    assert "char nextCursor[256]" not in steamworks
+    assert "event.steamId = QL_Steamworks_CombineIdentityWords( raw->steamIDFriendLow, raw->steamIDFriendHigh );" in steamworks
+    assert "event.steamId = QL_Steamworks_CombineIdentityWords( raw->steamIDLow, raw->steamIDHigh );" in steamworks
+    assert "event.ownerSteamId = QL_Steamworks_CombineIdentityWords( raw->ownerSteamIdLow, raw->ownerSteamIdHigh );" in steamworks
+    assert "event.steamId = QL_Steamworks_CombineIdentityWords( raw->steamIdLow, raw->steamIdHigh );" in steamworks
+    assert "QL_Steamworks_PrepareCallbackObject( &callbackState->lobbyChatUpdate, QL_STEAM_CALLBACK_LOBBY_CHAT_UPDATE, sizeof( ql_steam_lobby_chat_update_raw_t ), qfalse, callbackState, QL_Steamworks_DispatchLobbyChatUpdate, NULL );" in register_lobby_block
+    assert "QL_Steamworks_PrepareCallbackObject( &callbackState->lobbyChatMessage, QL_STEAM_CALLBACK_LOBBY_CHAT_MESSAGE, sizeof( ql_steam_lobby_chat_message_raw_t ), qfalse, callbackState, QL_Steamworks_DispatchLobbyChatMessage, NULL );" in register_lobby_block
+    assert "typedef struct {\n\tint result;\n} ql_steam_server_connect_failure_raw_t;" in steamworks
+    assert "QL_Steamworks_PrepareCallbackObject( &callbackState->connectFailure, QL_STEAM_CALLBACK_STEAM_SERVER_CONNECT_FAILURE, sizeof( ql_steam_server_connect_failure_raw_t ), qtrue, callbackState, QL_Steamworks_DispatchServerConnectFailure, NULL );" in register_server_block
+    assert "QL_Steamworks_PrepareCallbackObject( &callbackState->serversDisconnected, QL_STEAM_CALLBACK_STEAM_SERVERS_DISCONNECTED, sizeof( ql_steam_servers_disconnected_raw_t ), qtrue, callbackState, QL_Steamworks_DispatchServersDisconnected, NULL );" in register_server_block
+    assert "event.stillRetrying = qfalse;" in dispatch_failure_block
+    assert "raw->stillRetrying" not in dispatch_failure_block
+    assert "vtable[0x30 / 4]" in max_players_block
+    assert "fn( gameServer, NULL, maxPlayers );" in max_players_block
+    assert 'if ( !QL_Steamworks_ServerSetMaxPlayerCount( sv_maxclients ? sv_maxclients->integer : 0 ) ) {' in publish_block
+
+
 def test_operator_workshop_commands_reconstruct_retail_ugc_surface() -> None:
     server_h = (REPO_ROOT / "src/code/server/server.h").read_text(encoding="utf-8")
     sv_init = (REPO_ROOT / "src/code/server/sv_init.c").read_text(encoding="utf-8")
@@ -13616,3 +15234,607 @@ def test_operator_workshop_commands_reconstruct_retail_ugc_surface() -> None:
     assert "return itemState != 0u ? qtrue : qfalse;" in subscribe_platform_block
     assert "vtable[0xc4 / 4]" in unsubscribe_platform_block
     assert "vtable[0xdc / 4]" in download_platform_block
+
+
+def test_server_steam_command_and_vm_bridge_aliases_track_ghidra_hlil_rows() -> None:
+    aliases = json.loads(
+        (REPO_ROOT / "references/analysis/quakelive_symbol_aliases.json").read_text(encoding="utf-8")
+    )["quakelive_steam_srp"]
+    functions_csv = (
+        REPO_ROOT / "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+    ).read_text(encoding="utf-8").lower()
+    hlil_part04 = (
+        REPO_ROOT
+        / "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part04.txt"
+    ).read_text(encoding="utf-8")
+    hlil_part05 = (
+        REPO_ROOT
+        / "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part05.txt"
+    ).read_text(encoding="utf-8")
+    hlil_part07 = (
+        REPO_ROOT
+        / "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part07.txt"
+    ).read_text(encoding="utf-8")
+    sv_ccmds = (REPO_ROOT / "src/code/server/sv_ccmds.c").read_text(encoding="utf-8")
+    sv_game = (REPO_ROOT / "src/code/server/sv_game.c").read_text(encoding="utf-8")
+    sv_client = (REPO_ROOT / "src/code/server/sv_client.c").read_text(encoding="utf-8")
+    ql_game_imports = (REPO_ROOT / "src/code/server/ql_game_imports.inc").read_text(encoding="utf-8")
+    mapping_round = (
+        REPO_ROOT / "docs/reverse-engineering/quakelive_steam_mapping_round_549.md"
+    ).read_text(encoding="utf-8")
+
+    expected_aliases = {
+        "FUN_004df010": "SteamCmd_DownloadUGC_f",
+        "sub_4DF010": "SteamCmd_DownloadUGC_f",
+        "sub_4df010": "SteamCmd_DownloadUGC_f",
+        "FUN_004df070": "SteamCmd_SubscribeUGC_f",
+        "sub_4DF070": "SteamCmd_SubscribeUGC_f",
+        "sub_4df070": "SteamCmd_SubscribeUGC_f",
+        "FUN_004df0d0": "SteamCmd_UnsubscribeUGC_f",
+        "sub_4DF0D0": "SteamCmd_UnsubscribeUGC_f",
+        "sub_4df0d0": "SteamCmd_UnsubscribeUGC_f",
+        "FUN_004e2620": "SV_SubmitMatchReport",
+        "sub_4E2620": "SV_SubmitMatchReport",
+        "sub_4e2620": "SV_SubmitMatchReport",
+        "FUN_004e2640": "SV_ReportPlayerEvent",
+        "sub_4E2640": "SV_ReportPlayerEvent",
+        "sub_4e2640": "SV_ReportPlayerEvent",
+        "FUN_004e2710": "SV_ClientGetSteamID",
+        "sub_4E2710": "SV_ClientGetSteamID",
+        "sub_4e2710": "SV_ClientGetSteamID",
+        "FUN_004e2770": "SV_ClientAddSteamStat",
+        "sub_4E2770": "SV_ClientAddSteamStat",
+        "sub_4e2770": "SV_ClientAddSteamStat",
+        "FUN_004e2860": "SV_ClientUnlockSteamAchievement",
+        "sub_4E2860": "SV_ClientUnlockSteamAchievement",
+        "sub_4e2860": "SV_ClientUnlockSteamAchievement",
+        "FUN_004e28c0": "SV_ClientHasSteamAchievement",
+        "sub_4E28C0": "SV_ClientHasSteamAchievement",
+        "sub_4e28c0": "SV_ClientHasSteamAchievement",
+        "FUN_004e2920": "SV_ClientBeginSteamAuthSession",
+        "sub_4E2920": "SV_ClientBeginSteamAuthSession",
+        "sub_4e2920": "SV_ClientBeginSteamAuthSession",
+    }
+    for symbol, alias in expected_aliases.items():
+        assert aliases[symbol] == alias
+
+    for function_row in (
+        "fun_004df010,004df010,95,0,unknown",
+        "fun_004df070,004df070,87,0,unknown",
+        "fun_004df0d0,004df0d0,87,0,unknown",
+        "fun_004e2620,004e2620,25,0,unknown",
+        "fun_004e2640,004e2640,55,0,unknown",
+        "fun_004e2710,004e2710,89,0,unknown",
+        "fun_004e2770,004e2770,86,0,unknown",
+        "fun_004e2860,004e2860,82,0,unknown",
+        "fun_004e28c0,004e28c0,86,0,unknown",
+        "fun_004e2920,004e2920,253,0,unknown",
+    ):
+        assert function_row in functions_csv
+
+    for doc_anchor in (
+        "| `sub_4df010` | `SteamCmd_DownloadUGC_f` |",
+        "| `sub_4df070` | `SteamCmd_SubscribeUGC_f` |",
+        "| `sub_4df0d0` | `SteamCmd_UnsubscribeUGC_f` |",
+        "| `sub_4e2620` | `SV_SubmitMatchReport` |",
+        "| `sub_4e2640` | `SV_ReportPlayerEvent` |",
+        "| `sub_4e2710` | `SV_ClientGetSteamID` |",
+        "| `sub_4e2770` | `SV_ClientAddSteamStat` |",
+        "| `sub_4e2860` | `SV_ClientUnlockSteamAchievement` |",
+        "| `sub_4e28c0` | `SV_ClientHasSteamAchievement` |",
+        "| `sub_4e2920` | `SV_ClientBeginSteamAuthSession` |",
+    ):
+        assert doc_anchor in mapping_round
+
+    assert 'sub_4c81d0("steam_downloadugc", sub_4df010)' in hlil_part04
+    assert 'sub_4c81d0("steam_subscribeugc", sub_4df070)' in hlil_part04
+    assert 'sub_4c81d0("steam_unsubscribeugc", sub_4df0d0)' in hlil_part04
+    assert 'sscanf(sub_4c7ee0(1), "%llu", &var_c)' in hlil_part04
+    assert "return sub_4699c0(var_c, var_8, 0)" in hlil_part04
+    assert "return sub_469260(var_c, var_8)" in hlil_part04
+    assert "return sub_4692b0(var_c, var_8)" in hlil_part04
+
+    assert "004e2628  sub_468ee0(arg1)" in hlil_part05
+    assert "004e2638  return sub_4f4e40(arg1)" in hlil_part05
+    assert "004e265a  sub_468030(arg1, arg2, arg3)" in hlil_part05
+    assert "004e2676  return sub_4f4e10(arg1, arg2, arg3, arg4, arg5)" in hlil_part05
+    assert "004e2761          return *(esi_2 + 0x25b60)" in hlil_part05
+    assert "004e27bc          return sub_467d40(result[0x96d8], result[0x96d9], arg2, arg3)" in hlil_part05
+    assert "004e28a8          return sub_467e00(result[0x96d8], result[0x96d9], arg2)" in hlil_part05
+    assert "004e2911          return sub_467f70(*(eax_2 + 0x25b60), *(eax_2 + 0x25b64), arg2)" in hlil_part05
+    assert "004e29e6          int32_t result = sub_465fd0(eax_4 + 0x13337f0, *(eax_4 + 0x13339f0)," in hlil_part05
+    assert "004e2a02              sub_467cd0(*(esi_2 + 0x25b60))" in hlil_part05
+
+    assert "0056d2a0  void* data_56d2a0 = sub_4e2710" in hlil_part07
+    assert "0056d2a4  void* data_56d2a4 = sub_4e2770" in hlil_part07
+    assert "0056d2ac  void* data_56d2ac = sub_4e2860" in hlil_part07
+    assert "0056d2b0  void* data_56d2b0 = sub_4e28c0" in hlil_part07
+    assert "0056d2b4  void* data_56d2b4 = sub_4e2920" in hlil_part07
+
+    add_operator_block = _extract_function_block(sv_ccmds, "void SV_AddOperatorCommands( void )")
+    submit_bridge_block = _extract_function_block(sv_game, "static void SV_SubmitMatchReport( void *report )")
+    player_event_bridge_block = _extract_function_block(
+        sv_game, "static void SV_ReportPlayerEvent( uint32_t steamIdLow, uint32_t steamIdHigh, const void *clientStats, const char *eventName, void *payload )"
+    )
+    steam_id_compat_block = _extract_function_block(
+        ql_game_imports, "static qboolean QDECL QL_G_trap_GetSteamId( int clientNum, unsigned int *steamIdLow, unsigned int *steamIdHigh )"
+    )
+    verify_compat_block = _extract_function_block(
+        ql_game_imports, "static qboolean QDECL QL_G_trap_VerifySteamAuth( int clientNum )"
+    )
+    begin_auth_block = _extract_function_block(
+        sv_client, "static const char *SV_BeginPlatformAuthSession( client_t *cl, const netadr_t *adr )"
+    )
+
+    assert 'Cmd_AddCommand ("steam_downloadugc", SV_SteamCmd_DownloadUGC_f);' in add_operator_block
+    assert 'Cmd_AddCommand ("steam_subscribeugc", SV_SteamCmd_SubscribeUGC_f);' in add_operator_block
+    assert 'Cmd_AddCommand ("steam_unsubscribeugc", SV_SteamCmd_UnsubscribeUGC_f);' in add_operator_block
+    assert "preparedReport = SV_SteamStats_ProcessMatchReport( report, steamMatchReport, (int)sizeof( steamMatchReport ) );" in submit_bridge_block
+    assert "Zmq_SubmitMatchReport( preparedReport );" in submit_bridge_block
+    assert "SV_SteamStats_ProcessEvent( steamIdLow, steamIdHigh, clientStats, eventName, payload );" in player_event_bridge_block
+    assert "Zmq_ReportPlayerEvent( steamIdLow, steamIdHigh, clientStats, eventName, payload );" in player_event_bridge_block
+    assert "ql_game_imports[G_QL_IMPORT_STEAMID_QUERY] = (ql_import_f)QL_G_trap_GetSteamId;" in sv_game
+    assert "ql_game_imports[G_QL_IMPORT_STEAM_AUTH_VALIDATE] = (ql_import_f)QL_G_trap_VerifySteamAuth;" in sv_game
+    assert "G_Import_Syscall( G_STEAMID_QUERY, clientNum, steamIdLow, steamIdHigh )" in steam_id_compat_block
+    assert "G_Import_Syscall( G_STEAM_AUTH_VALIDATE, clientNum )" in verify_compat_block
+    assert "QL_Steamworks_ServerBeginAuthSession( &steamId, cl->platformAuthToken, &response )" in begin_auth_block
+    assert "SV_SteamStats_CreatePlayerSession( cl );" in begin_auth_block
+
+
+def test_steam_auth_and_stats_tree_helpers_track_retail_reference_rows() -> None:
+    aliases = json.loads(
+        (REPO_ROOT / "references/analysis/quakelive_symbol_aliases.json").read_text(encoding="utf-8")
+    )["quakelive_steam_srp"]
+    functions_csv = (
+        REPO_ROOT / "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+    ).read_text(encoding="utf-8")
+    hlil_part02 = (
+        REPO_ROOT
+        / "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part02.txt"
+    ).read_text(encoding="utf-8")
+    sv_client = (REPO_ROOT / "src/code/server/sv_client.c").read_text(encoding="utf-8")
+    mapping_round = (
+        REPO_ROOT / "docs/reverse-engineering/quakelive_steam_mapping_round_558.md"
+    ).read_text(encoding="utf-8")
+
+    expected_aliases = {
+        "FUN_00465eb0": "std_tree_equal_range_steamid_node",
+        "sub_465EB0": "std_tree_equal_range_steamid_node",
+        "sub_465eb0": "std_tree_equal_range_steamid_node",
+        "FUN_00465f60": "std_tree_create_steamid_node",
+        "sub_465F60": "std_tree_create_steamid_node",
+        "sub_465f60": "std_tree_create_steamid_node",
+        "FUN_004660c0": "std_tree_find_or_insert_steamid_node",
+        "sub_4660C0": "std_tree_find_or_insert_steamid_node",
+        "sub_4660c0": "std_tree_find_or_insert_steamid_node",
+        "FUN_00467320": "std_tree_rightmost_steamid_map_node",
+        "sub_467320": "std_tree_rightmost_steamid_map_node",
+        "FUN_00467340": "std_tree_leftmost_steamid_map_node",
+        "sub_467340": "std_tree_leftmost_steamid_map_node",
+        "FUN_00467510": "std_tree_lower_bound_steamid_map_node",
+        "sub_467510": "std_tree_lower_bound_steamid_map_node",
+        "FUN_00467620": "std_tree_insert_steamid_map_node_rebalance",
+        "sub_467620": "std_tree_insert_steamid_map_node_rebalance",
+        "FUN_00467a20": "std_tree_destroy_steamid_map_subtree",
+        "sub_467A20": "std_tree_destroy_steamid_map_subtree",
+        "sub_467a20": "std_tree_destroy_steamid_map_subtree",
+        "FUN_00467a60": "std_tree_find_steamid_map_node",
+        "sub_467A60": "std_tree_find_steamid_map_node",
+        "sub_467a60": "std_tree_find_steamid_map_node",
+        "FUN_00467ac0": "std_tree_clear_steamid_map",
+        "sub_467AC0": "std_tree_clear_steamid_map",
+        "sub_467ac0": "std_tree_clear_steamid_map",
+        "FUN_00467bd0": "std_tree_create_steamid_value_node",
+        "sub_467BD0": "std_tree_create_steamid_value_node",
+        "sub_467bd0": "std_tree_create_steamid_value_node",
+        "FUN_00467c50": "std_tree_find_or_insert_steamid_value_node",
+        "sub_467C50": "std_tree_find_or_insert_steamid_value_node",
+        "sub_467c50": "std_tree_find_or_insert_steamid_value_node",
+    }
+    for symbol, alias in expected_aliases.items():
+        assert aliases[symbol] == alias
+
+    for function_row in (
+        "FUN_00465eb0,00465eb0,170,0,unknown",
+        "FUN_00465f60,00465f60,110,0,unknown",
+        "FUN_004660c0,004660c0,274,0,unknown",
+        "FUN_00467320,00467320,29,0,unknown",
+        "FUN_00467340,00467340,28,0,unknown",
+        "FUN_00467510,00467510,65,0,unknown",
+        "FUN_00467620,00467620,546,0,unknown",
+        "FUN_00467a20,00467a20,56,0,unknown",
+        "FUN_00467a60,00467a60,83,0,unknown",
+        "FUN_00467ac0,00467ac0,77,0,unknown",
+        "FUN_00467bd0,00467bd0,116,0,unknown",
+        "FUN_00467c50,00467c50,113,0,unknown",
+    ):
+        assert function_row in functions_csv
+
+    for doc_anchor in (
+        "| `sub_465eb0` | `std_tree_equal_range_steamid_node` |",
+        "| `sub_4660c0` | `std_tree_find_or_insert_steamid_node` |",
+        "| `sub_467320` | `std_tree_rightmost_steamid_map_node` |",
+        "| `sub_467c50` | `std_tree_find_or_insert_steamid_value_node` |",
+    ):
+        assert doc_anchor in mapping_round
+
+    assert "00465eb0    void** __thiscall sub_465eb0(void* arg1, void** arg2, int32_t* arg3)" in hlil_part02
+    assert "00465f51  *arg2 = var_8" in hlil_part02
+    assert "00465f60    void* __fastcall sub_465f60(void* arg1)" in hlil_part02
+    assert "00465f6b  result, ecx = operator new(0x20)" in hlil_part02
+    assert "00465f9a      *(result + 0x10) = *edx_1" in hlil_part02
+    assert "00465f9f      *(result + 0x14) = *(edx_1 + 4)" in hlil_part02
+    assert "004660c0    void*** __thiscall sub_4660c0(void* arg1, void*** arg2, int32_t* arg3, void** arg4)" in hlil_part02
+    assert "0046615c          sub_461170(arg1, &arg4, 1, esi, sub_465f60(arg1))" in hlil_part02
+    assert "004661a6  sub_461170(arg1, &arg4, var_8, esi, sub_465f60(arg1))" in hlil_part02
+    assert "004661e0    void* sub_4661e0(int32_t arg1, int32_t arg2)" in hlil_part02
+    assert "0046622e  sub_465eb0(&data_e3035c, &var_c, &arg1)" in hlil_part02
+    assert "00466244  sub_461ca0(&data_e3035c, &var_8, var_c, var_8)" in hlil_part02
+    assert "00466c4d                  sub_4660c0(&var_2c, &var_18, &i[4], nullptr)" in hlil_part02
+    assert "00467320    void* sub_467320(void* arg1)" in hlil_part02
+    assert "0046732d  while (*(result_1 + 0x21) == 0)" in hlil_part02
+    assert "00467340    int32_t* sub_467340(int32_t* arg1)" in hlil_part02
+    assert "0046734c  while (*(result_1 + 0x21) == 0)" in hlil_part02
+    assert "00467510    void** __thiscall sub_467510(void* arg1, int32_t* arg2)" in hlil_part02
+    assert "00467549      while (*(result_1 + 0x21) == 0)" in hlil_part02
+    assert "00467620    void** __thiscall sub_467620(void* arg1, void** arg2, char arg3, void** arg4, void* arg5)" in hlil_part02
+    assert "0046783c  *(ecx + 0x20) = 1" in hlil_part02
+    assert "00467a20    void __stdcall sub_467a20(void** arg1)" in hlil_part02
+    assert "00467a39          sub_467a20(esi[2])" in hlil_part02
+    assert "00467a60    void*** __thiscall sub_467a60(void* arg1, void*** arg2, void** arg3)" in hlil_part02
+    assert "00467a6c  void** eax = sub_467510(arg1, edi)" in hlil_part02
+    assert "00467ac0    void* __fastcall sub_467ac0(void* arg1)" in hlil_part02
+    assert "00467ad9          sub_467a20(esi[2])" in hlil_part02
+    assert "00467b02  *(arg1 + 8) = 0" in hlil_part02
+    assert "00467bd0    void* __fastcall sub_467bd0(void* arg1)" in hlil_part02
+    assert "00467bdb  result, ecx = operator new(0x28)" in hlil_part02
+    assert "00467c50    void* __thiscall sub_467c50(void* arg1, int32_t* arg2)" in hlil_part02
+    assert "00467c5f  void** eax = sub_467510(arg1, ebx)" in hlil_part02
+    assert "00467ca1  sub_463d80(arg1, &arg2, eax, sub_467bd0(arg1))" in hlil_part02
+    assert "00467d10  *sub_467c50(&data_e30390, &arg_4) = esi_1" in hlil_part02
+
+    auth_owner_block = _extract_function_block(
+        sv_client, "static qboolean SV_SteamServerClientOwnsAuthSteamId( const CSteamID *steamId )"
+    )
+    orphan_cleanup_block = _extract_function_block(sv_client, "void SV_SteamServerEndOrphanedAuthSessions( void )")
+    begin_auth_block = _extract_function_block(
+        sv_client, "static const char *SV_BeginPlatformAuthSession( client_t *cl, const netadr_t *adr )"
+    )
+    end_auth_block = _extract_function_block(sv_client, "static void SV_EndPlatformAuthSession( client_t *cl )")
+    find_session_block = _extract_function_block(
+        sv_client, "static sv_steam_stats_session_t *SV_SteamStats_FindSessionBySteamId( const CSteamID *steamId )"
+    )
+    create_session_block = _extract_function_block(sv_client, "static void SV_SteamStats_CreatePlayerSession( client_t *cl )")
+    remove_session_block = _extract_function_block(sv_client, "static void SV_SteamStats_RemovePlayerSession( client_t *cl )")
+    stats_received_callback_block = _extract_function_block(
+        sv_client, "static void SV_SteamServerGSStatsReceivedCallback( void *context, const ql_steam_gs_stats_received_t *event )"
+    )
+    stats_stored_callback_block = _extract_function_block(
+        sv_client, "static void SV_SteamServerGSStatsStoredCallback( void *context, const ql_steam_gs_stats_stored_t *event )"
+    )
+
+    assert "for ( i = 0, cl = svs.clients; i < sv_maxclients->integer; i++, cl++ )" in auth_owner_block
+    assert "SV_ParsePlatformSteamId( cl->platformSteamId, &parsedSteamId )" in auth_owner_block
+    assert "parsedSteamId.value == steamId->value" in auth_owner_block
+    assert "if ( !cl->platformAuthSessionActive ) {" in orphan_cleanup_block
+    assert "SV_SteamServerClientOwnsAuthSteamId( &steamId )" in orphan_cleanup_block
+    assert "cl->platformAuthSessionActive = qfalse;" in orphan_cleanup_block
+    assert "SV_SteamStats_RemovePlayerSession( cl );" in orphan_cleanup_block
+    assert "QL_Steamworks_ServerEndAuthSession( &steamId );" in orphan_cleanup_block
+    assert "cl->platformAuthSessionActive = qtrue;" in begin_auth_block
+    assert "SV_SteamStats_CreatePlayerSession( cl );" in begin_auth_block
+    assert "cl->platformAuthSessionActive = qfalse;" in end_auth_block
+    assert "SV_SteamStats_RemovePlayerSession( cl );" in end_auth_block
+    assert "QL_Steamworks_ServerEndAuthSession( &steamId );" in end_auth_block
+    assert "for ( i = 0; i < sv_maxclients->integer && i < MAX_CLIENTS; i++ )" in find_session_block
+    assert "session = &sv_steamStatsSessions[i];" in find_session_block
+    assert "session->active" in find_session_block
+    assert "session->steamId.value == steamId->value" in find_session_block
+    assert "session = &sv_steamStatsSessions[clientNum];" in create_session_block
+    assert "session->active && session->steamId.value == steamId.value" in create_session_block
+    assert "SV_SteamStats_RequestCurrentValues( session );" in create_session_block
+    assert "SV_SteamStats_FlushPendingValues( session, qfalse );" in remove_session_block
+    assert "SV_SteamStats_ResetSession( session );" in remove_session_block
+    assert "SV_SteamStats_FindSessionBySteamId( &event->steamId );" in stats_received_callback_block
+    assert "SV_SteamStats_PrimeReceivedValues( session );" in stats_received_callback_block
+    assert "SV_SteamStats_FindSessionBySteamId( &event->steamId );" in stats_stored_callback_block
+    assert "SV_SteamStats_PrimeReceivedValues( session );" in stats_stored_callback_block
+
+
+def test_steam_stats_callback_lifecycle_helpers_track_retail_reference_rows() -> None:
+    aliases = json.loads(
+        (REPO_ROOT / "references/analysis/quakelive_symbol_aliases.json").read_text(encoding="utf-8")
+    )["quakelive_steam_srp"]
+    functions_csv = (
+        REPO_ROOT / "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+    ).read_text(encoding="utf-8")
+    hlil_part02 = (
+        REPO_ROOT
+        / "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part02.txt"
+    ).read_text(encoding="utf-8")
+    hlil_part06 = (
+        REPO_ROOT
+        / "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part06.txt"
+    ).read_text(encoding="utf-8")
+    steamworks = (REPO_ROOT / "src/common/platform/platform_steamworks.c").read_text(encoding="utf-8")
+    mapping_round = (
+        REPO_ROOT / "docs/reverse-engineering/quakelive_steam_mapping_round_561.md"
+    ).read_text(encoding="utf-8")
+
+    expected_aliases = {
+        "FUN_00467430": "SteamStatsCallback_DestroyServersConnected",
+        "sub_467430": "SteamStatsCallback_DestroyServersConnected",
+        "FUN_00467460": "SteamStatsCallback_DestroyGSStatsReceived",
+        "sub_467460": "SteamStatsCallback_DestroyGSStatsReceived",
+        "FUN_00467490": "SteamStatsCallback_DestroyGSStatsStored",
+        "sub_467490": "SteamStatsCallback_DestroyGSStatsStored",
+        "FUN_004674b0": "std_tree_rotate_right_steamid_map_node",
+        "sub_4674B0": "std_tree_rotate_right_steamid_map_node",
+        "sub_4674b0": "std_tree_rotate_right_steamid_map_node",
+        "FUN_004675c0": "std_tree_rotate_left_steamid_map_node",
+        "sub_4675C0": "std_tree_rotate_left_steamid_map_node",
+        "sub_4675c0": "std_tree_rotate_left_steamid_map_node",
+    }
+    for symbol, alias in expected_aliases.items():
+        assert aliases[symbol] == alias
+
+    for function_row in (
+        "FUN_00467430,00467430,21,0,unknown",
+        "FUN_00467460,00467460,21,0,unknown",
+        "FUN_00467490,00467490,21,0,unknown",
+        "FUN_004674b0,004674b0,87,0,unknown",
+        "FUN_00467560,00467560,88,0,unknown",
+        "FUN_004675c0,004675c0,83,0,unknown",
+        "FUN_00467850,00467850,454,0,unknown",
+    ):
+        assert function_row in functions_csv
+
+    for doc_anchor in (
+        "| `sub_467430` | `SteamStatsCallback_DestroyServersConnected` |",
+        "| `sub_467460` | `SteamStatsCallback_DestroyGSStatsReceived` |",
+        "| `sub_467490` | `SteamStatsCallback_DestroyGSStatsStored` |",
+        "| `sub_4674b0` | `std_tree_rotate_right_steamid_map_node` |",
+        "| `sub_4675c0` | `std_tree_rotate_left_steamid_map_node` |",
+    ):
+        assert doc_anchor in mapping_round
+
+    assert "00467430    void __fastcall sub_467430" in hlil_part02
+    assert "00467430  bool cond:0 = (arg1[1].b & 1) == 0" in hlil_part02
+    assert "00467434  *arg1 = &CCallback<class idSteamStats, struct SteamServersConnected_t, 1>::`vftable'{for `CCallbackBase'}" in hlil_part02
+    assert "0046743d      SteamAPI_UnregisterCallback(arg1)" in hlil_part02
+    assert "00467460    void __fastcall sub_467460" in hlil_part02
+    assert "00467464  *arg1 = &CCallback<class idSteamStats, struct GSStatsReceived_t, 1>::`vftable'{for `CCallbackBase'}" in hlil_part02
+    assert "0046746d      SteamAPI_UnregisterCallback(arg1)" in hlil_part02
+    assert "00467490    void __fastcall sub_467490" in hlil_part02
+    assert "00467494  *arg1 = &CCallback<class idSteamStats, struct GSStatsStored_t, 1>::`vftable'{for `CCallbackBase'}" in hlil_part02
+    assert "0046749d      SteamAPI_UnregisterCallback(arg1)" in hlil_part02
+    assert "00467560    void* __fastcall sub_467560(void* arg1)" in hlil_part02
+    assert "00467568  operator delete(*(arg1 + 0x18))" in hlil_part02
+    assert "0046757d  *(arg1 + 0x4c) = &CCallback<class idSteamStats, struct GSStatsStored_t, 1>::`vftable'{for `CCallbackBase'}" in hlil_part02
+    assert "00467586      SteamAPI_UnregisterCallback(arg1 + 0x4c)" in hlil_part02
+    assert "00467592  *(arg1 + 0x38) = &CCallback<class idSteamStats, struct GSStatsReceived_t, 1>::`vftable'{for `CCallbackBase'}" in hlil_part02
+    assert "0046759b      SteamAPI_UnregisterCallback(arg1 + 0x38)" in hlil_part02
+    assert "004675a7  *result = &CCallback<class idSteamStats, struct SteamServersConnected_t, 1>::`vftable'{for `CCallbackBase'}" in hlil_part02
+    assert "004675b0  return SteamAPI_UnregisterCallback(result)" in hlil_part02
+    assert hlil_part02.index("0046757d  *(arg1 + 0x4c)") < hlil_part02.index("00467592  *(arg1 + 0x38)")
+    assert hlil_part02.index("00467592  *(arg1 + 0x38)") < hlil_part02.index("004675a7  *result")
+
+    assert "004674b0    void* __thiscall sub_4674b0(void* arg1, int32_t* arg2)" in hlil_part02
+    assert "004674bc  *arg2 = *(result + 8)" in hlil_part02
+    assert "004674c7      *(esi_1 + 4) = arg2" in hlil_part02
+    assert "004674dc      *(result + 8) = arg2" in hlil_part02
+    assert "004674df      arg2[1] = result" in hlil_part02
+    assert "004675c0    void** __thiscall sub_4675c0(void* arg1, void* arg2)" in hlil_part02
+    assert "004675cc  *(arg2 + 8) = *result" in hlil_part02
+    assert "004675d7      *(esi_1 + 4) = arg2" in hlil_part02
+    assert "004675ec      *result = arg2" in hlil_part02
+    assert "004675ee      *(arg2 + 4) = result" in hlil_part02
+    assert "00467620    void** __thiscall sub_467620" in hlil_part02
+    assert "004676d9                      void** edx_8 = *(eax_5 + 8)" in hlil_part02
+    assert "00467796                      eax_5 = edx_5" in hlil_part02
+
+    assert "005336c0  struct CCallbackBase::CCallback<class idSteamStats, struct SteamServersConnected_t, 1>::VTable" in hlil_part06
+    assert "005336c8      int32_t (* const vFunc_2)() __pure = sub_467450" in hlil_part06
+    assert "005336d0  struct CCallbackBase::CCallback<class idSteamStats, struct GSStatsReceived_t, 1>::VTable" in hlil_part06
+    assert "005336d8      int32_t (* const vFunc_2)() __pure = sub_467480" in hlil_part06
+    assert "005336e0  struct CCallbackBase::CCallback<class idSteamStats, struct GSStatsStored_t, 1>::VTable" in hlil_part06
+    assert "005336e8      int32_t (* const vFunc_2)() __pure = sub_467480" in hlil_part06
+
+    assert "00467850    int32_t* __thiscall sub_467850(int32_t* arg1, int32_t arg2, int32_t arg3)" in hlil_part02
+    assert "004678af  arg1[9] = &CCallback<class idSteamStats, struct SteamServersConnected_t, 1>::`vftable'{for `CCallbackBase'}" in hlil_part02
+    assert "004678cc  SteamAPI_RegisterCallback(&arg1[9], 0x65, eax_2)" in hlil_part02
+    assert "004678e4  arg1[0xe] = &CCallback<class idSteamStats, struct GSStatsReceived_t, 1>::`vftable'{for `CCallbackBase'}" in hlil_part02
+    assert "00467904  SteamAPI_RegisterCallback(&arg1[0xe], 0x708, eax_2)" in hlil_part02
+    assert "00467919  arg1[0x13] = &CCallback<class idSteamStats, struct GSStatsStored_t, 1>::`vftable'{for `CCallbackBase'}" in hlil_part02
+    assert "00467939  SteamAPI_RegisterCallback(&arg1[0x13], 0x709, eax_2)" in hlil_part02
+    assert "004679d9  if (SteamGameServerStats() != 0 && (*(*SteamGameServer() + 0x20))() != 0)" in hlil_part02
+    assert "004679fe      (**eax_20)(arg1[2], arg1[3])" in hlil_part02
+    assert hlil_part02.index("004678cc  SteamAPI_RegisterCallback(&arg1[9], 0x65, eax_2)") < hlil_part02.index(
+        "00467904  SteamAPI_RegisterCallback(&arg1[0xe], 0x708, eax_2)"
+    )
+    assert hlil_part02.index("00467904  SteamAPI_RegisterCallback(&arg1[0xe], 0x708, eax_2)") < hlil_part02.index(
+        "00467939  SteamAPI_RegisterCallback(&arg1[0x13], 0x709, eax_2)"
+    )
+
+    register_callbacks_block = _extract_function_block(
+        steamworks, "qboolean QL_Steamworks_RegisterServerCallbacks( const ql_steam_server_callback_bindings_t *bindings )"
+    )
+    unregister_callbacks_block = _extract_function_block(steamworks, "void QL_Steamworks_UnregisterServerCallbacks( void )")
+    unregister_object_block = _extract_function_block(
+        steamworks, "static void QL_Steamworks_UnregisterCallbackObject( ql_steam_callback_base_t *object )"
+    )
+
+    assert "#define QL_STEAM_CALLBACK_STEAM_SERVERS_CONNECTED 0x65" in steamworks
+    assert "#define QL_STEAM_CALLBACK_GS_STATS_RECEIVED 0x708" in steamworks
+    assert "#define QL_STEAM_CALLBACK_GS_STATS_STORED 0x709" in steamworks
+    assert "ql_steam_callback_base_t serversConnected;" in steamworks
+    assert "ql_steam_callback_base_t gsStatsReceived;" in steamworks
+    assert "ql_steam_callback_base_t gsStatsStored;" in steamworks
+    assert "QL_Steamworks_PrepareCallbackObject( &callbackState->serversConnected, QL_STEAM_CALLBACK_STEAM_SERVERS_CONNECTED, sizeof( ql_steam_servers_connected_raw_t ), qtrue" in register_callbacks_block
+    assert "QL_Steamworks_PrepareCallbackObject( &callbackState->gsStatsReceived, QL_STEAM_CALLBACK_GS_STATS_RECEIVED, sizeof( ql_steam_gs_stats_received_raw_t ), qtrue" in register_callbacks_block
+    assert "QL_Steamworks_PrepareCallbackObject( &callbackState->gsStatsStored, QL_STEAM_CALLBACK_GS_STATS_STORED, sizeof( ql_steam_gs_stats_stored_raw_t ), qtrue" in register_callbacks_block
+    assert "QL_Steamworks_RegisterCallbackObject( &callbackState->gsStatsReceived )" in register_callbacks_block
+    assert "QL_Steamworks_RegisterCallbackObject( &callbackState->gsStatsStored )" in register_callbacks_block
+    assert "QL_Steamworks_UnregisterCallbackObject( &callbackState->gsStatsStored );" in unregister_callbacks_block
+    assert "QL_Steamworks_UnregisterCallbackObject( &callbackState->gsStatsReceived );" in unregister_callbacks_block
+    assert "QL_Steamworks_UnregisterCallbackObject( &callbackState->serversConnected );" in unregister_callbacks_block
+    assert unregister_callbacks_block.index("QL_Steamworks_UnregisterCallbackObject( &callbackState->gsStatsStored );") < unregister_callbacks_block.index(
+        "QL_Steamworks_UnregisterCallbackObject( &callbackState->gsStatsReceived );"
+    )
+    assert unregister_callbacks_block.index("QL_Steamworks_UnregisterCallbackObject( &callbackState->gsStatsReceived );") < unregister_callbacks_block.index(
+        "QL_Steamworks_UnregisterCallbackObject( &callbackState->serversConnected );"
+    )
+    assert "if ( !( object->callbackFlags & QL_STEAM_CALLBACK_FLAG_REGISTERED ) ) {" in unregister_object_block
+    assert "if ( state.SteamAPI_UnregisterCallback ) {" in unregister_object_block
+    assert "state.SteamAPI_UnregisterCallback( object );" in unregister_object_block
+    assert "object->callbackFlags &= ~QL_STEAM_CALLBACK_FLAG_REGISTERED;" in unregister_object_block
+
+
+def test_steam_workshop_queue_helpers_track_retail_reference_rows() -> None:
+    aliases = json.loads(
+        (REPO_ROOT / "references/analysis/quakelive_symbol_aliases.json").read_text(encoding="utf-8")
+    )["quakelive_steam_srp"]
+    functions_csv = (
+        REPO_ROOT / "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+    ).read_text(encoding="utf-8")
+    hlil_part02 = (
+        REPO_ROOT
+        / "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part02.txt"
+    ).read_text(encoding="utf-8")
+    hlil_part04 = (
+        REPO_ROOT
+        / "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part04.txt"
+    ).read_text(encoding="utf-8")
+    hlil_part06 = (
+        REPO_ROOT
+        / "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part06.txt"
+    ).read_text(encoding="utf-8")
+    cl_main = (REPO_ROOT / "src/code/client/cl_main.c").read_text(encoding="utf-8")
+    steamworks = (REPO_ROOT / "src/common/platform/platform_steamworks.c").read_text(encoding="utf-8")
+    mapping_round = (
+        REPO_ROOT / "docs/reverse-engineering/quakelive_steam_mapping_round_562.md"
+    ).read_text(encoding="utf-8")
+
+    expected_aliases = {
+        "FUN_004692d0": "SteamWorkshop_DownloadsSettled",
+        "sub_4692D0": "SteamWorkshop_DownloadsSettled",
+        "sub_4692d0": "SteamWorkshop_DownloadsSettled",
+        "FUN_00469330": "std_list_remove_workshop_download_node",
+        "sub_469330": "std_list_remove_workshop_download_node",
+        "FUN_00469390": "std_list_create_workshop_download_node",
+        "sub_469390": "std_list_create_workshop_download_node",
+        "FUN_00469750": "std_list_push_workshop_download_node",
+        "sub_469750": "std_list_push_workshop_download_node",
+    }
+    for symbol, alias in expected_aliases.items():
+        assert aliases[symbol] == alias
+
+    for function_row in (
+        "FUN_004692d0,004692d0,50,0,unknown",
+        "FUN_00469330,00469330,88,0,unknown",
+        "FUN_00469390,00469390,100,0,unknown",
+        "FUN_00469400,00469400,105,0,unknown",
+        "FUN_00469750,00469750,69,0,unknown",
+        "FUN_004699c0,004699c0,309,0,unknown",
+    ):
+        assert function_row in functions_csv
+
+    for doc_anchor in (
+        "| `sub_4692d0` | `SteamWorkshop_DownloadsSettled` |",
+        "| `sub_469330` | `std_list_remove_workshop_download_node` |",
+        "| `sub_469390` | `std_list_create_workshop_download_node` |",
+        "| `sub_469750` | `std_list_push_workshop_download_node` |",
+    ):
+        assert doc_anchor in mapping_round
+
+    assert "004692d0    int32_t sub_4692d0()" in hlil_part02
+    assert "004692d7  if (data_e40bb4 == 0)" in hlil_part02
+    assert "004692e6  if (data_e40bc4 == 0)" in hlil_part02
+    assert '004692ed      sub_4c9860(esi, "Download completed for all steam' in hlil_part02
+    assert "004692f5      data_e40bb4 = 0" in hlil_part02
+    assert "00469330    int32_t* __thiscall sub_469330(int32_t* arg1, int32_t* arg2)" in hlil_part02
+    assert "0046934f  while (esi != ebx)" in hlil_part02
+    assert "0046935f      if (result != ecx || *(esi + 0xc) != edx)" in hlil_part02
+    assert "00469367          *eax = esi" in hlil_part02
+    assert "0046936c          result = operator delete(var_1c_1)" in hlil_part02
+    assert "00469374          arg1[1] -= 1" in hlil_part02
+    assert "00469390    void* __stdcall sub_469390(int32_t arg1, int32_t* arg2)" in hlil_part02
+    assert "00469398  result, ecx = operator new(0x10)" in hlil_part02
+    assert "004693bc      *(result + 8) = *arg2" in hlil_part02
+    assert "004693c1      *(result + 0xc) = arg2[1]" in hlil_part02
+    assert "0046940a  sub_469330(&data_e40bc0, &data_e40bb8)" in hlil_part02
+    assert "00469411  data_e40bb8 = 0" in hlil_part02
+    assert "00469416  data_e40bbc = 0" in hlil_part02
+    assert "00469421  if (data_e40bc4 == 0)" in hlil_part02
+    assert "00469428  void* eax_2 = *data_e40bc0" in hlil_part02
+    assert '00469442  sub_4c9860(esi, "Workshop item %llu: was queued,' in hlil_part02
+    assert "00469466  return (*(*data_e30344 + 0xdc))(data_e40bb8, data_e40bbc, 1)" in hlil_part02
+    assert "00469750    void* __thiscall sub_469750(int32_t* arg1, int32_t arg2)" in hlil_part02
+    assert "00469764  void* result = sub_469390(edi, *(edi + 4))" in hlil_part02
+    assert '0046977d      result, ecx_2 = std::_Xlength_error("list<T> too long")' in hlil_part02
+    assert "00469784  arg1[1] = ecx_2 + 1" in hlil_part02
+    assert "00469787  *(edi + 4) = result" in hlil_part02
+    assert "004699c9  if (arg3 != 0)" in hlil_part02
+    assert "00469a40          data_e40bb4 = 1" in hlil_part02
+    assert '00469a92              sub_4c9860(esi_2, "Workshop item %llu: queueing dow' in hlil_part02
+    assert "00469aa3              sub_469750(&data_e40bc0, &arg1)" in hlil_part02
+    assert '00469ab6          sub_4c9860(esi_2, "Workshop item %llu: requesting d' in hlil_part02
+    assert "00469ad0          (*(*data_e30344 + 0xdc))(edi_2, esi_2, 1)" in hlil_part02
+    assert "00469adb          sub_469750(&data_e40bc0, &arg1)" in hlil_part02
+    assert '004699e1          sub_4c9860(esi, "Steamworks downloads are already' in hlil_part02
+    assert '00469a12          sub_4c9860(esi_2, "Workshop item %llu: download\\n")' in hlil_part02
+    assert '00469a6d  sub_4c9860(esi_2, "Workshop item %llu: in cache.\\n")' in hlil_part02
+
+    assert "004bc340      eax_1 = sub_4692d0()" in hlil_part04
+    assert '004bc35b              sub_4c9860(esi, "Steamworks downloads complete - ' in hlil_part04
+    assert "004bc36d              int32_t eax_3 = sub_4d35e0(data_15f6b70, data_1472870)" in hlil_part04
+    assert '004bc392          sub_4c9ab0("Steamworks downloads complete\\n")' in hlil_part04
+    assert "004bc3be          data_15ee388 = 0" in hlil_part04
+    assert "004bc3c8          eax_1 = sub_4bb9c0()" in hlil_part04
+
+    assert "00533878  char const data_533878[0x11] = \"list<T> too long\", 0" in hlil_part06
+    assert "0053388c  char const data_53388c[0x36] = \"Workshop item %llu: was queued, requesting download.\\n\", 0" in hlil_part06
+    assert "005338c4  char const data_5338c4[0x24] = \"Steamworks download complete: %llu\\n\", 0" in hlil_part06
+    assert "00533a9c  char const data_533a9c[0x28] = \"Workshop item %llu: queueing download.\\n\", 0" in hlil_part06
+    assert "00533b08  char const data_533b08[0x59] = \"Steamworks downloads are already active, ignoring an explicit download request for %llu\\n\", 0" in hlil_part06
+
+    request_download_block = _extract_function_block(cl_main, "static qboolean CL_Workshop_RequestDownload( int itemIndex )")
+    advance_queue_block = _extract_function_block(cl_main, "static qboolean CL_Workshop_AdvanceDownloadQueue( void )")
+    finalize_item_block = _extract_function_block(cl_main, "static qboolean CL_Workshop_FinalizeInstalledItem( int itemIndex )")
+    downloads_settled_block = _extract_function_block(cl_main, "static qboolean CL_Workshop_DownloadsSettled( void )")
+    frame_block = _extract_function_block(cl_main, "static void CL_Workshop_Frame( void )")
+    get_item_state_block = _extract_function_block(steamworks, "uint32_t QL_Steamworks_GetItemState( uint32_t idLow, uint32_t idHigh )")
+    download_item_block = _extract_function_block(
+        steamworks, "qboolean QL_Steamworks_DownloadItem( uint32_t idLow, uint32_t idHigh, qboolean highPriority )"
+    )
+
+    assert "cl_steamWorkshopDownloadState.queueActive = qtrue;" in request_download_block
+    assert "QL_Steamworks_GetItemState( item->itemIdLow, item->itemIdHigh ) & CL_STEAM_WORKSHOP_ITEM_STATE_INSTALLED" in request_download_block
+    assert '"Workshop item %llu: in cache."' in request_download_block
+    assert '"Workshop item %llu: queueing download."' in request_download_block
+    assert "item->queued = qtrue;" in request_download_block
+    assert '"Workshop item %llu: requesting download."' in request_download_block
+    assert "QL_Steamworks_DownloadItem( item->itemIdLow, item->itemIdHigh, qtrue );" in request_download_block
+    assert "if ( cl_steamWorkshopDownloadState.activeItemIndex >= 0 ) {" in advance_queue_block
+    assert "CL_Workshop_ClearActiveDownload();" in advance_queue_block
+    assert "if ( item->completed || !item->queued ) {" in advance_queue_block
+    assert "item->queued = qfalse;" in advance_queue_block
+    assert "item->downloadRequested = qtrue;" in advance_queue_block
+    assert '"Workshop item %llu: was queued, requesting download."' in advance_queue_block
+    assert "QL_Steamworks_DownloadItem( item->itemIdLow, item->itemIdHigh, qtrue );" in advance_queue_block
+    assert "item->completed = qtrue;" in finalize_item_block
+    assert '"Steamworks download complete: %llu"' in finalize_item_block
+    assert "return CL_Workshop_AdvanceDownloadQueue();" in finalize_item_block
+    assert "CL_Workshop_RefreshProgress( cl_steamWorkshopDownloadState.activeItemIndex );" in downloads_settled_block
+    assert "QL_Steamworks_GetItemState( item->itemIdLow, item->itemIdHigh ) & CL_STEAM_WORKSHOP_ITEM_STATE_INSTALLED" in downloads_settled_block
+    assert "if ( CL_Workshop_AdvanceDownloadQueue() ) {" in downloads_settled_block
+    assert 'CL_LogWorkshopLifecycle( "queue-complete", "Download completed for all steamworks items" );' in downloads_settled_block
+    assert "cl_steamWorkshopDownloadState.queueActive = qfalse;" in downloads_settled_block
+    assert "if ( !CL_Workshop_DownloadsSettled() ) {" in frame_block
+    assert 'Com_Printf( "Steamworks downloads complete - FS restart is required\\n" );' in frame_block
+    assert "FS_Restart( clc.checksumFeed );" in frame_block
+    assert 'Com_Printf( "Steamworks downloads complete\\n" );' in frame_block
+    assert "CL_DownloadsComplete();" in frame_block
+    assert "vtable[0xd0 / 4]" in get_item_state_block
+    assert "vtable[0xdc / 4]" in download_item_block
+    assert "return fn( ugc, NULL, idLow, idHigh, highPriority ? 1 : 0 ) ? qtrue : qfalse;" in download_item_block

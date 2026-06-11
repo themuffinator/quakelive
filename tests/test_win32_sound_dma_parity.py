@@ -25,6 +25,17 @@ WIN32_SOUND_DMA_ALIASES = {
 	"sub_4F0090": ("SNDDMA_Init", "FUN_004f0090", "93"),
 }
 
+WIN32_SOUND_DMA_LOWERCASE_BN_ALIASES = {
+	"sub_4ef9f0": "DSoundError",
+	"sub_4efa30": "SNDDMA_Shutdown",
+	"sub_4efb80": "SNDDMA_GetDMAPos",
+	"sub_4efbf0": "SNDDMA_BeginPainting",
+	"sub_4efd00": "SNDDMA_Submit",
+	"sub_4efd30": "SNDDMA_Activate",
+	"sub_4efd70": "SNDDMA_InitDS",
+	"sub_4f0090": "SNDDMA_Init",
+}
+
 
 def _extract_function_block(source: str, marker: str) -> str:
 	start = source.rindex(marker)
@@ -53,7 +64,11 @@ def test_win32_sound_dma_aliases_cover_retail_directsound_cluster() -> None:
 
 	for alias, (name, ghidra_name, size) in WIN32_SOUND_DMA_ALIASES.items():
 		assert aliases[alias] == name
+		assert aliases[ghidra_name] == name
 		assert function_rows[ghidra_name]["size"] == size
+
+	for alias, name in WIN32_SOUND_DMA_LOWERCASE_BN_ALIASES.items():
+		assert aliases[alias] == name
 
 	for expected in (
 		'004ef9f0    int32_t __convention("regparm") sub_4ef9f0(int32_t arg1) __pure',

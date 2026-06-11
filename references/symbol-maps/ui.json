@@ -1515,7 +1515,7 @@
       "signature": null,
       "string_refs": [],
       "relocation_refs": [],
-      "comment": "Accumulates cursor deltas, clamps them to the 640x480 UI bounds, and forwards movement into Display_MouseMove."
+      "comment": "Projects host screen coordinates into the 640x480 UI cursor space, bounds-checks the virtual cursor, and forwards movement into Display_MouseMove."
     },
     {
       "address": "0x10010080",

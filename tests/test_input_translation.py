@@ -133,6 +133,7 @@ def test_char_event_dispatch_encodes_utf8_before_routing() -> None:
         "for ( i = 0 ; i < byteCount ; i++ ) {",
         "utf8Byte = (unsigned char)utf8[i];",
         "Field_CharEvent( &g_consoleField, utf8Byte );",
+        "CL_WebView_OnKeyEvent( utf8Byte | K_CHAR_FLAG, qtrue );",
         "VM_Call( uivm, UI_KEY_EVENT, utf8Byte | K_CHAR_FLAG, qtrue, cls.realtime );",
         "Field_CharEvent( &chatField, utf8Byte );",
     ):

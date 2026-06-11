@@ -1483,6 +1483,10 @@ void CL_KeyEvent (int key, qboolean down, unsigned time) {
 
 	// escape is always handled special
 	if ( key == K_ESCAPE && dispatchDown ) {
+		if ( cls.keyCatchers & KEYCATCH_CONSOLE ) {
+			Con_ToggleConsole_f();
+			return;
+		}
 		if ( cls.keyCatchers & KEYCATCH_BROWSER ) {
 			// Retail WebUI consumes Escape while the browser owns input.
 			return;
@@ -1615,6 +1619,9 @@ void CL_CharEvent( int key ) {
 		// distribute the key down event to the apropriate handler
 		if ( cls.keyCatchers & KEYCATCH_CONSOLE ) {
 			Field_CharEvent( &g_consoleField, utf8Byte );
+		}
+		else if ( cls.keyCatchers & KEYCATCH_BROWSER ) {
+			CL_WebView_OnKeyEvent( utf8Byte | K_CHAR_FLAG, qtrue );
 		}
 		else if ( cls.keyCatchers & KEYCATCH_UI ) {
 			VM_Call( uivm, UI_KEY_EVENT, utf8Byte | K_CHAR_FLAG, qtrue, cls.realtime );

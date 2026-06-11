@@ -14,12 +14,14 @@ CG_EVENT = REPO_ROOT / "src" / "code" / "cgame" / "cg_event.c"
 CG_LOCAL = REPO_ROOT / "src" / "code" / "cgame" / "cg_local.h"
 CG_LOCALENTS = REPO_ROOT / "src" / "code" / "cgame" / "cg_localents.c"
 CG_MAIN = REPO_ROOT / "src" / "code" / "cgame" / "cg_main.c"
+CG_NEWDRAW = REPO_ROOT / "src" / "code" / "cgame" / "cg_newdraw.c"
 CG_PLAYERS = REPO_ROOT / "src" / "code" / "cgame" / "cg_players.c"
 CG_PLAYERSTATE = REPO_ROOT / "src" / "code" / "cgame" / "cg_playerstate.c"
 CG_SERVERCMDS = REPO_ROOT / "src" / "code" / "cgame" / "cg_servercmds.c"
 CG_SYSCALLS = REPO_ROOT / "src" / "code" / "cgame" / "cg_syscalls.c"
 CG_VIEW = REPO_ROOT / "src" / "code" / "cgame" / "cg_view.c"
 CG_WEAPONS = REPO_ROOT / "src" / "code" / "cgame" / "cg_weapons.c"
+UI_SHARED = REPO_ROOT / "src" / "code" / "ui" / "ui_shared.c"
 SYMBOL_ALIASES = REPO_ROOT / "references" / "analysis" / "quakelive_symbol_aliases.json"
 CGAME_FUNCTIONS = (
 	REPO_ROOT
@@ -153,6 +155,14 @@ def test_cgame_sound_helper_aliases_and_function_table_match_retail_offsets() ->
 		"sub_1004ac30": "CG_AddBufferedVoiceChat",
 		"FUN_1004ac90": "CG_VoiceChatLocal",
 		"sub_1004ac90": "CG_VoiceChatLocal",
+		"sub_10059eb0": "CG_BrowserScriptPlay",
+		"sub_10059f00": "CG_BrowserScriptPlayLooped",
+		"FUN_10059f50": "CG_RunBrowserScript",
+		"sub_10059f50": "CG_RunBrowserScript",
+		"FUN_10060e20": "CG_BrowserItemParseFocusSound",
+		"sub_10060e20": "CG_BrowserItemParseFocusSound",
+		"FUN_10063010": "CG_BrowserMenuParseSoundLoop",
+		"sub_10063010": "CG_BrowserMenuParseSoundLoop",
 	}
 	for symbol, expected_name in expected_aliases.items():
 		assert aliases[symbol] == expected_name
@@ -191,10 +201,159 @@ def test_cgame_sound_helper_aliases_and_function_table_match_retail_offsets() ->
 		"1004e110": ("FUN_1004e110", "109"),
 		"1004e180": ("FUN_1004e180", "153"),
 		"1004e220": ("FUN_1004e220", "182"),
+		"10059f50": ("FUN_10059f50", "246"),
+		"10060e20": ("FUN_10060e20", "171"),
+		"10063010": ("FUN_10063010", "153"),
 	}
 	for address, (name, size) in expected_rows.items():
 		assert rows[address]["name"] == name
 		assert rows[address]["size"] == size
+
+
+def test_cgame_browser_sound_parser_wiring_pins_focus_and_loop_tokens() -> None:
+	alias_sections = json.loads(_read(SYMBOL_ALIASES))
+	aliases = alias_sections["cgame"]
+	ui_aliases = alias_sections["ui"]
+	rows = _function_rows()
+	hlil = _read(CGAME_HLIL)
+	main_source = _read(CG_MAIN)
+	newdraw_source = _read(CG_NEWDRAW)
+	ui_shared = _read(UI_SHARED)
+	item_focus_block = _block_from_marker(ui_shared, "qboolean ItemParse_focusSound")
+	item_text_block = _block_from_marker(ui_shared, "qboolean ItemParse_text( itemDef_t")
+	menu_loop_block = _block_from_marker(ui_shared, "qboolean MenuParse_soundLoop")
+	activate_block = _block_from_marker(ui_shared, "void  Menus_Activate")
+	cache_block = _block_from_marker(ui_shared, "static void Menu_CacheContents")
+	browser_focus_block = _block_from_marker(newdraw_source, "static qboolean CG_SetBrowserFocus")
+	setup_item_block = _block_from_marker(main_source, "void CG_SetupBrowserItemKeywordHash")
+	parse_item_block = _block_from_marker(main_source, "qboolean CG_ParseBrowserItem")
+	setup_menu_block = _block_from_marker(main_source, "void CG_SetupBrowserMenuKeywordHash")
+	parse_menu_block = _block_from_marker(main_source, "qboolean CG_ParseBrowserMenu")
+	init_runtime_block = _block_from_marker(main_source, "void CG_InitBrowserRuntime")
+
+	assert ui_aliases["FUN_1001dc00"] == "ItemParse_focusSound"
+	assert ui_aliases["FUN_1001fed0"] == "Parse_text_or_soundLoop"
+	assert "sub_1001dc00" not in ui_aliases
+	assert "sub_1001fed0" not in ui_aliases
+	assert aliases["FUN_10060e20"] == "CG_BrowserItemParseFocusSound"
+	assert aliases["sub_10060e20"] == "CG_BrowserItemParseFocusSound"
+	assert aliases["FUN_10063010"] == "CG_BrowserMenuParseSoundLoop"
+	assert aliases["sub_10063010"] == "CG_BrowserMenuParseSoundLoop"
+	assert rows["10060e20"]["name"] == "FUN_10060e20"
+	assert rows["10060e20"]["size"] == "171"
+	assert rows["10063010"]["name"] == "FUN_10063010"
+	assert rows["10063010"]["size"] == "153"
+
+	for expected in (
+		"10060e20    int32_t sub_10060e20(void* arg1, int32_t arg2)",
+		"10060e5b  if ((*(data_1074cccc + 0x1b8))(arg2, &var_420) == 0)",
+		"10060e6b  sub_10057330(\"NULL\", 0x1869f, &var_410)",
+		"10060e8d  *(arg1 + 0x188) = (*(data_1074ccf8 + 0xac))(sub_10057830())",
+		"10060eae  return 1",
+		"10063010    int32_t sub_10063010(void* arg1, int32_t arg2)",
+		"1006304b  if ((*(data_1074cccc + 0x1b8))(arg2, &var_420) == 0)",
+		"1006305b  sub_10057330(\"NULL\", 0x1869f, &var_410)",
+		"1006306e  *(arg1 + 0x130) = sub_10057830()",
+		"1006308c  return 1",
+		"10075874  char const (* data_10075874)[0x5] = data_10073610 {\"text\"}",
+		"10075878  void* data_10075878 = sub_10063010",
+		"10075b08  char const (* data_10075b08)[0xb] = data_100733ac {\"focusSound\"}",
+		"10075b0c  void* data_10075b0c = sub_10060e20",
+		"10075d90  char const (* data_10075d90)[0xa] = data_100731d0 {\"soundLoop\"}",
+		"10075d94  void* data_10075d94 = sub_10063010",
+	):
+		assert expected in hlil
+
+	assert "PC_String_Parse(handle, &temp)" in item_focus_block
+	assert "item->focusSound = DC->registerSound(temp, qfalse);" in item_focus_block
+	assert "PC_String_Parse(handle, &item->text)" in item_text_block
+	assert "menuDef_t *menu = (menuDef_t*)item;" in menu_loop_block
+	assert "PC_String_Parse(handle, &menu->soundName)" in menu_loop_block
+	assert "{\"focusSound\", ItemParse_focusSound, NULL}" in ui_shared
+	assert "{\"soundLoop\", MenuParse_soundLoop, NULL}" in ui_shared
+	assert "DC->startBackgroundTrack(menu->soundName, menu->soundName);" in activate_block
+	assert "DC->registerSound(menu->soundName, qfalse);" in cache_block
+
+	assert "Item_SetupKeywordHash();" in setup_item_block
+	assert "return Item_Parse( handle, (itemDef_t *)item );" in parse_item_block
+	assert "Menu_SetupKeywordHash();" in setup_menu_block
+	assert "return Menu_Parse( handle, (menuDef_t *)menu );" in parse_menu_block
+	_assert_order(
+		init_runtime_block,
+		"String_Init();",
+		"CG_SetupBrowserItemKeywordHash();",
+		"CG_SetupBrowserMenuKeywordHash();",
+	)
+
+	assert "sfx = &cgDC.Assets.itemFocusSound;" in browser_focus_block
+	assert browser_focus_block.count("sfx = &item->focusSound;") == 2
+	assert "if ( playSound && sfx && cgDC.startLocalSound ) {" in browser_focus_block
+	assert "cgDC.startLocalSound( *sfx, CHAN_LOCAL_SOUND );" in browser_focus_block
+
+
+def test_cgame_browser_script_sound_verbs_pin_local_and_looped_playback_wiring() -> None:
+	alias_sections = json.loads(_read(SYMBOL_ALIASES))
+	aliases = alias_sections["cgame"]
+	ui_aliases = alias_sections["ui"]
+	rows = _function_rows()
+	hlil = _read(CGAME_HLIL)
+	main_source = _read(CG_MAIN)
+	newdraw_source = _read(CG_NEWDRAW)
+	ui_shared = _read(UI_SHARED)
+	display_context_block = _block_from_marker(main_source, "static void CG_InitDisplayContext")
+	run_script_block = _block_from_marker(newdraw_source, "static void CG_RunBrowserScript")
+	browser_play_block = _block_from_marker(newdraw_source, "static void CG_BrowserScriptPlay( void *widget, char **args )")
+	browser_looped_block = _block_from_marker(newdraw_source, "static void CG_BrowserScriptPlayLooped( void *widget, char **args )")
+	shared_play_block = _block_from_marker(ui_shared, "void Script_Play")
+	shared_looped_block = _block_from_marker(ui_shared, "void Script_playLooped")
+
+	assert ui_aliases["sub_10016cd0"] == "Script_Play"
+	assert ui_aliases["sub_10016d20"] == "Script_playLooped"
+	assert aliases["sub_10059eb0"] == "CG_BrowserScriptPlay"
+	assert aliases["sub_10059f00"] == "CG_BrowserScriptPlayLooped"
+	assert aliases["FUN_10059f50"] == "CG_RunBrowserScript"
+	assert aliases["sub_10059f50"] == "CG_RunBrowserScript"
+	assert rows["10059f50"]["name"] == "FUN_10059f50"
+	assert rows["10059f50"]["size"] == "246"
+
+	for expected in (
+		"10059eb0    int32_t sub_10059eb0(int32_t* arg1)",
+		"10059eb7  int32_t result = sub_10057120(arg1, 0)",
+		"10059ecc  int32_t* eax = sub_10057830()",
+		"10059eeb  return (*(ecx_1 + 0x74))((*(ecx_1 + 0xac))(eax, 6))",
+		"10059f00    int32_t sub_10059f00(int32_t* arg1)",
+		"10059f07  int32_t result = sub_10057120(arg1, 0)",
+		"10059f1c  int32_t* eax = sub_10057830()",
+		"10059f2f  (*(data_1074ccf8 + 0xb4))()",
+		"10059f3e  return (*(data_1074ccf8 + 0xb0))(eax, eax)",
+		"10059f50    int32_t __convention(\"regparm\") sub_10059f50",
+		"1005a026                  (&data_1007501c)[esi_1 * 2](arg4, &var_808)",
+		"1005a012                  (*(data_1074ccf8 + 0x50))(&var_808)",
+		"100750b0  char const (* data_100750b0)[0x5] = data_1007382c {\"play\"}",
+		"100750b4  void* data_100750b4 = sub_10059eb0",
+		"100750b8  char const (* data_100750b8)[0xb] = data_10073820 {\"playlooped\"}",
+		"100750bc  void* data_100750bc = sub_10059f00",
+	):
+		assert expected in hlil
+
+	assert "{ \"play\", CG_BrowserScriptPlay }," in run_script_block
+	assert "{ \"playlooped\", CG_BrowserScriptPlayLooped }," in run_script_block
+	assert "browserScriptCommands[i].handler( widget, &p );" in run_script_block
+	assert "cgDC.runScript( &p );" in run_script_block
+	assert "Script_Play( (itemDef_t *)widget, args );" in browser_play_block
+	assert "Script_playLooped( (itemDef_t *)widget, args );" in browser_looped_block
+	assert "DC->startLocalSound(DC->registerSound(val, qfalse), CHAN_LOCAL_SOUND);" in shared_play_block
+	assert "DC->stopBackgroundTrack();" in shared_looped_block
+	assert "DC->startBackgroundTrack(val, val);" in shared_looped_block
+	assert "{\"play\", &Script_Play}" in ui_shared
+	assert "{\"playlooped\", &Script_playLooped}" in ui_shared
+	assert "cgDC.runScript = &CG_RunMenuScript;" in display_context_block
+	_assert_order(
+		display_context_block,
+		"cgDC.startLocalSound = &trap_S_StartLocalSound;",
+		"cgDC.startBackgroundTrack = &trap_S_StartBackgroundTrack;",
+		"cgDC.stopBackgroundTrack = &trap_S_StopBackgroundTrack;",
+	)
 
 
 def test_cgame_item_pickup_use_and_powerup_sounds_match_retail_wiring() -> None:

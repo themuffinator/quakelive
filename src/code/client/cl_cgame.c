@@ -391,6 +391,9 @@ typedef struct {
 	long			nativeKeyCode;
 } qlWebKeyboardEventFields_t;
 
+#define QL_WEB_KEYBOARD_EVENT_KEYDOWN_TYPE 0u
+#define QL_WEB_KEYBOARD_EVENT_KEYUP_TYPE 1u
+#define QL_WEB_KEYBOARD_EVENT_CHAR_TYPE 2u
 #define QL_WEB_KEYBOARD_EVENT_ACTIVATION_TYPE 0u
 #define QL_WEB_KEYBOARD_EVENT_ACTIVATION_VIRTUAL_KEY 0x11u
 #define QL_WEB_KEYBOARD_EVENT_ACTIVATION_NATIVE_KEY 0x1d0001L
@@ -408,6 +411,7 @@ typedef enum {
 	QL_WEB_BRIDGE_SLOT_SET_CLIENT_STATE_FLAGS = 0x2c,
 	QL_WEB_BRIDGE_SLOT_GET_CELL_DISPLAY_STATE = 0x38,
 	QL_WEB_BRIDGE_SLOT_GET_CELL_LABEL = 0x3c,
+	QL_WEB_BRIDGE_SLOT_RESERVED_21C0 = 0x40,
 	QL_WEB_BRIDGE_SLOT_INIT_UI = 0x44,
 	QL_WEB_BRIDGE_SLOT_GET_LABEL_LIST2_COUNT = 0x48,
 	QL_WEB_BRIDGE_SLOT_GET_LABEL_LIST1_COUNT = 0x4c,
@@ -478,6 +482,7 @@ QL_WEB_BRIDGE_ASSERT_VTBL_OFFSET( shutdownCGame, QL_WEB_BRIDGE_SLOT_SHUTDOWN_CGA
 QL_WEB_BRIDGE_ASSERT_VTBL_OFFSET( setClientStateFlags, QL_WEB_BRIDGE_SLOT_SET_CLIENT_STATE_FLAGS );
 QL_WEB_BRIDGE_ASSERT_VTBL_OFFSET( getCellDisplayState, QL_WEB_BRIDGE_SLOT_GET_CELL_DISPLAY_STATE );
 QL_WEB_BRIDGE_ASSERT_VTBL_OFFSET( getCellLabel, QL_WEB_BRIDGE_SLOT_GET_CELL_LABEL );
+QL_WEB_BRIDGE_ASSERT_VTBL_OFFSET( reserved21C0, QL_WEB_BRIDGE_SLOT_RESERVED_21C0 );
 QL_WEB_BRIDGE_ASSERT_VTBL_OFFSET( initUI, QL_WEB_BRIDGE_SLOT_INIT_UI );
 QL_WEB_BRIDGE_ASSERT_VTBL_OFFSET( getLabelList2Count, QL_WEB_BRIDGE_SLOT_GET_LABEL_LIST2_COUNT );
 QL_WEB_BRIDGE_ASSERT_VTBL_OFFSET( getLabelList1Count, QL_WEB_BRIDGE_SLOT_GET_LABEL_LIST1_COUNT );
@@ -946,6 +951,10 @@ static qboolean CL_WebHost_HasSteamIdentity( void ) {
 		return qfalse;
 	}
 
+	if ( !SteamClient_IsInitialized() ) {
+		SteamClient_InitForFilesystem();
+	}
+
 	return SteamClient_GetSteamID() != 0ull ? qtrue : qfalse;
 }
 
@@ -961,6 +970,9 @@ static void CL_WebHost_RefreshBootstrapProperties( void ) {
 	cl_webHost.appId = QL_Steamworks_GetAppID();
 	cl_webHost.steamIdLow = 0u;
 	cl_webHost.steamIdHigh = 0u;
+	if ( CL_SteamServicesEnabled() && !SteamClient_IsInitialized() ) {
+		SteamClient_InitForFilesystem();
+	}
 	steamId = SteamClient_GetSteamID();
 	cl_webHost.steamIdLow = (uint32_t)( steamId & 0xffffffffull );
 	cl_webHost.steamIdHigh = (uint32_t)( steamId >> 32 );
@@ -2232,6 +2244,21 @@ static void QLWebView_InjectKeyboardEvent( int key, qboolean down ) {
 		QLWebView_PublishGameKey( key );
 		cl_webHost.keyCaptureArmed = qfalse;
 	}
+
+#if defined( _WIN32 ) && QL_PLATFORM_HAS_ONLINE_SERVICES
+	if ( cl_webHost.liveAwesomium ) {
+		if ( key & K_CHAR_FLAG ) {
+			if ( down ) {
+				CL_Awesomium_InjectKeyboardEvent( QL_WEB_KEYBOARD_EVENT_CHAR_TYPE, (unsigned int)( key & ~K_CHAR_FLAG ), 0 );
+			}
+		} else {
+			CL_Awesomium_InjectKeyboardEvent(
+				down ? QL_WEB_KEYBOARD_EVENT_KEYDOWN_TYPE : QL_WEB_KEYBOARD_EVENT_KEYUP_TYPE,
+				(unsigned int)key,
+				0 );
+		}
+	}
+#endif
 
 	if ( down ) {
 		cl_webHost.focused = qtrue;

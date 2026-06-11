@@ -4198,6 +4198,47 @@ int inflate(z_streamp z, int f)
 #endif
 }
 
+/*
+=============
+QZ_Uncompress
+
+Decompresses one complete zlib stream into a caller-owned output buffer.
+=============
+*/
+int QZ_Uncompress( unsigned char *dest, unsigned long *destLen, const unsigned char *source, unsigned long sourceLen ) {
+	z_stream stream;
+	int err;
+
+	if ( !dest || !destLen || !source ) {
+		return Z_STREAM_ERROR;
+	}
+
+	if ( sourceLen > (unsigned long)( (uInt)-1 ) || *destLen > (unsigned long)( (uInt)-1 ) ) {
+		return Z_BUF_ERROR;
+	}
+
+	zmemzero( &stream, sizeof( stream ) );
+	stream.next_in = (unsigned char *)source;
+	stream.avail_in = (uInt)sourceLen;
+	stream.next_out = dest;
+	stream.avail_out = (uInt)*destLen;
+
+	err = inflateInit2( &stream, DEF_WBITS );
+	if ( err != Z_OK ) {
+		return err;
+	}
+
+	err = inflate( &stream, Z_FINISH );
+	if ( err != Z_STREAM_END ) {
+		inflateEnd( &stream );
+		return err == Z_OK ? Z_BUF_ERROR : err;
+	}
+
+	*destLen = stream.total_out;
+	err = inflateEnd( &stream );
+	return err;
+}
+
 // defined but not used
 #if 0
 int inflateSetDictionary(z_streamp z, const Byte *dictionary, uInt dictLength)

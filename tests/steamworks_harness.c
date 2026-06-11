@@ -7561,7 +7561,8 @@ QLR_EXPORT qboolean QLR_SteamworksMock_QueueFriendRichPresenceUpdate( uint64_t s
 	ql_steam_friend_rich_presence_update_raw_t event;
 
 	memset( &event, 0, sizeof( event ) );
-	event.steamIDFriend.value = steamId;
+	event.steamIDFriendLow = (uint32_t)( steamId & 0xffffffffu );
+	event.steamIDFriendHigh = (uint32_t)( steamId >> 32 );
 	event.appId = appId;
 	return QLR_SteamworksMock_QueueCallback( qfalse, qfalse, QL_STEAM_CALLBACK_FRIEND_RICH_PRESENCE_UPDATE, 0ull, &event, sizeof( event ), qfalse );
 }
@@ -7575,7 +7576,8 @@ QLR_EXPORT qboolean QLR_SteamworksMock_QueueAvatarImageLoaded( uint64_t steamId,
 	ql_steam_avatar_image_loaded_raw_t event;
 
 	memset( &event, 0, sizeof( event ) );
-	event.steamID.value = steamId;
+	event.steamIDLow = (uint32_t)( steamId & 0xffffffffu );
+	event.steamIDHigh = (uint32_t)( steamId >> 32 );
 	event.image = image;
 	event.wide = width;
 	event.tall = height;
@@ -7800,9 +7802,10 @@ QLR_SteamworksMock_QueueServerConnectFailure
 QLR_EXPORT qboolean QLR_SteamworksMock_QueueServerConnectFailure( int result, int stillRetrying ) {
 	ql_steam_server_connect_failure_raw_t event;
 
+	(void)stillRetrying;
+
 	memset( &event, 0, sizeof( event ) );
 	event.result = result;
-	event.stillRetrying = stillRetrying ? qtrue : qfalse;
 	return QLR_SteamworksMock_QueueCallback( qfalse, qtrue, QL_STEAM_CALLBACK_STEAM_SERVER_CONNECT_FAILURE, 0ull, &event, sizeof( event ), qfalse );
 }
 
@@ -7828,8 +7831,10 @@ QLR_EXPORT qboolean QLR_SteamworksMock_QueueValidateAuthTicketResponse( uint64_t
 	ql_steam_validate_auth_ticket_response_raw_t event;
 
 	memset( &event, 0, sizeof( event ) );
-	event.steamId.value = steamId;
-	event.ownerSteamId.value = ownerSteamId;
+	event.steamIdLow = (uint32_t)( steamId & 0xffffffffu );
+	event.steamIdHigh = (uint32_t)( steamId >> 32 );
+	event.ownerSteamIdLow = (uint32_t)( ownerSteamId & 0xffffffffu );
+	event.ownerSteamIdHigh = (uint32_t)( ownerSteamId >> 32 );
 	event.authSessionResponse = authSessionResponse;
 	return QLR_SteamworksMock_QueueCallback( qfalse, qtrue, QL_STEAM_CALLBACK_VALIDATE_AUTH_TICKET_RESPONSE, 0ull, &event, sizeof( event ), qfalse );
 }
@@ -7857,7 +7862,8 @@ QLR_EXPORT qboolean QLR_SteamworksMock_QueueGSStatsReceived( uint64_t steamId, i
 
 	memset( &event, 0, sizeof( event ) );
 	event.result = result;
-	event.steamId.value = steamId;
+	event.steamIdLow = (uint32_t)( steamId & 0xffffffffu );
+	event.steamIdHigh = (uint32_t)( steamId >> 32 );
 	return QLR_SteamworksMock_QueueCallback( qfalse, qtrue, QL_STEAM_CALLBACK_GS_STATS_RECEIVED, 0ull, &event, sizeof( event ), qfalse );
 }
 
@@ -7871,7 +7877,8 @@ QLR_EXPORT qboolean QLR_SteamworksMock_QueueGSStatsStored( uint64_t steamId, int
 
 	memset( &event, 0, sizeof( event ) );
 	event.result = result;
-	event.steamId.value = steamId;
+	event.steamIdLow = (uint32_t)( steamId & 0xffffffffu );
+	event.steamIdHigh = (uint32_t)( steamId >> 32 );
 	return QLR_SteamworksMock_QueueCallback( qfalse, qtrue, QL_STEAM_CALLBACK_GS_STATS_STORED, 0ull, &event, sizeof( event ), qfalse );
 }
 

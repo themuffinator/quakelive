@@ -38,8 +38,19 @@ SOUND_CONSOLE_ALIASES = {
 	"sub_4DB810": ("S_Music_f", None, None),
 }
 
+SOUND_CONSOLE_LOWERCASE_BN_ALIASES = {
+	"sub_4d9b60": "S_SoundInfo_f",
+	"sub_4dafd0": "S_SoundList_f",
+	"sub_4db710": "S_Play_f",
+	"sub_4db810": "S_Music_f",
+}
+
 SHARED_SOUND_HASH_ALIASES = {
 	"sub_4D8990": ("generateHashValue", "FUN_004d8990", "75"),
+}
+
+SHARED_SOUND_HASH_LOWERCASE_BN_ALIASES = {
+	"sub_4d8990": "generateHashValue",
 }
 
 SOUND_HELPER_ALIASES = {
@@ -50,6 +61,7 @@ SOUND_HELPER_ALIASES = {
 	"sub_4DBB30": ("SND_setup", "FUN_004dbb30", "106"),
 	"sub_4DBBA0": ("SND_shutdown", "FUN_004dbba0", "50"),
 	"sub_4DBBE0": ("S_DisplayFreeMemory", "FUN_004dbbe0", "27"),
+	"sub_4DBC00": ("ResampleSfx", "FUN_004dbc00", "245"),
 	"sub_4DBD00": ("S_LoadSound", "FUN_004dbd00", "228"),
 	"sub_4DC6A0": ("S_VorbisBufferRead", "FUN_004dc6a0", "62"),
 	"sub_4DC6E0": ("S_VorbisBufferSeek", "FUN_004dc6e0", "61"),
@@ -65,12 +77,44 @@ SOUND_HELPER_ALIASES = {
 	"sub_4DCC70": ("S_LoadWavSound", "FUN_004dcc70", "177"),
 }
 
+SOUND_HELPER_LOWERCASE_BN_ALIASES = {
+	"sub_4d9b20": "S_SoundFileTypeForPath",
+	"sub_4dab00": "S_AddVoiceSamples",
+	"sub_4db1c0": "S_UpdateBackgroundTrack",
+	"sub_4dbb10": "SND_free",
+	"sub_4dbb30": "SND_setup",
+	"sub_4dbba0": "SND_shutdown",
+	"sub_4dbbe0": "S_DisplayFreeMemory",
+	"sub_4dbc00": "ResampleSfx",
+	"sub_4dbd00": "S_LoadSound",
+	"sub_4dc6a0": "S_VorbisBufferRead",
+	"sub_4dc6e0": "S_VorbisBufferSeek",
+	"sub_4dc720": "S_VorbisBufferTell",
+	"sub_4dc730": "S_VorbisDecodeMemory",
+	"sub_4dc920": "S_LoadOggSound",
+	"sub_4dc960": "S_OggReadCallback",
+	"sub_4dc980": "S_OggCloseCallback",
+	"sub_4dc9a0": "S_OpenBackgroundOgg",
+	"sub_4dca40": "S_CloseBackgroundOgg",
+	"sub_4dcad0": "S_FindWavChunk",
+	"sub_4dcb20": "GetWavinfo",
+	"sub_4dcc70": "S_LoadWavSound",
+}
+
 SOUND_REGISTRATION_ALIASES = {
 	"sub_4D9D00": ("S_FindName", "FUN_004d9d00", "266"),
 	"sub_4D9E10": ("S_memoryLoad", "FUN_004d9e10", "50"),
 	"sub_4D9E50": ("S_RegisterSound", "FUN_004d9e50", "151"),
 	"sub_4DB320": ("S_FreeOldestSound", "FUN_004db320", "126"),
 	"sub_4DB3A0": ("S_BeginRegistration", "FUN_004db3a0", "78"),
+}
+
+SOUND_REGISTRATION_LOWERCASE_BN_ALIASES = {
+	"sub_4d9d00": "S_FindName",
+	"sub_4d9e10": "S_memoryLoad",
+	"sub_4d9e50": "S_RegisterSound",
+	"sub_4db320": "S_FreeOldestSound",
+	"sub_4db3a0": "S_BeginRegistration",
 }
 
 SOUND_BACKGROUND_ALIASES = {
@@ -81,11 +125,27 @@ SOUND_BACKGROUND_ALIASES = {
 	"sub_4DCA50": ("S_OggUpdateBackgroundTrack", "FUN_004dca50", "114"),
 }
 
+SOUND_BACKGROUND_LOWERCASE_BN_ALIASES = {
+	"sub_4db030": "S_StopBackgroundTrack",
+	"sub_4db060": "S_StartBackgroundTrack",
+	"sub_4db1c0": "S_UpdateBackgroundTrack",
+	"sub_4dc9a0": "S_OpenBackgroundOgg",
+	"sub_4dca40": "S_CloseBackgroundOgg",
+	"sub_4dca50": "S_OggUpdateBackgroundTrack",
+}
+
 SOUND_MIXER_ALIASES = {
 	"sub_4DBDF0": ("S_TransferStereo16", "FUN_004dbdf0", "214"),
 	"sub_4DBED0": ("S_TransferPaintBuffer", "FUN_004dbed0", "351"),
 	"sub_4DC030": ("S_PaintChannelFrom16", "FUN_004dc030", "775"),
 	"sub_4DC350": ("S_PaintChannels", "FUN_004dc350", "781"),
+}
+
+SOUND_MIXER_LOWERCASE_BN_ALIASES = {
+	"sub_4dbdf0": "S_TransferStereo16",
+	"sub_4dbed0": "S_TransferPaintBuffer",
+	"sub_4dc030": "S_PaintChannelFrom16",
+	"sub_4dc350": "S_PaintChannels",
 }
 
 
@@ -128,6 +188,9 @@ def test_sound_helper_aliases_cover_retail_ogg_wav_voice_cluster() -> None:
 		assert aliases[alias] == name
 		assert aliases[ghidra_name] == name
 		assert function_rows[ghidra_name]["size"] == size
+
+	for alias, name in SOUND_HELPER_LOWERCASE_BN_ALIASES.items():
+		assert aliases[alias] == name
 
 	for expected in (
 		'004d9b20    int32_t sub_4d9b20(char* arg1)',
@@ -231,10 +294,16 @@ def test_sound_registration_cache_helpers_match_retail_diagnostics_and_reset_pat
 		assert aliases[ghidra_name] == name
 		assert function_rows[ghidra_name]["size"] == size
 
+	for alias, name in SHARED_SOUND_HASH_LOWERCASE_BN_ALIASES.items():
+		assert aliases[alias] == name
+
 	for alias, (name, ghidra_name, size) in SOUND_REGISTRATION_ALIASES.items():
 		assert aliases[alias] == name
 		assert aliases[ghidra_name] == name
 		assert function_rows[ghidra_name]["size"] == size
+
+	for alias, name in SOUND_REGISTRATION_LOWERCASE_BN_ALIASES.items():
+		assert aliases[alias] == name
 
 	for expected in (
 		"004d8990    int32_t sub_4d8990(char* arg1, int32_t arg2)",
@@ -352,6 +421,9 @@ def test_sound_console_commands_match_retail_registration_and_output_contracts()
 		if ghidra_name is not None:
 			assert aliases[ghidra_name] == name
 			assert function_rows[ghidra_name]["size"] == size
+
+	for alias, name in SOUND_CONSOLE_LOWERCASE_BN_ALIASES.items():
+		assert aliases[alias] == name
 
 	for expected in (
 		"004d9b60    int32_t sub_4d9b60()",
@@ -507,6 +579,13 @@ def test_voice_mixer_reconstructs_retail_lane_shape_and_cvars() -> None:
 	assert 's_pvs = Cvar_GetBounded( "s_pvs", "0", "0", "1", CVAR_ARCHIVE | CVAR_PROTECTED | CVAR_VM_CREATED | CVAR_CLOUD );' in snd_dma
 	assert 's_voiceStep = Cvar_Get( "s_voiceStep", "0.02", CVAR_ARCHIVE | CVAR_PROTECTED );' in snd_dma
 	assert "Com_Memset( s_voiceChannels, 0, sizeof( s_voiceChannels ) );" in snd_dma
+	_assert_order(
+		add_voice_block,
+		"channelIndex = -1;",
+		"for ( i = 0; i < MAX_VOICE_CHANNELS; ++i ) {",
+		"if ( s_voiceChannels[i].clientNum == clientNum ) {",
+	)
+	assert "if ( !s_soundStarted || s_soundMuted || !data || samples <= 0 )" not in add_voice_block
 	assert "s_paintedtime - s_voiceChannels[i].endSample > (int)( dma.samples * 0.5f )" in add_voice_block
 	assert 'Com_DPrintf( "client %d: using voice %d\\n", clientNum, channelIndex );' in add_voice_block
 	assert 'Com_DPrintf( "client %d silenced: no voices left\\n", clientNum );' in add_voice_block
@@ -553,6 +632,9 @@ def test_sound_mixer_paint_channels_preserves_retail_stage_order_and_transfer_he
 		assert aliases[alias] == name
 		assert aliases[ghidra_name] == name
 		assert function_rows[ghidra_name]["size"] == size
+
+	for alias, name in SOUND_MIXER_LOWERCASE_BN_ALIASES.items():
+		assert aliases[alias] == name
 
 	_assert_order(
 		hlil,
@@ -818,6 +900,7 @@ def test_sound_cache_and_shutdown_match_retail_allocator_contracts() -> None:
 	snd_setup_block = _extract_function_block(snd_mem, "void SND_setup()")
 	snd_shutdown_block = _extract_function_block(snd_mem, "void SND_shutdown( void )")
 	display_block = _extract_function_block(snd_mem, "void S_DisplayFreeMemory()")
+	resample_block = _extract_function_block(snd_mem, "static void ResampleSfx")
 	file_block = _extract_function_block(snd_mem, "static qboolean S_OpenSoundFile")
 	pcm_block = _extract_function_block(snd_mem, "static qboolean S_LoadPCMSound")
 	ogg_block = _extract_function_block(snd_mem, "static qboolean S_LoadOggSound")
@@ -842,8 +925,18 @@ def test_sound_cache_and_shutdown_match_retail_allocator_contracts() -> None:
 		"004dbbeb  int32_t var_4 = data_12c5b8c",
 		"004dbbec  int32_t var_8 = data_12c5b90",
 		'char const data_544528[0x2f] = "%d bytes sound buffer memory in use, %d free \\n", 0',
+		"004dbc00    int32_t sub_4dbc00(int32_t* arg1, int32_t arg2, int32_t arg3, int32_t arg4)",
+		"004dbc1b  long double x87_r6 = fconvert.t(fconvert.s(float.t(arg2) / float.t(data_142c330)))",
+		"004dbc34  edi[3] = eax",
+		"004dbc6d          if (arg3 != 2)",
+		"004dbc7c              esi_2 = ((zx.d(*(result + arg4)) - 0x80) << 8).w",
+		"004dbc6f              esi_2 = *(arg4 + (result << 1))",
+		"004dbc81          int32_t ebx_3 = edx & 0x3ff",
 		"004dbca2              data_12c5b8c -= 0x808",
 		"004dbcac              data_12c5b90 += 0x808",
+		"004dbcc0              *(result + 0x800) = 0",
+		"004dc8ad  sub_4dbc00(arg2, *(eax_4 + 8), 2, eax_7)",
+		"004dcd07  sub_4dbc00(arg1, var_18, var_14, eax_4)",
 	):
 		assert expected in hlil
 
@@ -891,6 +984,27 @@ def test_sound_cache_and_shutdown_match_retail_allocator_contracts() -> None:
 
 	assert 'Com_Printf("%d bytes sound buffer memory in use, %d free \\n", totalInUse, inUse);' in display_block
 	assert 'Com_Printf("%d bytes sound buffer memory in use, %d free\\n", totalInUse, inUse);' not in display_block
+	for expected in (
+		"static void ResampleSfx( sfx_t *sfx, int inrate, int inwidth, byte *data )",
+		"stepscale = (float)inrate / dma.speed;",
+		"outcount = sfx->soundLength / stepscale;",
+		"sfx->soundLength = outcount;",
+		"samplefrac = 0;",
+		"fracstep = stepscale * 256;",
+		"chunk = sfx->soundData;",
+		"srcsample = samplefrac >> 8;",
+		"samplefrac += fracstep;",
+		"if( inwidth == 2 ) {",
+		"sample = LittleShort ( ((short *)data)[srcsample] );",
+		"sample = (int)( (unsigned char)(data[srcsample]) - 128) << 8;",
+		"part  = (i&(SND_CHUNK_SIZE-1));",
+		"newchunk = SND_malloc();",
+		"sfx->soundData = newchunk;",
+		"chunk->next = newchunk;",
+		"chunk->sndChunk[part] = sample;",
+	):
+		assert expected in resample_block
+	assert "qboolean compressed" not in resample_block
 	assert "SND_shutdown();" in shutdown_block
 	assert 'Cmd_RemoveCommand("play");' in shutdown_block
 	assert 'Cmd_RemoveCommand("music");' in shutdown_block
@@ -932,6 +1046,8 @@ def test_sound_cache_and_shutdown_match_retail_allocator_contracts() -> None:
 	assert "Hunk_FreeTempMemory( data );" in wav_block
 	assert 'Com_DPrintf( "WAV_Load: %s is not a 16-bit file\\n", loadName );' in pcm_block
 	assert 'Com_DPrintf( "WAV_Load: %s is not a 22kHz file\\n", loadName );' in pcm_block
+	assert "ResampleSfx( sfx, info->rate, info->width, source );" in pcm_block
+	assert "ResampleSfx( sfx, info->rate, info->width, source, qfalse );" not in pcm_block
 	assert "lastTimeUsed" not in pcm_block
 	assert 'Com_Printf ("%s is a stereo wav file\\n", loadName);' not in wav_block
 	assert 'WARNING: %s is a 8 bit wav file' not in pcm_block
@@ -955,6 +1071,8 @@ def test_background_track_ogg_update_matches_retail_restart_path() -> None:
 		snd_dma,
 		"static void S_SetOggTrackPath",
 	)
+	close_block = _extract_function_block(snd_dma, "static void S_CloseBackgroundOgg")
+	open_block = _extract_function_block(snd_dma, "static qboolean S_OpenBackgroundOgg")
 	stop_block = _extract_function_block(snd_dma, "void S_StopBackgroundTrack( void )")
 	start_block = _extract_function_block(snd_dma, "void S_StartBackgroundTrack")
 	update_helper = _extract_function_block(
@@ -967,6 +1085,9 @@ def test_background_track_ogg_update_matches_retail_restart_path() -> None:
 		assert aliases[alias] == name
 		assert aliases[ghidra_name] == name
 		assert function_rows[ghidra_name]["size"] == size
+
+	for alias, name in SOUND_BACKGROUND_LOWERCASE_BN_ALIASES.items():
+		assert aliases[alias] == name
 
 	for expected in (
 		"004db030    void sub_4db030()",
@@ -983,6 +1104,8 @@ def test_background_track_ogg_update_matches_retail_restart_path() -> None:
 		"sub_4dca50(&var_7538, esi_3)",
 		"004db2c1                      result = sub_4dca40()",
 		"004db2e3                      result = sub_4db060(var_18_3, var_14_3)",
+		"004dca40    int32_t sub_4dca40()",
+		"sub_4fcde0(&data_12cdbb0)",
 	):
 		assert expected in hlil
 
@@ -997,9 +1120,24 @@ def test_background_track_ogg_update_matches_retail_restart_path() -> None:
 	):
 		assert expected in set_path_block
 
+	assert "S_OggStreamClose( &s_backgroundOgg );" in close_block
+
+	for expected in (
+		"if ( !S_OggStreamOpen( &s_backgroundOgg, name ) ) {",
+		"s_backgroundIsOgg = qtrue;",
+		"s_backgroundFile = 0;",
+		"s_backgroundInfo.format = WAV_FORMAT_PCM;",
+		"s_backgroundInfo.channels = S_OggStreamChannels( &s_backgroundOgg );",
+		"s_backgroundInfo.rate = S_OggStreamRate( &s_backgroundOgg );",
+		"s_backgroundInfo.width = S_OggStreamWidth( &s_backgroundOgg );",
+		"S_CloseBackgroundOgg();",
+		"s_backgroundIsOgg = qfalse;",
+	):
+		assert expected in open_block
+
 	for expected in (
 		"if ( s_backgroundFile ) {",
-		"S_OggStreamClose( &s_backgroundOgg );",
+		"S_CloseBackgroundOgg();",
 		"s_backgroundIsOgg = qfalse;",
 		"s_rawend = 0;",
 	):
@@ -1010,6 +1148,7 @@ def test_background_track_ogg_update_matches_retail_restart_path() -> None:
 		"if ( s_backgroundFile ) {",
 		"stopped = qtrue;",
 		"if ( S_OggStreamActive( &s_backgroundOgg ) ) {",
+		"S_CloseBackgroundOgg();",
 		"stopped = qtrue;",
 		"s_backgroundIsOgg = qfalse;",
 		"if ( stopped ) {",
@@ -1025,6 +1164,7 @@ def test_background_track_ogg_update_matches_retail_restart_path() -> None:
 		"S_SetOggTrackPath( loop, s_backgroundLoop, sizeof( s_backgroundLoop ) );",
 		"S_SetOggTrackPath( intro, introPath, sizeof( introPath ) );",
 		"if ( S_OggStreamActive( &s_backgroundOgg ) ) {",
+		"S_CloseBackgroundOgg();",
 		"if ( !S_OpenBackgroundOgg( introPath ) ) {",
 		'Com_Printf( S_COLOR_YELLOW "WARNING: couldn\'t open music file %s\\n", introPath );',
 	):
@@ -1035,6 +1175,7 @@ def test_background_track_ogg_update_matches_retail_restart_path() -> None:
 		"S_SetOggTrackPath( intro, introPath, sizeof( introPath ) );",
 		"if ( s_backgroundFile ) {",
 		"if ( S_OggStreamActive( &s_backgroundOgg ) ) {",
+		"S_CloseBackgroundOgg();",
 		"s_backgroundIsOgg = qfalse;",
 		"if ( !S_OpenBackgroundOgg( introPath ) ) {",
 	)
@@ -1042,7 +1183,7 @@ def test_background_track_ogg_update_matches_retail_restart_path() -> None:
 
 	assert 'result = S_OggStreamRead( &s_backgroundOgg, buffer, bytesToRead );' in update_helper
 	assert 'Com_Printf( S_COLOR_YELLOW "OGG_UpdateBackgroundTrack: %i\\n", result );' in update_helper
-	assert "S_OggStreamClose( &s_backgroundOgg );" in update_helper
+	assert "S_CloseBackgroundOgg();" in update_helper
 	assert "return 0;" in update_helper
 	assert "if ( !S_OggStreamActive( &s_backgroundOgg ) ) {" in update_block
 	assert "r = S_OggUpdateBackgroundTrack( raw, fileBytes );" in update_block

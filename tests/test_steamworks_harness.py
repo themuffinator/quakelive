@@ -1998,7 +1998,7 @@ def test_server_connection_and_p2p_callbacks_dispatch_from_server_callback_pump(
     assert lib.QLR_SteamworksMock_GetSteamGameServerCallbackCalls() == 2
     assert lib.QLR_SteamworksMock_GetClientCallbackCaptureCount() == 2
     assert lib.QLR_SteamworksMock_GetLastCallbackKind() == b"server_connect_failure"
-    assert lib.QLR_SteamworksMock_GetLastCallbackAppId() == 1
+    assert lib.QLR_SteamworksMock_GetLastCallbackAppId() == 0
     assert lib.QLR_SteamworksMock_GetLastCallbackResult() == 3
 
     assert lib.QLR_SteamworksMock_QueueServersDisconnected(7)

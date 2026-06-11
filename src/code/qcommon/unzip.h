@@ -331,6 +331,12 @@ extern int unzGetLocalExtrafield (unzFile file, void* buf, unsigned len);
 
   if buf!=NULL, len is the size of the buffer, the extra header is copied in
 	buf.
-  the return value is the number of unsigned chars copied in buf, or (if <0) 
+	the return value is the number of unsigned chars copied in buf, or (if <0)
 	the error code
 */
+
+/*
+  Decompress a complete zlib stream into a caller-provided buffer using the
+  bundled qcommon zlib implementation.
+*/
+extern int QZ_Uncompress( unsigned char *dest, unsigned long *destLen, const unsigned char *source, unsigned long sourceLen );

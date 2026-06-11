@@ -519,6 +519,152 @@ def test_client_input_button3_release_and_mlook_follow_retail_mouse_and_joystick
 	assert 'cmd->forwardmove = ClampChar( cmd->forwardmove + cl.joystickAxis[AXIS_FORWARD] );' in joystick_move_block
 
 
+def test_client_mouse_input_owner_aliases_and_hlil_anchors_match_retail() -> None:
+	aliases = json.loads(
+		(REPO_ROOT / "references/analysis/quakelive_symbol_aliases.json").read_text(encoding="utf-8")
+	)["quakelive_steam_srp"]
+	ghidra_functions = (
+		REPO_ROOT / "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+	).read_text(encoding="utf-8")
+	host_hlil = (
+		REPO_ROOT
+		/ "references"
+		/ "hlil"
+		/ "quakelive"
+		/ "quakelive_steam.exe"
+		/ "quakelive_steam.exe_hlil_split"
+		/ "quakelive_steam.exe_hlil_part04.txt"
+	).read_text(encoding="utf-8")
+	cl_input = (REPO_ROOT / "src/code/client/cl_input.c").read_text(encoding="utf-8")
+	cl_main = (REPO_ROOT / "src/code/client/cl_main.c").read_text(encoding="utf-8")
+
+	mouse_event_block = _extract_function_block(cl_input, "void CL_MouseEvent( int dx, int dy, int time ) {")
+	begin_filter_block = _extract_function_block(cl_input, "static void CL_BeginMouseFilter( void ) {")
+	end_filter_block = _extract_function_block(cl_input, "static void CL_EndMouseFilter( void ) {")
+	mouse_move_block = _extract_function_block(cl_input, "void CL_MouseMove( usercmd_t *cmd ) {")
+	calculate_sensitivity_block = _extract_function_block(
+		cl_input, "static float CL_CalculateMouseSensitivity( float mx, float my, float *debugRate, float *debugPower ) {"
+	)
+	init_block = _extract_function_block(cl_main, "void CL_Init( void ) {")
+
+	expected_aliases = {
+		"FUN_004b54e0": "CL_MouseEvent",
+		"sub_4B54E0": "CL_MouseEvent",
+		"sub_4b54e0": "CL_MouseEvent",
+		"FUN_004b5640": "CL_BeginMouseFilter",
+		"sub_4B5640": "CL_BeginMouseFilter",
+		"sub_4b5640": "CL_BeginMouseFilter",
+		"FUN_004b5710": "CL_EndMouseFilter",
+		"sub_4B5710": "CL_EndMouseFilter",
+		"sub_4b5710": "CL_EndMouseFilter",
+		"FUN_004b5800": "CL_MouseMove",
+		"sub_4B5800": "CL_MouseMove",
+		"sub_4b5800": "CL_MouseMove",
+	}
+
+	for raw_name, normalized_name in expected_aliases.items():
+		assert aliases[raw_name] == normalized_name
+
+	for expected_row in (
+		"FUN_004b54e0,004b54e0,141,0,unknown",
+		"FUN_004b5640,004b5640,197,0,unknown",
+		"FUN_004b5710,004b5710,236,0,unknown",
+		"FUN_004b5800,004b5800,968,0,unknown",
+	):
+		assert expected_row in ghidra_functions
+
+	for expected in (
+		"004b54e0    int32_t sub_4b54e0(int32_t arg1, int32_t arg2)",
+		"004b54e3  int32_t result = sub_4f22e0()",
+		"004b54f5      if (*(result + 0x30) == 0",
+		"004b54f7          result = sub_4eab80()",
+		"004b5507              if ((result.b & 0x20) != 0)",
+		"004b551a                  return sub_4f2750(arg1, arg2)",
+		"004b551d              if ((result.b & 2) != 0)",
+		"004b5536                  return (*(data_146cc18 + 0xc))(arg1, arg2)",
+		"004b5539              if ((result.b & 8) != 0)",
+		"004b5551                  return (*(data_146cc38 + 0x20))(arg1, arg2)",
+		"004b5557              if ((result & 0xffffffef) == 0)",
+		"004b555f                  data_1471e9c += arg1",
+		"004b5565                  data_1471ea0 += result",
+		"004b5640    int32_t* sub_4b5640()",
+		"004b566b      if (result s>= 0x20)",
+		"004b5691      if (*(esi + 0x20) != 0)",
+		"004b56b7          memset(&data_1472768, 0, 0x80)",
+		"004b56c8          result = memset(&data_14727e8, 0, 0x80)",
+		"004b5710    void* sub_4b5710()",
+		"004b5731      *((data_147286c << 2) + &data_1472768) = fconvert.s(fconvert.t(data_1472758))",
+		"004b575d      if (result_1 s> result)",
+		"004b57db      data_1472758 = fconvert.s(fconvert.t(var_8_1) / x87_r6_1)",
+		"004b5800    void* sub_4b5800(void* arg1)",
+		"004b5815  eax.b = *(data_15f6724 + 0x30) != 0",
+		'004b5842          char const* const var_34_1 = "mouse.log"',
+		'004b5869          var_38 = "mx my frame_msec rate power\\n"',
+		"004b58da              / fconvert.t(2.5399999618530273)))",
+		"004b5989              var_8_1 = fconvert.s(fconvert.t(var_8_1) * fconvert.t(1000.0))",
+		"004b5998          float var_8_2 = fconvert.s(fconvert.t(var_8_1) - fconvert.t(*(ecx_2 + 0x2c)))",
+		"004b5acc          sub_4b5640()",
+		"004b5bbd              return sub_4b5710()",
+	):
+		assert expected in host_hlil
+
+	mouse_event_order = [
+		"if ( !CL_AdvertisementBridge_IsDelayElapsed() ) {",
+		'if ( Cvar_VariableIntegerValue( "cg_ignoreMouseInput" ) ) {',
+		"if ( cls.keyCatchers & KEYCATCH_BROWSER ) {",
+		"if ( cls.keyCatchers & KEYCATCH_UI ) {",
+		"if ( cls.keyCatchers & KEYCATCH_CGAME ) {",
+		"if ( ( cls.keyCatchers & ~KEYCATCH_RETAIL_MOUSEPASS ) == 0 ) {",
+		"cl.mouseDx[0] += dx;",
+		"cl.mouseDy[0] += dy;",
+	]
+	positions = [mouse_event_block.index(expected) for expected in mouse_event_order]
+	assert positions == sorted(positions)
+	assert "CL_WebView_OnMouseMove( dx, dy );" in mouse_event_block
+	assert "VM_Call( uivm, UI_MOUSE_EVENT, dx, dy );" in mouse_event_block
+	assert "VM_Call( cgvm, CG_MOUSE_EVENT, dx, dy );" in mouse_event_block
+	assert "CL_TranslateRetailMouseDelta" not in mouse_event_block
+
+	assert 'Cvar_Get( "cg_ignoreMouseInput", "0", CVAR_ROM );' in init_block
+	assert 'cl_mouseAccelDebug = Cvar_Get ("cl_mouseAccelDebug", "0", 0 );' in init_block
+	assert 'm_cpi = Cvar_Get ("m_cpi", "0", CVAR_ARCHIVE | CVAR_PROTECTED | CVAR_CLOUD );' in init_block
+
+	assert 'Cvar_Set( "m_filter", "0" );' in begin_filter_block
+	assert 'Cvar_Set( "m_filter", "31" );' in begin_filter_block
+	assert "m_filter->modified = qfalse;" in begin_filter_block
+	assert "cl_mouseFilterBaseYaw = cl.viewangles[YAW];" in begin_filter_block
+	assert "cl_mouseFilterBasePitch = cl.viewangles[PITCH];" in begin_filter_block
+
+	assert "cl_mouseFilterYaw[cl_mouseFilterIndex] = cl.viewangles[YAW];" in end_filter_block
+	assert "cl_mouseFilterPitch[cl_mouseFilterIndex] = cl.viewangles[PITCH];" in end_filter_block
+	assert "index = ( index - 1 ) & ( CL_MOUSE_FILTER_SAMPLES - 1 );" in end_filter_block
+	assert "cl.viewangles[YAW] = yaw / (float)cl_mouseFilterCount;" in end_filter_block
+	assert "cl.viewangles[PITCH] = pitch / (float)cl_mouseFilterCount;" in end_filter_block
+
+	assert "CL_UpdateMouseAccelDebugLog();" in mouse_move_block
+	assert "CL_ReadMouseMovement( &mx, &my );" in mouse_move_block
+	assert "CL_ApplyMouseCpiScale( &mx, &my );" in mouse_move_block
+	assert "sensitivity = CL_CalculateMouseSensitivity( mx, my, &rate, &power );" in mouse_move_block
+	assert "sensitivity *= cl.cgameSensitivity;" in mouse_move_block
+	assert "mouseScale = CL_MouseAxisScale();" in mouse_move_block
+	assert "CL_BeginMouseFilter();" in mouse_move_block
+	assert "CL_EndMouseFilter();" in mouse_move_block
+	assert "cmd->rightmove = ClampChar( cmd->rightmove + m_side->value * mx );" in mouse_move_block
+	assert "cl.viewangles[YAW] -= m_yaw->value * mouseScale * mx;" in mouse_move_block
+	assert "cl.viewangles[PITCH] += m_pitch->value * mouseScale * my;" in mouse_move_block
+	assert "cmd->forwardmove = ClampChar( cmd->forwardmove - m_forward->value * my );" in mouse_move_block
+	assert "cl_viewAccel" not in mouse_move_block
+
+	assert "rate *= 1000.0f;" in calculate_sensitivity_block
+	assert "rate -= cl_mouseAccelOffset->value;" in calculate_sensitivity_block
+	assert "power = cl_mouseAccelPower->value - 1.0f;" in calculate_sensitivity_block
+	assert "accelRate = fabsf( cl_mouseAccel->value ) * rate;" in calculate_sensitivity_block
+	assert "if ( cl_mouseAccel->value <= 0.0f ) {" in calculate_sensitivity_block
+	assert "sensitivity -= accelSensitivity;" in calculate_sensitivity_block
+	assert "sensitivity += accelSensitivity;" in calculate_sensitivity_block
+	assert "cl_mouseSensCap->value > 0.0f" in calculate_sensitivity_block
+
+
 def test_postprocess_restart_routes_through_renderer_export_not_renderer_cmd_registration() -> None:
 	tr_public = (REPO_ROOT / "src/code/renderer/tr_public.h").read_text(encoding="utf-8")
 	tr_init = (REPO_ROOT / "src/code/renderer/tr_init.c").read_text(encoding="utf-8")
@@ -1108,8 +1254,12 @@ def test_client_input_mapping_round_277_promotes_console_input_and_usercmd_symbo
 		"sub_4B4F60": "IN_CenterView",
 		"sub_4B5290": "CL_AdjustAngles",
 		"sub_4B5360": "CL_KeyMove",
+		"FUN_004b5570": "CL_JoystickEvent",
 		"sub_4B5570": "CL_JoystickEvent",
+		"sub_4b5570": "CL_JoystickEvent",
+		"FUN_004b55b0": "CL_JoystickMove",
 		"sub_4B55B0": "CL_JoystickMove",
+		"sub_4b55b0": "CL_JoystickMove",
 		"sub_4B5640": "CL_BeginMouseFilter",
 		"sub_4B5710": "CL_EndMouseFilter",
 		"sub_4B5BD0": "CL_CmdButtons",

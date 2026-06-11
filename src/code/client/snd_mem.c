@@ -343,7 +343,7 @@ ResampleSfx
 resample / decimate to the current source rate
 ================
 */
-static void ResampleSfx( sfx_t *sfx, int inrate, int inwidth, byte *data, qboolean compressed ) {
+static void ResampleSfx( sfx_t *sfx, int inrate, int inwidth, byte *data ) {
 	int		outcount;
 	int		srcsample;
 	float	stepscale;
@@ -388,7 +388,7 @@ static void ResampleSfx( sfx_t *sfx, int inrate, int inwidth, byte *data, qboole
 
 /*
 ================
-ResampleSfx
+ResampleSfxRaw
 
 resample / decimate to the current source rate
 ================
@@ -472,7 +472,7 @@ static qboolean S_LoadPCMSound( sfx_t *sfx, const char *loadName, const wavinfo_
 		sfx->soundCompressionMethod = 0;
 		sfx->soundLength = info->samples;
 		sfx->soundData = NULL;
-		ResampleSfx( sfx, info->rate, info->width, source, qfalse );
+		ResampleSfx( sfx, info->rate, info->width, source );
 	}
 
 	Hunk_FreeTempMemory(samples);
