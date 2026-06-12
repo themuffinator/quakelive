@@ -662,19 +662,19 @@ cvar_t *Cvar_GetBounded( const char *var_name, const char *value, const char *mi
 
 void	Cvar_Register( vmCvar_t *vmCvar, const char *varName, const char *defaultValue, int flags );
 // basically a slightly modified Cvar_Get for the interpreted modules
-void	Cvar_RegisterBounded( vmCvar_t *vmCvar, const char *varName, const char *defaultValue, const char *minimumValue, const char *maximumValue, int flags );
+cvar_t	*Cvar_RegisterBounded( vmCvar_t *vmCvar, const char *varName, const char *defaultValue, const char *minimumValue, const char *maximumValue, int flags );
 // retail Quake Live ranged cvar registration for interpreted modules
 
 void	Cvar_Update( vmCvar_t *vmCvar );
 // updates an interpreted modules' version of a cvar
 
-void 	Cvar_Set( const char *var_name, const char *value );
+cvar_t	*Cvar_Set( const char *var_name, const char *value );
 // will create the variable with no flags if it doesn't exist
 
-void Cvar_SetLatched( const char *var_name, const char *value);
+cvar_t	*Cvar_SetLatched( const char *var_name, const char *value);
 // don't set the cvar immediately
 
-void	Cvar_SetValue( const char *var_name, float value );
+cvar_t	*Cvar_SetValue( const char *var_name, float value );
 // expands value to a string and calls Cvar_Set
 
 float	Cvar_VariableValue( const char *var_name );

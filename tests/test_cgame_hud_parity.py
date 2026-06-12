@@ -23,6 +23,7 @@ UI_SHARED = REPO_ROOT / "src" / "code" / "ui" / "ui_shared.c"
 Q_SHARED = REPO_ROOT / "src" / "code" / "game" / "q_shared.h"
 MSG = REPO_ROOT / "src" / "code" / "qcommon" / "msg.c"
 G_ACTIVE = REPO_ROOT / "src" / "code" / "game" / "g_active.c"
+G_CLIENT = REPO_ROOT / "src" / "code" / "game" / "g_client.c"
 G_TEAM = REPO_ROOT / "src" / "code" / "game" / "g_team.c"
 BG_PUBLIC = REPO_ROOT / "src" / "code" / "game" / "bg_public.h"
 CGAME_HLIL = (
@@ -647,8 +648,9 @@ def test_team_info_overlay_restores_fixed_retail_row_renderer() -> None:
 	assert "CG_GetTeamInfoArmorColor( ci->armor, armorColor );" in row_block
 	assert "CG_TrimTeammatePOILabelToWidth( ci->name" in row_block
 	assert "CG_TrimTeammatePOILabelToWidth( CG_TeamInfoLocation( ci )" in row_block
-	assert "CG_DrawTeamInfoBar( barX, y + 3.0f, 64.0f, 6.0f, CG_TeamInfoBarFraction( ci->health ), cgs.media.healthBar200, healthColor );" in row_block
-	assert "CG_DrawTeamInfoBar( barX, y + 11.0f, 64.0f, 6.0f, CG_TeamInfoBarFraction( ci->armor ), cgs.media.armorBar200, armorColor );" in row_block
+	assert "barWidth = cg_specTeamVitalsWidth.value;" in row_block
+	assert "CG_DrawTeamInfoBar( barX, y + 3.0f, barWidth, 6.0f, CG_TeamInfoBarFraction( ci->health ), cgs.media.healthBar200, healthColor );" in row_block
+	assert "CG_DrawTeamInfoBar( barX, y + 11.0f, barWidth, 6.0f, CG_TeamInfoBarFraction( ci->armor ), cgs.media.armorBar200, armorColor );" in row_block
 	assert "trap_R_DrawStretchPic" in bar_block
 
 
@@ -820,8 +822,9 @@ def test_team_overlay_uses_retail_cvars_and_scaled_host_text_lane() -> None:
 	assert f'{{ &cg_drawTeamOverlayX, "cg_drawTeamOverlayX", "0", {retail_flags}, "-640", "640" }}' in main_source
 	assert f'{{ &cg_drawTeamOverlayY, "cg_drawTeamOverlayY", "0", {retail_flags}, "-480", "480" }}' in main_source
 	assert f'{{ &cg_selfOnTeamOverlay, "cg_selfOnTeamOverlay", "0", {retail_flags}, "0", "1" }}' in main_source
-	assert 'trap_Cvar_Set( "teamoverlay", "1" );' in main_source
-	assert 'trap_Cvar_Set( "teamoverlay", "0" );' in main_source
+	assert "cg_teamOverlayUserinfo" not in main_source
+	assert '"teamoverlay"' not in main_source
+	assert 'trap_Cvar_Set( "teamoverlay"' not in main_source
 	assert "// FIXME E3 HACK" not in main_source
 
 	assert "scale = Com_Clamp( 0.12f, 0.22f, cg_drawTeamOverlaySize.value );" in overlay_block
@@ -853,6 +856,10 @@ def test_team_overlay_uses_retail_cvars_and_scaled_host_text_lane() -> None:
 	assert "CG_IsSelfOnTeamOverlay()" in overlay_block
 	assert "CG_Text_PaintExt( textX, textY, scale, textColor, nameText, 0.0f, TEAM_OVERLAY_NAME_PRINT_LIMIT, ITEM_TEXTSTYLE_SHADOWED, FONT_SANS );" in overlay_block
 	assert "powerups = CG_TeamOverlayPlayerPowerups( clientNum );" in overlay_block
+	assert "state = &cg_entities[clientNum].currentState;" in overlay_block
+	assert "health = state->health;" in overlay_block
+	assert "armor = state->armor;" in overlay_block
+	assert "weapon = state->weapon;" in overlay_block
 	assert "health = cg.snap->ps.stats[STAT_HEALTH];" in overlay_block
 	assert "armor = cg.snap->ps.stats[STAT_ARMOR];" in overlay_block
 	assert "weapon = cg.snap->ps.weapon;" in overlay_block
@@ -862,6 +869,7 @@ def test_team_overlay_uses_retail_cvars_and_scaled_host_text_lane() -> None:
 	assert 'Q_strncpyz( healthText, "DEAD", sizeof( healthText ) );' in overlay_block
 	assert "CG_Text_PaintExt( statusX, textY, scale, textColor, healthText, 0.0f, 0, ITEM_TEXTSTYLE_SHADOWED, FONT_MONO );" in overlay_block
 	assert "CG_Text_PaintExt( armorX, textY, scale, textColor, armorText, 0.0f, 0, ITEM_TEXTSTYLE_SHADOWED, FONT_MONO );" in overlay_block
+	assert "CG_ConfigString( CS_LOCATIONS + state->location )" in overlay_block
 	assert "if ( locationWidth > 0.0f ) {" in overlay_block
 	assert "CG_Text_PaintExt( locationX, textY, scale, textColor, p, 0.0f, 0, ITEM_TEXTSTYLE_SHADOWED, FONT_SANS );" in overlay_block
 	assert "if ( powerups & ( 1 << j ) ) {" in overlay_block
@@ -874,9 +882,14 @@ def test_team_overlay_uses_retail_cvars_and_scaled_host_text_lane() -> None:
 
 def test_team_overlay_transport_uses_retail_top_eight_stable_client_order() -> None:
 	bg_public = BG_PUBLIC.read_text(encoding="utf-8")
+	game_client = G_CLIENT.read_text(encoding="utf-8")
 	game_team = G_TEAM.read_text(encoding="utf-8")
 	servercmds = CG_SERVERCMDS.read_text(encoding="utf-8")
 	message_block = _block_from_marker(game_team, "void TeamplayInfoMessage")
+	schedule_block = _block_from_marker(game_team, "void G_ScheduleTeamOverlayRefresh")
+	status_block = _block_from_marker(game_team, "void CheckTeamStatus")
+	spawn_block = _block_from_marker(game_client, "void ClientSpawn")
+	disconnect_block = _block_from_marker(game_client, "void ClientDisconnect")
 	parse_block = _block_from_marker(servercmds, "static void CG_ParseTeamInfo")
 
 	assert "#define TEAM_MAXOVERLAY\t\t8" in bg_public
@@ -886,9 +899,24 @@ def test_team_overlay_transport_uses_retail_top_eight_stable_client_order() -> N
 	assert "qsort( clients, cnt, sizeof( clients[0] ), SortClients );" in message_block
 	assert "for (i = 0; i < cnt; i++) {" in message_block
 	assert "player = g_entities + clients[i];" in message_block
-	assert "clients[i], player->client->pers.teamState.location, h, a," in message_block
+	assert 'Com_sprintf (entry, sizeof(entry),' in message_block
+	assert '" %i",' in message_block
+	assert "clients[i]);" in message_block
+	assert "player->client->pers.teamState.location" not in message_block
+	assert "player->client->ps.weapon" not in message_block
+	assert "player->s.powerups" not in message_block
+	assert "pers.teamInfo" not in message_block
 	assert "if (stringlength + j >= sizeof(string))" in message_block
 	assert 'trap_SendServerCommand( ent-g_entities, va("tinfo %i %s", sent, string) );' in message_block
+	assert "level.lastTeamLocationTime = level.time + TEAM_LOCATION_UPDATE_TIME;" in schedule_block
+	assert "if ( level.lastTeamLocationTime <= 0 || level.time < level.lastTeamLocationTime ) {" in status_block
+	assert "level.lastTeamLocationTime = -1;" in status_block
+	assert "ent->client->ps.location = loc->health;" in status_block
+	assert "ent->client->pers.teamState.location = ent->client->ps.location;" in status_block
+	assert status_block.index("ent->client->ps.location = loc->health;") < status_block.index("TeamplayInfoMessage( ent );")
+	assert "G_ScheduleTeamOverlayRefresh();" in spawn_block
+	assert "G_ScheduleTeamOverlayRefresh();" in disconnect_block
+	assert '"teamoverlay"' not in game_client
 
 	assert "count = atoi( CG_Argv( 1 ) );" in parse_block
 	assert "if ( count > TEAM_MAXOVERLAY ) {" in parse_block

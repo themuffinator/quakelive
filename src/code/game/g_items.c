@@ -1558,6 +1558,26 @@ int Pickup_Ammo (gentity_t *ent, gentity_t *other)
 
 /*
 =============
+G_AddWeaponStayPickupEvent
+
+Emits the item pickup event from the retail weapon-stay leaf before
+Pickup_Weapon returns zero to the caller.
+=============
+*/
+static void G_AddWeaponStayPickupEvent( gentity_t *ent, gentity_t *other ) {
+	if ( !ent || !other || !other->client ) {
+		return;
+	}
+
+	if ( other->client->pers.predictItemPickup ) {
+		G_AddPredictableEvent( other, EV_ITEM_PICKUP, ent->s.modelindex );
+	} else {
+		G_AddEvent( other, EV_ITEM_PICKUP, ent->s.modelindex );
+	}
+}
+
+/*
+=============
 Pickup_Weapon
 
 Handles weapon pickups and issues any ammo associated with the weapon.
@@ -1601,6 +1621,10 @@ int Pickup_Weapon (gentity_t *ent, gentity_t *other) {
 
 	if ( weapon == WP_GRAPPLING_HOOK ) {
 		other->client->ps.ammo[weapon] = -1; // unlimited ammo
+	}
+
+	if ( g_weaponRespawn.integer == 0 ) {
+		G_AddWeaponStayPickupEvent( ent, other );
 	}
 
 	return g_weaponRespawn.integer;
@@ -2101,6 +2125,11 @@ void Touch_Item (gentity_t *ent, gentity_t *other, trace_t *trace) {
 
 	G_RecordItemPickupLifecycle( ent );
 
+	// dropped items will not respawn
+	if ( ent->flags & FL_DROPPED_ITEM ) {
+		ent->freeAfterEvent = qtrue;
+	}
+
 	if ( !respawn ) {
 		return;
 	}
@@ -2179,11 +2208,6 @@ void Touch_Item (gentity_t *ent, gentity_t *other, trace_t *trace) {
 	respawn = G_ApplyPowerupRespawnOverride( ent, respawn );
 
 	G_RecordSpectatorItemPickup( ent, other, respawn );
-
-	// dropped items will not respawn
-	if ( ent->flags & FL_DROPPED_ITEM ) {
-		ent->freeAfterEvent = qtrue;
-	}
 
 	// picked up items still stay around, they just don't
 	// draw anything.  This allows respawnable items
@@ -2850,8 +2874,8 @@ void ClearRegisteredItems( void ) {
 	RegisterItem( BG_FindItemForWeapon( WP_MACHINEGUN ) );
 	RegisterItem( BG_FindItemForWeapon( WP_GAUNTLET ) );
 	if( g_gametype.integer == GT_HARVESTER ) {
-		RegisterItem( BG_FindItem( "Red Cube" ) );
-		RegisterItem( BG_FindItem( "Blue Cube" ) );
+		RegisterItem( BG_FindItem( "Red Skull" ) );
+		RegisterItem( BG_FindItem( "Blue Skull" ) );
 	}
 
 	if ( g_runes.integer ) {

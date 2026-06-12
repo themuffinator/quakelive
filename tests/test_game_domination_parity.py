@@ -11,6 +11,23 @@ QAGAME_HLIL_PART02 = (
 	/ "qagamex86.dll.bndb_hlil_split"
 	/ "qagamex86.dll.bndb_hlil_part02.txt"
 )
+QAGAME_HLIL_PART01 = (
+	REPO_ROOT
+	/ "references"
+	/ "hlil"
+	/ "quakelive"
+	/ "qagamex86.dll"
+	/ "qagamex86.dll.bndb_hlil_split"
+	/ "qagamex86.dll.bndb_hlil_part01.txt"
+)
+QAGAME_GHIDRA_TOP_FUNCTIONS = (
+	REPO_ROOT
+	/ "references"
+	/ "reverse-engineering"
+	/ "ghidra"
+	/ "qagamex86"
+	/ "decompile_top_functions.c"
+)
 
 
 def _read(rel_path: str) -> str:
@@ -133,10 +150,20 @@ def test_domination_point_activation_and_point_cap_match_retail_qagame() -> None
 
 	assert "1004b720" in hlil
 	assert "1004bb10" in hlil
+	assert "if (data_105a898c != 0xa)" in hlil
+	assert '*(arg4 + 0x244) = "freed"' in hlil
+	assert 'sub_10065c00("identifier"' in hlil
 	assert "if (eax_9 s< 5)" in hlil
 	assert "128.0" in hlil
 	assert "#define DOMINATION_MAX_POINTS\t5" in game_local_h
 
+	assert "if ( g_gametype.integer != GT_DOMINATION ) {" in spawn_block
+	assert "G_FreeEntity( ent );" in spawn_block
+	assert "return;" in spawn_block
+	assert "ent->s.eType = ET_TEAM;" in spawn_block
+	assert "ent->s.modelindex = TEAM_FREE;" in spawn_block
+	assert "ent->s.modelindex2 = TEAM_FREE;" in spawn_block
+	assert "ent->s.clientNum = 0;" in spawn_block
 	assert "Team_RegisterDominationPoint( ent );" in spawn_block
 	assert "ent->think = G_DominationPointActivate;" in spawn_block
 	assert "ent->nextthink = level.time + 1;" in spawn_block
@@ -152,3 +179,77 @@ def test_domination_point_activation_and_point_cap_match_retail_qagame() -> None
 	assert "trap_LinkEntity( ent );" in activate_block
 	assert "Team_DominationBuildSpawnList( point );" in activate_block
 	assert "ent->think = Team_DominationPointThink;" in activate_block
+
+
+def test_domination_spawn_selection_uses_retail_linked_point_spawns() -> None:
+	game_local_h = _read("src/code/game/g_local.h")
+	game_client_c = _read("src/code/game/g_client.c")
+	game_team_c = _read("src/code/game/g_team.c")
+	hlil = QAGAME_HLIL_PART01.read_text(encoding="utf-8")
+
+	build_block = _block_from_marker(game_team_c, "static void Team_DominationBuildSpawnList")
+	select_block = _block_from_marker(game_team_c, "gentity_t *Team_SelectDominationSpawnPoint")
+	client_spawn_block = _block_from_marker(game_client_c, "gentity_t *G_SelectClientSpawnPoint")
+
+	assert "10038b60" in hlil
+	assert '"team_dom_point"' in hlil
+	assert '"info_player_deathmatch"' in hlil
+	assert "i_5 s< 0x19" in hlil
+
+	assert "#define DOMINATION_MAX_POINT_SPAWNS\t25" in game_team_c
+	assert "gentity_t *Team_SelectDominationSpawnPoint( gentity_t *ent, vec3_t origin, vec3_t angles );" in game_local_h
+	assert 'Q_stricmp( match->classname, "info_player_deathmatch" )' in build_block
+	assert "point->spawnTargets[count++] = match;" in build_block
+	assert "point->pointEnt->target_ent = NULL;" in build_block
+	assert "match->nextTrain = point->pointEnt->target_ent;" in build_block
+	assert "point->pointEnt->target_ent = match;" in build_block
+
+	assert "gentity_t\t*spots[DOMINATION_MAX_POINTS * DOMINATION_MAX_POINT_SPAWNS];" in select_block
+	assert "if ( point->ownerTeam != team ) {" in select_block
+	assert "spots[count++] = point->spawnTargets[j];" in select_block
+	assert "return G_SelectRankedSpawnPointForTeam( spots, count, OtherTeam( team ), origin, angles );" in select_block
+
+	assert "if ( g_gametype.integer == GT_DOMINATION && client->pers.teamState.state == TEAM_ACTIVE ) {" in client_spawn_block
+	assert "spawnPoint = Team_SelectDominationSpawnPoint( ent, origin, angles );" in client_spawn_block
+	assert "return spawnPoint;" in client_spawn_block
+
+
+def test_domination_runframe_scoring_and_owned_count_sidechannels_match_retail() -> None:
+	game_main_c = _read("src/code/game/g_main.c")
+	game_team_c = _read("src/code/game/g_team.c")
+	cgame_servercmds_c = _read("src/code/cgame/cg_servercmds.c")
+	hlil = QAGAME_HLIL_PART02.read_text(encoding="utf-8")
+	ghidra = QAGAME_GHIDRA_TOP_FUNCTIONS.read_text(encoding="utf-8")
+
+	runframe_block = _block_from_marker(game_main_c, "void G_RunFrame")
+	hook_block = _block_from_marker(game_main_c, "static void G_RunFrameGametypeHooks")
+	run_domination_block = _block_from_marker(game_team_c, "void Team_RunDomination")
+	count_block = _block_from_marker(game_team_c, "void G_UpdateDominationPointCountConfigstrings")
+	shared_parser_block = _block_from_marker(
+		cgame_servercmds_c,
+		"static void CG_ParseSharedRaceDominationConfigStrings",
+	)
+
+	assert "1004b900" in hlil
+	assert "0x2bc" in hlil
+	assert "0x2bd" in hlil
+	assert "case 10:\n    FUN_1004b900();" in ghidra
+
+	assert "Team_RunDomination();" in runframe_block
+	assert "if ( !level.timeoutActive ) {" in runframe_block
+	assert runframe_block.index("Team_RunDomination();") < runframe_block.index("G_FinishClientFrames( ctx );")
+	assert "G_UpdateDominationPointCountConfigstrings();" in hook_block
+
+	assert "if ( g_gametype.integer != GT_DOMINATION ) {" in run_domination_block
+	assert "Team_DominationUpdatePointState( point, captureTime );" in run_domination_block
+	assert "teamgame.dominationNextScoreTime = level.time + scoreInterval;" in run_domination_block
+	assert "AddTeamScore( origin, TEAM_RED, redOwned );" in run_domination_block
+	assert "AddTeamScore( origin, TEAM_BLUE, blueOwned );" in run_domination_block
+
+	assert "trap_SetConfigstring( CS_RACE_SCORES, redOwnedString );" in count_block
+	assert "trap_SetConfigstring( CS_RACE_INFO, blueOwnedString );" in count_block
+	assert "CG_ParseRaceInit();" in shared_parser_block
+	assert "CG_ConfigString( CS_RACE_STATUS )" in shared_parser_block
+	assert "CG_ConfigString( CS_RACE_INFO )" in shared_parser_block
+	assert "cgs.dominationOwnedPointCount[TEAM_RED] = value;" in shared_parser_block
+	assert "cgs.dominationOwnedPointCount[TEAM_BLUE] = value;" in shared_parser_block

@@ -9,6 +9,157 @@ Observed facts come from exports, `functions.csv`, native dispatch-table slots,
 log strings, and call flow. Inferred names are only promoted when the retail
 behavior and source analogue align cleanly.
 
+## Latest All-Gametype Integration Reconstruction
+
+- Scope: full gametype enum identity, factory defaults, qagame lifecycle
+  buckets, runframe hooks, exit-rule ownership, scoreboard command transports,
+  team count publishing, flag/objective configstrings, and intermission stat
+  publishers.
+- Coverage delta: `+0` curated symbol-map entries; the individual gametype
+  owners were already promoted, but this pass added a single executable
+  cross-mode parity gate over the full retail mode matrix.
+- Source delta: no gameplay rewrite was needed. Current qagame source already
+  preserves Race as the reused single-player slot, maps shipped factory ids for
+  every retail gametype, keeps the `scores_*` command split, delegates CA/A-D/RR
+  exit decisions to round controllers, gates Freeze through its round delay,
+  and keeps CTF-family stat publishing scoped to CTF, One Flag, Harvester,
+  Domination, and Attack and Defend.
+- Evidence note: qagame HLIL anchors the scoreboard command family from
+  `scores_ffa` through `scores_rr`, the `tdmstats` / `castats` / `ctfstats`
+  postgame publishers, and the CA, A/D, Freeze, and RR invalid-state
+  controller diagnostics.
+- Reconstruction note:
+  `docs/reverse-engineering/all-gametype-wiring-reconstruction-2026-06-12.md`.
+
+## Latest CTF And One Flag Wiring Reconstruction
+
+- Scope: `Team_SetFlagStatus`, `Pickup_Team`, `Team_TouchOurFlag`,
+  `Team_TouchEnemyFlag`, `Team_ReturnFlagIfMissing`, `CheckAlmostCapture`,
+  flag drop/forced-return helpers, legacy `trigger_capturezone`, and the
+  CTF-family `scores_ctf` / `ctfstats` transports.
+- Coverage delta: `+0` curated symbol-map entries; the CTF and One Flag owners
+  were already promoted, but this pass tightened their comments, source
+  headers, and parity gates around the compact flag-status and drop/return
+  wiring.
+- Source delta: `g_team.c` now has corrected reconstruction headers for the
+  flag status/reset/return/touch helpers. No qagame gameplay rewrite was needed:
+  current source already publishes CTF status as `0/1/*/*/2`, One Flag status
+  as `0/1/2/3/4`, routes neutral pickup and enemy-base capture correctly, and
+  clears red/blue/neutral carried flags through `G_TossFlag`.
+- Evidence note: qagame HLIL anchors `0x10068770 -> Team_SetFlagStatus`,
+  `0x10069800 -> Team_TouchOurFlag`, `0x10069E30 -> Team_TouchEnemyFlag`,
+  `0x1006A040 -> Pickup_Team`,
+  `0x1006BDA0 -> G_DroppedPowerupTouchCaptureZone`, and
+  `0x10046F80 -> CheckAlmostCapture`; Ghidra keeps the red/blue/neutral
+  missing-objective warnings in `G_CheckTeamItems`.
+- Reconstruction note:
+  `docs/reverse-engineering/ctf-oneflag-gametype-wiring-reconstruction-2026-06-12.md`.
+
+## Latest Harvester Skull-Drop Reconstruction
+
+- Scope: `TossClientCubes`, `G_ApplyTeamChange`, Harvester obelisk validation,
+  `scores_ctf` / `ctfstats`, and cgame Harvester skull ownerdraw wiring.
+- Coverage delta: `+0` curated symbol-map entries; the Harvester skull-drop,
+  obelisk, scoreboard, cgame HUD, and bot goal owners were already promoted,
+  but source still used stale `Red Cube` / `Blue Cube` lookup names and did not
+  preserve the retail carried-skull drop semantics.
+- Source delta: `g_combat.c::TossClientCubes` now reads
+  `ps.generic1 & 0x3f`, clears with `ps.generic1 &= 0xc0`, launches the
+  generated death skull, and loops carried skulls only while `g_dropSkulls` is
+  enabled. Harvester item lookups now use `Red Skull` / `Blue Skull`, and
+  `G_ApplyTeamChange` now feeds `MOD_SWITCHTEAM` into `player_die` so the
+  recovered Harvester death-path exclusion is effective on team changes.
+- Evidence note: qagame Ghidra `FUN_10046970` exposes the count mask, clear
+  mask, `g_dropSkulls` branch, team-flipped carried-skull spawnflags,
+  `g_cubeTimeout` timeout, and the `GT_HARVESTER && meansOfDeath != 0x1d`
+  call gate; `FUN_10040440` passes `0x1d` into `player_die` for team-change
+  cleanup, which maps to `MOD_SWITCHTEAM`.
+- Reconstruction note:
+  `docs/reverse-engineering/harvester-gametype-wiring-reconstruction-2026-06-12.md`.
+
+## Latest Domination Point Wiring Recheck
+
+- Scope: `SP_team_dom_point`, `trigger_capturezone`,
+  `Team_SelectDominationSpawnPoint`, `Team_RunDomination`,
+  `G_UpdateDominationPointCountConfigstrings`, the capture/assist reward fanout,
+  and the Domination defense-bonus path.
+- Coverage delta: `+0` curated symbol-map entries; the Domination point,
+  capture, spawn, reward, count, and defense helpers were already promoted, but
+  this pass connects the helpers to explicit source parity gates.
+- Source delta: no gameplay-code rewrite was needed. Existing qagame source
+  already reconstructs the non-Domination point free path, delayed point
+  activation, linked point-spawn selection, per-frame capture/scoring pass,
+  capture/assist rewards, defense bonus, and owned-count configstring bridge.
+- Evidence note: qagame HLIL pins Domination respawn selection at `0x10038B60`,
+  capture/assist rewards at `0x1004AA80`, primary-capturer selection at
+  `0x1004ABF0`, point activation/spawn at `0x1004B720`/`0x1004BB10`,
+  owned-count publishing at `0x1004B900`, and defense bonus at `0x1004B980`.
+- Reconstruction note:
+  `docs/reverse-engineering/domination-gametype-wiring-reconstruction-2026-06-12.md`.
+
+## Latest Red Rover Round Wiring Reconstruction
+
+- Scope: `RR_RoundStateTransition`, the hidden round-start configstring, the
+  compact `CS_MATCH_STATE` payload, RR infection-role helpers, and the
+  `scores_rr` qagame scoreboard transport.
+- Coverage delta: `+0` curated symbol-map entries; the RR controller,
+  infection helpers, exit helper, autojoin helper, death-path helper, and
+  scoreboard owner were already promoted, but source still published the
+  generic SRP match-state payload on the RR path and silently ignored unknown
+  controller states.
+- Source delta: `g_match_state.c` now emits the retail compact RR
+  configstring forms, active rounds keep the `0x296` start side channel, and
+  RR complete/exit states clear that slot to `-1`. `g_active.c` now fatal
+  errors unexpected RR controller states with the recovered retail diagnostic.
+- Evidence note: qagame HLIL at `0x100649F0` writes `0x295` as
+  `\time\-1\round\0`, `\time\%d\round\%d`, or `\round\%d`; the same body
+  writes `0x296` with the active start time and later `-1`, and preserves
+  `RR_RoundStateTransition: invalid state`.
+- Reconstruction note:
+  `docs/reverse-engineering/red-rover-gametype-wiring-reconstruction-2026-06-12.md`.
+
+## Latest Attack and Defend Round Wiring Reconstruction
+
+- Scope: `AD_RoundStateTransition`, the hidden round-start configstring, the
+  compact `CS_MATCH_STATE` payload, the A/D side resolvers, and the
+  `scores_ad` qagame history transport.
+- Coverage delta: `+0` curated symbol-map entries; the A/D controller,
+  side-resolver, score-history, objective, and scoreboard owners were already
+  promoted, but source still published a richer SRP match-state payload on the
+  A/D path.
+- Source delta: `g_match_state.c` now emits the retail compact A/D
+  configstring forms, active rounds keep the `0x296` start side channel, and
+  complete/exit states clear that slot to `-1` while retaining the completed
+  turn's active `turn/state` payload for cgame.
+- Evidence note: qagame HLIL at `0x10035B70` writes `0x295` as
+  `\time\-1\round\0\turn\0\state\0`,
+  `\time\%d\round\%d\turn\%d\state\1`, or `\turn\%d\state\2`; the same body
+  writes `0x296` with the active start time and later `-1`, and preserves
+  `AD_RoundStateTransition: invalid state`.
+- Reconstruction note:
+  `docs/reverse-engineering/attack-defend-gametype-wiring-reconstruction-2026-06-12.md`.
+
+## Latest Clan Arena Round Wiring Reconstruction
+
+- Scope: `CA_RoundStateTransition`, the hidden round-start configstring, the
+  compact `CS_MATCH_STATE` payload, CA winner prints, and the dedicated
+  `scores_ca` / `castats` qagame transports.
+- Coverage delta: `+0` curated symbol-map entries; the CA controller and
+  scoreboard/stat transport owners were already promoted, but source still
+  carried an SRP-rich match-state payload and a source-only round centerprint
+  on the CA path.
+- Source delta: `g_match_state.c` now emits the retail compact Clan Arena
+  configstring forms, active rounds publish the `0x296` start side channel, and
+  complete CA rounds clear that slot to `-1`. `g_active.c` now emits the retail
+  survivor-count, survivor-health, and health-vs-health round-result prints and
+  fatal-errors unexpected CA controller states.
+- Evidence note: qagame HLIL at `0x10038230` writes `0x295` as
+  `\time\-1\round\0`, `\time\%d\round\%d`, or `\round\%d`; the same body writes
+  `0x296` with the active start time and later `-1`, and preserves the three
+  CA result print strings plus `CA_RoundStateTransition: invalid state`.
+- Reconstruction note:
+  `docs/reverse-engineering/clan-arena-gametype-wiring-reconstruction-2026-06-12.md`.
+
 ## Latest Botlib Debug Visualization Wiring
 
 - Scope: `ai_main.c::BotTestAAS`, qagame native import slots `83/84`, and the
@@ -1240,7 +1391,7 @@ utility helpers outside that widened control surface.
 | `0x1003EDA0` | `G_BuildFreezeScoreboardMessage` | Retail-only Freeze scoreboard helper | Emits the `scores_ft` payload with the Freeze-specific per-client stat block. | High |
 | `0x1003F260` | `G_BuildRedRoverScoreboardMessage` | Retail-only Red Rover scoreboard helper | Emits the `scores_rr` payload with the Red Rover per-client stat block. | High |
 | `0x100400F0` | `Cmd_TeamTask_f` | `g_cmds.c::Cmd_TeamTask_f` | Exact `Argc == 2` / `teamtask` userinfo rewrite flow from the stock command handler, ending in `ClientUserinfoChanged`. | High |
-| `0x10040440` | `G_ApplyTeamChange` | `g_cmds.c::G_ApplyTeamChange` | Recovered inner `SetTeam` executor that handles death/body-queue teardown, session mutation, spectator item sync, leadership repair, per-opponent revenge counter cleanup, userinfo publication, `ClientBegin`, and the rank switch-team event. | High |
+| `0x10040440` | `G_ApplyTeamChange` | `g_cmds.c::G_ApplyTeamChange` | Recovered inner `SetTeam` executor that handles death/body-queue teardown through `player_die(..., MOD_SWITCHTEAM)`, session mutation, spectator item sync, leadership repair, per-opponent revenge counter cleanup, userinfo publication, `ClientBegin`, and the rank switch-team event. | High |
 | `0x100406D0` | `SetTeam` | `g_cmds.c::SetTeam` | Outer team-change parser that handles `follow1`, `follow2`, spectator/team requests, duel-only spectate enforcement, and then forwards into the deeper retail execution helper. | High |
 | `0x10040D10` | `StopFollowing` | `g_cmds.c::StopFollowing` | Restores the caller's persisted team, forces `PM_SPECTATOR`, clears `PMF_FOLLOW`, enters `SPECTATOR_FREE`, resets `spectatorClient` and `ps.clientNum` to self, and unlinks if still linked. | High |
 | `0x10040F30` | `Cmd_Follow_f` | `g_cmds.c::Cmd_Follow_f` | Resolves argument 1 through `ClientNumberFromString`, preserves the current followed flag carrier on the cgame `"pw"` suffix, rejects self and `PM_SPECTATOR` targets, promotes non-spectator callers through `SetTeam("spectator")`, and keeps no `follow1` / `follow2` parser branch. | High |
@@ -1251,7 +1402,7 @@ utility helpers outside that widened control surface.
 | `0x100456B0` | `Cmd_Forfeit_f` | `g_cmds.c::Cmd_Forfeit_f` | Thin forfeit-command wrapper identified by the local pause/timeout and round-countdown rejection strings before the tailcall into the deeper retail forfeit helpers. | High |
 | `0x10045BD0` | `Cmd_ReadyUp_f` | `g_cmds.c::Cmd_ReadyUp_f` | Retail ready-up command helper that toggles the per-client ready latch, enforces the minimum-player and team-presence gates, and prints the `Ready` / `Not Ready` warmup centerprint. | High |
 | `0x10045DD0` | `ClientCommand` | `g_cmds.c::ClientCommand` | HLIL-visible command dispatch over `say_team`, `vsay_team`, `vosay_team`, `callvote`, `give`, `follow`, `team`, and other retail client commands matches the source dispatcher. | High |
-| `0x10046970` | `TossClientCubes` | `g_combat.c::TossClientCubes` | Harvester skull-drop helper backed by the carried-skull count, the `Red Skull` / `Blue Skull` item lookups, and the death-path call that ejects the cubes before corpse cleanup. | High |
+| `0x10046970` | `TossClientCubes` | `g_combat.c::TossClientCubes` | Harvester skull-drop helper backed by the `ps.generic1 & 0x3f` carried-skull count, the `ps.generic1 &= 0xc0` clear, the `Red Skull` / `Blue Skull` item lookups, the `g_dropSkulls` carried-skull loop, and the `GT_HARVESTER && meansOfDeath != MOD_SWITCHTEAM` death-path call before corpse cleanup. | High |
 | `0x10046D80` | `GibEntity` | `g_combat.c::GibEntity` | Shared gib helper with the recovered Freeze thaw-respawn branch: marked frozen clients keep the normal gib event prelude, emit `EV_THAW_PLAYER`, restore `PM_NORMAL`, and rerun `ClientSpawn` instead of falling through to ordinary corpse invisibility cleanup. | Medium-High |
 | `0x1004BC30` | `G_FreezeResolveRoundState` | Retail-only Freeze controller helper | Resolves any expired deferred round-state transition through `Freeze_RoundStateTransition` and returns the current Freeze controller state for HUD/end-frame callers. | High |
 | `0x1004BC80` | `G_FreezeSetClientFrozenState` | Retail-only shared Freeze helper spanning `g_freeze.c::G_FreezeApplyFreezeState` and `g_freeze.c::G_FreezeThawClient` | Shared retail-only mutator that applies frozen or thawed client state, clears the retail synthetic frozen marker on the thaw branch, and owns the adjacent thaw temp-entity/event path; assisted thaw now publishes the recovered obituary/team-sound surface and falls into the reconstructed `GibEntity` thaw respawn tail. | High |
@@ -1369,7 +1520,8 @@ utility helpers outside that widened control surface.
 | `0x100680C0` | `TeamCount` | `g_client.c::TeamCount` | HLIL preserves the classic ignore-client, connected-state, and `sess.sessionTeam` loop even though the committed decomp still drops one register-passed argument. | High |
 | `0x10068100` | `Team_CountsBalanced` | Retail-only `g_teamForceBalance` helper | Extracted boolean helper that returns true when the current red/blue spread is at most one player; retail reuses it from both `SetTeam` and `Cmd_ReadyUp_f` before their stricter join/ready gates. | High |
 | `0x10068140` | `Team_HasMinimumPlayersForWarmup` | `g_team.c::Team_HasMinimumPlayersForWarmup` | Warmup gate that checks the duel/team minimum-player requirements and the stronger both-teams-present rule used by the retail ready-up flow. | High |
-| `0x10068490` | `TeamplayInfoMessage` | `g_team.c::TeamplayInfoMessage` | Uses the `tinfo %i %s` payload while building team overlay info for clients. | High |
+| `0x10068490` | `TeamplayInfoMessage` | `g_team.c::TeamplayInfoMessage` | Builds the compact retail `tinfo %i %s` payload from client-number entries; teammate vitals ride entity-state snapshots instead of this command. | High |
+| `0x10068670` | `CheckTeamStatus` | `g_team.c::CheckTeamStatus` | Scheduled one-shot team overlay refresher; when `lastTeamLocationTime` is due it resets the timer to `-1`, refreshes connected red/blue clients' `ps.location`, and emits compact `TeamplayInfoMessage` rows. | High |
 | `0x1006AAF0` | `SpawnObelisk` | `g_team.c::SpawnObelisk` | `SpawnObelisk: %s startsolid at %s` diagnostic and the matching overload spawn flow. | High |
 | `0x1006B110` | `G_TotalLivingHealthByTeam` | Retail-only Freeze tally helper | Sums entity health for the connected `PM_NORMAL` clients grouped by `sess.sessionTeam`, feeding the freeze round-end health summary and tiebreak path. | High |
 | `0x1006B170` | `G_CountActivePlayersByTeam` | Retail-only shared team counter | Counts connected clients whose `ps.pm_type == PM_NORMAL`, grouped by `sess.sessionTeam`; retail reuses it for Freeze, Red Rover, teamsize validation, and the auxiliary team-count configstrings. | High |
@@ -1467,6 +1619,7 @@ utility helpers outside that widened control surface.
 - `AddTournamentPlayer` and `RemoveTournamentLoser` are source-faithful queue boundaries, but the surrounding retail tournament flow is still split more aggressively than GPL, including the descriptive selector/helper layer around them and the retail-only award publisher at `0x100559E0`.
 - `G_UpdateTournamentQueuePositions` and `G_SyncTournamentQueueTeamTasks` are descriptive retail-only queue helpers. The current source now preserves that queue sidecar directly: the waiting-spectator eligibility predicate is shared across queue selection and queue-position sorting, `ClientUserinfoChanged` publishes the recovered `rp` / `p` / `so` / `pq` slab, and the queue helper mirrors dirty `pq` positions, including zero clears, back through `teamtask` for HUD/UI compatibility.
 - `G_CheckReadyUpDelayAction` at `0x10058580` is a descriptive retail-only helper name. The current source now preserves that standalone `g_warmupReadyDelay` / `g_warmupReadyDelayAction` controller, including the cached ready-up tally consumed by `CheckTournament`, the spectate-only branch for the unready duelist, and the forced ready-latch clears when retail drops warmup back to `PRE_GAME`.
+- The 2026-06-12 warmup-state wiring pass keeps `G_SetWarmupTime` as the shared source boundary for public warmup deadline mutations. Duel lifecycle reset/countdown, round-controller waiting/countdown/live transitions, timeout pause adjustment, auto-shuffle countdown clamping, Freeze warmup expiry, and admin abort now route through that helper so `CS_WARMUP`, ready-up deadline publication, auto-record state, and `g_gameState` stay coupled. The only remaining direct mutation is the documented internal `G_RequestWarmupMapRestart` grace bump immediately before `map_restart 0`.
 - `BeginIntermission` at `0x10056CB0` is broader than the stock GPL helper: in the retail build it also clears vote state through `G_ClearVoteState` and bundles extra `nextmaps` setup/configstring work after the core intermission transition.
 - `ExitLevel` at `0x10057000` is likewise broader than the stock GPL helper: the retail build honors `sv_killserver` / `sv_quitOnExitLevel`, clears `CS_INTERMISSION`, resolves `nextmaps`, falls back to `map_restart 0` when needed, clears extra intermission/vote state, and still preserves the stock tournament-loser restart path.
 - `Cmd_Forfeit_f` at `0x100456B0` is only a thin client-facing gate. The current source now mirrors the retail helper split: pause/countdown rejection stays in the command wrapper, duel surrender score marking lives in `G_CanForfeit`, and the final broadcast/log path is handled by `G_ApplyForfeit`.

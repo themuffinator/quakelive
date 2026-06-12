@@ -1807,16 +1807,6 @@ void ClientUserinfoChanged( int clientNum ) {
 	}
 */
 
-	if (g_gametype.integer >= GT_TEAM) {
-		client->pers.teamInfo = qtrue;
-	} else {
-		s = Info_ValueForKey( userinfo, "teamoverlay" );
-		if ( ! *s || atoi( s ) != 0 ) {
-			client->pers.teamInfo = qtrue;
-		} else {
-			client->pers.teamInfo = qfalse;
-		}
-	}
 	/*
 	s = Info_ValueForKey( userinfo, "cg_pmove_fixed" );
 	if ( !*s || atoi( s ) == 0 ) {
@@ -3031,6 +3021,7 @@ void ClientSpawn(gentity_t *ent) {
 
 	// clear entity state values
 	BG_PlayerStateToEntityState( &client->ps, &ent->s, qtrue );
+	G_ScheduleTeamOverlayRefresh();
 }
 
 
@@ -3061,6 +3052,7 @@ void ClientDisconnect( int clientNum ) {
 	if ( !ent->client ) {
 		return;
 	}
+	G_ScheduleTeamOverlayRefresh();
 
 	if ( !( ent->r.svFlags & SVF_BOT ) ) {
 		char		userinfo[MAX_INFO_STRING];

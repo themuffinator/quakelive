@@ -1577,9 +1577,7 @@ void Team_ClampWarmupToShuffleCountdown( void ) {
 
 	targetTime = level.time + secondsRemaining * 1000;
 	if ( level.warmupTime < targetTime ) {
-		level.warmupTime = targetTime;
-		trap_SetConfigstring( CS_WARMUP, va( "%i", level.warmupTime ) );
-		G_UpdateReadyUpConfigstring();
+		G_SetWarmupTime( targetTime );
 	}
 }
 
@@ -3540,6 +3538,13 @@ flagDropResult_t G_TossFlag( gentity_t *carrier, int flagPowerup, flagDropContex
 static char ctfFlagStatusRemap[] = { '0', '1', '*', '*', '2' };
 static char oneFlagStatusRemap[] = { '0', '1', '2', '3', '4' };
 
+/*
+=============
+Team_SetFlagStatus
+
+Publishes the compact retail flag-status configstring for CTF and One Flag.
+=============
+*/
 void Team_SetFlagStatus( int team, flagStatus_t status ) {
 	qboolean modified = qfalse;
 
@@ -3584,6 +3589,13 @@ void Team_SetFlagStatus( int team, flagStatus_t status ) {
 	}
 }
 
+/*
+=============
+Team_CheckDroppedItem
+
+Marks a newly dropped red, blue, or neutral flag as dropped in CS_FLAGSTATUS.
+=============
+*/
 void Team_CheckDroppedItem( gentity_t *dropped ) {
 	if( dropped->item->giTag == PW_REDFLAG ) {
 		Team_SetFlagStatus( TEAM_RED, FLAG_DROPPED );
@@ -3945,7 +3957,13 @@ void Team_CheckHurtCarrier(gentity_t *targ, gentity_t *attacker)
 		attacker->client->pers.teamState.lasthurtcarrier = level.time;
 }
 
+/*
+=============
+Team_ResetFlag
 
+Respawns the base flag for the requested team and removes dropped copies.
+=============
+*/
 gentity_t *Team_ResetFlag( int team ) {
 	char *c;
 	gentity_t *ent, *rent = NULL;
@@ -3980,6 +3998,13 @@ gentity_t *Team_ResetFlag( int team ) {
 	return rent;
 }
 
+/*
+=============
+Team_ResetFlags
+
+Resets the active CTF or One Flag objective set after a capture or restart.
+=============
+*/
 void Team_ResetFlags( void ) {
 	if( g_gametype.integer == GT_CTF ) {
 		Team_ResetFlag( TEAM_RED );
@@ -3990,6 +4015,13 @@ void Team_ResetFlags( void ) {
 	}
 }
 
+/*
+=============
+Team_ReturnFlagSound
+
+Emits the global flag-return sound from the reset flag entity.
+=============
+*/
 void Team_ReturnFlagSound( gentity_t *ent, int team ) {
 	gentity_t	*te;
 
@@ -4005,6 +4037,13 @@ void Team_ReturnFlagSound( gentity_t *ent, int team ) {
 		-1, TEAM_FREE, 0 );
 }
 
+/*
+=============
+Team_TakeFlagSound
+
+Emits the throttled global taken-flag sound for red/blue flag objectives.
+=============
+*/
 void Team_TakeFlagSound( gentity_t *ent, int team, int trackedClientNum ) {
 	if (ent == NULL) {
 		G_Printf ("Warning:  NULL passed to Team_TakeFlagSound\n");
@@ -4036,6 +4075,13 @@ void Team_TakeFlagSound( gentity_t *ent, int team, int trackedClientNum ) {
 		trackedClientNum, TEAM_FREE, 0 );
 }
 
+/*
+=============
+Team_CaptureFlagSound
+
+Emits the global capture sound for the scoring team.
+=============
+*/
 void Team_CaptureFlagSound( gentity_t *ent, int team ) {
 	gentity_t	*te;
 
@@ -4051,6 +4097,13 @@ void Team_CaptureFlagSound( gentity_t *ent, int team ) {
 		-1, TEAM_FREE, 0 );
 }
 
+/*
+=============
+Team_ReturnFlag
+
+Resets a team flag and prints the retail return announcement.
+=============
+*/
 void Team_ReturnFlag( int team ) {
 	Team_ReturnFlagSound(Team_ResetFlag(team), team);
 	if( team == TEAM_FREE ) {
@@ -4061,6 +4114,13 @@ void Team_ReturnFlag( int team ) {
 	}
 }
 
+/*
+=============
+Team_FreeEntity
+
+Returns a dropped flag when its item entity is freed by the item system.
+=============
+*/
 void Team_FreeEntity( gentity_t *ent ) {
 	if( ent->item->giTag == PW_REDFLAG ) {
 		Team_ReturnFlag( TEAM_RED );
@@ -4073,6 +4133,13 @@ void Team_FreeEntity( gentity_t *ent ) {
 	}
 }
 
+/*
+=============
+Team_AnnounceNeutralFlagEvent
+
+Prints the One Flag neutral-objective pickup and return messages.
+=============
+*/
 static void Team_AnnounceNeutralFlagEvent( neutralFlagEvent_t event, const gentity_t *player ) {
 	switch ( event ) {
 	case NEUTRAL_FLAG_EVENT_PICKUP:
@@ -4090,6 +4157,13 @@ static void Team_AnnounceNeutralFlagEvent( neutralFlagEvent_t event, const genti
 	}
 }
 
+/*
+=============
+Team_FlagPickupBlockedByTackle
+
+Checks the reconstructed tackle metadata that can suppress immediate flag pickup.
+=============
+*/
 static qboolean Team_FlagPickupBlockedByTackle( const gentity_t *flag, const gentity_t *player ) {
 	gentity_t *target;
 
@@ -4114,10 +4188,24 @@ static qboolean Team_FlagPickupBlockedByTackle( const gentity_t *flag, const gen
 	return qfalse;
 }
 
+/*
+=============
+Team_FlagPickupStatusTeam
+
+Maps One Flag pickups onto the neutral status slot and CTF pickups onto team slots.
+=============
+*/
 static team_t Team_FlagPickupStatusTeam( int gametype, team_t team ) {
 	return ( gametype == GT_1FCTF ) ? TEAM_FREE : team;
 }
 
+/*
+=============
+Team_FlagPickupStatusValue
+
+Selects the carried flag status value for CTF and One Flag carriers.
+=============
+*/
 static flagStatus_t Team_FlagPickupStatusValue( int gametype, team_t playerTeam ) {
 	if ( gametype == GT_1FCTF ) {
 		return ( playerTeam == TEAM_RED ) ? FLAG_TAKEN_RED : FLAG_TAKEN_BLUE;
@@ -4177,7 +4265,9 @@ void Team_DroppedFlagThink( gentity_t *ent ) {
 
 /*
 ==============
-Team_DroppedFlagThink
+Team_TouchOurFlag
+
+Handles dropped-flag returns and captures at the correct CTF or One Flag base.
 ==============
 */
 int Team_TouchOurFlag( gentity_t *ent, gentity_t *other, int team ) {
@@ -4643,10 +4733,10 @@ static int QDECL SortClients( const void *a, const void *b ) {
 
 /*
 ==================
-TeamplayLocationsMessage
+TeamplayInfoMessage
 
 Format:
-	clientNum location health armor weapon powerups
+	clientNum
 
 ==================
 */
@@ -4658,11 +4748,11 @@ void TeamplayInfoMessage( gentity_t *ent ) {
 	gentity_t	*player;
 	int			cnt;
 	int			sent;
-	int			h, a;
 	int			clients[TEAM_MAXOVERLAY];
 
-	if ( !ent || !ent->client || !ent->client->pers.teamInfo )
+	if ( !ent || !ent->client ) {
 		return;
+	}
 
 	// figure out what client should be on the display
 	// we are limited to 8, but we want to use the top eight players
@@ -4688,15 +4778,9 @@ void TeamplayInfoMessage( gentity_t *ent ) {
 		if (player->inuse && player->client && player->client->sess.sessionTeam == 
 			ent->client->sess.sessionTeam ) {
 
-			h = player->client->ps.stats[STAT_HEALTH];
-			a = player->client->ps.stats[STAT_ARMOR];
-			if (h < 0) h = 0;
-			if (a < 0) a = 0;
-
 			Com_sprintf (entry, sizeof(entry),
-				" %i %i %i %i %i %i", 
-				clients[i], player->client->pers.teamState.location, h, a, 
-				player->client->ps.weapon, player->s.powerups);
+				" %i",
+				clients[i]);
 			j = strlen(entry);
 			if (stringlength + j >= sizeof(string))
 				break;
@@ -4709,41 +4793,65 @@ void TeamplayInfoMessage( gentity_t *ent ) {
 	trap_SendServerCommand( ent-g_entities, va("tinfo %i %s", sent, string) );
 }
 
+/*
+==================
+G_ScheduleTeamOverlayRefresh
+==================
+*/
+void G_ScheduleTeamOverlayRefresh( void ) {
+	if ( g_gametype.integer < GT_TEAM ) {
+		return;
+	}
+
+	level.lastTeamLocationTime = level.time + TEAM_LOCATION_UPDATE_TIME;
+}
+
+/*
+==================
+CheckTeamStatus
+==================
+*/
 void CheckTeamStatus(void) {
 	int i;
 	gentity_t *loc, *ent;
 
-	if (level.time - level.lastTeamLocationTime > TEAM_LOCATION_UPDATE_TIME) {
+	if ( level.intermissiontime ) {
+		return;
+	}
 
-		level.lastTeamLocationTime = level.time;
+	if ( level.lastTeamLocationTime <= 0 || level.time < level.lastTeamLocationTime ) {
+		return;
+	}
 
-		for (i = 0; i < g_maxclients.integer; i++) {
-			ent = g_entities + i;
+	level.lastTeamLocationTime = -1;
 
-			if ( ent->client->pers.connected != CON_CONNECTED ) {
-				continue;
-			}
+	for (i = 0; i < g_maxclients.integer; i++) {
+		ent = g_entities + i;
 
-			if (ent->inuse && (ent->client->sess.sessionTeam == TEAM_RED ||	ent->client->sess.sessionTeam == TEAM_BLUE)) {
-				loc = Team_GetLocation( ent );
-				if (loc)
-					ent->client->pers.teamState.location = loc->health;
-				else
-					ent->client->pers.teamState.location = 0;
-				ent->client->ps.location = ent->client->pers.teamState.location;
-			}
+		if ( !ent->client || ent->client->pers.connected != CON_CONNECTED ) {
+			continue;
 		}
 
-		for (i = 0; i < g_maxclients.integer; i++) {
-			ent = g_entities + i;
-
-			if ( ent->client->pers.connected != CON_CONNECTED ) {
-				continue;
+		if (ent->inuse && (ent->client->sess.sessionTeam == TEAM_RED ||	ent->client->sess.sessionTeam == TEAM_BLUE)) {
+			loc = Team_GetLocation( ent );
+			if (loc) {
+				ent->client->ps.location = loc->health;
+			} else {
+				ent->client->ps.location = 0;
 			}
+			ent->client->pers.teamState.location = ent->client->ps.location;
+		}
+	}
 
-			if (ent->inuse && (ent->client->sess.sessionTeam == TEAM_RED ||	ent->client->sess.sessionTeam == TEAM_BLUE)) {
-				TeamplayInfoMessage( ent );
-			}
+	for (i = 0; i < g_maxclients.integer; i++) {
+		ent = g_entities + i;
+
+		if ( !ent->client || ent->client->pers.connected != CON_CONNECTED ) {
+			continue;
+		}
+
+		if (ent->inuse && (ent->client->sess.sessionTeam == TEAM_RED ||	ent->client->sess.sessionTeam == TEAM_BLUE)) {
+			TeamplayInfoMessage( ent );
 		}
 	}
 }

@@ -9,6 +9,123 @@ Observed facts come from exports, function inventories, strings, and call flow.
 Inferred names are only used where the retail behavior and the Quake Live source
 analogue line up cleanly enough to support a stable mapping.
 
+## Latest All-Gametype Client Wiring Reconstruction
+
+- Scope: full gametype info text, gametype HUD icon registration, cgame
+  scoreboard command parser dispatch, Race/non-team/team scoreboard feeders,
+  CTF-family stat feeders, shared Race/Domination configstring consumers, and
+  compact flag-status parsing.
+- Coverage delta: `+0` curated symbol-map entries; the parser and feeder owners
+  were already promoted, but this pass pins their relationship to the full
+  retail qagame gametype matrix in `tests/test_all_gametype_wiring_parity.py`.
+- Source delta: no client gameplay or HUD rewrite was needed. Current cgame
+  source already carries every retail `scores_*` parser token, the A/D
+  `adscores` alias, compact `smscores`, all `cg_gameInfo*` mode text entries,
+  the full gametype icon bank, and the recovered feeder family split.
+- Evidence note: cgame HLIL anchors command-token checks for `scores_ffa`,
+  `scores_duel`, `scores_race`, `scores_tdm`, `scores_ca`, `scores_ctf`,
+  `scores_ft`, `scores_ad`, and `scores_rr`; symbol maps pin the matching
+  parser and feeder owners.
+- Reconstruction note:
+  `docs/reverse-engineering/all-gametype-wiring-reconstruction-2026-06-12.md`.
+
+## Latest CTF And One Flag Client Wiring Reconstruction
+
+- Scope: compact `CS_FLAGSTATUS` parsing, `CG_OneFlagStatus`,
+  red/blue base-status ownerdraws, flag-carrier visibility predicates,
+  item-touch prediction, local `dropflag`, and CTF-family scoreboard/stat
+  transports.
+- Coverage delta: `+0` curated symbol-map entries; the client owners were
+  already promoted, but this pass connected them to the refreshed qagame flag
+  status and drop/return mapping.
+- Source delta: `cg_servercmds.c` now parses initial and live `CS_FLAGSTATUS`
+  updates through `CG_ParseFlagStatusConfigString`, removing the duplicate
+  malformed live-update block while preserving CTF red/blue parsing and One
+  Flag single-status parsing. No HUD behavior rewrite was needed.
+- Evidence note: cgame HLIL pins `0x10001000 -> CG_IsRedBlueFlagItem`,
+  `0x100076B0 -> CG_DropFlag_f`, `0x10030FF0 -> CG_OneFlagStatus`,
+  `0x100316B0 -> CG_OtherTeamHasFlag`, `0x10031720 -> CG_YourTeamHasFlag`,
+  `0x10031CD0 -> CG_DrawPlayerHasFlag`, `0x10046BF0 -> CG_ParseCtfScores`,
+  `0x10047400 -> CG_ParseCTFStats`, `0x10049420 -> CG_SetConfigValues`, and
+  `0x10049980 -> CG_ConfigStringModified`.
+- Reconstruction note:
+  `docs/reverse-engineering/ctf-oneflag-gametype-wiring-reconstruction-2026-06-12.md`.
+
+## Latest Domination Client Wiring Recheck
+
+- Scope: Domination owned-count parsing, point labels, point-status HUD,
+  billboard markers, owned-count ownerdraws, objective strip inclusion,
+  match-end condition text, and shared CTF-family team-list/stat feeders.
+- Coverage delta: `+0` curated symbol-map entries; the point status,
+  billboard, owned-count ownerdraw, and feeder owners were already promoted,
+  but this pass revalidates them against the qagame owned-count and point-state
+  wiring.
+- Source delta: no cgame gameplay/presentation rewrite was needed. Existing
+  cgame source already reads red/blue owned point counts from the retail shared
+  `CS_RACE_STATUS`/`CS_RACE_INFO` slots and preserves the Domination HUD,
+  billboard, announcement, match-end, and shared scoreboard consumers.
+- Evidence note: cgame symbol maps pin `CG_DominationPointLabel`,
+  `CG_DrawDominationPointStatus`, `CG_QueueDominationPointBillboard`, and
+  `CG_DrawDominationOwnedFlags`; qagame HLIL pins the producing count slots at
+  `0x2BC` and `0x2BD`.
+- Reconstruction note:
+  `docs/reverse-engineering/domination-gametype-wiring-reconstruction-2026-06-12.md`.
+
+## Latest Red Rover Client Wiring Recheck
+
+- Scope: `CG_ParseMatchState`, `CG_ParseRedRoverScores`, Red Rover warmup and
+  placement HUD branches, infected marker/media registration, infected event
+  sound, and survivor-warning global team sound.
+- Coverage delta: `+0` curated symbol-map entries; the RR score parser and
+  infected presentation owners were already promoted, but this pass reconnects
+  them to the now-reconstructed compact qagame RR match-state publisher.
+- Source delta: `cg_servercmds.c` already treats RR as both a compact and sparse
+  retail round payload, preserving omitted keys and inferring round state from
+  `time`, `round`, warmup state, and the hidden round-start slot. Focused cgame
+  tests revalidated `scores_rr`, infected marker sprites, infected reward
+  sound, and survivor-warning sound consumers after the server-side RR change.
+- Evidence note: qagame HLIL pins the compact RR `0x295` payloads; cgame symbol
+  maps pin `CG_ParseRedRoverScores` to `scores_rr`, and current cgame source
+  preserves the RR infected POI shader, infected local sound, persistent
+  infected loop, and survivor-warning global team-sound route.
+- Reconstruction note:
+  `docs/reverse-engineering/red-rover-gametype-wiring-reconstruction-2026-06-12.md`.
+
+## Latest Attack and Defend Client Wiring Recheck
+
+- Scope: `CG_ParseMatchState`, `CG_ParseADScores`,
+  `CG_DrawADRoundScoreboard`, A/D warmup/start banners, A/D POI media, and the
+  shared CTF-family team-list/stat feeders.
+- Coverage delta: `+0` curated symbol-map entries; the A/D score parser, round
+  scoreboard, POI, and feeder owners were already promoted, but the client
+  match-state parser still assumed every payload included the full source-side
+  round key set.
+- Source delta: `cg_servercmds.c` now treats A/D as a sparse retail round
+  payload, preserves previous round fields when active `\turn\%d\state\2`
+  payloads omit `time` and `round`, and re-parses the hidden round-start
+  configstring after reset so round timers survive `CS_MATCH_STATE` updates.
+- Evidence note: qagame HLIL pins the compact A/D `0x295` payloads; cgame
+  symbol maps pin `CG_ParseADScores` to `scores_ad`, and cgame HLIL preserves
+  the A/D attack/defend banner strings consumed by the warmup HUD path.
+- Reconstruction note:
+  `docs/reverse-engineering/attack-defend-gametype-wiring-reconstruction-2026-06-12.md`.
+
+## Latest Clan Arena Client Wiring Recheck
+
+- Scope: `CG_ParseMatchState`, `CG_ParseClanArenaScores`,
+  `CG_ParseClanArenaStats`, and the CA team-list/stat feeders.
+- Coverage delta: `+0` curated symbol-map entries; the CA score/stat parsers
+  and feeders were already promoted, but the client match-state parser still
+  assumed a source-side `state` key that retail CA qagame does not publish.
+- Source delta: `cg_servercmds.c` now detects compact retail round payloads for
+  CA-style round modes and infers the round-state cache from `time`, `round`,
+  warmup state, and the hidden round-start configstring when `state` is absent.
+- Evidence note: qagame HLIL pins the compact CA `0x295` payload; cgame symbol
+  maps pin `CG_ParseMatchState` to that configstring and preserve the dedicated
+  CA `scores_ca`, `castats`, and feeder owners.
+- Reconstruction note:
+  `docs/reverse-engineering/clan-arena-gametype-wiring-reconstruction-2026-06-12.md`.
+
 ## Latest Source Reconstruction Pass
 
 - Scope: spectator client-state resync across `CG_Respawn`,
@@ -1469,6 +1586,14 @@ analogue line up cleanly enough to support a stable mapping.
 - This pass keeps map coverage unchanged at `854 / 854` combined committed anchors (`100.0%`) and tightens the three-way `cg_drawTeamOverlay` placement split in the classic HUD dispatcher.
 - HLIL for `0x1000A770 -> CG_DrawUpperRightStack` already gates mode `1` into the upper-right stack. The surrounding `0x10010D90 -> CG_Draw2D` dispatcher then gates mode `2` into a standalone `CG_DrawTeamOverlay( 408.0f, qtrue, qfalse )` call immediately after the upper-right stack, without feeding that y result into powerups.
 - HLIL for `0x1000ABF0 -> CG_DrawLowerRight` gates mode `3`, not mode `2`, into the lower-right wrapper and passes the returned y coordinate to `CG_DrawPowerups`. Source now mirrors that split: mode `2` remains a dispatcher-level right-side overlay, while mode `3` owns the lower-right/powerup stack interaction.
+
+### Retail Team-Overlay Transport/Vitals Sweep
+
+- This pass keeps map coverage unchanged at `854 / 854` combined committed anchors (`100.0%`) and reconciles the qagame producer, cgame parser, snapshot bridge, and classic HUD drawer around the retail compact team-overlay contract.
+- qagame HLIL for `0x10068490 -> TeamplayInfoMessage` builds `tinfo %i %s` from compact ` %i` client-number entries after the eight-row selection/sort. Source qagame now emits only those client numbers; cgame still accepts legacy six-field rows as a compatibility path.
+- cgame HLIL for `0x100487B0 -> CG_ParseTeamInfo` only copies args `2..N` into `sortedTeamPlayers`, while `0x10009DA0 -> CG_DrawTeamOverlay` reads health, armor, current weapon, location, and powerup bits from `cg_entities[client].currentState`. The source draw path now uses those entity-state fields directly, and snapshot handoff mirrors them into the existing source-only `clientInfo_t` sidecars for menu-HUD and fixed team-info consumers.
+- Follow-up wiring rechecked `0x10020CA0 -> CG_UpdateCvars` and the retained cvar strings: retail registers the `cg_drawTeamOverlay*` display cvars, but there is no lowercase `"teamoverlay"` userinfo cvar or `trap_Cvar_Set("teamoverlay", ...)` handshake in cgame. The source now treats `cg_drawTeamOverlay` as local draw policy only.
+- qagame refresh ownership is correspondingly server-driven: spawn/disconnect events schedule `level.lastTeamLocationTime = level.time + 1000`, and the next `CheckTeamStatus` pass updates `ps.location`, emits compact `tinfo`, and resets the timer to `-1`.
 
 ### Retail Raw Bind Prompt Sweep
 

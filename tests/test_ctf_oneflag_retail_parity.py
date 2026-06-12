@@ -21,11 +21,17 @@ G_TEAM = REPO_ROOT / "src" / "code" / "game" / "g_team.c"
 G_COMBAT = REPO_ROOT / "src" / "code" / "game" / "g_combat.c"
 G_MAIN = REPO_ROOT / "src" / "code" / "game" / "g_main.c"
 G_CMDS = REPO_ROOT / "src" / "code" / "game" / "g_cmds.c"
+G_ACTIVE = REPO_ROOT / "src" / "code" / "game" / "g_active.c"
+G_MISC = REPO_ROOT / "src" / "code" / "game" / "g_misc.c"
+G_TARGET = REPO_ROOT / "src" / "code" / "game" / "g_target.c"
+BG_MISC = REPO_ROOT / "src" / "code" / "game" / "bg_misc.c"
 AI_DMQ3 = REPO_ROOT / "src" / "code" / "game" / "ai_dmq3.c"
 AI_TEAM = REPO_ROOT / "src" / "code" / "game" / "ai_team.c"
 CG_SERVERCMDS = REPO_ROOT / "src" / "code" / "cgame" / "cg_servercmds.c"
 CG_MAIN = REPO_ROOT / "src" / "code" / "cgame" / "cg_main.c"
 CG_NEWDRAW = REPO_ROOT / "src" / "code" / "cgame" / "cg_newdraw.c"
+CG_PREDICT = REPO_ROOT / "src" / "code" / "cgame" / "cg_predict.c"
+CG_CONSOLECMDS = REPO_ROOT / "src" / "code" / "cgame" / "cg_consolecmds.c"
 
 
 def _extract_block(source: str, marker: str) -> str:
@@ -95,6 +101,7 @@ def test_team_init_and_flag_configstrings_keep_ctf_and_oneflag_split() -> None:
 	status_block = _block(G_TEAM, "void Team_SetFlagStatus( int team, flagStatus_t status ) {")
 	dropped_block = _block(G_TEAM, "void Team_CheckDroppedItem( gentity_t *dropped ) {")
 	reset_block = _block(G_TEAM, "void Team_ResetFlags( void ) {")
+	flag_parse_block = _block(CG_SERVERCMDS, "static void CG_ParseFlagStatusConfigString( const char *str ) {")
 	config_values_block = _block(CG_SERVERCMDS, "void CG_SetConfigValues( void ) {")
 	configstring_block = _block(CG_SERVERCMDS, "static void CG_ConfigStringModified( void ) {")
 
@@ -137,12 +144,17 @@ def test_team_init_and_flag_configstrings_keep_ctf_and_oneflag_split() -> None:
 	assert "else if( g_gametype.integer == GT_1FCTF ) {" in reset_block
 	assert "Team_ResetFlag( TEAM_FREE );" in reset_block
 
-	for block in (config_values_block, configstring_block):
-		assert "cgs.gametype == GT_CTF || cgs.gametype == GT_ATTACK_DEFEND || cgs.gametype == GT_OBELISK" in block
-		assert "cgs.redflag = s[0] - '0';" in block or "cgs.redflag = str[0] - '0';" in block
-		assert "cgs.blueflag = s[1] - '0';" in block or "cgs.blueflag = str[1] - '0';" in block
-		assert "else if( cgs.gametype == GT_1FCTF )" in block
-		assert "cgs.flagStatus = s[0] - '0';" in block or "cgs.flagStatus = str[0] - '0';" in block
+	for expected in (
+		"cgs.gametype == GT_CTF || cgs.gametype == GT_ATTACK_DEFEND || cgs.gametype == GT_OBELISK",
+		"cgs.redflag = str[0] - '0';",
+		"cgs.blueflag = str[1] - '0';",
+		"else if( cgs.gametype == GT_1FCTF )",
+		"cgs.flagStatus = str[0] - '0';",
+	):
+		assert expected in flag_parse_block
+
+	assert "CG_ParseFlagStatusConfigString( CG_ConfigString( CS_FLAGSTATUS ) );" in config_values_block
+	assert "CG_ParseFlagStatusConfigString( str );" in configstring_block
 
 
 def test_qagame_flag_touch_capture_and_bonus_paths_keep_oneflag_neutral_semantics() -> None:
@@ -221,6 +233,60 @@ def test_check_almost_capture_matches_retail_ctf_and_oneflag_base_selection() ->
 		"200.0",
 	):
 		assert expected in hlil_source
+
+
+def test_flag_drop_prediction_and_command_surfaces_cover_ctf_and_oneflag() -> None:
+	toss_items_block = _block(G_COMBAT, "void TossClientItems( gentity_t *self, gentity_t *attacker, flagDropContext_t context, int meansOfDeath ) {")
+	player_die_block = _block(G_COMBAT, "void player_die( gentity_t *self, gentity_t *inflictor, gentity_t *attacker, int damage, int meansOfDeath ) {")
+	client_events_block = _block(G_ACTIVE, "void ClientEvents( gentity_t *ent, int oldEventSequence ) {")
+	portal_touch_block = _block(G_MISC, "static void PortalTouch( gentity_t *self, gentity_t *other, trace_t *trace) {")
+	remove_powerups_block = _block(G_TARGET, "void Use_target_remove_powerups( gentity_t *ent, gentity_t *other, gentity_t *activator ) {")
+	can_grab_block = _block(BG_MISC, "qboolean BG_CanItemBeGrabbed( int gametype, int currentTime, const entityState_t *ent, const playerState_t *ps ) {")
+	touch_item_block = _block(CG_PREDICT, "static void CG_TouchItem( centity_t *cent ) {")
+	drop_flag_block = _block(CG_CONSOLECMDS, "static void CG_DropFlag_f( void ) {")
+
+	for expected in (
+		"G_TossFlag( self, PW_NEUTRALFLAG, context, attacker, meansOfDeath, NULL );",
+		"G_TossFlag( self, PW_REDFLAG, context, attacker, meansOfDeath, NULL );",
+		"G_TossFlag( self, PW_BLUEFLAG, context, attacker, meansOfDeath, NULL );",
+	):
+		assert expected in toss_items_block
+
+	for expected in (
+		"G_TossFlag( self, PW_NEUTRALFLAG, FLAG_DROP_CONTEXT_FORCED_RETURN, attacker, meansOfDeath, NULL );",
+		"G_TossFlag( self, PW_REDFLAG, FLAG_DROP_CONTEXT_FORCED_RETURN, attacker, meansOfDeath, NULL );",
+		"G_TossFlag( self, PW_BLUEFLAG, FLAG_DROP_CONTEXT_FORCED_RETURN, attacker, meansOfDeath, NULL );",
+	):
+		assert expected in player_die_block
+
+	assert "G_TossFlag( ent, j, FLAG_DROP_CONTEXT_SCRIPTED, NULL, MOD_UNKNOWN, &dropped );" in client_events_block
+	assert "if ( other->client->ps.powerups[PW_NEUTRALFLAG] )" in portal_touch_block
+	assert "G_TossFlag( other, PW_NEUTRALFLAG, FLAG_DROP_CONTEXT_SCRIPTED, NULL, MOD_UNKNOWN, NULL );" in portal_touch_block
+	assert "G_TossFlag( other, PW_REDFLAG, FLAG_DROP_CONTEXT_SCRIPTED, NULL, MOD_UNKNOWN, NULL );" in portal_touch_block
+	assert "G_TossFlag( other, PW_BLUEFLAG, FLAG_DROP_CONTEXT_SCRIPTED, NULL, MOD_UNKNOWN, NULL );" in portal_touch_block
+
+	for powerup in ("PW_REDFLAG", "PW_BLUEFLAG", "PW_NEUTRALFLAG"):
+		assert f"G_TossFlag( activator, {powerup}, FLAG_DROP_CONTEXT_FORCED_RETURN" in remove_powerups_block
+
+	for expected in (
+		"case GT_CTF:",
+		"case GT_1FCTF:",
+		"carryingAnyFlag = BG_PlayerCarryingFlag( ps );",
+		"return carryingAnyFlag ? qfalse : qtrue;",
+		"return ps->powerups[PW_NEUTRALFLAG] ? qtrue : qfalse;",
+	):
+		assert expected in can_grab_block
+
+	for expected in (
+		"if( cgs.gametype == GT_1FCTF ) {",
+		"if( item->giTag != PW_NEUTRALFLAG ) {",
+		"if( ( cgs.gametype == GT_CTF || cgs.gametype == GT_HARVESTER ) && BG_IsRedBlueFlagItem( item ) ) {",
+	):
+		assert expected in touch_item_block
+
+	assert "cgs.gametype != GT_CTF && cgs.gametype != GT_1FCTF" in drop_flag_block
+	assert "cgs.gametype != GT_ATTACK_DEFEND" in drop_flag_block
+	assert 'trap_SendClientCommand( "dropflag" );' in drop_flag_block
 
 
 def test_ctf_and_oneflag_server_scoreboard_transports_share_retail_ctf_family_path() -> None:

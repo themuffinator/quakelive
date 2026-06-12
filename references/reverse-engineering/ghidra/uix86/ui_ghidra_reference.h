@@ -39,65 +39,108 @@ typedef enum {
 } uiMenuCommand_t;
 
 /*
- * Retail syscall-table layout (DAT_106b40a8 in Ghidra).
- * Indices are 32-bit pointer slots.
+ * Retail native import-table layout (DAT_106b40a8 in Ghidra).
+ * Indices are 32-bit pointer slots; slot i == DAT_106b40a8 + i*4.
+ * This is distinct from the legacy source/QVM uiImport_t syscall ABI.
  */
 
-#define QL_UITRAP_CVAR_REGISTER            0x00	/* slot 0x00 */
-#define QL_UITRAP_CVAR_UPDATE              0x01	/* slot 0x01 */
-#define QL_UITRAP_CVAR_SET                 0x02	/* slot 0x02 */
-#define QL_UITRAP_CVAR_VARIABLEVALUE       0x07	/* slot 0x07 */
-#define QL_UITRAP_CVAR_SETVALUE            0x08	/* slot 0x08 */
-#define QL_UITRAP_CVAR_INFOSTRINGBUFFER    0x0A	/* slot 0x0A */
-#define QL_UITRAP_ARGC                     0x0B	/* slot 0x0B */
-#define QL_UITRAP_ARGV                     0x0C	/* slot 0x0C */
-#define QL_UITRAP_CMD_EXECUTETEXT          0x0D	/* slot 0x0D */
-#define QL_UITRAP_FS_FOPENFILE             0x0F	/* slot 0x0F */
-#define QL_UITRAP_FS_READ                  0x10	/* slot 0x10 */
-#define QL_UITRAP_FS_WRITE                 0x11	/* slot 0x11 */
-#define QL_UITRAP_FS_FCLOSEFILE            0x12	/* slot 0x12 */
-#define QL_UITRAP_FS_GETFILELIST           0x13	/* slot 0x13 */
-#define QL_UITRAP_R_REGISTERSHADERNOMIP    0x14	/* slot 0x14 */
-#define QL_UITRAP_R_DRAWSTRETCHPIC         0x18	/* slot 0x18 */
-#define QL_UITRAP_R_MODELBOUNDS            0x1C	/* slot 0x1C */
-#define QL_UITRAP_R_REGISTERMODEL          0x1E	/* slot 0x1E */
-#define QL_UITRAP_R_REGISTERFONT           0x20	/* slot 0x20 */
-#define QL_UITRAP_R_SETCOLOR               0x22	/* slot 0x22 */
-#define QL_UITRAP_UPDATESCREEN             0x23	/* slot 0x23 */
-#define QL_UITRAP_CM_LERPTAG               0x24	/* slot 0x24 */
-#define QL_UITRAP_S_REGISTERSOUND          0x27	/* slot 0x27 */
-#define QL_UITRAP_S_STARTLOCALSOUND        0x28	/* slot 0x28 */
-#define QL_UITRAP_KEY_KEYNUMTOSTRINGBUF    0x29	/* slot 0x29 */
-#define QL_UITRAP_KEY_GETBINDINGBUF        0x2A	/* slot 0x2A */
-#define QL_UITRAP_KEY_SETBINDING           0x2B	/* slot 0x2B */
-#define QL_UITRAP_KEY_ISDOWN               0x2C	/* slot 0x2C */
-#define QL_UITRAP_KEY_GETOVERSTRIKEMODE    0x2D	/* slot 0x2D */
-#define QL_UITRAP_KEY_SETOVERSTRIKEMODE    0x2E	/* slot 0x2E */
-#define QL_UITRAP_KEY_CLEARSTATES          0x2F	/* slot 0x2F */
-#define QL_UITRAP_KEY_GETCATCHER           0x30	/* slot 0x30 */
-#define QL_UITRAP_KEY_SETCATCHER           0x31	/* slot 0x31 */
-#define QL_UITRAP_GETCLIPBOARDDATA         0x32	/* slot 0x32 */
-#define QL_UITRAP_GETGLCONFIG              0x33	/* slot 0x33 */
-#define QL_UITRAP_GETCLIENTSTATE           0x34	/* slot 0x34 */
-#define QL_UITRAP_GETCONFIGSTRING          0x35	/* slot 0x35 */
-#define QL_UITRAP_LAN_GETPINGINFO          0x36	/* slot 0x36 */
-#define QL_UITRAP_LAN_GETPING              0x37	/* slot 0x37 */
-#define QL_UITRAP_LAN_MARKSERVERVISIBLE    0x38	/* slot 0x38 */
-#define QL_UITRAP_LAN_UPDATEVISIBLEPINGS   0x39	/* slot 0x39 */
-#define QL_UITRAP_LAN_RESETPINGS           0x3A	/* slot 0x3A */
-#define QL_UITRAP_LAN_LOADCACHEDSERVERS    0x3B	/* slot 0x3B */
-#define QL_UITRAP_LAN_SAVECACHEDSERVERS    0x3C	/* slot 0x3C */
-#define QL_UITRAP_LAN_ADDSERVER            0x3D	/* slot 0x3D */
-#define QL_UITRAP_LAN_REMOVESERVER         0x3E	/* slot 0x3E */
-#define QL_UITRAP_SNAPSHOTINFO             0x3F	/* slot 0x3F */
-#define QL_UITRAP_SETPBCLSTATUS            0x40	/* slot 0x40 */
-#define QL_UITRAP_GETSAVEDGAMES            0x41	/* slot 0x41 */
-#define QL_UITRAP_LOADSAVEGAME             0x42	/* slot 0x42 */
-#define QL_UITRAP_AUTOSAVE                 0x43	/* slot 0x43 */
-#define QL_UITRAP_LAN_GETSERVERADDRESS     0x52	/* slot 0x52 */
-#define QL_UITRAP_GETMAPNAME               0x53	/* slot 0x53 */
-#define QL_UITRAP_GETSKILLRATING           0x54	/* slot 0x54 */
-#define QL_UITRAP_GETMATCHSTARTTIME        0x55	/* slot 0x55 */
+#define QL_UITRAP_PRINT                                0x00	/* slot 0x00 / offset 0x000 */
+#define QL_UITRAP_ERROR                                0x01	/* slot 0x01 / offset 0x004 */
+#define QL_UITRAP_MILLISECONDS                         0x02	/* slot 0x02 / offset 0x008 */
+#define QL_UITRAP_REAL_TIME                            0x03	/* slot 0x03 / offset 0x00C */
+#define QL_UITRAP_CVAR_REGISTER                        0x04	/* slot 0x04 / offset 0x010 */
+#define QL_UITRAP_CVAR_CREATE                          0x05	/* slot 0x05 / offset 0x014 */
+#define QL_UITRAP_CVAR_UPDATE                          0x06	/* slot 0x06 / offset 0x018 */
+#define QL_UITRAP_CVAR_SET                             0x07	/* slot 0x07 / offset 0x01C */
+#define QL_UITRAP_CVAR_SET_VALUE                       0x08	/* slot 0x08 / offset 0x020 */
+#define QL_UITRAP_CVAR_VARIABLE_STRING_BUFFER          0x09	/* slot 0x09 / offset 0x024 */
+#define QL_UITRAP_CVAR_VARIABLE_VALUE                  0x0A	/* slot 0x0A / offset 0x028 */
+#define QL_UITRAP_ARGC                                 0x0B	/* slot 0x0B / offset 0x02C */
+#define QL_UITRAP_ARGV                                 0x0C	/* slot 0x0C / offset 0x030 */
+#define QL_UITRAP_CMD_ARGS_BUFFER                      0x0D	/* slot 0x0D / offset 0x034 */
+#define QL_UITRAP_FS_FOPENFILE                         0x0E	/* slot 0x0E / offset 0x038 */
+#define QL_UITRAP_FS_READ                              0x0F	/* slot 0x0F / offset 0x03C */
+#define QL_UITRAP_FS_WRITE                             0x10	/* slot 0x10 / offset 0x040 */
+#define QL_UITRAP_FS_FCLOSEFILE                        0x11	/* slot 0x11 / offset 0x044 */
+#define QL_UITRAP_FS_SEEK                              0x12	/* slot 0x12 / offset 0x048 */
+#define QL_UITRAP_FS_GETFILELIST                       0x13	/* slot 0x13 / offset 0x04C */
+#define QL_UITRAP_CMD_EXECUTETEXT                      0x14	/* slot 0x14 / offset 0x050 */
+#define QL_UITRAP_R_REGISTERMODEL                      0x15	/* slot 0x15 / offset 0x054 */
+#define QL_UITRAP_R_REGISTERSKIN                       0x16	/* slot 0x16 / offset 0x058 */
+#define QL_UITRAP_R_REGISTERSHADERNOMIP                0x17	/* slot 0x17 / offset 0x05C */
+#define QL_UITRAP_R_CLEARSCENE                         0x18	/* slot 0x18 / offset 0x060 */
+#define QL_UITRAP_R_ADDREFENTITYTOSCENE                0x19	/* slot 0x19 / offset 0x064 */
+#define QL_UITRAP_R_ADDPOLYTOSCENE                     0x1A	/* slot 0x1A / offset 0x068 */
+#define QL_UITRAP_R_ADDLIGHTTOSCENE                    0x1B	/* slot 0x1B / offset 0x06C */
+#define QL_UITRAP_R_RENDERSCENE                        0x1C	/* slot 0x1C / offset 0x070 */
+#define QL_UITRAP_R_SETCOLOR                           0x1D	/* slot 0x1D / offset 0x074 */
+#define QL_UITRAP_R_DRAWSTRETCHPIC                     0x1E	/* slot 0x1E / offset 0x078 */
+#define QL_UITRAP_R_MODELBOUNDS                        0x1F	/* slot 0x1F / offset 0x07C */
+#define QL_UITRAP_UPDATESCREEN                         0x20	/* slot 0x20 / offset 0x080 */
+#define QL_UITRAP_CM_LERPTAG                           0x21	/* slot 0x21 / offset 0x084 */
+#define QL_UITRAP_S_STARTLOCALSOUND                    0x22	/* slot 0x22 / offset 0x088 */
+#define QL_UITRAP_S_REGISTERSOUND                      0x23	/* slot 0x23 / offset 0x08C */
+#define QL_UITRAP_KEY_KEYNUMTOSTRINGBUF                0x24	/* slot 0x24 / offset 0x090 */
+#define QL_UITRAP_KEY_GETBINDINGBUF                    0x25	/* slot 0x25 / offset 0x094 */
+#define QL_UITRAP_KEY_SETBINDING                       0x26	/* slot 0x26 / offset 0x098 */
+#define QL_UITRAP_KEY_ISDOWN                           0x27	/* slot 0x27 / offset 0x09C */
+#define QL_UITRAP_KEY_GETOVERSTRIKEMODE                0x28	/* slot 0x28 / offset 0x0A0 */
+#define QL_UITRAP_KEY_SETOVERSTRIKEMODE                0x29	/* slot 0x29 / offset 0x0A4 */
+#define QL_UITRAP_KEY_CLEARSTATES                      0x2A	/* slot 0x2A / offset 0x0A8 */
+#define QL_UITRAP_KEY_GETCATCHER                       0x2B	/* slot 0x2B / offset 0x0AC */
+#define QL_UITRAP_KEY_SETCATCHER                       0x2C	/* slot 0x2C / offset 0x0B0 */
+#define QL_UITRAP_GETCLIPBOARDDATA                     0x2D	/* slot 0x2D / offset 0x0B4 */
+#define QL_UITRAP_GETCLIENTSTATE                       0x2E	/* slot 0x2E / offset 0x0B8 */
+#define QL_UITRAP_GETGLCONFIG                          0x2F	/* slot 0x2F / offset 0x0BC */
+#define QL_UITRAP_GETCONFIGSTRING                      0x30	/* slot 0x30 / offset 0x0C0 */
+#define QL_UITRAP_LAN_GETSERVERCOUNT                   0x31	/* slot 0x31 / offset 0x0C4 */
+#define QL_UITRAP_LAN_GETSERVERADDRESSSTRING           0x32	/* slot 0x32 / offset 0x0C8 */
+#define QL_UITRAP_LAN_GETSERVERINFO                    0x33	/* slot 0x33 / offset 0x0CC */
+#define QL_UITRAP_LAN_GETSERVERPING                    0x34	/* slot 0x34 / offset 0x0D0 */
+#define QL_UITRAP_LAN_GETPINGQUEUECOUNT                0x35	/* slot 0x35 / offset 0x0D4 */
+#define QL_UITRAP_LAN_CLEARPING                        0x36	/* slot 0x36 / offset 0x0D8 */
+#define QL_UITRAP_LAN_GETPING                          0x37	/* slot 0x37 / offset 0x0DC */
+#define QL_UITRAP_LAN_GETPINGINFO                      0x38	/* slot 0x38 / offset 0x0E0 */
+#define QL_UITRAP_LAN_LOADCACHEDSERVERS                0x39	/* slot 0x39 / offset 0x0E4 */
+#define QL_UITRAP_LAN_SAVECACHEDSERVERS                0x3A	/* slot 0x3A / offset 0x0E8 */
+#define QL_UITRAP_LAN_MARKSERVERVISIBLE                0x3B	/* slot 0x3B / offset 0x0EC */
+#define QL_UITRAP_LAN_SERVERISVISIBLE                  0x3C	/* slot 0x3C / offset 0x0F0 */
+#define QL_UITRAP_LAN_UPDATEVISIBLEPINGS               0x3D	/* slot 0x3D / offset 0x0F4 */
+#define QL_UITRAP_LAN_ADDSERVER                        0x3E	/* slot 0x3E / offset 0x0F8 */
+#define QL_UITRAP_LAN_REMOVESERVER                     0x3F	/* slot 0x3F / offset 0x0FC */
+#define QL_UITRAP_LAN_RESETPINGS                       0x40	/* slot 0x40 / offset 0x100 */
+#define QL_UITRAP_LAN_SERVERSTATUS                     0x41	/* slot 0x41 / offset 0x104 */
+#define QL_UITRAP_LAN_COMPARESERVERS                   0x42	/* slot 0x42 / offset 0x108 */
+#define QL_UITRAP_MEMORY_REMAINING                     0x43	/* slot 0x43 / offset 0x10C */
+#define QL_UITRAP_GET_CDKEY                            0x44	/* slot 0x44 / offset 0x110 */
+#define QL_UITRAP_SET_CDKEY                            0x45	/* slot 0x45 / offset 0x114 */
+#define QL_UITRAP_R_REGISTERFONT                       0x46	/* slot 0x46 / offset 0x118 */
+#define QL_UITRAP_S_STOPBACKGROUNDTRACK                0x47	/* slot 0x47 / offset 0x11C */
+#define QL_UITRAP_S_STARTBACKGROUNDTRACK               0x48	/* slot 0x48 / offset 0x120 */
+#define QL_UITRAP_CIN_PLAYCINEMATIC                    0x49	/* slot 0x49 / offset 0x124 */
+#define QL_UITRAP_CIN_STOPCINEMATIC                    0x4A	/* slot 0x4A / offset 0x128 */
+#define QL_UITRAP_CIN_DRAWCINEMATIC                    0x4B	/* slot 0x4B / offset 0x12C */
+#define QL_UITRAP_CIN_RUNCINEMATIC                     0x4C	/* slot 0x4C / offset 0x130 */
+#define QL_UITRAP_CIN_SETEXTENTS                       0x4D	/* slot 0x4D / offset 0x134 */
+#define QL_UITRAP_R_REMAP_SHADER                       0x4E	/* slot 0x4E / offset 0x138 */
+#define QL_UITRAP_VERIFY_CDKEY                         0x4F	/* slot 0x4F / offset 0x13C */
+#define QL_UITRAP_SETUP_ADVERT_CELL_SHADER             0x50	/* slot 0x50 / offset 0x140 */
+#define QL_UITRAP_REFRESH_ADVERT_CELL_SHADER           0x51	/* slot 0x51 / offset 0x144 */
+#define QL_UITRAP_INIT_ADVERTISEMENT_BRIDGE            0x52	/* slot 0x52 / offset 0x148 */
+#define QL_UITRAP_UNUSED_83                            0x53	/* slot 0x53 / offset 0x14C / update-advert callback */
+#define QL_UITRAP_ACTIVATE_ADVERT                      0x54	/* slot 0x54 / offset 0x150 */
+#define QL_UITRAP_UNUSED_85                            0x55	/* slot 0x55 / offset 0x154 */
+#define QL_UITRAP_SET_CURSOR_POS                       0x56	/* slot 0x56 / offset 0x158 */
+#define QL_UITRAP_GET_CURSOR_POS                       0x57	/* slot 0x57 / offset 0x15C */
+#define QL_UITRAP_PC_ADD_GLOBAL_DEFINE                 0x58	/* slot 0x58 / offset 0x160 */
+#define QL_UITRAP_PC_LOAD_SOURCE                       0x59	/* slot 0x59 / offset 0x164 */
+#define QL_UITRAP_PC_FREE_SOURCE                       0x5A	/* slot 0x5A / offset 0x168 */
+#define QL_UITRAP_PC_READ_TOKEN                        0x5B	/* slot 0x5B / offset 0x16C */
+#define QL_UITRAP_PC_SOURCE_FILE_AND_LINE              0x5C	/* slot 0x5C / offset 0x170 */
+#define QL_UITRAP_IS_SUBSCRIBED_APP                    0x5D	/* slot 0x5D / offset 0x174 */
+#define QL_UITRAP_DRAW_SCALED_TEXT                     0x5E	/* slot 0x5E / offset 0x178 */
+#define QL_UITRAP_MEASURE_TEXT                         0x5F	/* slot 0x5F / offset 0x17C */
+#define QL_UITRAP_GET_ITEM_DOWNLOAD_INFO               0x60	/* slot 0x60 / offset 0x180 */
 
 /* Curated exact prototypes recovered from committed UI reconstruction work. */
 /* Ordinal 1 / dllEntry @ 0x10003970 */
@@ -278,13 +321,13 @@ char *	va( const char *format, ... );
 #define QLR_UI_ADDR__UI_DRAWSIDES                                0x10003B30u
 /* _UI_DrawTopBottom: Draws the top and bottom edges of the UI outline rectangle. */
 #define QLR_UI_ADDR__UI_DRAWTOPBOTTOM                            0x10003C20u
-/* Text_GetDimensions: Lower-level retail text-bounds helper that measures string width and height through out-parameters and sits underneath the Text_Width and Text_Height wrappers. */
+/* Text_GetDimensions: Lower-level retail text-bounds helper that measures string width and height through the host scaled-text measurement lane and sits underneath the Text_Width and Text_Height wrappers. */
 #define QLR_UI_ADDR_TEXT_GETDIMENSIONS                           0x10003D90u
 /* Text_Width: HLIL-only wrapper over the retail text-bounds helper that returns width and is assigned to uiDC.textWidth during _UI_Init. */
 #define QLR_UI_ADDR_TEXT_WIDTH                                   0x10003E60u
 /* Text_Height: HLIL-only wrapper over the retail text-bounds helper that returns height and is assigned to uiDC.textHeight during _UI_Init. */
 #define QLR_UI_ADDR_TEXT_HEIGHT                                  0x10003E90u
-/* Text_Paint: Font renderer assigned into uiDC.drawText during _UI_Init. */
+/* Text_Paint: Font renderer assigned into uiDC.drawText during _UI_Init; source-side reconstruction routes the paint through the host scaled-text draw lane while preserving the retail text style entry point. */
 #define QLR_UI_ADDR_TEXT_PAINT                                   0x10003EC0u
 /* Text_PaintWithCursor: Paints text while drawing a blinking insert or overstrike cursor at the active position. */
 #define QLR_UI_ADDR_TEXT_PAINTWITHCURSOR                         0x10004070u
@@ -296,7 +339,7 @@ char *	va( const char *format, ... );
 #define QLR_UI_ADDR__UI_SHUTDOWN                                 0x100044E0u
 /* GetMenuBuffer: Loads a menu script into the static buffer with default fallback and size guards. */
 #define QLR_UI_ADDR_GETMENUBUFFER                                0x100044F0u
-/* Asset_Parse: Parses assetGlobalDef menu blocks and populates shared UI asset definitions. */
+/* Asset_Parse: Parses assetGlobalDef menu blocks and populates shared UI asset definitions, including the retail `font`, `smallFont`, and `bigFont` registration tokens before the gradient, cursor, fade, and sound assets. */
 #define QLR_UI_ADDR_ASSET_PARSE                                  0x100045B0u
 /* UI_ParseMenu: Opens a menu file buffer and parses its top-level assetGlobalDef and menudef blocks. */
 #define QLR_UI_ADDR_UI_PARSEMENU                                 0x10004B20u
@@ -450,7 +493,7 @@ char *	va( const char *format, ... );
 #define QLR_UI_ADDR_UI_BUILDFINDPLAYERLIST                       0x1000DEB0u
 /* UI_BuildServerStatus: Refreshes the selected server's status table, resetting outstanding requests on forced rebuilds and retrying until data arrives. */
 #define QLR_UI_ADDR_UI_BUILDSERVERSTATUS                         0x1000E3B0u
-/* UI_FeederCount: Returns the active row count for the committed retail UI feeder set, with FEEDER_HEADS/FEEDER_Q3HEADS backed by the validated player-model catalog. */
+/* UI_FeederCount: Returns the active row count for the committed retail UI feeder set: player-model heads, maps, servers, player/team lists, mods, demos, cinematics, server-status/find-player rows, and the callvote-map filter. */
 #define QLR_UI_ADDR_UI_FEEDERCOUNT                               0x1000E470u
 /* UI_SelectedMap: Converts a visible feeder row into the backing active map index and returns that map's display name. */
 #define QLR_UI_ADDR_UI_SELECTEDMAP                               0x1000E600u
@@ -458,7 +501,7 @@ char *	va( const char *format, ... );
 #define QLR_UI_ADDR_UI_FEEDERITEMIMAGE                           0x1000E640u
 /* UI_FeederItemText: Returns feeder row text for the committed retail UI feeder set: player-model names, maps, server browser columns, mods, movies, demos, server-status/find-player rows, and the older player/team list families. */
 #define QLR_UI_ADDR_UI_FEEDERITEMTEXT                            0x1000EA80u
-/* UI_FeederSelection: Applies feeder selection side effects such as model/headmodel writes, item-cvar model writes, cinematic refresh, server-status selection, and the FEEDER_CVMAPS branch that rebuilds the visible callvote set through `UI_CVMapCountByGameType`, resolves the chosen row through `UI_SelectedMap`, and then refreshes `ui_currentNetMap` for the retail voteMap preview path. */
+/* UI_FeederSelection: Applies feeder selection side effects such as model/headmodel cvar writes, item-cvar model writes when the shared listbox supplies a cvar, cinematic refresh, server-status selection, and the FEEDER_CVMAPS branch that rebuilds the visible callvote set through `UI_CVMapCountByGameType`, resolves the chosen row through `UI_SelectedMap`, and then refreshes `ui_currentNetMap` for the retail voteMap preview path. */
 #define QLR_UI_ADDR_UI_FEEDERSELECTION                           0x1000EBA0u
 /* Character_Parse: Parses one characters block from teaminfo into the retail model and skin table and builds each head icon path. */
 #define QLR_UI_ADDR_CHARACTER_PARSE                              0x1000F140u
@@ -480,7 +523,7 @@ char *	va( const char *format, ... );
 #define QLR_UI_ADDR__UI_INIT                                     0x1000FAB0u
 /* _UI_KeyEvent: Routes key events to the focused menu, closes unfocused UI on ESC, and clears KEYCATCH_UI when no focused menu remains. */
 #define QLR_UI_ADDR__UI_KEYEVENT                                 0x1000FF40u
-/* _UI_MouseEvent: Accumulates cursor deltas, clamps them to the 640x480 UI bounds, and forwards movement into Display_MouseMove. */
+/* _UI_MouseEvent: Projects host screen coordinates into the 640x480 UI cursor space, bounds-checks the virtual cursor, and forwards movement into Display_MouseMove. */
 #define QLR_UI_ADDR__UI_MOUSEEVENT                               0x10010000u
 /* UI_LoadNonIngame: Loads the non-ingame menu set and clears the ingame-load state flag. */
 #define QLR_UI_ADDR_UI_LOADNONINGAME                             0x10010080u
@@ -856,7 +899,7 @@ char *	va( const char *format, ... );
 #define QLR_UI_ADDR_PARSE_TEXTALIGN_OR_FADECYCLE                 0x1001E2E0u
 /* Parse_textaligny_or_fadeAmount: Shared retail float parser reused by item `textaligny` and menu `fadeAmount`. */
 #define QLR_UI_ADDR_PARSE_TEXTALIGNY_OR_FADEAMOUNT               0x1001E300u
-/* ItemParse_font: Retail-only item parser that interns the item's font token. */
+/* ItemParse_font: Retail-only item parser for the integer per-item font bucket. */
 #define QLR_UI_ADDR_ITEMPARSE_FONT                               0x1001E320u
 /* ItemParse_textscale: Parses item->textscale. */
 #define QLR_UI_ADDR_ITEMPARSE_TEXTSCALE                          0x1001E340u
@@ -956,7 +999,7 @@ char *	va( const char *format, ... );
 #define QLR_UI_ADDR_ITEM_SETUPKEYWORDHASH                        0x1001F730u
 /* Item_Parse: Parses an itemDef block, resolves tokens through the item keyword hash, and reports unknown or malformed retail item keywords. */
 #define QLR_UI_ADDR_ITEM_PARSE                                   0x1001F7C0u
-/* MenuParse_font: Normalizes the menu font path, registers the retail text, small, and big fonts on first use, and stores the resolved menu font token. */
+/* MenuParse_font: Normalizes the menu font path, lazily registers the retail text, small, and big baked fonts on first use, and stores the resolved menu font token. */
 #define QLR_UI_ADDR_MENUPARSE_FONT                               0x1001F9D0u
 /* MenuParse_fullscreen: Parses the menu fullScreen flag. */
 #define QLR_UI_ADDR_MENUPARSE_FULLSCREEN                         0x1001FAA0u

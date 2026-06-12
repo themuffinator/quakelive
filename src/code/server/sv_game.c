@@ -1140,6 +1140,166 @@ static void QDECL QL_G_trap_SendConsoleCommandText( const char *text ) {
 	G_Import_Syscall( G_SEND_CONSOLE_COMMAND, text );
 }
 
+/*
+==============
+QL_G_trap_Cmd_TokenizeString
+
+Retail qagame import slot 21 exposes the engine command tokenizer directly.
+==============
+*/
+static void QDECL QL_G_trap_Cmd_TokenizeString( const char *text ) {
+	Cmd_TokenizeString( text );
+}
+
+/*
+==============
+QL_G_trap_Args
+
+Retail qagame import slot 19 exposes the current command arguments without the
+leading command token.
+==============
+*/
+static void QDECL QL_G_trap_Args( char *buffer, int bufferLength ) {
+	Cmd_ArgsBuffer( buffer, bufferLength );
+}
+
+/*
+==============
+QL_G_trap_Cvar_SetValue
+
+Retail qagame import slot 14 sets a cvar from a float value and returns the
+affected host cvar.
+==============
+*/
+static cvar_t *QDECL QL_G_trap_Cvar_SetValue( const char *var_name, float value ) {
+	return Cvar_SetValue( var_name, value );
+}
+
+/*
+==============
+QL_G_trap_Cvar_RegisterBounded
+
+Retail qagame import slot 16 registers a vmCvar with string min/max bounds and
+returns the affected host cvar.
+==============
+*/
+static cvar_t *QDECL QL_G_trap_Cvar_RegisterBounded( vmCvar_t *cvar, const char *var_name,
+		const char *value, const char *minValue, const char *maxValue, int flags ) {
+	return Cvar_RegisterBounded( cvar, var_name, value, minValue, maxValue, flags );
+}
+
+/*
+===============
+SV_GameResendConfigstring
+
+Retail qagame import slot 27 resends the current configstring value without
+changing it, so it must bypass SV_SetConfigstring's no-change suppression.
+===============
+*/
+static void SV_GameResendConfigstring( int index ) {
+	const char	*val;
+	int			len;
+	int			i;
+	int			maxChunkSize = MAX_STRING_CHARS - 24;
+	client_t	*client;
+
+	if ( index < 0 || index >= MAX_CONFIGSTRINGS ) {
+		Com_Error( ERR_DROP, "SV_SetConfigstring: bad index %i\n", index );
+	}
+
+	val = sv.configstrings[index];
+	if ( !val ) {
+		return;
+	}
+
+	if ( sv.state != SS_GAME && !sv.restarting ) {
+		return;
+	}
+
+	for ( i = 0, client = svs.clients; i < sv_maxclients->integer; i++, client++ ) {
+		if ( client->state < CS_PRIMED ) {
+			continue;
+		}
+
+		if ( index == CS_SERVERINFO && client->gentity && ( client->gentity->r.svFlags & SVF_NOSERVERINFO ) ) {
+			continue;
+		}
+
+		len = strlen( val );
+		if ( len >= maxChunkSize ) {
+			int			sent = 0;
+			int			remaining = len;
+			const char	*cmd;
+			char		buf[MAX_STRING_CHARS];
+
+			while ( remaining > 0 ) {
+				if ( sent == 0 ) {
+					cmd = "bcs0";
+				}
+				else if ( remaining < maxChunkSize ) {
+					cmd = "bcs2";
+				}
+				else {
+					cmd = "bcs1";
+				}
+
+				Q_strncpyz( buf, &val[sent], maxChunkSize );
+				SV_SendServerCommand( client, "%s %i \"%s\"\n", cmd, index, buf );
+
+				sent += ( maxChunkSize - 1 );
+				remaining -= ( maxChunkSize - 1 );
+			}
+		}
+		else {
+			SV_SendServerCommand( client, "cs %i \"%s\"\n", index, val );
+		}
+	}
+}
+
+/*
+===============
+QL_G_trap_ResendConfigstring
+
+Thin native import wrapper for the retail qagame configstring resend helper.
+===============
+*/
+static void QDECL QL_G_trap_ResendConfigstring( int index ) {
+	SV_GameResendConfigstring( index );
+}
+
+/*
+===============
+QL_G_trap_MarkClientGotCP
+
+Retail qagame import slot 192 marks that a client has acknowledged the pure
+checksum command before the regular server-side cp verification arrives.
+===============
+*/
+static void *QDECL QL_G_trap_MarkClientGotCP( int clientNum ) {
+	client_t	*client;
+
+	if ( clientNum < 0 || clientNum >= sv_maxclients->integer ) {
+		return (void *)(intptr_t)clientNum;
+	}
+
+	client = &svs.clients[clientNum];
+	client->gotCP = qtrue;
+
+	return client;
+}
+
+/*
+===============
+QL_G_trap_ReturnZero
+
+Retail qagame import slots 198 and 199 both point at the same engine stub that
+returns zero.
+===============
+*/
+static int QDECL QL_G_trap_ReturnZero( void ) {
+	return 0;
+}
+
 static const ql_import_f ql_game_compat_imports[GAME_LEGACY_IMPORT_COUNT] = {
 	[G_PRINT] = (ql_import_f)QL_G_trap_Printf,
 	[G_ERROR] = (ql_import_f)QL_G_trap_Error,
@@ -1644,8 +1804,11 @@ static void SV_InitGameImports( void ) {
 	Com_Memset( ql_game_imports, 0, sizeof( ql_game_imports ) );
 
 	ql_game_imports[G_QL_IMPORT_SEND_CONSOLE_COMMAND] = (ql_import_f)QL_G_trap_SendConsoleCommandText;
+	ql_game_imports[G_QL_IMPORT_REAL_TIME] = (ql_import_f)QL_G_trap_RealTime;
 	ql_game_imports[G_QL_IMPORT_PRINT] = (ql_import_f)QL_G_trap_Printf;
+	ql_game_imports[G_QL_IMPORT_MILLISECONDS] = (ql_import_f)QL_G_trap_Milliseconds;
 	ql_game_imports[G_QL_IMPORT_FS_WRITE] = (ql_import_f)QL_G_trap_FS_Write;
+	ql_game_imports[G_QL_IMPORT_FS_SEEK] = (ql_import_f)QL_G_trap_FS_Seek;
 	ql_game_imports[G_QL_IMPORT_FS_READ] = (ql_import_f)QL_G_trap_FS_Read;
 	ql_game_imports[G_QL_IMPORT_FS_GETFILELIST] = (ql_import_f)QL_G_trap_FS_GetFileList;
 	ql_game_imports[G_QL_IMPORT_FS_FOPEN_FILE] = (ql_import_f)QL_G_trap_FS_FOpenFile;
@@ -1654,15 +1817,20 @@ static void SV_InitGameImports( void ) {
 	ql_game_imports[G_QL_IMPORT_CVAR_VARIABLE_INTEGER_VALUE] = (ql_import_f)QL_G_trap_Cvar_VariableIntegerValue;
 	ql_game_imports[G_QL_IMPORT_CVAR_UPDATE] = (ql_import_f)QL_G_trap_Cvar_Update;
 	ql_game_imports[G_QL_IMPORT_CVAR_VARIABLE_STRING_BUFFER] = (ql_import_f)QL_G_trap_Cvar_VariableStringBuffer;
+	ql_game_imports[G_QL_IMPORT_CVAR_SET_VALUE] = (ql_import_f)QL_G_trap_Cvar_SetValue;
 	ql_game_imports[G_QL_IMPORT_CVAR_SET] = (ql_import_f)QL_G_trap_Cvar_Set;
+	ql_game_imports[G_QL_IMPORT_CVAR_REGISTER_BOUNDED] = (ql_import_f)QL_G_trap_Cvar_RegisterBounded;
 	ql_game_imports[G_QL_IMPORT_CVAR_REGISTER] = (ql_import_f)QL_G_trap_Cvar_Register;
 	ql_game_imports[G_QL_IMPORT_ARGV] = (ql_import_f)QL_G_trap_Argv;
+	ql_game_imports[G_QL_IMPORT_ARGS] = (ql_import_f)QL_G_trap_Args;
 	ql_game_imports[G_QL_IMPORT_ARGC] = (ql_import_f)QL_G_trap_Argc;
+	ql_game_imports[G_QL_IMPORT_CMD_TOKENIZE_STRING] = (ql_import_f)QL_G_trap_Cmd_TokenizeString;
 	ql_game_imports[G_QL_IMPORT_LOCATE_GAME_DATA] = (ql_import_f)QL_G_trap_LocateGameData;
 	ql_game_imports[G_QL_IMPORT_DROP_CLIENT] = (ql_import_f)QL_G_trap_DropClient;
 	ql_game_imports[G_QL_IMPORT_SEND_SERVER_COMMAND] = (ql_import_f)QL_G_trap_SendServerCommand;
 	ql_game_imports[G_QL_IMPORT_SET_CONFIGSTRING] = (ql_import_f)QL_G_trap_SetConfigstring;
 	ql_game_imports[G_QL_IMPORT_GET_CONFIGSTRING] = (ql_import_f)QL_G_trap_GetConfigstring;
+	ql_game_imports[G_QL_IMPORT_RESEND_CONFIGSTRING] = (ql_import_f)QL_G_trap_ResendConfigstring;
 	ql_game_imports[G_QL_IMPORT_GET_USERINFO] = (ql_import_f)QL_G_trap_GetUserinfo;
 	ql_game_imports[G_QL_IMPORT_SET_USERINFO] = (ql_import_f)QL_G_trap_SetUserinfo;
 	ql_game_imports[G_QL_IMPORT_GET_SERVERINFO] = (ql_import_f)QL_G_trap_GetServerinfo;
@@ -1822,6 +1990,9 @@ static void SV_InitGameImports( void ) {
 	ql_game_imports[G_QL_IMPORT_BOTLIB_AI_GENETIC_PARENTS_AND_CHILD_SELECTION] = (ql_import_f)QL_G_trap_GeneticParentsAndChildSelection;
 	ql_game_imports[G_QL_IMPORT_SUBMIT_MATCH_REPORT] = (ql_import_f)QL_G_trap_SubmitMatchReport;
 	ql_game_imports[G_QL_IMPORT_REPORT_PLAYER_EVENT] = (ql_import_f)QL_G_trap_ReportPlayerEvent;
+	ql_game_imports[G_QL_IMPORT_MARK_CLIENT_GOT_CP] = (ql_import_f)QL_G_trap_MarkClientGotCP;
+	ql_game_imports[G_QL_IMPORT_RETURN_ZERO_198] = (ql_import_f)QL_G_trap_ReturnZero;
+	ql_game_imports[G_QL_IMPORT_RETURN_ZERO_199] = (ql_import_f)QL_G_trap_ReturnZero;
 	ql_game_imports[G_QL_IMPORT_STEAMID_QUERY] = (ql_import_f)QL_G_trap_GetSteamId;
 	ql_game_imports[G_QL_IMPORT_STEAM_STAT_ADD] = (ql_import_f)QL_G_trap_AddSteamStat;
 	ql_game_imports[G_QL_IMPORT_GENERATE_MATCH_GUID] = (ql_import_f)QL_G_trap_GenerateMatchGuid;

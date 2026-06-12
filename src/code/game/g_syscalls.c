@@ -64,8 +64,11 @@ static int G_MapNativeImport( int arg, const intptr_t *stack ) {
 
 	switch ( arg ) {
 	case G_SEND_CONSOLE_COMMAND: return G_QL_IMPORT_SEND_CONSOLE_COMMAND;
+	case G_REAL_TIME: return G_QL_IMPORT_REAL_TIME;
 	case G_PRINT: return G_QL_IMPORT_PRINT;
+	case G_MILLISECONDS: return G_QL_IMPORT_MILLISECONDS;
 	case G_FS_WRITE: return G_QL_IMPORT_FS_WRITE;
+	case G_FS_SEEK: return G_QL_IMPORT_FS_SEEK;
 	case G_FS_READ: return G_QL_IMPORT_FS_READ;
 	case G_FS_GETFILELIST: return G_QL_IMPORT_FS_GETFILELIST;
 	case G_FS_FOPEN_FILE: return G_QL_IMPORT_FS_FOPEN_FILE;

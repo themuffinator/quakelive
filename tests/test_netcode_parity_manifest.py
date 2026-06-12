@@ -857,6 +857,10 @@ def test_ql_server_browser_and_master_heartbeat_related_wiring_parity_recheck() 
 		steamworks,
 		"qboolean QL_Steamworks_ReadServerBrowserPingResponseForApp( const void *serverDetails, uint32_t appId, ql_steam_server_browser_response_t *outResponse )",
 	)
+	browser_app_id_compatibility = _function_block(
+		steamworks,
+		"static qboolean QL_Steamworks_ServerBrowserAppIdsCompatible( uint32_t rowAppId, uint32_t requestAppId )",
+	)
 	enable_heartbeats = _function_block(steamworks, "qboolean QL_Steamworks_ServerEnableHeartbeats( qboolean enable )")
 
 	assert "#define QL_BUILD_ONLINE_SERVICES 0" in platform_config
@@ -1062,8 +1066,13 @@ def test_ql_server_browser_and_master_heartbeat_related_wiring_parity_recheck() 
 	assert "vtable[0x34 / 4]" in detail_request
 	assert "vtable[0x38 / 4]" in detail_request
 	assert "vtable[0x3c / 4]" in detail_request
+	assert "rowAppId == requestAppId" in browser_app_id_compatibility
+	assert "rowAppId == QL_STEAM_APPID_PUBLIC_RETAIL" in browser_app_id_compatibility
+	assert "requestAppId == QL_STEAM_APPID_REFERENCE_RETAIL" in browser_app_id_compatibility
+	assert "rowAppId == QL_STEAM_APPID_REFERENCE_RETAIL" in browser_app_id_compatibility
+	assert "requestAppId == QL_STEAM_APPID_PUBLIC_RETAIL" in browser_app_id_compatibility
 	assert "raw = (const ql_steam_gameserveritem_raw_t *)serverDetails;" in ping_response_reader
-	assert "raw->appId != appId" in ping_response_reader
+	assert "QL_Steamworks_ServerBrowserAppIdsCompatible( raw->appId, appId )" in ping_response_reader
 	assert "QL_Steamworks_CopyServerBrowserResponse( outResponse, &server );" in ping_response_reader
 	_assert_order(
 		detail_request,

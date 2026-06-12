@@ -1136,9 +1136,9 @@ void ClientEvents( gentity_t *ent, int oldEventSequence ) {
 			if ( g_gametype.integer == GT_HARVESTER ) {
 				if ( ent->client->ps.generic1 > 0 ) {
 					if ( ent->client->sess.sessionTeam == TEAM_RED ) {
-						item = BG_FindItem( "Blue Cube" );
+						item = BG_FindItem( "Blue Skull" );
 					} else {
-						item = BG_FindItem( "Red Cube" );
+						item = BG_FindItem( "Red Skull" );
 					}
 					if ( item ) {
 						for ( j = 0; j < ent->client->ps.generic1; j++ ) {
@@ -2153,6 +2153,88 @@ static qboolean G_CAShouldCompleteActiveRound( const int counts[TEAM_NUM_TEAMS] 
 
 /*
 =============
+G_CARoundTeamColor
+
+Returns the retail color prefix used by Clan Arena round-result prints.
+=============
+*/
+static const char *G_CARoundTeamColor( team_t team ) {
+	switch ( team ) {
+	case TEAM_RED:
+		return S_COLOR_RED;
+	case TEAM_BLUE:
+		return S_COLOR_BLUE;
+	default:
+		return S_COLOR_YELLOW;
+	}
+}
+
+/*
+=============
+G_CARoundTeamName
+
+Returns the retail uppercase team name used by Clan Arena round-result prints.
+=============
+*/
+static const char *G_CARoundTeamName( team_t team ) {
+	switch ( team ) {
+	case TEAM_RED:
+		return "RED";
+	case TEAM_BLUE:
+		return "BLUE";
+	case TEAM_SPECTATOR:
+		return "SPECTATOR";
+	default:
+		return "FREE";
+	}
+}
+
+/*
+=============
+G_CASendRoundWinnerPrint
+
+Publishes the retail Clan Arena round-result print with survivor or health detail.
+=============
+*/
+static void G_CASendRoundWinnerPrint( team_t winner, const int counts[TEAM_NUM_TEAMS], const int health[TEAM_NUM_TEAMS] ) {
+	team_t	otherTeam;
+	int	winnerCount;
+	int	winnerHealth;
+
+	if ( winner != TEAM_RED && winner != TEAM_BLUE ) {
+		return;
+	}
+
+	winnerCount = counts ? counts[winner] : 0;
+	winnerHealth = health ? health[winner] : 0;
+	otherTeam = ( winner == TEAM_RED ) ? TEAM_BLUE : TEAM_RED;
+
+	if ( counts && counts[otherTeam] <= 0 && winnerCount < 2 ) {
+		trap_SendServerCommand( -1,
+			va( "print \"%s%s TEAM^3 WINS the round!^7 (%i hp remaining)\n\"",
+				G_CARoundTeamColor( winner ), G_CARoundTeamName( winner ), winnerHealth ) );
+		return;
+	}
+
+	if ( G_RoundTimeLimitExpired( level.roundStartTime )
+		&& counts && health
+		&& g_roundDrawHealthCount.integer
+		&& counts[TEAM_RED] == counts[TEAM_BLUE]
+		&& health[TEAM_RED] != health[TEAM_BLUE] ) {
+		trap_SendServerCommand( -1,
+			va( "print \"%s%s TEAM^3 WINS the round!^7 (%s%i^7 hp vs %s%i^7 hp)\n\"",
+				G_CARoundTeamColor( winner ), G_CARoundTeamName( winner ),
+				S_COLOR_RED, health[TEAM_RED], S_COLOR_BLUE, health[TEAM_BLUE] ) );
+		return;
+	}
+
+	trap_SendServerCommand( -1,
+		va( "print \"%s%s TEAM^3 WINS the round!^7 (%i players remaining)\n\"",
+			G_CARoundTeamColor( winner ), G_CARoundTeamName( winner ), winnerCount ) );
+}
+
+/*
+=============
 G_CAResolveRoundState
 
 Services any expired Clan Arena warmup or round transition and returns the live controller state.
@@ -2200,9 +2282,7 @@ static int CA_RoundStateTransition( qboolean announce ) {
 	case ROUNDSTATE_WARMUP:
 		if ( g_gametype.integer >= GT_TEAM && !Team_HasMinimumPlayersForWarmup() ) {
 			if ( level.warmupTime != -1 ) {
-				level.warmupTime = -1;
-				trap_SetConfigstring( CS_WARMUP, va( "%i", level.warmupTime ) );
-				G_UpdateReadyUpConfigstring();
+				G_SetWarmupTime( -1 );
 				G_LogPrintf( "Warmup:\n" );
 			}
 			G_Frame_ReleaseWaitingWarmupClients();
@@ -2237,8 +2317,7 @@ static int CA_RoundStateTransition( qboolean announce ) {
 			G_BroadcastGlobalTeamSound( vec3_origin,
 				( winner == TEAM_RED ) ? GTS_REDTEAM_WINS_ROUND : GTS_BLUETEAM_WINS_ROUND,
 				-1, winner, 0 );
-			trap_SendServerCommand( -1,
-				va( "cp \"%s team wins the round\\n\"", ( winner == TEAM_RED ) ? "Red" : "Blue" ) );
+			G_CASendRoundWinnerPrint( winner, counts, health );
 		} else {
 			G_BroadcastGlobalTeamSound( vec3_origin, GTS_ROUND_DRAW, -1, TEAM_FREE, 0 );
 		}
@@ -2265,6 +2344,7 @@ static int CA_RoundStateTransition( qboolean announce ) {
 		break;
 
 	default:
+		G_Error( "CA_RoundStateTransition: invalid state" );
 		break;
 	}
 
@@ -2471,15 +2551,11 @@ static void G_RoundScheduleWarmupDelay( void ) {
 
 	delay = g_roundWarmupDelay.integer;
 	if ( delay > 0 ) {
-		level.warmupTime = level.time + delay;
-		trap_SetConfigstring( CS_WARMUP, va( "%i", level.warmupTime ) );
-		G_UpdateReadyUpConfigstring();
+		G_SetWarmupTime( level.time + delay );
 		return;
 	}
 
-	level.warmupTime = 0;
-	trap_SetConfigstring( CS_WARMUP, va( "%i", level.warmupTime ) );
-	G_UpdateReadyUpConfigstring();
+	G_SetWarmupTime( 0 );
 }
 
 /*
@@ -2877,6 +2953,7 @@ static void G_FreezeHandleRoundEnd( team_t winner ) {
 			level.freezeLivingHealth[TEAM_RED], level.freezeLivingHealth[TEAM_BLUE] ) );
 	}
 
+	CalculateRanks();
 	level.roundState = ROUNDSTATE_COMPLETE;
 	G_SetAllActiveClientAttackLockout( qtrue );
 	level.roundPendingExit = G_CAFZCheckExitRules( qfalse );
@@ -2911,9 +2988,7 @@ static int Freeze_RoundStateTransition( qboolean announce ) {
 	case ROUNDSTATE_WARMUP:
 		if ( g_gametype.integer >= GT_TEAM && !Team_HasMinimumPlayersForWarmup() ) {
 			if ( level.warmupTime != -1 ) {
-				level.warmupTime = -1;
-				trap_SetConfigstring( CS_WARMUP, va( "%i", level.warmupTime ) );
-				G_UpdateReadyUpConfigstring();
+				G_SetWarmupTime( -1 );
 				G_LogPrintf( "Warmup:\n" );
 			}
 			G_Frame_ReleaseWaitingWarmupClients();
@@ -3160,9 +3235,7 @@ static int RR_RoundStateTransition( qboolean announce ) {
 
 		if ( g_gametype.integer >= GT_TEAM && !Team_HasMinimumPlayersForWarmup() ) {
 			if ( level.warmupTime != -1 ) {
-				level.warmupTime = -1;
-				trap_SetConfigstring( CS_WARMUP, va( "%i", level.warmupTime ) );
-				G_UpdateReadyUpConfigstring();
+				G_SetWarmupTime( -1 );
 				G_LogPrintf( "Warmup:\n" );
 			}
 			G_Frame_ReleaseWaitingWarmupClients();
@@ -3250,7 +3323,7 @@ static int RR_RoundStateTransition( qboolean announce ) {
 		break;
 
 	default:
-		break;
+		G_Error( "RR_RoundStateTransition: invalid state" );
 	}
 
 	return level.rrRoundState;
@@ -3340,9 +3413,7 @@ void G_Frame_UpdateRoundController( void ) {
 	case ROUNDSTATE_WARMUP:
 		if ( g_gametype.integer >= GT_TEAM && !Team_HasMinimumPlayersForWarmup() ) {
 			if ( level.warmupTime != -1 ) {
-				level.warmupTime = -1;
-				trap_SetConfigstring( CS_WARMUP, va( "%i", level.warmupTime ) );
-				G_UpdateReadyUpConfigstring();
+				G_SetWarmupTime( -1 );
 				G_LogPrintf( "Warmup:\n" );
 			}
 			G_Frame_ReleaseWaitingWarmupClients();
@@ -3405,9 +3476,7 @@ void G_FreezeRunFrame( void ) {
 	state = G_FreezeResolveRoundState();
 	if ( state == ROUNDSTATE_WARMUP ) {
 		if ( level.warmupTime > 0 && level.time >= level.warmupTime ) {
-			level.warmupTime = 0;
-			trap_SetConfigstring( CS_WARMUP, va( "%i", level.warmupTime ) );
-			G_UpdateReadyUpConfigstring();
+			G_SetWarmupTime( 0 );
 		}
 		return;
 	}

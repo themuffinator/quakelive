@@ -29,6 +29,11 @@ The current audited state, with the aggregate pytest sweep refreshed on
   Awesomium/browser-host audits.
 - The focused gameplay validation sweep remains closed on the current worktree
   through dedicated Race, gametype-lifecycle, ready-up, and `pmove` fixtures.
+- The 2026-06-12 all-gametype integration pass keeps the focused gametype
+  routing surface at **99%** by pinning the complete QL enum/factory matrix,
+  qagame lifecycle/runframe/exit/scoreboard buckets, cgame scoreboard parser
+  and HUD feeder families, and shared objective configstring consumers in one
+  executable parity gate.
 - The 2026-06-05 Race gametype closure keeps the focused Race qagame/cgame
   wiring surface at **100%** by matching the retail evidence for `race_info`,
   `race_init`, admin `racepoint`/`admin_race_point_N` transport, checkpoint

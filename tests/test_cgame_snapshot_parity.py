@@ -238,6 +238,7 @@ def test_snapshot_handoff_wiring_keeps_prediction_inputs_in_retail_order() -> No
         "CG_Respawn();",
         "for ( i = 0 ; i < cg.snap->numEntities ; i++ ) {",
         "memcpy(&cent->currentState, state, sizeof(entityState_t));",
+        "CG_SyncTeamOverlayClientInfo( state );",
         "cent->interpolate = qfalse;",
         "cent->currentValid = qtrue;",
         "CG_ResetEntity( cent );",
@@ -253,6 +254,7 @@ def test_snapshot_handoff_wiring_keeps_prediction_inputs_in_retail_order() -> No
         "BG_PlayerStateToEntityState( &cg.snap->ps, &cg_entities[ cg.snap->ps.clientNum ].currentState, qfalse );",
         "cg_entities[ cg.snap->ps.clientNum ].interpolate = qfalse;",
         "CG_TransitionEntity( cent );",
+        "CG_SyncTeamOverlayClientInfo( &cent->currentState );",
         "cent->snapShotTime = cg.snap->serverTime;",
         "if ( ( ps->eFlags ^ ops->eFlags ) & EF_TELEPORT_BIT ) {",
         "if ( cg.demoPlayback || (cg.snap->ps.pm_flags & PMF_FOLLOW)",
@@ -306,6 +308,29 @@ def test_snapshot_handoff_wiring_keeps_prediction_inputs_in_retail_order() -> No
         "if ( cg.time < cg.snap->serverTime ) {",
         "if ( cg.nextSnap != NULL && cg.nextSnap->serverTime <= cg.time ) {",
     )
+
+
+def test_team_overlay_snapshot_sync_mirrors_retail_entity_state_vitals() -> None:
+    source = CG_SNAPSHOT.read_text(encoding="utf-8")
+    sync_block = _block_from_marker(source, "static void CG_SyncTeamOverlayClientInfo")
+    initial_block = _block_from_marker(source, "void CG_SetInitialSnapshot")
+    transition_block = _block_from_marker(source, "static void CG_TransitionSnapshot")
+
+    for expected in (
+        "clientNum = state->clientNum;",
+        "if ( state->number != clientNum ) {",
+        "ci->location = state->location;",
+        "ci->health = state->health;",
+        "ci->armor = state->armor;",
+        "ci->curWeapon = state->weapon;",
+        "ci->powerups = state->powerups;",
+    ):
+        assert expected in sync_block
+
+    assert "CG_SyncTeamOverlayClientInfo( state );" in initial_block
+    assert "CG_SyncTeamOverlayClientInfo( &cg_entities[ snap->ps.clientNum ].currentState );" in initial_block
+    assert "CG_SyncTeamOverlayClientInfo( &cent->currentState );" in transition_block
+    assert "CG_SyncTeamOverlayClientInfo( &cg_entities[ cg.snap->ps.clientNum ].currentState );" in transition_block
 
 
 def test_prediction_solid_trace_and_interpolation_helpers_match_retail_shape() -> None:

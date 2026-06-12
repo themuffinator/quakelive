@@ -20,6 +20,8 @@ def test_duel_scoreboard_cache_fields_match_retail_level_tail() -> None:
 
 def test_nonteam_scoreboard_helper_family_is_split_from_generic_builder() -> None:
 	game_cmds = _read("src/code/game/g_cmds.c")
+	qagame_hlil = _read("references/hlil/quakelive/qagamex86.dll/qagamex86.dll.bndb_hlil_split/qagamex86.dll.bndb_hlil_part01.txt")
+	level_notes = _read("references/hlil/quakelive/qagamex86.dll/sully_interpreted/structs/level_locals_t.md")
 
 	assert "static qboolean G_BuildObeliskScoreboardMessage( char *payload, int payloadSize, int *emittedCount ) {" in game_cmds
 	assert "static qboolean G_BuildFFAScoreboardMessage( char *payload, int payloadSize, int *emittedCount ) {" in game_cmds
@@ -31,7 +33,12 @@ def test_nonteam_scoreboard_helper_family_is_split_from_generic_builder() -> Non
 	assert "level.duelScoreboardHighClientNum = -1;" in game_cmds
 	assert "level.duelScoreboardLowClientNum = firstClientNum;" in game_cmds
 	assert "level.duelScoreboardHighClientNum = secondClientNum;" in game_cmds
+	assert "if ( level.intermissionQueued || level.intermissiontime ) {" in game_cmds
 	assert "lowRow = G_ShouldRevealDuelScoreboardDetails( g_duelScoreboardViewer, level.duelScoreboardLowClientNum ) ? lowPrivate : lowPublic;" in game_cmds
+	assert "1003db06  if (data_105de9d4 != 0 || data_105de9d8 != 0)" in qagame_hlil
+	assert '1003db7f      *(esp_1 - 0xc) = "scores_duel 2 %s %s"' in qagame_hlil
+	assert "| `0x1B94` | `intermissionQueued`" in level_notes
+	assert "| `0x1B98` | `intermissiontime`" in level_notes
 
 
 def test_race_scoreboard_helper_is_exposed_and_reused() -> None:

@@ -765,6 +765,31 @@ static void QL_Steamworks_CopyServerBrowserResponse( ql_steam_server_browser_res
 
 /*
 =============
+QL_Steamworks_ServerBrowserAppIdsCompatible
+
+Accepts exact server-browser app-id matches, plus SRP's documented public
+retail/reference app-id interop pair for native browser discovery.
+=============
+*/
+static qboolean QL_Steamworks_ServerBrowserAppIdsCompatible( uint32_t rowAppId, uint32_t requestAppId ) {
+	if ( rowAppId == 0u || requestAppId == 0u ) {
+		return qfalse;
+	}
+
+	if ( rowAppId == requestAppId ) {
+		return qtrue;
+	}
+
+	if ( ( rowAppId == QL_STEAM_APPID_PUBLIC_RETAIL && requestAppId == QL_STEAM_APPID_REFERENCE_RETAIL ) ||
+		( rowAppId == QL_STEAM_APPID_REFERENCE_RETAIL && requestAppId == QL_STEAM_APPID_PUBLIC_RETAIL ) ) {
+		return qtrue;
+	}
+
+	return qfalse;
+}
+
+/*
+=============
 QL_Steamworks_PrepareCallbackObject
 
 Initialises a CCallbackBase-compatible object with the retained binding owner.
@@ -1404,6 +1429,33 @@ uint32_t QL_Steamworks_GetAppID( void ) {
 	}
 
 	return fn( utils, NULL );
+}
+
+/*
+=============
+QL_Steamworks_IsUserLoggedOn
+
+Checks the active Steam user login state before client auth-ticket work.
+=============
+*/
+qboolean QL_Steamworks_IsUserLoggedOn( void ) {
+	void *user;
+	void **vtable;
+	typedef qboolean (__fastcall *QL_SteamUser_BLoggedOnFn)( void *self, void *unused );
+	QL_SteamUser_BLoggedOnFn fn;
+
+	user = QL_Steamworks_GetUserInterface();
+	vtable = QL_Steamworks_GetInterfaceVTable( user );
+	if ( !vtable ) {
+		return qfalse;
+	}
+
+	fn = (QL_SteamUser_BLoggedOnFn)vtable[0x04 / 4];
+	if ( !fn ) {
+		return qfalse;
+	}
+
+	return fn( user, NULL ) ? qtrue : qfalse;
 }
 
 /*
@@ -3202,7 +3254,7 @@ qboolean QL_Steamworks_ReadServerListDetailsForApp( ql_steam_server_list_request
 		return qfalse;
 	}
 
-	if ( appId == 0u || raw->appId != appId ) {
+	if ( !QL_Steamworks_ServerBrowserAppIdsCompatible( raw->appId, appId ) ) {
 		return qfalse;
 	}
 
@@ -3312,7 +3364,7 @@ qboolean QL_Steamworks_ReadServerBrowserPingResponseForApp( const void *serverDe
 	}
 
 	raw = (const ql_steam_gameserveritem_raw_t *)serverDetails;
-	if ( appId == 0u || raw->appId != appId ) {
+	if ( !QL_Steamworks_ServerBrowserAppIdsCompatible( raw->appId, appId ) ) {
 		return qfalse;
 	}
 
@@ -7420,11 +7472,25 @@ Requests an auth session ticket and returns it encoded as hex.
 =============
 */
 qboolean QL_Steamworks_RequestAuthTicket( char *ticketBuffer, size_t ticketBufferSize, int *ticketLength, uint32_t *ticketHandle ) {
+	if ( ticketBuffer && ticketBufferSize > 0 ) {
+		ticketBuffer[0] = '\0';
+	}
+	if ( ticketLength ) {
+		*ticketLength = 0;
+	}
+	if ( ticketHandle ) {
+		*ticketHandle = 0u;
+	}
+
 	if ( !ticketBuffer || ticketBufferSize == 0 ) {
 		return qfalse;
 	}
 
 	if ( !QL_Steamworks_Init() ) {
+		return qfalse;
+	}
+
+	if ( !QL_Steamworks_IsUserLoggedOn() ) {
 		return qfalse;
 	}
 
@@ -7501,6 +7567,13 @@ qboolean QL_Steamworks_ServerBeginAuthSession( const CSteamID *steamId, const ch
 	}
 
 	if ( !state.gameServerInitialised ) {
+		return qfalse;
+	}
+
+	if ( !QL_Steamworks_ServerIsLoggedOn() ) {
+		if ( response ) {
+			QL_Backend_SetAuthResponse( response, QL_AUTH_RESULT_ERROR, "Steam GameServer not logged on" );
+		}
 		return qfalse;
 	}
 
@@ -7608,6 +7681,11 @@ qboolean QL_Steamworks_ValidateTicket( const char *ticketHex, ql_auth_response_t
 	void *user = state.SteamUser ? state.SteamUser() : NULL;
 	if ( !user || !state.BeginAuthSession || !state.GetSteamID ) {
 		QL_Backend_SetAuthResponse( response, QL_AUTH_RESULT_ERROR, "Steam user interface unavailable" );
+		return qtrue;
+	}
+
+	if ( !QL_Steamworks_IsUserLoggedOn() ) {
+		QL_Backend_SetAuthResponse( response, QL_AUTH_RESULT_ERROR, "Steam user not logged on" );
 		return qtrue;
 	}
 

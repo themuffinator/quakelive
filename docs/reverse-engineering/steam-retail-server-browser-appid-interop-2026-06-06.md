@@ -52,6 +52,10 @@ master fallback is disabled by the online-services policy.
   plus `CL_SteamBrowser_GetDiscoveryAppID()`.
 - Stored the selected app id on native list/detail request state so callbacks
   validate rows against the same app id that started the request.
+- Relaxed returned-row validation only for the documented public retail
+  (`282440`) and reference (`0x54100`) Quake Live app-id pair, so a valid row
+  from either side of the SRP interop lane is not discarded after Steam has
+  already produced it.
 - Routed WebUI favorite add/remove through the same discovery app id used by
   Favorites/History browser requests.
 - Matched retained-handle `RefreshList` behavior: native refresh now calls the
@@ -74,7 +78,8 @@ master fallback is disabled by the online-services policy.
 
 SRP clients now request and accept public retail Quake Live server rows by
 default while preserving current-app Steam wrappers for recovered retail
-surfaces that still need them.
+surfaces that still need them. The only cross-app acceptance is the explicit
+public/reference Quake Live pair; unrelated app ids are still rejected.
 
 SRP servers already publish through the Steam GameServer heartbeat path when
 online services are explicitly enabled and `sv_master` or `sv_masterN` is
@@ -87,5 +92,6 @@ making the runtime requirement explicit.
 ## Verification
 
 - `python -m pytest tests/test_steamworks_harness.py -q`
+- `python -m pytest tests/test_steamworks_harness.py::test_server_browser_detail_reader_projects_retail_gameserveritem_row tests/test_steamworks_harness.py::test_server_browser_response_projection_matches_retail_jsbrowser_payload_shape tests/test_steamworks_harness.py::test_server_browser_ping_response_projection_matches_retail_jsbrowserdetails_payload_shape -q --tb=short`
 - `python -m pytest tests/test_platform_services.py::test_client_browser_favorite_server_lane_reconstructs_retail_steam_matchmaking_owner tests/test_platform_services.py::test_client_browser_server_shims_reconstruct_retail_server_browser_surface -q`
 - `python -m pytest tests/test_netcode_parity_manifest.py -q`

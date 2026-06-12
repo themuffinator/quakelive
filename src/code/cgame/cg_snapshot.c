@@ -94,6 +94,39 @@ void CG_QueueClientInfoContextRefresh( void ) {
 }
 
 /*
+================================
+CG_SyncTeamOverlayClientInfo
+
+Mirrors retail team-overlay vitals from replicated entity-state fields into
+source compatibility clientInfo_t sidecars used by legacy HUD/menu code.
+================================
+*/
+static void CG_SyncTeamOverlayClientInfo( const entityState_t *state ) {
+	clientInfo_t	*ci;
+	int			clientNum;
+
+	if ( !state ) {
+		return;
+	}
+
+	clientNum = state->clientNum;
+	if ( clientNum < 0 || clientNum >= MAX_CLIENTS ) {
+		return;
+	}
+
+	if ( state->number != clientNum ) {
+		return;
+	}
+
+	ci = &cgs.clientinfo[clientNum];
+	ci->location = state->location;
+	ci->health = state->health;
+	ci->armor = state->armor;
+	ci->curWeapon = state->weapon;
+	ci->powerups = state->powerups;
+}
+
+/*
 ==================
 CG_SetInitialSnapshot
 
@@ -128,6 +161,7 @@ void CG_SetInitialSnapshot( snapshot_t *snap ) {
 
 		memcpy(&cent->currentState, state, sizeof(entityState_t));
 		//cent->currentState = *state;
+		CG_SyncTeamOverlayClientInfo( state );
 		cent->interpolate = qfalse;
 		cent->currentValid = qtrue;
 
@@ -137,6 +171,7 @@ void CG_SetInitialSnapshot( snapshot_t *snap ) {
 		CG_CheckEvents( cent );
 	}
 
+	CG_SyncTeamOverlayClientInfo( &cg_entities[ snap->ps.clientNum ].currentState );
 }
 
 
@@ -178,10 +213,12 @@ static void CG_TransitionSnapshot( void ) {
 	for ( i = 0 ; i < cg.snap->numEntities ; i++ ) {
 		cent = &cg_entities[ cg.snap->entities[ i ].number ];
 		CG_TransitionEntity( cent );
+		CG_SyncTeamOverlayClientInfo( &cent->currentState );
 
 		// remember time of snapshot this entity was last updated in
 		cent->snapShotTime = cg.snap->serverTime;
 	}
+	CG_SyncTeamOverlayClientInfo( &cg_entities[ cg.snap->ps.clientNum ].currentState );
 
 	// check for playerstate transition events
 	if ( oldFrame ) {

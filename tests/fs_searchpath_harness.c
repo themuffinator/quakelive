@@ -667,9 +667,10 @@ char *va( const char *format, ... ) {
 Cvar_Set
 =============
 */
-void Cvar_Set( const char *var_name, const char *value ) {
+cvar_t *Cvar_Set( const char *var_name, const char *value ) {
 	(void)var_name;
 	(void)value;
+	return NULL;
 }
 
 /*

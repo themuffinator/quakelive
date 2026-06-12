@@ -2266,6 +2266,7 @@ static float CG_DrawTeamOverlay( float y, qboolean right, qboolean upper ) {
 	char		healthText[16];
 	char		armorText[16];
 	clientInfo_t	*ci;
+	const entityState_t	*state;
 	gitem_t		*item;
 
 	if ( !cg_drawTeamOverlay.integer ) {
@@ -2394,9 +2395,10 @@ static float CG_DrawTeamOverlay( float y, qboolean right, qboolean upper ) {
 		textY = drawY + (float)textHeight;
 		CG_Text_PaintExt( textX, textY, scale, textColor, nameText, 0.0f, TEAM_OVERLAY_NAME_PRINT_LIMIT, ITEM_TEXTSTYLE_SHADOWED, FONT_SANS );
 
-		health = ci->health;
-		armor = ci->armor;
-		weapon = ci->curWeapon;
+		state = &cg_entities[clientNum].currentState;
+		health = state->health;
+		armor = state->armor;
+		weapon = state->weapon;
 		powerups = CG_TeamOverlayPlayerPowerups( clientNum );
 		if ( clientNum == cg.snap->ps.clientNum ) {
 			health = cg.snap->ps.stats[STAT_HEALTH];
@@ -2435,7 +2437,7 @@ static float CG_DrawTeamOverlay( float y, qboolean right, qboolean upper ) {
 			}
 		}
 
-		p = CG_ConfigString( CS_LOCATIONS + ci->location );
+		p = CG_ConfigString( CS_LOCATIONS + state->location );
 		if ( !p || !*p ) {
 			p = "unknown";
 		}

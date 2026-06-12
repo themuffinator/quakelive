@@ -224,6 +224,9 @@ def test_client_command_handlers_match_retail_forward_restart_and_info_contracts
 	assert "FS_ConditionalRestart( clc.checksumFeed );" in vid_restart_block
 
 	assert 'Cvar_Set("ui_singlePlayerActive", "0");' in disconnect_block
+	assert 'if ( com_sv_running && com_sv_running->integer && ( !com_dedicated || !com_dedicated->integer ) ) {' in disconnect_block
+	assert 'SV_Shutdown( "Server quit\\n" );' in disconnect_block
+	assert disconnect_block.index('SV_Shutdown( "Server quit\\n" );') < disconnect_block.index('Com_Error (ERR_DISCONNECT, "Disconnected from server");')
 	assert 'Com_Error (ERR_DISCONNECT, "Disconnected from server");' in disconnect_block
 
 	assert 'Com_Printf ("Not recording a demo.\\n");' in stoprecord_block

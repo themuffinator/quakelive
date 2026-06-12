@@ -125,6 +125,19 @@ void G_UpdateReadyUpConfigstring( void ) {
 
 /*
 =============
+G_SetWarmupTime
+
+Mirrors the shared qagame warmup latch helper for lifecycle-only tests.
+=============
+*/
+void G_SetWarmupTime( int warmupTime ) {
+@TAB@level.warmupTime = warmupTime;
+@TAB@trap_SetConfigstring( CS_WARMUP, va( "%i", level.warmupTime ) );
+@TAB@G_UpdateReadyUpConfigstring();
+}
+
+/*
+=============
 G_RunGrantScript
 
 Captures the duel spawn grant script applied during ClientSpawn.

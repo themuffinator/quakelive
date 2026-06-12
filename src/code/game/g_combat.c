@@ -311,6 +311,10 @@ void AddScore( gentity_t *ent, const vec3_t origin, int score ) {
 	if ( level.warmupTime ) {
 		return;
 	}
+	// no scoring once the match result is locked
+	if ( level.intermissiontime ) {
+		return;
+	}
 	// show score plum
 	ScorePlum(ent, origin, score);
 	//
@@ -585,36 +589,24 @@ void TossClientItems( gentity_t *self, gentity_t *attacker, flagDropContext_t co
 	G_TossFlag( self, PW_BLUEFLAG, context, attacker, meansOfDeath, NULL );
 }
 
-/*
-=================
-TossClientCubes
-=================
-*/
 extern gentity_t	*neutralObelisk;
 
-void TossClientCubes( gentity_t *self ) {
-	gitem_t		*item;
+/*
+=================
+G_LaunchHarvesterSkull
+=================
+*/
+static void G_LaunchHarvesterSkull( gitem_t *item, team_t skullTeam, float yaw ) {
 	gentity_t	*drop;
 	vec3_t		velocity;
 	vec3_t		angles;
 	vec3_t		origin;
 
-	self->client->ps.generic1 = 0;
-
-	// this should never happen but we should never
-	// get the server to crash due to skull being spawned in
-	if (!G_EntitiesFree()) {
+	if ( !item ) {
 		return;
 	}
 
-	if( self->client->sess.sessionTeam == TEAM_RED ) {
-		item = BG_FindItem( "Red Cube" );
-	}
-	else {
-		item = BG_FindItem( "Blue Cube" );
-	}
-
-	angles[YAW] = (float)(level.time % 360);
+	angles[YAW] = yaw;
 	angles[PITCH] = 0;	// always forward
 	angles[ROLL] = 0;
 
@@ -630,10 +622,71 @@ void TossClientCubes( gentity_t *self ) {
 	}
 
 	drop = LaunchItem( item, origin, velocity );
+	if ( !drop ) {
+		return;
+	}
 
 	drop->nextthink = level.time + g_cubeTimeout.integer * 1000;
 	drop->think = G_FreeEntity;
-	drop->spawnflags = self->client->sess.sessionTeam;
+	drop->spawnflags = skullTeam;
+}
+
+/*
+=================
+G_OtherHarvesterTeam
+=================
+*/
+static team_t G_OtherHarvesterTeam( team_t team ) {
+	if ( team == TEAM_RED ) {
+		return TEAM_BLUE;
+	}
+	if ( team == TEAM_BLUE ) {
+		return TEAM_RED;
+	}
+
+	return TEAM_FREE;
+}
+
+/*
+=================
+TossClientCubes
+=================
+*/
+void TossClientCubes( gentity_t *self ) {
+	gitem_t		*deathSkullItem;
+	gitem_t		*carriedSkullItem;
+	team_t		deathSkullTeam;
+	team_t		carriedSkullTeam;
+	int		carriedSkulls;
+	int		i;
+
+	carriedSkulls = self->client->ps.generic1 & 0x3f;
+	self->client->ps.generic1 &= 0xc0;
+
+	// this should never happen but we should never
+	// get the server to crash due to skull being spawned in
+	if (!G_EntitiesFree()) {
+		return;
+	}
+
+	deathSkullTeam = self->client->sess.sessionTeam;
+	carriedSkullTeam = G_OtherHarvesterTeam( deathSkullTeam );
+	if( deathSkullTeam == TEAM_RED ) {
+		deathSkullItem = BG_FindItem( "Red Skull" );
+		carriedSkullItem = BG_FindItem( "Blue Skull" );
+	}
+	else {
+		deathSkullItem = BG_FindItem( "Blue Skull" );
+		carriedSkullItem = BG_FindItem( "Red Skull" );
+	}
+
+	G_LaunchHarvesterSkull( deathSkullItem, deathSkullTeam, (float)( level.time % 360 ) );
+
+	if ( g_dropSkulls.integer && carriedSkulls > 0 ) {
+		for ( i = 0; i < carriedSkulls; i++ ) {
+			G_LaunchHarvesterSkull( carriedSkullItem, carriedSkullTeam, (float)( rand() % 360 ) );
+		}
+	}
 }
 
 
@@ -1305,7 +1358,7 @@ void player_die( gentity_t *self, gentity_t *inflictor, gentity_t *attacker, int
 		}
 	}
 	TossClientPersistantPowerups( self );
-	if( g_gametype.integer == GT_HARVESTER ) {
+	if( g_gametype.integer == GT_HARVESTER && meansOfDeath != MOD_SWITCHTEAM ) {
 		TossClientCubes( self );
 	}
 

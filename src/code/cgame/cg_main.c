@@ -374,7 +374,6 @@ vmCvar_t	cg_drawTeamOverlayOpacity;
 vmCvar_t	cg_drawTeamOverlaySize;
 vmCvar_t	cg_drawTeamOverlayX;
 vmCvar_t	cg_drawTeamOverlayY;
-vmCvar_t	cg_teamOverlayUserinfo;
 vmCvar_t	cg_drawTieredArmorAvailability;
 vmCvar_t	cg_enableDust;
 vmCvar_t	cg_enableBreath;
@@ -693,7 +692,6 @@ static cvarTable_t cvarTable[] = { // bk001129
 	{ &cg_drawTeamOverlaySize, "cg_drawTeamOverlaySize", "0.16", CVAR_ARCHIVE | CVAR_PROTECTED | CVAR_VM_CREATED | CVAR_CLOUD, "0.12", "0.22" },
 	{ &cg_drawTeamOverlayX, "cg_drawTeamOverlayX", "0", CVAR_ARCHIVE | CVAR_PROTECTED | CVAR_VM_CREATED | CVAR_CLOUD, "-640", "640" },
 	{ &cg_drawTeamOverlayY, "cg_drawTeamOverlayY", "0", CVAR_ARCHIVE | CVAR_PROTECTED | CVAR_VM_CREATED | CVAR_CLOUD, "-480", "480" },
-	{ &cg_teamOverlayUserinfo, "teamoverlay", "0", CVAR_ROM | CVAR_USERINFO },
 	{ &cg_drawTieredArmorAvailability, "cg_drawTieredArmorAvailability", "1", CVAR_ARCHIVE | CVAR_PROTECTED | CVAR_VM_CREATED | CVAR_CLOUD, "0", "1" },
 	{ &cg_enableDust, "g_enableDust", "0", CVAR_SERVERINFO},
 	{ &cg_enableBreath, "g_enableBreath", "0", CVAR_SERVERINFO},
@@ -1751,20 +1749,6 @@ void CG_UpdateCvars( void ) {
 
 	for ( i = 0, cv = cvarTable ; i < cvarTableSize ; i++, cv++ ) {
 		trap_Cvar_Update( cv->vmCvar );
-	}
-
-	// check for modications here
-
-	// If team overlay is on, ask for updates from the server.  If its off,
-	// let the server know so we don't receive it
-	if ( drawTeamOverlayModificationCount != cg_drawTeamOverlay.modificationCount ) {
-		drawTeamOverlayModificationCount = cg_drawTeamOverlay.modificationCount;
-
-		if ( cg_drawTeamOverlay.integer > 0 ) {
-			trap_Cvar_Set( "teamoverlay", "1" );
-		} else {
-			trap_Cvar_Set( "teamoverlay", "0" );
-		}
 	}
 
 	refreshClients = qfalse;

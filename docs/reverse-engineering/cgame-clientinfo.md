@@ -207,12 +207,18 @@ claiming binary-exact early member offsets:
   `0x2E0..0x690` anchors. Retail `CG_CopyClientInfoModel` starts its metadata
   copy at `0x2E8`, so the reconstruction intentionally does not copy
   `fixedlegs` or `fixedtorso` through deferred asset reuse.
-- `CG_ParseTeamInfo` now accepts the retail compact `tinfo` command shape:
-  count plus client numbers. The retail `tinfo` parser only rebuilds
-  `sortedTeamPlayers`; source-compatible six-field `tinfo` rows are still
-  accepted so current source qagame builds can continue feeding location,
-  health, armor, weapon, and powerup overlay caches until those values are
-  reconstructed through their retail transport.
+- `CG_ParseTeamInfo` accepts the retail compact `tinfo` command shape: count
+  plus client numbers. The retail `tinfo` parser only rebuilds
+  `sortedTeamPlayers`, and the reconstructed qagame `TeamplayInfoMessage`
+  producer now emits that compact shape.
+- Source-compatible six-field `tinfo` rows are still accepted for older/source
+  servers, but retail-style teammate overlay vitals now arrive through
+  `entityState_t` snapshot fields. Cgame mirrors those replicated health,
+  armor, current weapon, location, and powerup bits into source compatibility
+  `clientInfo_t` sidecars for menu-HUD and legacy overlay consumers.
+- Retail cgame does not expose the source-era lowercase `"teamoverlay"`
+  userinfo cvar. `cg_drawTeamOverlay` and its size/opacity/offset cvars remain
+  local HUD controls; qagame owns the compact row-list refresh cadence.
 - `cg_local.h` now names the recovered retail byte map with
   `CG_CLIENTINFO_RETAIL_OFFSET_*` constants. The early constants are evidence
   markers for future repacking, not claims that every current source member has
@@ -228,9 +234,9 @@ claiming binary-exact early member offsets:
 ## Remaining Layout Work
 
 The cgame animation-record split, strongest internal anchor repack, score
-mirror, compact team-info client list, medkit/invulnerability timer lanes, and
-the post-scalar animation metadata/model-handle band are now complete. The next
-binary-layout pass should:
+mirror, compact team-info client list, entity-state team-overlay vitals,
+medkit/invulnerability timer lanes, and the post-scalar animation
+metadata/model-handle band are now complete. The next binary-layout pass should:
 
 1. Resolve the remaining early-slot medium-confidence semantics, especially the
    `teamLeader` consumer set and the unobserved `0x150` breath-puff timer
@@ -238,10 +244,10 @@ binary-layout pass should:
 2. Decide which source-only compatibility fields should remain in the retail
    slab and which deserve sidecar storage once stronger evidence separates
    retail fields from reconstruction conveniences.
-3. Reconstruct the retail transport for location, health, armor, current
-   weapon, and powerup teammate overlay values; current source keeps those as
-   compatibility fields fed by legacy six-field `tinfo` rows, not proven retail
-   clientinfo offsets.
+3. Audit remaining consumers of the source-compatibility teammate vital fields
+   before a future clientinfo repack; those fields are fed by entity-state
+   snapshots and legacy six-field `tinfo` rows, not proven retail clientinfo
+   offsets.
 4. Replace the remaining named retail pads with recovered fields if later
    evidence identifies their roles.
 5. Regenerate top-level `cgs_t` offsets after any future size-affecting

@@ -478,6 +478,190 @@ void QLR_BuildMatchStateConfigstring( void ) {
 
 /*
 =============
+QLR_BuildClanArenaWarmupMatchStateConfigstring
+
+Publishes a representative retail Clan Arena warmup payload.
+=============
+*/
+void QLR_BuildClanArenaWarmupMatchStateConfigstring( void ) {
+@TAB@QLR_ClearMatchStateConfig();
+@TAB@g_gametype.integer = GT_CLAN_ARENA;
+@TAB@level.roundState = ROUNDSTATE_WARMUP;
+@TAB@level.warmupTime = 12000;
+@TAB@level.teamScores[TEAM_RED] = 2;
+@TAB@level.teamScores[TEAM_BLUE] = 3;
+@TAB@G_UpdateMatchStateConfigString();
+}
+
+/*
+=============
+QLR_BuildClanArenaActiveMatchStateConfigstring
+
+Publishes a representative retail Clan Arena active-round payload.
+=============
+*/
+void QLR_BuildClanArenaActiveMatchStateConfigstring( void ) {
+@TAB@QLR_ClearMatchStateConfig();
+@TAB@g_gametype.integer = GT_CLAN_ARENA;
+@TAB@level.roundState = ROUNDSTATE_ACTIVE;
+@TAB@level.roundNumber = 6;
+@TAB@level.roundStartTime = 444000;
+@TAB@G_UpdateMatchStateConfigString();
+}
+
+/*
+=============
+QLR_BuildClanArenaCompleteMatchStateConfigstring
+
+Publishes a representative retail Clan Arena round-complete payload.
+=============
+*/
+void QLR_BuildClanArenaCompleteMatchStateConfigstring( void ) {
+@TAB@QLR_ClearMatchStateConfig();
+@TAB@g_gametype.integer = GT_CLAN_ARENA;
+@TAB@level.roundState = ROUNDSTATE_COMPLETE;
+@TAB@level.roundNumber = 6;
+@TAB@level.roundStartTime = 444000;
+@TAB@G_UpdateMatchStateConfigString();
+}
+
+/*
+=============
+QLR_BuildAttackDefendInactiveMatchStateConfigstring
+
+Publishes a representative retail Attack and Defend inactive payload.
+=============
+*/
+void QLR_BuildAttackDefendInactiveMatchStateConfigstring( void ) {
+@TAB@QLR_ClearMatchStateConfig();
+@TAB@g_gametype.integer = GT_ATTACK_DEFEND;
+@TAB@level.roundState = ROUNDSTATE_INACTIVE;
+@TAB@level.adRoundState = AD_ROUNDSTATE_INACTIVE;
+@TAB@G_UpdateMatchStateConfigString();
+}
+
+/*
+=============
+QLR_BuildAttackDefendWarmupMatchStateConfigstring
+
+Publishes a representative retail Attack and Defend warmup payload.
+=============
+*/
+void QLR_BuildAttackDefendWarmupMatchStateConfigstring( void ) {
+@TAB@QLR_ClearMatchStateConfig();
+@TAB@g_gametype.integer = GT_ATTACK_DEFEND;
+@TAB@level.roundState = ROUNDSTATE_WARMUP;
+@TAB@level.adRoundState = AD_ROUNDSTATE_WARMUP;
+@TAB@level.roundTransitionTime = 13000;
+@TAB@level.roundNumber = 4;
+@TAB@level.adTurnIndex = 1;
+@TAB@G_UpdateMatchStateConfigString();
+}
+
+/*
+=============
+QLR_BuildAttackDefendActiveMatchStateConfigstring
+
+Publishes a representative retail Attack and Defend active-round payload.
+=============
+*/
+void QLR_BuildAttackDefendActiveMatchStateConfigstring( void ) {
+@TAB@QLR_ClearMatchStateConfig();
+@TAB@g_gametype.integer = GT_ATTACK_DEFEND;
+@TAB@level.roundState = ROUNDSTATE_ACTIVE;
+@TAB@level.adRoundState = AD_ROUNDSTATE_ACTIVE;
+@TAB@level.roundNumber = 4;
+@TAB@level.adTurnIndex = 1;
+@TAB@level.roundStartTime = 888000;
+@TAB@G_UpdateMatchStateConfigString();
+}
+
+/*
+=============
+QLR_BuildAttackDefendCompleteMatchStateConfigstring
+
+Publishes the retained retail Attack and Defend complete-round payload.
+=============
+*/
+void QLR_BuildAttackDefendCompleteMatchStateConfigstring( void ) {
+@TAB@QLR_ClearMatchStateConfig();
+@TAB@g_gametype.integer = GT_ATTACK_DEFEND;
+@TAB@level.roundState = ROUNDSTATE_COMPLETE;
+@TAB@level.adRoundState = AD_ROUNDSTATE_COMPLETE;
+@TAB@level.roundNumber = 4;
+@TAB@level.adTurnIndex = 0;
+@TAB@level.roundStartTime = 888000;
+@TAB@G_UpdateMatchStateConfigString();
+}
+
+/*
+=============
+QLR_BuildRedRoverInactiveMatchStateConfigstring
+
+Publishes a representative retail Red Rover inactive payload.
+=============
+*/
+void QLR_BuildRedRoverInactiveMatchStateConfigstring( void ) {
+@TAB@QLR_ClearMatchStateConfig();
+@TAB@g_gametype.integer = GT_RED_ROVER;
+@TAB@level.roundState = ROUNDSTATE_INACTIVE;
+@TAB@level.rrRoundState = RR_ROUNDSTATE_INACTIVE;
+@TAB@G_UpdateMatchStateConfigString();
+}
+
+/*
+=============
+QLR_BuildRedRoverWarmupMatchStateConfigstring
+
+Publishes a representative retail Red Rover warmup payload.
+=============
+*/
+void QLR_BuildRedRoverWarmupMatchStateConfigstring( void ) {
+@TAB@QLR_ClearMatchStateConfig();
+@TAB@g_gametype.integer = GT_RED_ROVER;
+@TAB@level.roundState = ROUNDSTATE_WARMUP;
+@TAB@level.rrRoundState = RR_ROUNDSTATE_WARMUP;
+@TAB@level.roundTransitionTime = 24000;
+@TAB@level.roundNumber = 7;
+@TAB@G_UpdateMatchStateConfigString();
+}
+
+/*
+=============
+QLR_BuildRedRoverActiveMatchStateConfigstring
+
+Publishes a representative retail Red Rover active-round payload.
+=============
+*/
+void QLR_BuildRedRoverActiveMatchStateConfigstring( void ) {
+@TAB@QLR_ClearMatchStateConfig();
+@TAB@g_gametype.integer = GT_RED_ROVER;
+@TAB@level.roundState = ROUNDSTATE_ACTIVE;
+@TAB@level.rrRoundState = RR_ROUNDSTATE_ACTIVE;
+@TAB@level.roundNumber = 7;
+@TAB@level.roundStartTime = 555000;
+@TAB@G_UpdateMatchStateConfigString();
+}
+
+/*
+=============
+QLR_BuildRedRoverCompleteMatchStateConfigstring
+
+Publishes the retained retail Red Rover complete-round payload.
+=============
+*/
+void QLR_BuildRedRoverCompleteMatchStateConfigstring( void ) {
+@TAB@QLR_ClearMatchStateConfig();
+@TAB@g_gametype.integer = GT_RED_ROVER;
+@TAB@level.roundState = ROUNDSTATE_COMPLETE;
+@TAB@level.rrRoundState = RR_ROUNDSTATE_COMPLETE;
+@TAB@level.roundNumber = 7;
+@TAB@level.roundStartTime = 555000;
+@TAB@G_UpdateMatchStateConfigString();
+}
+
+/*
+=============
 QLR_GetMatchStateConfigstring
 
 Exposes the captured configstring to the Python harness.
@@ -820,6 +1004,28 @@ def _load_match_state_library(lib_path: Path) -> ctypes.CDLL:
     library.QLR_ResetMatchState.restype = None
     library.QLR_BuildMatchStateConfigstring.argtypes = []
     library.QLR_BuildMatchStateConfigstring.restype = None
+    library.QLR_BuildClanArenaWarmupMatchStateConfigstring.argtypes = []
+    library.QLR_BuildClanArenaWarmupMatchStateConfigstring.restype = None
+    library.QLR_BuildClanArenaActiveMatchStateConfigstring.argtypes = []
+    library.QLR_BuildClanArenaActiveMatchStateConfigstring.restype = None
+    library.QLR_BuildClanArenaCompleteMatchStateConfigstring.argtypes = []
+    library.QLR_BuildClanArenaCompleteMatchStateConfigstring.restype = None
+    library.QLR_BuildAttackDefendInactiveMatchStateConfigstring.argtypes = []
+    library.QLR_BuildAttackDefendInactiveMatchStateConfigstring.restype = None
+    library.QLR_BuildAttackDefendWarmupMatchStateConfigstring.argtypes = []
+    library.QLR_BuildAttackDefendWarmupMatchStateConfigstring.restype = None
+    library.QLR_BuildAttackDefendActiveMatchStateConfigstring.argtypes = []
+    library.QLR_BuildAttackDefendActiveMatchStateConfigstring.restype = None
+    library.QLR_BuildAttackDefendCompleteMatchStateConfigstring.argtypes = []
+    library.QLR_BuildAttackDefendCompleteMatchStateConfigstring.restype = None
+    library.QLR_BuildRedRoverInactiveMatchStateConfigstring.argtypes = []
+    library.QLR_BuildRedRoverInactiveMatchStateConfigstring.restype = None
+    library.QLR_BuildRedRoverWarmupMatchStateConfigstring.argtypes = []
+    library.QLR_BuildRedRoverWarmupMatchStateConfigstring.restype = None
+    library.QLR_BuildRedRoverActiveMatchStateConfigstring.argtypes = []
+    library.QLR_BuildRedRoverActiveMatchStateConfigstring.restype = None
+    library.QLR_BuildRedRoverCompleteMatchStateConfigstring.argtypes = []
+    library.QLR_BuildRedRoverCompleteMatchStateConfigstring.restype = None
     library.QLR_BuildSuddenDeathStatusConfigstring.argtypes = [ctypes.c_int]
     library.QLR_BuildSuddenDeathStatusConfigstring.restype = None
     library.QLR_GetMatchStateConfigstring.argtypes = []
@@ -938,6 +1144,68 @@ def test_timeout_auxiliary_configstrings_publish_retail_values(match_state_libra
 
 
 @pytest.mark.skipif(os.name == "nt", reason="Match-state harness requires a POSIX toolchain")
+def test_clan_arena_match_state_uses_retail_compact_round_payloads(match_state_library: ctypes.CDLL) -> None:
+    library = match_state_library
+    library.QLR_ResetMatchState()
+
+    library.QLR_BuildClanArenaWarmupMatchStateConfigstring()
+    assert library.QLR_GetMatchStateConfigstring().decode("utf-8") == r"\time\12000\round\6"
+    assert library.QLR_GetRoundStartConfigstring().decode("utf-8") == ""
+
+    library.QLR_BuildClanArenaActiveMatchStateConfigstring()
+    assert library.QLR_GetMatchStateConfigstring().decode("utf-8") == r"\round\6"
+    assert library.QLR_GetRoundStartConfigstring().decode("utf-8") == "444000"
+
+    library.QLR_BuildClanArenaCompleteMatchStateConfigstring()
+    assert library.QLR_GetMatchStateConfigstring().decode("utf-8") == r"\round\6"
+    assert library.QLR_GetRoundStartConfigstring().decode("utf-8") == "-1"
+
+
+@pytest.mark.skipif(os.name == "nt", reason="Match-state harness requires a POSIX toolchain")
+def test_attack_defend_match_state_uses_retail_compact_round_payloads(match_state_library: ctypes.CDLL) -> None:
+    library = match_state_library
+    library.QLR_ResetMatchState()
+
+    library.QLR_BuildAttackDefendInactiveMatchStateConfigstring()
+    assert library.QLR_GetMatchStateConfigstring().decode("utf-8") == r"\time\-1\round\0\turn\0\state\0"
+    assert library.QLR_GetRoundStartConfigstring().decode("utf-8") == ""
+
+    library.QLR_BuildAttackDefendWarmupMatchStateConfigstring()
+    assert library.QLR_GetMatchStateConfigstring().decode("utf-8") == r"\time\13000\round\4\turn\1\state\1"
+    assert library.QLR_GetRoundStartConfigstring().decode("utf-8") == ""
+
+    library.QLR_BuildAttackDefendActiveMatchStateConfigstring()
+    assert library.QLR_GetMatchStateConfigstring().decode("utf-8") == r"\turn\1\state\2"
+    assert library.QLR_GetRoundStartConfigstring().decode("utf-8") == "888000"
+
+    library.QLR_BuildAttackDefendCompleteMatchStateConfigstring()
+    assert library.QLR_GetMatchStateConfigstring().decode("utf-8") == r"\turn\1\state\2"
+    assert library.QLR_GetRoundStartConfigstring().decode("utf-8") == "-1"
+
+
+@pytest.mark.skipif(os.name == "nt", reason="Match-state harness requires a POSIX toolchain")
+def test_red_rover_match_state_uses_retail_compact_round_payloads(match_state_library: ctypes.CDLL) -> None:
+    library = match_state_library
+    library.QLR_ResetMatchState()
+
+    library.QLR_BuildRedRoverInactiveMatchStateConfigstring()
+    assert library.QLR_GetMatchStateConfigstring().decode("utf-8") == r"\time\-1\round\0"
+    assert library.QLR_GetRoundStartConfigstring().decode("utf-8") == ""
+
+    library.QLR_BuildRedRoverWarmupMatchStateConfigstring()
+    assert library.QLR_GetMatchStateConfigstring().decode("utf-8") == r"\time\24000\round\7"
+    assert library.QLR_GetRoundStartConfigstring().decode("utf-8") == ""
+
+    library.QLR_BuildRedRoverActiveMatchStateConfigstring()
+    assert library.QLR_GetMatchStateConfigstring().decode("utf-8") == r"\round\7"
+    assert library.QLR_GetRoundStartConfigstring().decode("utf-8") == "555000"
+
+    library.QLR_BuildRedRoverCompleteMatchStateConfigstring()
+    assert library.QLR_GetMatchStateConfigstring().decode("utf-8") == r"\round\7"
+    assert library.QLR_GetRoundStartConfigstring().decode("utf-8") == "-1"
+
+
+@pytest.mark.skipif(os.name == "nt", reason="Match-state harness requires a POSIX toolchain")
 def test_client_parser_receives_factory_config(match_state_library: ctypes.CDLL) -> None:
     library = match_state_library
     library.QLR_ResetMatchState()
@@ -1011,6 +1279,18 @@ def test_cgame_match_flow_configstrings_are_wired() -> None:
     assert "CG_ParseSuddenDeathStatus();" in servercmds
     assert "CG_ParseReadyUpStatus();" in servercmds
     assert "CG_ParseWarmupReadyStatus();" in servercmds
+    assert "static qboolean CG_UsesCompactRoundStatePayload( int gametype ) {" in servercmds
+    assert "case GT_CLAN_ARENA:" in servercmds
+    assert "case GT_FREEZE:" in servercmds
+    assert "case GT_RED_ROVER:" in servercmds
+    assert "static qboolean CG_UsesSparseRoundPayload( int gametype ) {" in servercmds
+    assert "case GT_ATTACK_DEFEND:" in servercmds
+    assert "static int CG_InferCompactRoundState( int transitionTime, int roundNumber ) {" in servercmds
+    assert "if ( roundNumber <= 0 ) {" in servercmds
+    assert "if ( cg_matchRoundStartTime > 0 ) {" in servercmds
+    assert "CG_InferCompactRoundState( cgs.matchRoundTransitionTime, cgs.matchRoundNumber );" in servercmds
+    assert "previousRoundNumber = cgs.matchRoundNumber;" in servercmds
+    assert "CG_ParseRoundStartTimeConfigString();" in servercmds
     assert "num == CS_SUDDENDEATH_STATUS" in servercmds
     assert "num == CS_READYUP_STATUS" in servercmds
     assert "num == CS_WARMUP_READY" in servercmds

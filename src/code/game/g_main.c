@@ -7914,9 +7914,7 @@ void G_ApplyTimeoutPauseDelta( int msec ) {
 	}
 
 	if ( level.warmupTime > 0 ) {
-		level.warmupTime += msec;
-		trap_SetConfigstring( CS_WARMUP, va( "%i", level.warmupTime ) );
-		G_UpdateReadyUpConfigstring();
+		G_SetWarmupTime( level.warmupTime + msec );
 	}
 
 	if ( level.intermissionQueued ) {

@@ -125,3 +125,20 @@ def test_team_damage_event_counters_are_tracked_for_retail_intermission_stats() 
 	assert "attacker->client->teamDamageEventsGiven++;" in game_combat
 	assert "targ->client->teamDamageEventsReceived++;" in game_combat
 	assert "self->client->environmentalDeaths++;" in game_combat
+
+
+def test_add_score_gates_tdm_team_score_updates_after_intermission() -> None:
+	game_combat = _read("src/code/game/g_combat.c")
+	add_score_block = _block(
+		game_combat,
+		"void AddScore( gentity_t *ent, const vec3_t origin, int score ) {",
+		"static float G_CalcPowerupDamageScale( gentity_t *attacker ) {",
+	)
+
+	assert "if ( level.warmupTime ) {" in add_score_block
+	assert "if ( level.intermissiontime ) {" in add_score_block
+	assert add_score_block.index("if ( level.warmupTime ) {") < add_score_block.index("if ( level.intermissiontime ) {")
+	assert add_score_block.index("if ( level.intermissiontime ) {") < add_score_block.index("ScorePlum(ent, origin, score);")
+	assert add_score_block.index("if ( level.intermissiontime ) {") < add_score_block.index("ent->client->ps.persistant[PERS_SCORE] += score;")
+	assert add_score_block.index("if ( level.intermissiontime ) {") < add_score_block.index("level.teamScores[ ent->client->ps.persistant[PERS_TEAM] ] += score;")
+	assert "if ( g_gametype.integer == GT_TEAM )" in add_score_block

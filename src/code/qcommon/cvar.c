@@ -41,7 +41,7 @@ static	cvar_t*		hashTable[FILE_HASH_SIZE];
 
 #define ARRAY_LEN(x) (sizeof(x) / sizeof((x)[0]))
 
-cvar_t *Cvar_Set2( const char *var_name, const char *value, qboolean force);
+cvar_t *Cvar_Set2( const char *var_name, const char *value, qboolean force );
 
 /*
 ================
@@ -673,8 +673,8 @@ cvar_t *Cvar_Set2( const char *var_name, const char *value, qboolean force ) {
 Cvar_Set
 ============
 */
-void Cvar_Set( const char *var_name, const char *value) {
-	Cvar_Set2 (var_name, value, qtrue);
+cvar_t *Cvar_Set( const char *var_name, const char *value ) {
+	return Cvar_Set2 (var_name, value, qtrue);
 }
 
 /*
@@ -682,8 +682,8 @@ void Cvar_Set( const char *var_name, const char *value) {
 Cvar_SetLatched
 ============
 */
-void Cvar_SetLatched( const char *var_name, const char *value) {
-	Cvar_Set2 (var_name, value, qfalse);
+cvar_t *Cvar_SetLatched( const char *var_name, const char *value ) {
+	return Cvar_Set2 (var_name, value, qfalse);
 }
 
 /*
@@ -691,7 +691,7 @@ void Cvar_SetLatched( const char *var_name, const char *value) {
 Cvar_SetValue
 ============
 */
-void Cvar_SetValue( const char *var_name, float value) {
+cvar_t *Cvar_SetValue( const char *var_name, float value ) {
 	char	val[32];
 
 	if ( value == (int)value ) {
@@ -699,7 +699,7 @@ void Cvar_SetValue( const char *var_name, float value) {
 	} else {
 		Com_sprintf (val, sizeof(val), "%f",value);
 	}
-	Cvar_Set (var_name, val);
+	return Cvar_Set (var_name, val);
 }
 
 /*
@@ -1418,17 +1418,18 @@ Registers a bounded cvar for an interpreted module and forces the retail
 CVAR_VM_CREATED metadata bit.
 =====================
 */
-void	Cvar_RegisterBounded( vmCvar_t *vmCvar, const char *varName, const char *defaultValue, const char *minimumValue, const char *maximumValue, int flags ) {
+cvar_t	*Cvar_RegisterBounded( vmCvar_t *vmCvar, const char *varName, const char *defaultValue, const char *minimumValue, const char *maximumValue, int flags ) {
 	cvar_t	*cv;
 
 	cv = Cvar_GetBounded( varName, defaultValue, minimumValue, maximumValue, flags | CVAR_VM_CREATED );
 	if ( !vmCvar ) {
-		return;
+		return cv;
 	}
 	vmCvar->handle = cv - cvar_indexes;
 	vmCvar->modificationCount = -1;
 	vmCvar->flags = cv->flags;
 	Cvar_Update( vmCvar );
+	return cv;
 }
 
 

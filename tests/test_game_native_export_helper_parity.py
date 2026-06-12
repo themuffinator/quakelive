@@ -115,6 +115,154 @@ def test_native_loader_api_version_wiring_matches_retail_dllentry_contracts() ->
 	assert "fallback then opens `vm/<name>.qvm`" in qvm_fallback_note
 
 
+def test_cgame_native_import_export_wiring_is_consistent_end_to_end() -> None:
+	cgame_public = _read("src/code/cgame/cg_public.h")
+	cg_main = _read("src/code/cgame/cg_main.c")
+	cg_syscalls = _read("src/code/cgame/cg_syscalls.c")
+	cl_cgame = _read("src/code/client/cl_cgame.c")
+	vm_c = _read("src/code/qcommon/vm.c")
+	cgame_hlil = _read("references/hlil/quakelive/cgamex86.dll/cgamex86.dll_hlil.txt")
+	engine_import_table = _read(
+		"references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part07.txt"
+	)
+	native_table = _extract_block(cg_main, "static void *cg_nativeExports")
+	dll_entry = _extract_block(cg_syscalls, "void dllEntry")
+	invoke_import = _extract_block(cg_syscalls, "static int QDECL CG_InvokeImport")
+	import_map = _extract_block(cg_syscalls, "static int CG_MapNativeImport")
+	native_syscall = _extract_block(cg_syscalls, "static int QDECL CG_NativeImportSyscall")
+	host_imports = _extract_block(cl_cgame, "static void CL_InitCGameImports")
+	load_cgame = _extract_block(cl_cgame, "static vm_t *CL_LoadCGameVM")
+	expected_version = _extract_block(vm_c, "static int VM_GetExpectedNativeApiVersion")
+	expected_exports = _extract_block(vm_c, "static int VM_GetExpectedNativeExportCount")
+	required_slot = _extract_block(vm_c, "static qboolean VM_NativeExportSlotIsRequired")
+	native_dispatch = _extract_block(vm_c, "static int VM_CallNativeExports")
+	register_cvars = _extract_block(vm_c, "qboolean VM_CallCGameRegisterCvars")
+
+	expected_export_slots = (
+		("CG_NATIVE_EXPORT_INIT", "CG_Init", "CG_INIT"),
+		("CG_NATIVE_EXPORT_REGISTER_CVARS", "CG_RegisterCvars", None),
+		("CG_NATIVE_EXPORT_SHUTDOWN", "CG_Shutdown", "CG_SHUTDOWN"),
+		("CG_NATIVE_EXPORT_CONSOLE_COMMAND", "CG_ConsoleCommand", "CG_CONSOLE_COMMAND"),
+		("CG_NATIVE_EXPORT_DRAW_ACTIVE_FRAME", "CG_NativeDrawActiveFrame", "CG_DRAW_ACTIVE_FRAME"),
+		("CG_NATIVE_EXPORT_CROSSHAIR_PLAYER", "CG_CrosshairPlayer", "CG_CROSSHAIR_PLAYER"),
+		("CG_NATIVE_EXPORT_LAST_ATTACKER", "CG_LastAttacker", "CG_LAST_ATTACKER"),
+		("CG_NATIVE_EXPORT_KEY_EVENT", "CG_NativeKeyEvent", "CG_KEY_EVENT"),
+		("CG_NATIVE_EXPORT_MOUSE_EVENT", "CG_NativeMouseEvent", "CG_MOUSE_EVENT"),
+		("CG_NATIVE_EXPORT_EVENT_HANDLING", "CG_EventHandling", "CG_EVENT_HANDLING"),
+		("CG_NATIVE_EXPORT_SHOW_1ST_TRACKED_PLAYER", "CG_Show1stTrackedPlayer", "CG_SHOW_1ST_TRACKED_PLAYER"),
+		("CG_NATIVE_EXPORT_SHOW_2ND_TRACKED_PLAYER", "CG_Show2ndTrackedPlayer", "CG_SHOW_2ND_TRACKED_PLAYER"),
+		("CG_NATIVE_EXPORT_CHAT_DOWN", "CG_NativeChatDown", "CG_CHAT_DOWN"),
+		("CG_NATIVE_EXPORT_CHAT_UP", "CG_NativeChatUp", "CG_CHAT_UP"),
+		("CG_NATIVE_EXPORT_GET_PHYSICS_TIME", "CG_GetPhysicsTime", "CG_GET_PHYSICS_TIME"),
+		("CG_NATIVE_EXPORT_COPY_CLIENT_IDENTITY", "CG_CopyClientIdentity", "CG_COPY_CLIENT_IDENTITY"),
+		("CG_NATIVE_EXPORT_RESERVED_NULL", "NULL", None),
+		("CG_NATIVE_EXPORT_GET_CHAT_FIELD_Y", "CG_NativeGetChatFieldY", "CG_GET_CHAT_FIELD_Y"),
+		("CG_NATIVE_EXPORT_GET_CHAT_FIELD_PIXEL_WIDTH", "CG_NativeGetChatFieldPixelWidth", "CG_GET_CHAT_FIELD_PIXEL_WIDTH"),
+		("CG_NATIVE_EXPORT_GET_CHAT_FIELD_WIDTH_IN_CHARS", "CG_GetChatFieldWidthInChars", "CG_GET_CHAT_FIELD_WIDTH_IN_CHARS"),
+		("CG_NATIVE_EXPORT_SET_CLIENT_SPEAKING_STATE", "CG_NativeSetClientSpeakingState", "CG_SET_CLIENT_SPEAKING_STATE"),
+	)
+
+	assert "#define\tCGAME_IMPORT_API_VERSION\t4" in cgame_public
+	assert "#define\tCGAME_NATIVE_API_VERSION\t8" in cgame_public
+	assert "#define CGAME_NATIVE_IMPORT_COUNT\tCG_QL_IMPORT_TOTAL_COUNT" in cgame_public
+	assert "static void *cg_nativeExports[CG_NATIVE_EXPORT_COUNT]" in cg_main
+	assert "return CG_NATIVE_EXPORT_COUNT;" in expected_exports
+	assert "return CGAME_NATIVE_API_VERSION;" in expected_version
+	assert "slot == CG_NATIVE_EXPORT_RESERVED_NULL" in required_slot
+	assert "return qfalse;" in required_slot
+
+	last_index = -1
+	for slot, target, legacy_call in expected_export_slots:
+		assert slot in cgame_public
+		current_index = native_table.index(f"[{slot}] = {target}")
+		assert current_index > last_index
+		last_index = current_index
+		if legacy_call:
+			assert f"case {legacy_call}:" in native_dispatch
+			assert f"dllExports[{slot}]" in native_dispatch
+
+	assert "dllExports[CG_NATIVE_EXPORT_REGISTER_CVARS]" not in native_dispatch
+	assert "dllExports[CG_NATIVE_EXPORT_REGISTER_CVARS]" in register_cvars
+	assert "VM_LogTraceEvent( \"call %s CG_REGISTER_CVARS\", vm->name );" in register_cvars
+	for expected_signature in (
+		"((void (QDECL *)( int, int, int ))exportFunc)( args[0], args[1], args[2] );",
+		"return VM_NormalizeQbooleanResult( ((qboolean (QDECL *)( void ))exportFunc)() );",
+		"((void (QDECL *)( int, stereoFrame_t, qboolean ))exportFunc)( args[0], args[1], VM_NormalizeQbooleanArg( args[2] ) );",
+		"return ((int (QDECL *)( void ))exportFunc)();",
+		"((void (QDECL *)( int, qboolean ))exportFunc)( args[0], VM_NormalizeQbooleanArg( args[1] ) );",
+		"((void (QDECL *)( int, int ))exportFunc)( args[0], args[1] );",
+		"((void (QDECL *)( int ))exportFunc)( args[0] );",
+		"((void (QDECL *)( void ))exportFunc)();",
+		"return VM_NormalizeQbooleanResult( ((qboolean (QDECL *)( int, void * ))exportFunc)( args[0], (void *)(intptr_t)args[1] ) );",
+		"return ((int (QDECL *)( int, int ))exportFunc)( args[0], args[1] );",
+	):
+		assert expected_signature in native_dispatch
+
+	for expected in (
+		"*arg1 = &data_100769a8",
+		"*arg3 = 8",
+		"100769a8  void* data_100769a8 = sub_10029820",
+		"100769ac  void* data_100769ac = sub_10020bb0",
+		"100769e8",
+		"00 00 00 00",
+		"100769f8  void* data_100769f8 = sub_10020a40",
+	):
+		assert expected in cgame_hlil
+
+	assert "cg_imports = (ql_import_f *)imports;" in dll_entry
+	assert "syscall = CG_NativeImportSyscall;" in dll_entry
+	assert "*exports = CG_GetNativeExportTable();" in dll_entry
+	assert "*apiVersion = CGAME_NATIVE_API_VERSION;" in dll_entry
+	assert "args[0], args[1], args[2], args[3], args[4]," in invoke_import
+	assert "args[10], args[11], args[12], args[13], args[14]" in invoke_import
+	assert "Com_Memset( ql_cgame_imports, 0, sizeof( ql_cgame_imports ) );" in host_imports
+	assert 'VM_Create( "cgame", CL_CgameSystemCalls, VMI_NATIVE, ql_cgame_imports, CGAME_NATIVE_API_VERSION );' in load_cgame
+	assert 'VM_Create( "cgame", CL_CgameSystemCalls, interpret, ql_cgame_imports, CGAME_IMPORT_API_VERSION );' in load_cgame
+	assert "( stack && stack[1] ) ? CG_QL_IMPORT_S_CLEARLOOPINGSOUNDS_KILLALL : CG_QL_IMPORT_S_CLEARLOOPINGSOUNDS_FRAME" in import_map
+	assert "if ( importIndex < 0 || importIndex >= CGAME_NATIVE_IMPORT_COUNT ) {" in native_syscall
+	assert "return CG_InvokeImport( import, &stack[1] );" in native_syscall
+
+	mapped_imports = {
+		match.group(2)
+		for match in re.finditer(r"case\s+(CG_[A-Z0-9_]+):\s+return\s+(CG_QL_IMPORT_[A-Z0-9_]+);", import_map)
+	}
+	hosted_imports = set(re.findall(r"ql_cgame_imports\[(CG_QL_IMPORT_[A-Z0-9_]+)\]\s*=", host_imports))
+	public_retail_imports = {
+		int(slot): name
+		for name, slot in re.findall(r"\b(CG_QL_IMPORT_[A-Z0-9_]+)\s*=\s*(\d+),", cgame_public)
+		if int(slot) < 128
+	}
+	compat_imports = set(re.findall(r"\b(CG_QL_IMPORT_COMPAT_[A-Z0-9_]+)\b", cgame_public))
+	retail_null_imports = {
+		"CG_QL_IMPORT_NULL_100",
+		"CG_QL_IMPORT_NULL_118",
+		"CG_QL_IMPORT_NULL_119",
+	}
+	retail_import_base = 0x565958
+	retail_hlil_imports = {
+		(int(match.group(1), 16) - retail_import_base) // 4: match.group(2)
+		for match in re.finditer(
+			r"^([0-9a-f]{8})\s+void\* data_[0-9a-f]+ = (.+)$",
+			engine_import_table,
+			re.MULTILINE,
+		)
+		if retail_import_base <= int(match.group(1), 16) < retail_import_base + 128 * 4
+	}
+
+	assert len(mapped_imports) > 100
+	assert sorted(public_retail_imports) == list(range(128))
+	assert sorted(slot for slot in retail_hlil_imports if public_retail_imports[slot] in retail_null_imports) == []
+	assert sorted(public_retail_imports[slot] for slot in retail_hlil_imports if public_retail_imports[slot] not in hosted_imports) == []
+	assert sorted(name for name in public_retail_imports.values() if name not in retail_null_imports and name not in hosted_imports) == []
+	for null_import in retail_null_imports:
+		assert null_import not in mapped_imports
+		assert null_import not in hosted_imports
+	assert mapped_imports <= hosted_imports
+	assert compat_imports <= hosted_imports
+	assert "CG_QL_IMPORT_S_CLEARLOOPINGSOUNDS_FRAME" in hosted_imports
+	assert "CG_QL_IMPORT_S_CLEARLOOPINGSOUNDS_KILLALL" in hosted_imports
+
+
 def test_native_ui_and_cgame_receive_retail_packed_glconfig() -> None:
 	client_h = _read("src/code/client/client.h")
 	cl_cgame = _read("src/code/client/cl_cgame.c")
@@ -368,6 +516,157 @@ def test_freeze_visibility_helper_matches_retail_export_boundary() -> None:
 	assert "targetClientNum = ent->s.otherEntityNum;" in freeze_c
 	assert "targetClientNum = ent->s.clientNum;" in freeze_c
 	assert "return G_ClientNumsOnSameTeam( clientNum, targetClientNum );" in freeze_c
+
+
+def test_qagame_native_import_table_fills_retail_direct_slots() -> None:
+	public_h = _read("src/code/game/g_public.h")
+	g_syscalls = _read("src/code/game/g_syscalls.c")
+	sv_game = _read("src/code/server/sv_game.c")
+	qcommon_h = _read("src/code/qcommon/qcommon.h")
+	cvar_c = _read("src/code/qcommon/cvar.c")
+	qagame_ghidra = _read("references/reverse-engineering/ghidra/qagamex86/decompile_top_functions.c")
+	qagame_client_hlil = _read(
+		"references/hlil/quakelive/qagamex86.dll/qagamex86.dll.bndb_hlil_split/qagamex86.dll.bndb_hlil_part01.txt"
+	)
+	qagame_warmup_hlil = _read(
+		"references/hlil/quakelive/qagamex86.dll/qagamex86.dll.bndb_hlil_split/qagamex86.dll.bndb_hlil_part02.txt"
+	)
+	engine_client_hlil = _read(
+		"references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part04.txt"
+	)
+	engine_server_hlil = _read(
+		"references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part05.txt"
+	)
+	engine_import_table = _read(
+		"references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part07.txt"
+	)
+	aliases = _read("references/analysis/quakelive_symbol_aliases.json")
+	syscall_map = _extract_block(g_syscalls, "static int G_MapNativeImport")
+	cvar_set_value_block = _extract_block(sv_game, "static cvar_t *QDECL QL_G_trap_Cvar_SetValue")
+	cvar_register_bounded_block = _extract_block(sv_game, "static cvar_t *QDECL QL_G_trap_Cvar_RegisterBounded")
+	args_block = _extract_block(sv_game, "static void QDECL QL_G_trap_Args")
+	cmd_tokenize_block = _extract_block(sv_game, "static void QDECL QL_G_trap_Cmd_TokenizeString")
+	resend_configstring_block = _extract_block(sv_game, "static void SV_GameResendConfigstring")
+	resend_wrapper_block = _extract_block(sv_game, "static void QDECL QL_G_trap_ResendConfigstring")
+	mark_client_got_cp_block = _extract_block(sv_game, "static void *QDECL QL_G_trap_MarkClientGotCP")
+	return_zero_block = _extract_block(sv_game, "static int QDECL QL_G_trap_ReturnZero")
+
+	assert "G_QL_IMPORT_REAL_TIME = 1," in public_h
+	assert "G_QL_IMPORT_MILLISECONDS = 3," in public_h
+	assert "G_QL_IMPORT_FS_SEEK = 5," in public_h
+	assert "G_QL_IMPORT_CVAR_SET_VALUE = 14," in public_h
+	assert "G_QL_IMPORT_CVAR_REGISTER_BOUNDED = 16," in public_h
+	assert "G_QL_IMPORT_ARGS = 19," in public_h
+	assert "G_QL_IMPORT_CMD_TOKENIZE_STRING = 21," in public_h
+	assert "G_QL_IMPORT_RESEND_CONFIGSTRING = 27," in public_h
+	assert "G_QL_IMPORT_MARK_CLIENT_GOT_CP = 192," in public_h
+	assert "G_QL_IMPORT_RETURN_ZERO_198 = 198," in public_h
+	assert "G_QL_IMPORT_RETURN_ZERO_199 = 199," in public_h
+	assert "ql_game_imports[G_QL_IMPORT_REAL_TIME] = (ql_import_f)QL_G_trap_RealTime;" in sv_game
+	assert "ql_game_imports[G_QL_IMPORT_MILLISECONDS] = (ql_import_f)QL_G_trap_Milliseconds;" in sv_game
+	assert "ql_game_imports[G_QL_IMPORT_FS_SEEK] = (ql_import_f)QL_G_trap_FS_Seek;" in sv_game
+	assert "ql_game_imports[G_QL_IMPORT_CVAR_SET_VALUE] = (ql_import_f)QL_G_trap_Cvar_SetValue;" in sv_game
+	assert "ql_game_imports[G_QL_IMPORT_CVAR_REGISTER_BOUNDED] = (ql_import_f)QL_G_trap_Cvar_RegisterBounded;" in sv_game
+	assert "ql_game_imports[G_QL_IMPORT_ARGS] = (ql_import_f)QL_G_trap_Args;" in sv_game
+	assert "ql_game_imports[G_QL_IMPORT_CMD_TOKENIZE_STRING] = (ql_import_f)QL_G_trap_Cmd_TokenizeString;" in sv_game
+	assert "ql_game_imports[G_QL_IMPORT_RESEND_CONFIGSTRING] = (ql_import_f)QL_G_trap_ResendConfigstring;" in sv_game
+	assert "ql_game_imports[G_QL_IMPORT_MARK_CLIENT_GOT_CP] = (ql_import_f)QL_G_trap_MarkClientGotCP;" in sv_game
+	assert "ql_game_imports[G_QL_IMPORT_RETURN_ZERO_198] = (ql_import_f)QL_G_trap_ReturnZero;" in sv_game
+	assert "ql_game_imports[G_QL_IMPORT_RETURN_ZERO_199] = (ql_import_f)QL_G_trap_ReturnZero;" in sv_game
+
+	assert "case G_REAL_TIME: return G_QL_IMPORT_REAL_TIME;" in syscall_map
+	assert "case G_MILLISECONDS: return G_QL_IMPORT_MILLISECONDS;" in syscall_map
+	assert "case G_FS_SEEK: return G_QL_IMPORT_FS_SEEK;" in syscall_map
+	assert "cvar_t\t*Cvar_SetValue( const char *var_name, float value );" in qcommon_h
+	assert "cvar_t\t*Cvar_RegisterBounded( vmCvar_t *vmCvar, const char *varName, const char *defaultValue, const char *minimumValue, const char *maximumValue, int flags );" in qcommon_h
+	assert "cvar_t *Cvar_SetValue( const char *var_name, float value ) {" in cvar_c
+	assert "return Cvar_Set (var_name, val);" in cvar_c
+	assert "cvar_t\t*Cvar_RegisterBounded(" in cvar_c
+	assert "return cv;" in cvar_c
+	assert "return Cvar_SetValue( var_name, value );" in cvar_set_value_block
+	assert "return Cvar_RegisterBounded( cvar, var_name, value, minValue, maxValue, flags );" in cvar_register_bounded_block
+	assert "Cmd_ArgsBuffer( buffer, bufferLength );" in args_block
+	assert "Cmd_TokenizeString( text );" in cmd_tokenize_block
+	assert "SV_GameResendConfigstring( index );" in resend_wrapper_block
+	assert 'Com_Error( ERR_DROP, "SV_SetConfigstring: bad index %i\\n", index );' in resend_configstring_block
+	assert "if ( sv.state != SS_GAME && !sv.restarting ) {" in resend_configstring_block
+	assert "if ( client->state < CS_PRIMED ) {" in resend_configstring_block
+	assert "SVF_NOSERVERINFO" in resend_configstring_block
+	assert 'cmd = "bcs0";' in resend_configstring_block
+	assert 'cmd = "bcs1";' in resend_configstring_block
+	assert 'cmd = "bcs2";' in resend_configstring_block
+	assert 'SV_SendServerCommand( client, "%s %i \\"%s\\"\\n", cmd, index, buf );' in resend_configstring_block
+	assert 'SV_SendServerCommand( client, "cs %i \\"%s\\"\\n", index, val );' in resend_configstring_block
+	assert "return (void *)(intptr_t)clientNum;" in mark_client_got_cp_block
+	assert "client = &svs.clients[clientNum];" in mark_client_got_cp_block
+	assert "client->gotCP = qtrue;" in mark_client_got_cp_block
+	assert "return client;" in mark_client_got_cp_block
+	assert "return 0;" in return_zero_block
+
+	assert "(*(data_104b13ac + 4))(&var_78, eax_20)" in qagame_warmup_hlil
+	assert "(**(code **)(DAT_104b13ac + 0x54))(local_408);" in qagame_ghidra
+	assert "(*(data_104b13ac + 0x6c))(5)" in qagame_warmup_hlil
+	assert "(*(data_104b13ac + 0x6c))(0xd)" in qagame_warmup_hlil
+	assert "*(data_104b13ac + 0x300)" in qagame_client_hlil
+	assert "0056cf84  void* data_56cf84 = sub_4ea260" in engine_import_table
+	assert "004ea264  return sub_4c91b0() __tailcall" in engine_server_hlil
+	assert '"sub_4C91B0": "Com_RealTime"' in aliases
+	assert "0056cf8c  void* data_56cf8c = j_sub_4ef510" in engine_import_table
+	assert "004ef510    int32_t sub_4ef510()" in engine_server_hlil
+	assert "004ef51c  return timeGetTime() - data_12d39a8" in engine_server_hlil
+	assert "0056cf94  void* data_56cf94 = sub_4ed040" in engine_import_table
+	assert "004ed044  return sub_4d0240() __tailcall" in engine_server_hlil
+	assert '"sub_4D0240": "FS_Seek"' in aliases
+	assert "0056cfb8  void* data_56cfb8 = sub_4ea2b0" in engine_import_table
+	assert "004ea2c7  return sub_4cd270" in engine_server_hlil
+	assert "004cd270    int32_t* sub_4cd270" in engine_client_hlil
+	assert "004cd2d9  int32_t* result = sub_4cce90" in engine_client_hlil
+	assert "004cd2ef  return result" in engine_client_hlil
+	assert "0056cfc0  void* data_56cfc0 = sub_4ea280" in engine_import_table
+	assert "004ea284  return sub_4ce460() __tailcall" in engine_server_hlil
+	assert "004ce460    int32_t* sub_4ce460" in engine_client_hlil
+	assert "arg6 | 0x1000" in engine_client_hlil
+	assert "if (arg1 == 0)" in engine_client_hlil
+	assert "return result" in engine_client_hlil
+	assert "0056cfcc  void* data_56cfcc = sub_4ea310" in engine_import_table
+	assert "004ea314  return sub_4c8060() __tailcall" in engine_server_hlil
+	assert '"sub_4C8060": "Cmd_ArgsBuffer"' in aliases
+	assert "0056cfd4  void* data_56cfd4 = sub_4ea320" in engine_import_table
+	assert "004ea324  return sub_4c8090() __tailcall" in engine_server_hlil
+	assert '"sub_4C8090": "Cmd_TokenizeString"' in aliases
+	assert "0056cfec  void* data_56cfec = sub_4e1400" in engine_import_table
+	assert "004e1404  return sub_4e2f30() __tailcall" in engine_server_hlil
+	assert "004e2f30    int32_t sub_4e2f30(int32_t arg1)" in engine_server_hlil
+	assert "SV_SetConfigstring: bad index" in engine_server_hlil
+	assert "0056d280  void* data_56d280 = sub_4e26e0" in engine_import_table
+	assert "004e26e0    void* sub_4e26e0(void* arg1)" in engine_server_hlil
+	assert "004df830    void* sub_4df830(void* arg1)" in engine_client_hlil
+	assert "004df836  *(arg1 + 0x25b50) = 1" in engine_client_hlil
+	assert "ignoring outdated cp command fro" in engine_client_hlil
+	assert "didn't get cp command" in engine_client_hlil
+	assert "0056d298  void* data_56d298 = sub_4e26c0" in engine_import_table
+	assert "0056d29c  void* data_56d29c = sub_4e26c0" in engine_import_table
+	assert "004e26c0    int32_t sub_4e26c0(int32_t arg1)" in engine_server_hlil
+	assert "004e26d3  return 0" in engine_server_hlil
+
+	retail_import_base = 0x56CF80
+	retail_imports = {
+		(int(match.group(1), 16) - retail_import_base) // 4: match.group(2)
+		for match in re.finditer(
+			r"^([0-9a-f]{8})\s+void\* data_[0-9a-f]+ = (.+)$",
+			engine_import_table,
+			re.MULTILINE,
+		)
+		if retail_import_base <= int(match.group(1), 16) < retail_import_base + 207 * 4
+	}
+	public_imports = {
+		int(match.group(2)): match.group(1)
+		for match in re.finditer(r"\b(G_QL_IMPORT_[A-Z0-9_]+)\s*=\s*(\d+)", public_h)
+	}
+	hosted_imports = set(re.findall(r"ql_game_imports\[(G_QL_IMPORT_[A-Z0-9_]+)\]\s*=", sv_game))
+
+	assert sorted(slot for slot in retail_imports if slot not in public_imports) == []
+	assert sorted(public_imports[slot] for slot in retail_imports if public_imports[slot] not in hosted_imports) == []
 
 
 def test_qagame_native_import_table_uses_public_header_count() -> None:

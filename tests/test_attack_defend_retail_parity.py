@@ -41,6 +41,7 @@ G_CLIENT = REPO_ROOT / "src" / "code" / "game" / "g_client.c"
 G_ACTIVE = REPO_ROOT / "src" / "code" / "game" / "g_active.c"
 G_MAIN = REPO_ROOT / "src" / "code" / "game" / "g_main.c"
 G_CMDS = REPO_ROOT / "src" / "code" / "game" / "g_cmds.c"
+G_MATCH_STATE = REPO_ROOT / "src" / "code" / "game" / "g_match_state.c"
 G_FACTORY = REPO_ROOT / "src" / "code" / "game" / "g_factory.c"
 G_SPAWN = REPO_ROOT / "src" / "code" / "game" / "g_spawn.c"
 CG_LOCAL = REPO_ROOT / "src" / "code" / "cgame" / "cg_local.h"
@@ -128,6 +129,7 @@ def test_ad_flag_status_and_map_item_validation_follow_retail_ctf_branch() -> No
 	init_block = _block(G_TEAM, "void Team_InitGame( void ) {")
 	status_block = _block(G_TEAM, "void Team_SetFlagStatus( int team, flagStatus_t status ) {")
 	check_block = _block(G_ITEMS, "void G_CheckTeamItems( void ) {")
+	flag_parse_block = _block(CG_SERVERCMDS, "static void CG_ParseFlagStatusConfigString( const char *str ) {")
 	config_values_block = _block(CG_SERVERCMDS, "void CG_SetConfigValues( void ) {")
 	configstring_block = _block(CG_SERVERCMDS, "static void CG_ConfigStringModified( void ) {")
 	qagame_hlil = _source(QAGAME_HLIL)
@@ -153,10 +155,11 @@ def test_ad_flag_status_and_map_item_validation_follow_retail_ctf_branch() -> No
 	assert 'BG_FindItem( "Blue Flag" );' in check_block
 	assert 'G_Printf( S_COLOR_YELLOW "WARNING: No team_CTF_blueflag in map" );' in check_block
 
-	for block in (config_values_block, configstring_block):
-		assert "cgs.gametype == GT_CTF || cgs.gametype == GT_ATTACK_DEFEND || cgs.gametype == GT_OBELISK" in block
-		assert "cgs.redflag = s[0] - '0';" in block or "cgs.redflag = str[0] - '0';" in block
-		assert "cgs.blueflag = s[1] - '0';" in block or "cgs.blueflag = str[1] - '0';" in block
+	assert "cgs.gametype == GT_CTF || cgs.gametype == GT_ATTACK_DEFEND || cgs.gametype == GT_OBELISK" in flag_parse_block
+	assert "cgs.redflag = str[0] - '0';" in flag_parse_block
+	assert "cgs.blueflag = str[1] - '0';" in flag_parse_block
+	assert "CG_ParseFlagStatusConfigString( CG_ConfigString( CS_FLAGSTATUS ) );" in config_values_block
+	assert "CG_ParseFlagStatusConfigString( str );" in configstring_block
 
 	assert "if (esi_1 == 5 || esi_1 == 0xb)" in qagame_hlil
 	assert "if (DAT_105a898c == 0xb) goto LAB_1004fd7b;" in qagame_decompile
@@ -235,6 +238,34 @@ def test_ad_round_controller_damage_and_bonus_paths_are_connected() -> None:
 	assert "int G_ADResolveRoundState( void ) {" in team_c
 	assert "int G_ADResolveAttackingTeam( void ) {" in team_c
 	assert "int G_ADResolveDefendingTeam( void ) {" in team_c
+
+
+def test_ad_match_state_configstrings_follow_retail_compact_payloads() -> None:
+	match_state = _source(G_MATCH_STATE)
+	qagame_hlil = _source(QAGAME_HLIL)
+
+	for expected in (
+		'Q_strncpyz( info, "\\\\time\\\\-1\\\\round\\\\0\\\\turn\\\\0\\\\state\\\\0", MAX_INFO_STRING );',
+		"G_SetMatchStateInt( info, MATCH_STATE_KEY_TIME, level.roundTransitionTime );",
+		"G_SetMatchStateInt( info, MATCH_STATE_KEY_ROUND, level.roundNumber );",
+		"G_SetMatchStateInt( info, MATCH_STATE_KEY_TURN, level.adTurnIndex );",
+		"G_SetMatchStateInt( info, MATCH_STATE_KEY_STATE, ROUNDSTATE_WARMUP );",
+		"G_SetMatchStateInt( info, MATCH_STATE_KEY_STATE, ROUNDSTATE_ACTIVE );",
+		"G_SetMatchStateInt( info, MATCH_STATE_KEY_TURN, G_AttackDefendPublishedTurn() );",
+		"&& !G_BuildAttackDefendMatchStateInfo( info )",
+		"level.adRoundState == AD_ROUNDSTATE_COMPLETE || level.adRoundState == AD_ROUNDSTATE_EXIT",
+		'trap_SetConfigstring( CS_ROUND_START_TIME, va( "%i", -1 ) );',
+	):
+		assert expected in match_state
+
+	for expected in (
+		'10035bec              (*(data_104b13ac + 0x64))(0x295, "\\time\\-1\\round\\0\\turn\\0\\state\\0", edi)',
+		'char const data_10082144[0x22] = "\\\\time\\\\%d\\\\round\\\\%d\\\\turn\\\\%d\\\\state\\\\1", 0',
+		'10035daa          (*(esi_4 + 0x64))(0x296, sub_10070cb0(&data_1007dd18))',
+		'10035dcc              (*(data_104b13ac + 0x64))(0x295, sub_10070cb0("\\turn\\%d\\state\\2"))',
+		"100361d8              eax_62 = (*(esi_12 + 0x64))(0x296, sub_10070cb0(&data_1007dd18))",
+	):
+		assert expected in qagame_hlil
 
 
 def test_ad_objective_touch_spawn_and_frame_wiring_match_retail_surface() -> None:

@@ -2031,7 +2031,6 @@ extern	vmCvar_t		cg_drawTeamOverlayOpacity;
 extern	vmCvar_t		cg_drawTeamOverlaySize;
 extern	vmCvar_t		cg_drawTeamOverlayX;
 extern	vmCvar_t		cg_drawTeamOverlayY;
-extern	vmCvar_t		cg_teamOverlayUserinfo;
 extern	vmCvar_t		cg_drawTieredArmorAvailability;
 extern	vmCvar_t		cg_enableDust;
 extern	vmCvar_t		cg_enableBreath;
@@ -2328,7 +2327,6 @@ void CG_DrawTopBottom(float x, float y, float w, float h, float size);
 //
 extern	int sortedTeamPlayers[TEAM_MAXOVERLAY];
 extern	int	numSortedTeamPlayers;
-extern	int drawTeamOverlayModificationCount;
 extern  char systemChat[256];
 extern  char teamChat1[256];
 extern  char teamChat2[256];

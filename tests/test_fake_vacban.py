@@ -111,7 +111,7 @@ def test_fake_vacban_telemetry_payload(tmp_path: Path) -> None:
 	void Cmd_TokenizeString( const char *text_in ) { (void)text_in; }
 	int Cmd_Argc( void ) { return 0; }
 	char *Cmd_Argv( int arg ) { (void)arg; return ""; }
-	void Cvar_Set( const char *var_name, const char *value ) { (void)var_name; (void)value; }
+	cvar_t *Cvar_Set( const char *var_name, const char *value ) { (void)var_name; (void)value; return NULL; }
 	cvar_t *Cvar_Get( const char *var_name, const char *value, int flags ) { (void)var_name; (void)value; (void)flags; return NULL; }
 	int Cvar_VariableIntegerValue( const char *var_name ) { (void)var_name; return 0; }
 	qboolean Sys_StringToAdr( const char *s, netadr_t *a ) { (void)s; (void)a; return qfalse; }

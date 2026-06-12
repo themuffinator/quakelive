@@ -300,6 +300,51 @@ def test_team_arena_environment_cvars_keep_retail_behavioral_wiring() -> None:
 	assert 'trap_Cvar_Set( "g_enableBreath", s );' not in g_spawn
 
 
+def test_harvester_skull_drop_wiring_uses_retail_names_counts_and_cvar_gate() -> None:
+	g_active = G_ACTIVE_PATH.read_text(encoding="utf-8")
+	g_combat = G_COMBAT_PATH.read_text(encoding="utf-8")
+	g_cmds = G_CMDS_PATH.read_text(encoding="utf-8")
+	g_items = G_ITEMS_PATH.read_text(encoding="utf-8")
+	toss_body = _function_body(g_combat, "void TossClientCubes( gentity_t *self )")
+	launch_body = _function_body(g_combat, "static void G_LaunchHarvesterSkull( gitem_t *item, team_t skullTeam, float yaw )")
+	player_die_body = _function_body(g_combat, "void player_die( gentity_t *self, gentity_t *inflictor, gentity_t *attacker, int damage, int meansOfDeath )")
+	apply_team_body = _function_body(g_cmds, "static void G_ApplyTeamChange( gentity_t *ent, team_t team, spectatorState_t specState, int specClient )")
+	clear_items_body = _function_body(g_items, "void ClearRegisteredItems( void )")
+	client_events_body = _function_body(g_active, "void ClientEvents( gentity_t *ent, int oldEventSequence )")
+
+	assert "carriedSkulls = self->client->ps.generic1 & 0x3f;" in toss_body
+	assert "self->client->ps.generic1 &= 0xc0;" in toss_body
+	assert 'deathSkullItem = BG_FindItem( "Red Skull" );' in toss_body
+	assert 'deathSkullItem = BG_FindItem( "Blue Skull" );' in toss_body
+	assert 'carriedSkullItem = BG_FindItem( "Blue Skull" );' in toss_body
+	assert 'carriedSkullItem = BG_FindItem( "Red Skull" );' in toss_body
+	assert "G_OtherHarvesterTeam( deathSkullTeam )" in toss_body
+	assert "G_LaunchHarvesterSkull( deathSkullItem, deathSkullTeam, (float)( level.time % 360 ) );" in toss_body
+	assert "if ( g_dropSkulls.integer && carriedSkulls > 0 ) {" in toss_body
+	assert "for ( i = 0; i < carriedSkulls; i++ ) {" in toss_body
+	assert "G_LaunchHarvesterSkull( carriedSkullItem, carriedSkullTeam, (float)( rand() % 360 ) );" in toss_body
+
+	assert "drop->nextthink = level.time + g_cubeTimeout.integer * 1000;" in launch_body
+	assert "drop->think = G_FreeEntity;" in launch_body
+	assert "drop->spawnflags = skullTeam;" in launch_body
+
+	assert "if( g_gametype.integer == GT_HARVESTER && meansOfDeath != MOD_SWITCHTEAM ) {" in player_die_body
+	assert "TossClientCubes( self );" in player_die_body
+	assert "player_die( ent, ent, ent, 100000, MOD_SWITCHTEAM );" in apply_team_body
+
+	assert 'RegisterItem( BG_FindItem( "Red Skull" ) );' in clear_items_body
+	assert 'RegisterItem( BG_FindItem( "Blue Skull" ) );' in clear_items_body
+	assert 'item = BG_FindItem( "Blue Skull" );' in client_events_body
+	assert 'item = BG_FindItem( "Red Skull" );' in client_events_body
+
+	assert '"Red Cube"' not in g_active
+	assert '"Blue Cube"' not in g_active
+	assert '"Red Cube"' not in g_combat
+	assert '"Blue Cube"' not in g_combat
+	assert '"Red Cube"' not in g_items
+	assert '"Blue Cube"' not in g_items
+
+
 def test_server_admin_factory_match_cvar_rows_match_retail_hlil_batch() -> None:
 	g_main = G_MAIN_PATH.read_text(encoding="utf-8")
 	qagame_hlil = QAGAME_HLIL_PART03_PATH.read_text(encoding="utf-8")
@@ -539,12 +584,14 @@ def test_match_flow_warmup_timeout_cvars_keep_retail_behavioral_wiring() -> None
 	update_state_body = _function_body(g_main, "static void G_UpdateGameStateForLevel( void )")
 	ready_delay_body = _function_body(g_main, "static void G_CheckReadyUpDelayAction( void )")
 	check_tournament_body = _function_body(g_main, "void CheckTournament( void )")
+	timeout_pause_body = _function_body(g_main, "void G_ApplyTimeoutPauseDelta( int msec )")
 	worldspawn_body = _function_body(g_spawn, "void SP_worldspawn( void )")
 	level_timers_body = _function_body(g_main, "static void LevelCheckTimers( void )")
 	duel_begin_body = _function_body(g_lifecycle, "static void G_DuelClientBegin( gentity_t *ent )")
 	match_config_body = _function_body(g_match_config, "static matchFactoryConfig_t G_MatchConfig_Load( void )")
 	memory_body = _function_body(g_mem, "void *G_Alloc( int size )")
 	grant_body = _function_body(g_client, "static void G_GrantConfiguredItems( gentity_t *ent )")
+	team_clamp_body = _function_body(g_team, "void Team_ClampWarmupToShuffleCountdown( void )")
 
 	assert 'trap_Cvar_Set( "g_gameState", value );' in game_state_body
 	assert "value = ( state && state[0] ) ? state : GAME_STATE_PRE_GAME;" in game_state_body
@@ -561,6 +608,8 @@ def test_match_flow_warmup_timeout_cvars_keep_retail_behavioral_wiring() -> None
 	assert "state = GAME_STATE_IN_PROGRESS;" in set_warmup_body
 	assert "state = GAME_STATE_PRE_GAME;" in set_warmup_body
 	assert "void G_SetWarmupTime( int warmupTime );" in G_LOCAL_PATH.read_text(encoding="utf-8")
+	assert "G_SetWarmupTime( level.warmupTime + msec );" in timeout_pause_body
+	assert "G_SetWarmupTime( targetTime );" in team_clamp_body
 
 	assert "G_RankSendMatchStarted();" in warmup_restart_body
 	assert "level.warmupTime += 10000;" in warmup_restart_body
@@ -582,7 +631,7 @@ def test_match_flow_warmup_timeout_cvars_keep_retail_behavioral_wiring() -> None
 	assert "else {\n\t\tG_SetWarmupTime( 0 );\n\t}" not in worldspawn_body
 	assert "if ( !g_doWarmup.integer ) {" in g_main
 	assert "countdownSeconds = g_warmup.integer;" in duel_begin_body
-	assert "level.warmupTime = level.time + ( countdownSeconds - 1 ) * 1000;" in duel_begin_body
+	assert "G_SetWarmupTime( level.time + ( countdownSeconds - 1 ) * 1000 );" in duel_begin_body
 	assert "if ( g_warmup.modificationCount != level.warmupModificationCount ) {" in g_main
 	assert "G_SetWarmupTime( level.time + g_warmup.integer * 1000 );" in check_tournament_body
 	assert "if ( level.time >= level.warmupTime ) {" in check_tournament_body
@@ -1287,11 +1336,13 @@ def test_team_loadout_bot_and_drop_cvars_keep_retail_behavioral_wiring() -> None
 	for cvar_name in (
 		"g_droppedPowerupsDecay",
 		"g_dropPowerups",
-		"g_dropSkulls",
 	):
 		assert cvar_name not in g_combat
 		assert cvar_name not in g_items
 		assert cvar_name not in g_team
+	assert "g_dropSkulls.integer" in g_combat
+	assert "g_dropSkulls" not in g_items
+	assert "g_dropSkulls" not in g_team
 
 
 def test_logging_debug_dropcmd_and_best_weapon_cvar_rows_match_retail_hlil_batch() -> None:
@@ -1492,6 +1543,7 @@ def test_round_freeze_timing_cvars_keep_retail_behavioral_wiring() -> None:
 	freeze_sync_body = _function_body(g_active, "void G_FreezeSyncCvars( void )")
 	warmup_schedule_body = _function_body(g_active, "static void G_RoundScheduleWarmupDelay( void )")
 	warmup_update_body = _function_body(g_active, "void G_RoundHandleWarmupDelayCvarUpdate( void )")
+	freeze_run_body = _function_body(g_active, "void G_FreezeRunFrame( void )")
 	freeze_winner_body = _function_body(g_active, "static team_t G_FreezeEvaluateRoundWinner( const int counts[TEAM_NUM_TEAMS], const int health[TEAM_NUM_TEAMS] )")
 	freeze_end_body = _function_body(g_active, "static void G_FreezeHandleRoundEnd( team_t winner )")
 	freeze_count_body = _function_body(g_freeze, "int G_FreezeCountThawHelpers( gentity_t *ent, gentity_t **helperOut )")
@@ -1509,7 +1561,9 @@ def test_round_freeze_timing_cvars_keep_retail_behavioral_wiring() -> None:
 	assert "if ( g_roundDrawHealthCount.integer ) {" in freeze_end_body
 
 	assert "delay = g_roundWarmupDelay.integer;" in warmup_schedule_body
-	assert "level.warmupTime = level.time + delay;" in warmup_schedule_body
+	assert "G_SetWarmupTime( level.time + delay );" in warmup_schedule_body
+	assert "G_SetWarmupTime( 0 );" in warmup_schedule_body
+	assert "G_SetWarmupTime( 0 );" in freeze_run_body
 	assert "delay = g_roundWarmupDelay.integer;" in warmup_update_body
 	assert "level.roundTransitionTime = ( delay > 0 ) ? level.time + delay : level.time;" in warmup_update_body
 	assert "G_RoundHandleWarmupDelayCvarUpdate();" in update_body

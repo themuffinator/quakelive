@@ -178,6 +178,42 @@ The import side from slots 80-96 is fully assigned in `CL_InitUIImports`:
 | 95 | `UI_QL_IMPORT_MEASURE_TEXT` | `QL_UI_trap_MeasureText` | Retail packed width/height measurement bridge. |
 | 96 | `UI_QL_IMPORT_GET_ITEM_DOWNLOAD_INFO` | `QL_UI_trap_GetItemDownloadInfo` | Workshop progress bridge, retained client state first, Steam fallback second. |
 
+## Native Import Reference Header Audit (2026-06-12)
+
+A follow-up audit found that `scripts/ghidra/build_ui_ghidra_reference.py`, the
+generated `ui_ghidra_reference.h` snapshots, and `src-re/ui/include/ui_local.h`
+still carried an older "syscall table" ledger that placed `Cvar_Register` at
+slot 0. That contradicted the committed HLIL and the current `uiQlImport_t`
+native table.
+
+Observed HLIL facts:
+
+- `dllEntry @ 0x10003970` stores the engine import table in
+  `data_106b40a8` and returns API version 8.
+- `data_106b40a8 + 0x10` calls `Cvar_Register`, so the native slot is 4.
+- `data_106b40a8 + 0x1c` calls `Cvar_Set`, so the native slot is 7.
+- `data_106b40a8 + 0x24` calls `Cvar_VariableStringBuffer`, so the native slot
+  is 9.
+- `data_106b40a8 + 0xb8`, `+ 0xbc`, and `+ 0xc0` anchor
+  `GetClientState`, `GetGlconfig`, and `GetConfigString` at slots 46-48.
+- `data_106b40a8 + 0x148`, `+ 0x14c`, and `+ 0x154` anchor the advert bridge
+  init/update/no-op region at slots 82, 83, and 85.
+- `data_106b40a8 + 0x164` through `+ 0x180` anchor parser, Steam/subscription,
+  scaled-text, measurement, and item-download imports at slots 89-96.
+
+The generator and checked-in snapshots now publish the full recovered retail
+native import slab from slots 0-96. Source-only bridge extensions such as
+`UI_QL_IMPORT_CVAR_RESET`, `UI_QL_IMPORT_CVAR_INFOSTRINGBUFFER`,
+`UI_QL_IMPORT_CM_LOADMODEL`, `UI_QL_IMPORT_SET_PBCLSTATUS`, and
+`UI_QL_IMPORT_LAUNCHER_READSCREENSHOT` remain intentionally absent from these
+retail reference headers because they are not observed retail native slots.
+
+Regression coverage:
+`test_ui_native_import_reference_headers_match_recovered_hlil_slots` compares
+the generator, both checked-in Ghidra reference headers, and
+`src-re/ui/include/ui_local.h` against `uiQlImport_t`, then ties representative
+slots back to concrete `data_106b40a8 + offset` HLIL evidence.
+
 ## Qmenu Leaf Follow-Up
 
 The advert leaf chain under `src/code/ui/ui_shared.c` is now bounded well enough

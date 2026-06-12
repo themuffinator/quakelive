@@ -42,10 +42,12 @@ def test_runframe_restores_timeout_and_ctf_frame_hooks() -> None:
 	)
 
 	assert "G_RunFrameTimeoutAdvance( msec );" in runframe_block
+	assert "Team_RunDomination();" in runframe_block
 	assert "LevelCheckTimers();" in runframe_block
 	assert "AddTournamentPlayer();" in runframe_block
 	assert "G_RunFrameRoundModeCountHooks();" in runframe_block
 	assert "if ( g_gametype.integer == GT_TOURNAMENT ) {" not in runframe_block
+	assert runframe_block.index("Team_RunDomination();") < runframe_block.index("G_FinishClientFrames( ctx );")
 	assert runframe_block.index("G_RunFrameRoundModeCountHooks();") < runframe_block.index("LevelCheckTimers();")
 	assert runframe_block.index("LevelCheckTimers();") < runframe_block.index(
 		"G_CheckLevelTimers( ctx, previousWarmupTime, previousIntermissionQueued );"

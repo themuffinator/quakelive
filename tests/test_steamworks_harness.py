@@ -251,6 +251,9 @@ def steamworks_harness(request: pytest.FixtureRequest, tmp_path_factory: pytest.
     lib.QLR_Steamworks_Validate.argtypes = [ctypes.c_char_p, ctypes.POINTER(AuthResponse)]
     lib.QLR_Steamworks_Validate.restype = ctypes.c_int
 
+    lib.QLR_Steamworks_IsUserLoggedOn.argtypes = []
+    lib.QLR_Steamworks_IsUserLoggedOn.restype = ctypes.c_int
+
     lib.QLR_Steamworks_LoadAvatar.argtypes = [
         ctypes.c_uint32,
         ctypes.c_uint32,
@@ -888,12 +891,17 @@ def steamworks_harness(request: pytest.FixtureRequest, tmp_path_factory: pytest.
         lib.QLR_SteamworksMock_SetUserAvailable.argtypes = [ctypes.c_int]
         lib.QLR_SteamworksMock_SetUserAvailable.restype = None
 
+        lib.QLR_SteamworksMock_SetUserLoggedOn.argtypes = [ctypes.c_int]
+        lib.QLR_SteamworksMock_SetUserLoggedOn.restype = None
+
         lib.QLR_SteamworksMock_SetTicket.argtypes = [ctypes.c_char_p, ctypes.c_uint32, ctypes.c_uint32]
         lib.QLR_SteamworksMock_SetTicket.restype = None
         lib.QLR_SteamworksMock_GetCancelledTicketHandle.argtypes = []
         lib.QLR_SteamworksMock_GetCancelledTicketHandle.restype = ctypes.c_uint32
         lib.QLR_SteamworksMock_GetCancelAuthTicketCalls.argtypes = []
         lib.QLR_SteamworksMock_GetCancelAuthTicketCalls.restype = ctypes.c_int
+        lib.QLR_SteamworksMock_GetUserLoggedOnCalls.argtypes = []
+        lib.QLR_SteamworksMock_GetUserLoggedOnCalls.restype = ctypes.c_int
 
         lib.QLR_SteamworksMock_SetAuthResult.argtypes = [ctypes.c_int]
         lib.QLR_SteamworksMock_SetAuthResult.restype = None
@@ -1890,6 +1898,47 @@ def test_validate_maps_auth_results(steamworks_harness: tuple[ctypes.CDLL, bool]
     assert "runtime" in runtime_missing.message.decode().lower()
 
 
+def test_auth_ticket_requests_require_logged_on_steam_user(steamworks_harness: tuple[ctypes.CDLL, bool]) -> None:
+    lib, enabled = steamworks_harness
+    ticket_buffer = ctypes.create_string_buffer(TICKET_BUFFER)
+    ticket_length = ctypes.c_int(-1)
+    ticket_handle = ctypes.c_uint32(0xFFFFFFFF)
+
+    if not enabled:
+        assert not lib.QLR_Steamworks_IsUserLoggedOn()
+        assert not lib.QLR_Steamworks_Request(
+            ticket_buffer,
+            ctypes.sizeof(ticket_buffer),
+            ctypes.byref(ticket_length),
+            ctypes.byref(ticket_handle),
+        )
+        return
+
+    lib.QLR_SteamworksMock_Reset()
+    lib.QLR_SteamworksMock_PrimeState()
+
+    assert lib.QLR_Steamworks_IsUserLoggedOn()
+    assert lib.QLR_SteamworksMock_GetUserLoggedOnCalls() == 1
+
+    lib.QLR_SteamworksMock_SetUserLoggedOn(0)
+    assert not lib.QLR_Steamworks_Request(
+        ticket_buffer,
+        ctypes.sizeof(ticket_buffer),
+        ctypes.byref(ticket_length),
+        ctypes.byref(ticket_handle),
+    )
+    assert ticket_buffer.value == b""
+    assert ticket_length.value == 0
+    assert ticket_handle.value == 0
+    assert lib.QLR_SteamworksMock_GetUserLoggedOnCalls() == 2
+
+    response = AuthResponse()
+    assert lib.QLR_Steamworks_Validate(b"12345678", ctypes.byref(response))
+    assert response.result == QL_AUTH_RESULT_ERROR
+    assert response.outcome == QL_AUTH_OUTCOME_FAILURE
+    assert "not logged on" in response.message.decode().lower()
+
+
 @pytest.mark.parametrize(
     ("begin_result", "expected_result", "expected_outcome", "message_fragment"),
     [
@@ -2776,19 +2825,18 @@ def test_server_browser_detail_reader_projects_retail_gameserveritem_row(steamwo
     assert _c_string(server.tags) == b"duel,instagib"
     assert server.steamId == 0x0123456789ABCDEF
 
-    lib.QLR_SteamworksMock_SetServerBrowserDetailAppId(PUBLIC_RETAIL_APP_ID)
     retail_request = lib.QLR_Steamworks_RequestServerListForApp(0, PUBLIC_RETAIL_APP_ID, 0xBEEF)
     retail_server = SteamServerItem()
     assert lib.QLR_Steamworks_ReadServerListDetailsForApp(
         retail_request, 5, PUBLIC_RETAIL_APP_ID, ctypes.byref(retail_server)
     )
-    assert retail_server.appId == PUBLIC_RETAIL_APP_ID
+    assert retail_server.appId == REFERENCE_RETAIL_APP_ID
     assert _c_string(retail_server.displayName) == b"QLR Test Server"
 
-    rejected_current_app = SteamServerItem()
-    rejected_current_app.appId = PUBLIC_RETAIL_APP_ID
-    assert not lib.QLR_Steamworks_ReadServerListDetails(retail_request, 5, ctypes.byref(rejected_current_app))
-    assert rejected_current_app.appId == 0
+    lib.QLR_SteamworksMock_SetServerBrowserDetailAppId(PUBLIC_RETAIL_APP_ID)
+    public_row = SteamServerItem()
+    assert lib.QLR_Steamworks_ReadServerListDetails(retail_request, 5, ctypes.byref(public_row))
+    assert public_row.appId == PUBLIC_RETAIL_APP_ID
 
     lib.QLR_SteamworksMock_SetServerBrowserDetailAppId(REFERENCE_RETAIL_APP_ID)
 
@@ -2872,7 +2920,6 @@ def test_server_browser_response_projection_matches_retail_jsbrowser_payload_sha
     assert _c_string(unnamed.name) == b"1.2.3.4:27960"
 
     lib.QLR_SteamworksMock_SetServerBrowserServerName(b"QLR Test Server")
-    lib.QLR_SteamworksMock_SetServerBrowserDetailAppId(PUBLIC_RETAIL_APP_ID)
     retail_request = lib.QLR_Steamworks_RequestServerListForApp(0, PUBLIC_RETAIL_APP_ID, 0xBEEF)
     retail_response = SteamServerBrowserResponse()
     assert lib.QLR_Steamworks_ReadServerBrowserResponseForApp(
@@ -2882,7 +2929,13 @@ def test_server_browser_response_projection_matches_retail_jsbrowser_payload_sha
     assert _c_string(retail_response.name) == b"QLR Test Server"
     assert retail_response.serverIp == 0x01020304
     assert retail_response.serverPort == 27960
-    assert not lib.QLR_Steamworks_ReadServerBrowserResponse(retail_request, 5, ctypes.byref(retail_response))
+
+    lib.QLR_SteamworksMock_SetServerBrowserDetailAppId(PUBLIC_RETAIL_APP_ID)
+    current_response = SteamServerBrowserResponse()
+    assert lib.QLR_Steamworks_ReadServerBrowserResponse(retail_request, 5, ctypes.byref(current_response))
+    assert _c_string(current_response.id) == b"16909060_27960"
+    assert current_response.serverIp == 0x01020304
+    assert current_response.serverPort == 27960
     lib.QLR_SteamworksMock_SetServerBrowserDetailAppId(REFERENCE_RETAIL_APP_ID)
 
     lib.QLR_SteamworksMock_SetAppId(0x123456)
@@ -2940,7 +2993,12 @@ def test_server_browser_ping_response_projection_matches_retail_jsbrowserdetails
     assert _c_string(retail_response.name) == b"QLR Test Server"
     assert retail_response.serverIp == 0x01020304
     assert retail_response.serverPort == 27960
-    assert not lib.QLR_Steamworks_ReadServerBrowserPingResponse(ctypes.byref(retail_response))
+
+    current_response = SteamServerBrowserResponse()
+    assert lib.QLR_Steamworks_ReadServerBrowserPingResponse(ctypes.byref(current_response))
+    assert _c_string(current_response.id) == b"16909060_27960"
+    assert current_response.serverIp == 0x01020304
+    assert current_response.serverPort == 27960
     lib.QLR_SteamworksMock_SetServerBrowserDetailAppId(REFERENCE_RETAIL_APP_ID)
 
     lib.QLR_SteamworksMock_SetAppId(0x123456)

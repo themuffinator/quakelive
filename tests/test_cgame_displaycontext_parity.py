@@ -421,6 +421,7 @@ def test_cgame_match_state_auxiliary_configstrings_drive_live_timeout_and_team_c
 	parse_team_block = _block_from_marker(servercmds_source, "static void CG_ParseTeamCountConfigStrings( void )")
 	parse_match_block = _block_from_marker(servercmds_source, "static void CG_ParseMatchState( void )")
 	parse_round_start_block = _block_from_marker(servercmds_source, "static void CG_ParseRoundStartTimeConfigString( void )")
+	flag_status_block = _block_from_marker(servercmds_source, "static void CG_ParseFlagStatusConfigString")
 	set_config_values_block = _block_from_marker(servercmds_source, "void CG_SetConfigValues( void )")
 	get_timeout_start_block = _block_from_marker(servercmds_source, "int CG_GetMatchTimeoutStartTime( void )")
 	get_round_start_block = _block_from_marker(servercmds_source, "int CG_GetMatchRoundStartTime( void )")
@@ -465,13 +466,13 @@ def test_cgame_match_state_auxiliary_configstrings_drive_live_timeout_and_team_c
 		assert expected in parse_team_block
 
 	assert "CG_ParseMatchFactoryConfig( info );" in parse_match_block
-	assert "if( cgs.gametype == GT_CTF || cgs.gametype == GT_ATTACK_DEFEND || cgs.gametype == GT_OBELISK ) {" in set_config_values_block
+	assert "CG_ParseFlagStatusConfigString( CG_ConfigString( CS_FLAGSTATUS ) );" in set_config_values_block
 	assert "CG_ParseRoundStartTimeConfigString();" in set_config_values_block
 	assert "CG_ParseTimeoutConfigStrings();" in parse_match_block
 	assert "CG_ParseTeamCountConfigStrings();" in parse_match_block
 	assert "CG_ParseTimeoutConfigStrings();" in set_config_values_block
 	assert "CG_ParseTeamCountConfigStrings();" in set_config_values_block
-	assert "if( cgs.gametype == GT_CTF || cgs.gametype == GT_ATTACK_DEFEND || cgs.gametype == GT_OBELISK ) {" in servercmds_source
+	assert "if( cgs.gametype == GT_CTF || cgs.gametype == GT_ATTACK_DEFEND || cgs.gametype == GT_OBELISK ) {" in flag_status_block
 	assert "num == CS_ROUND_START_TIME" in servercmds_source
 	assert "num == CS_TEAM_COUNT_RED || num == CS_TEAM_COUNT_BLUE" in servercmds_source
 	assert "num == CS_TIMEOUT_START_TIME || num == CS_TIMEOUT_EXPIRE_TIME ||" in servercmds_source
@@ -2787,7 +2788,9 @@ def test_cgame_clientinfo_score_tinfo_and_effect_timer_band_are_pinned() -> None
 		"| `0x14C` | Invulnerability stop time | High",
 		"| `0x150` | Breath-puff time | Medium",
 		"The retail `tinfo` parser only rebuilds",
-		"`sortedTeamPlayers`; source-compatible six-field `tinfo` rows",
+		"`sortedTeamPlayers`, and the reconstructed qagame `TeamplayInfoMessage`",
+		"retail-style teammate overlay vitals now arrive through",
+		"`entityState_t` snapshot fields",
 	):
 		assert expected in clientinfo_doc
 

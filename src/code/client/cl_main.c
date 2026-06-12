@@ -7916,6 +7916,10 @@ void CL_Disconnect_f( void ) {
 	SCR_StopCinematic();
 	Cvar_Set("ui_singlePlayerActive", "0");
 	if ( cls.state != CA_DISCONNECTED && cls.state != CA_CINEMATIC ) {
+		if ( com_sv_running && com_sv_running->integer && ( !com_dedicated || !com_dedicated->integer ) ) {
+			SV_Shutdown( "Server quit\n" );
+			return;
+		}
 		Com_Error (ERR_DISCONNECT, "Disconnected from server");
 	}
 }

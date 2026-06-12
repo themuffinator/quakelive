@@ -1181,7 +1181,7 @@
         "0x100689C0"
       ],
       "relocation_refs": [],
-      "comment": "Retail-only `dropflag` command wrapper that gates flag drops by gametype before forwarding the server command."
+      "comment": "Retail-only `dropflag` command wrapper that gates flag drops to CTF, One Flag, and Attack and Defend before forwarding the server command."
     },
     {
       "address": "0x100076F0",
@@ -4116,7 +4116,7 @@
       "signature": "static void CG_OneFlagStatus(rectDef_t *rect)",
       "string_refs": [],
       "relocation_refs": [],
-      "comment": "Retail `CG_ONEFLAG_STATUS` ownerdraw. HLIL gates on `GT_1FCTF`, selects the dedicated neutral/red/blue/dropped icon family registered in `cg_main.c`, and paints the matching objective-status icon directly into the supplied rect."
+      "comment": "Retail `CG_ONEFLAG_STATUS` ownerdraw. HLIL gates on `GT_1FCTF`, selects the neutral at-base/taken/dropped/stolen icon family registered in `cg_main.c`, preserves distinct FLAG_TAKEN_RED and FLAG_TAKEN_BLUE handling, and paints the matching objective-status icon directly into the supplied rect."
     },
     {
       "address": "0x100310F0",
@@ -5814,7 +5814,7 @@
         "scores_ctf"
       ],
       "relocation_refs": [],
-      "comment": "Retail `scores_ctf` parser that decodes the shared CTF-family team header and per-client row block, matching `cg_servercmds.c::CG_ParseCtfScores`."
+      "comment": "Retail `scores_ctf` parser that decodes the shared CTF-family team header and per-client row block for CTF, One Flag, Harvester, Domination, and Attack and Defend, matching `cg_servercmds.c::CG_ParseCtfScores`."
     },
     {
       "address": "0x10046B00",
@@ -5923,7 +5923,7 @@
         "tinfo"
       ],
       "relocation_refs": [],
-      "comment": "Retail `tinfo` parser. The server-command dispatcher routes the literal token to this helper, which matches the longstanding team-overlay role of `cg_servercmds.c::CG_ParseTeamInfo`: updating the sorted team-player list plus per-client location, health, armor, weapon, and powerup state."
+      "comment": "Retail `tinfo` parser. The server-command dispatcher routes the literal token to this helper, and HLIL only rebuilds the sorted team-player list from compact client-number arguments; source-side legacy six-field rows are compatibility fallback, while retail teammate vitals come from entity-state snapshots."
     },
     {
       "address": "0x10048820",
@@ -6035,7 +6035,7 @@
         "cg_disableLoadout_%s"
       ],
       "relocation_refs": [],
-      "comment": "Initial configstring bootstrap that seeds scores, team names, flag status, level timing, loadout gates, armor-tiering, warmup, and the richer Quake Live configstring helpers. The overall role is the retail CG_SetConfigValues bootstrap even though the shipping DLL carries more post-GPL configstring consumers."
+      "comment": "Initial configstring bootstrap that seeds scores, team names, compact CS_FLAGSTATUS red/blue or One Flag status, level timing, loadout gates, armor-tiering, warmup, and the richer Quake Live configstring helpers. The overall role is the retail CG_SetConfigValues bootstrap even though the shipping DLL carries more post-GPL configstring consumers."
     },
     {
       "address": "0x10049980",
@@ -6047,7 +6047,7 @@
         "0x1006FCC8"
       ],
       "relocation_refs": [],
-      "comment": "Server-command configstring update dispatcher that reads Argv(1), parses the changed index, and switches over special handling paths."
+      "comment": "Server-command configstring update dispatcher that reads Argv(1), parses the changed index, and switches over special handling paths including the live CS_FLAGSTATUS update for CTF/One Flag objective HUD state."
     },
     {
       "address": "0x1004A1B0",

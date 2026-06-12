@@ -2567,6 +2567,243 @@ def test_ui_native_export_table_matches_recovered_retail_order() -> None:
     assert '"exports": ["dllEntry", "vmMain"]' in export_manifest
 
 
+def test_ui_native_api_bridge_is_anchored_to_committed_hlil_contract() -> None:
+    ui_public = (REPO_ROOT / "src/code/ui/ui_public.h").read_text(encoding="utf-8")
+    ui_syscalls = (REPO_ROOT / "src/code/ui/ui_syscalls.c").read_text(encoding="utf-8")
+    ui_main = (REPO_ROOT / "src/code/ui/ui_main.c").read_text(encoding="utf-8")
+    cl_ui = (REPO_ROOT / "src/code/client/cl_ui.c").read_text(encoding="utf-8")
+    vm_source = (REPO_ROOT / "src/code/qcommon/vm.c").read_text(encoding="utf-8")
+    ui_hlil = UI_HLIL_PART01.read_text(encoding="utf-8", errors="ignore")
+
+    native_exports = _extract_enum_values(ui_public, "uiNativeExport_t")
+    expected_export_order = (
+        "UI_NATIVE_EXPORT_INIT",
+        "UI_NATIVE_EXPORT_SHUTDOWN",
+        "UI_NATIVE_EXPORT_KEY_EVENT",
+        "UI_NATIVE_EXPORT_MOUSE_EVENT",
+        "UI_NATIVE_EXPORT_REFRESH",
+        "UI_NATIVE_EXPORT_IS_FULLSCREEN",
+        "UI_NATIVE_EXPORT_SET_ACTIVE_MENU",
+        "UI_NATIVE_EXPORT_CONSOLE_COMMAND",
+        "UI_NATIVE_EXPORT_DRAW_CONNECT_SCREEN",
+        "UI_NATIVE_EXPORT_HAS_UNIQUE_CD_KEY",
+        "UI_NATIVE_EXPORT_REFRESH_DISPLAY_CONTEXT",
+        "UI_NATIVE_EXPORT_MENUS_ANY_VISIBLE",
+        "UI_NATIVE_EXPORT_FOR_EACH_ARENA_NAME",
+        "UI_NATIVE_EXPORT_DRAW_ADVERTISEMENT_WAIT_SCREEN",
+    )
+
+    for index, export_name in enumerate(expected_export_order):
+        assert native_exports[export_name] == index
+    assert native_exports["UI_NATIVE_EXPORT_COUNT"] == len(expected_export_order)
+
+    for expected in (
+        "10003970    void*** dllEntry(void*** arg1, int32_t arg2, int32_t* arg3)",
+        "1000397c  *arg1 = &data_1002aea4",
+        "10003982  data_106b40a8 = arg2",
+        "10003988  *arg3 = 8",
+        "1002aea4  void* data_1002aea4 = sub_1000fab0",
+        "1002aea8  void* data_1002aea8 = 0x100044e0",
+        "1002aeac  void* data_1002aeac = sub_1000ff40",
+        "1002aeb0  void* data_1002aeb0 = sub_10010000",
+        "1002aeb4  void* data_1002aeb4 = sub_10004390",
+        "1002aeb8  void* data_1002aeb8 = sub_10010380",
+        "1002aebc  void* data_1002aebc = sub_100100d0",
+        "1002aec0  void* data_1002aec0 = sub_10002ac0",
+        "1002aec4  void* data_1002aec4 = sub_10010e30",
+        "1002aec8  void* data_1002aec8 = sub_10003910",
+        "1002aecc  void* data_1002aecc = sub_10003920",
+        "1002aed0  void* data_1002aed0 = sub_100103c0",
+        "1002aed4  void* data_1002aed4 = sub_10003930",
+        "1002aed8  void* data_1002aed8 = sub_10011130",
+    ):
+        assert expected in ui_hlil
+
+    dll_entry_block = _extract_function_block(
+        ui_syscalls,
+        "void dllEntry( void **exports, void *imports, int *apiVersion ) {",
+    )
+    assert "ui_imports = (ql_import_f *)imports;" in dll_entry_block
+    assert "*exports = UI_GetNativeExportTable();" in dll_entry_block
+    assert "*apiVersion = UI_QL_API_VERSION;" in dll_entry_block
+
+    native_export_table_block = _extract_function_block(
+        ui_main,
+        "void **UI_GetNativeExportTable( void ) {",
+    )
+    assert "return ui_nativeExports;" in native_export_table_block
+    assert "static void *ui_nativeExports[UI_NATIVE_EXPORT_COUNT] = {" in ui_main
+
+    vm_bridge_block = _extract_function_block(
+        vm_source,
+        "static int VM_CallNativeExports( vm_t *vm, int callnum, const int *args ) {",
+    )
+    assert "if ( vm->dllInterface && vm->dllApiVersion > UI_API_VERSION ) {" in vm_bridge_block
+    assert "if ( callnum == UI_GETAPIVERSION ) {" in vm_bridge_block
+    assert "return vm->dllApiVersion;" in vm_bridge_block
+    assert "uiExportIndex = callnum - 1;" in vm_bridge_block
+
+    ql_import_values = _extract_enum_values(ui_public, "uiQlImport_t")
+    assert ql_import_values["UI_QL_IMPORT_CMD_ARGS_BUFFER"] == 13
+    assert ql_import_values["UI_QL_IMPORT_SETUP_ADVERT_CELL_SHADER"] == 80
+    assert ql_import_values["UI_QL_IMPORT_IS_SUBSCRIBED_APP"] == 93
+    assert ql_import_values["UI_QL_IMPORT_DRAW_SCALED_TEXT"] == 94
+    assert ql_import_values["UI_QL_IMPORT_MEASURE_TEXT"] == 95
+    assert ql_import_values["UI_QL_IMPORT_GET_ITEM_DOWNLOAD_INFO"] == 96
+
+    for expected in (
+        "ql_ui_imports[UI_QL_IMPORT_CMD_ARGS_BUFFER] = (ql_import_f)QL_UI_trap_Cmd_ArgsBuffer_QL;",
+        "ql_ui_imports[UI_QL_IMPORT_SETUP_ADVERT_CELL_SHADER] = (ql_import_f)QL_UI_trap_SetupAdvertCellShader;",
+        "ql_ui_imports[UI_QL_IMPORT_REFRESH_ADVERT_CELL_SHADER] = (ql_import_f)QL_UI_trap_RefreshAdvertCellShader;",
+        "ql_ui_imports[UI_QL_IMPORT_INIT_ADVERTISEMENT_BRIDGE] = (ql_import_f)QL_UI_trap_InitAdvertisementBridge;",
+        "ql_ui_imports[UI_QL_IMPORT_UNUSED_83] = (ql_import_f)QL_UI_trap_UpdateAdvert;",
+        "ql_ui_imports[UI_QL_IMPORT_ACTIVATE_ADVERT] = (ql_import_f)QL_UI_trap_ActivateAdvert;",
+        "ql_ui_imports[UI_QL_IMPORT_SET_CURSOR_POS] = (ql_import_f)QL_UI_trap_SetCursorPos;",
+        "ql_ui_imports[UI_QL_IMPORT_GET_CURSOR_POS] = (ql_import_f)QL_UI_trap_GetCursorPos;",
+        "ql_ui_imports[UI_QL_IMPORT_IS_SUBSCRIBED_APP] = (ql_import_f)QL_UI_trap_IsSubscribedApp;",
+        "ql_ui_imports[UI_QL_IMPORT_DRAW_SCALED_TEXT] = (ql_import_f)QL_UI_trap_DrawScaledText;",
+        "ql_ui_imports[UI_QL_IMPORT_MEASURE_TEXT] = (ql_import_f)QL_UI_trap_MeasureText;",
+        "ql_ui_imports[UI_QL_IMPORT_GET_ITEM_DOWNLOAD_INFO] = (ql_import_f)QL_UI_trap_GetItemDownloadInfo;",
+    ):
+        assert expected in cl_ui
+
+
+def test_ui_native_import_reference_headers_match_recovered_hlil_slots() -> None:
+    ui_public = (REPO_ROOT / "src/code/ui/ui_public.h").read_text(encoding="utf-8")
+    ui_hlil = UI_HLIL_PART01.read_text(encoding="utf-8", errors="ignore")
+    ql_import_values = _extract_enum_values(ui_public, "uiQlImport_t")
+    expected_reference_values = {
+        f"QL_UITRAP_{name.removeprefix('UI_QL_IMPORT_')}": value
+        for name, value in ql_import_values.items()
+        if name.startswith("UI_QL_IMPORT_") and value <= 96
+    }
+    assert sorted(expected_reference_values.values()) == list(range(97))
+
+    generator = (REPO_ROOT / "scripts/ghidra/build_ui_ghidra_reference.py").read_text(
+        encoding="utf-8"
+    )
+    generator_values = {
+        match.group(1): int(match.group(2), 0)
+        for match in re.finditer(
+            r'\("(?P<name>QL_UITRAP_[A-Z0-9_]+)",\s*(?P<value>0x[0-9a-fA-F]+|\d+),',
+            generator,
+        )
+    }
+    assert generator_values == expected_reference_values
+
+    reference_paths = (
+        "references/reverse-engineering/ghidra/uix86/ui_ghidra_reference.h",
+        "references/reverse-engineering/ghidra/uix86/source-recreation/include/ui_ghidra_reference.h",
+        "src-re/ui/include/ui_local.h",
+    )
+    for relative_path in reference_paths:
+        text = (REPO_ROOT / relative_path).read_text(encoding="utf-8")
+        assert _extract_numeric_defines(text, "QL_UITRAP_") == expected_reference_values
+        assert "Retail native import-table layout (DAT_106b40a8 in Ghidra)" in text
+        assert "legacy source/QVM uiImport_t syscall ABI" in text
+
+    hlil_offset_evidence = {
+        "QL_UITRAP_CVAR_REGISTER": 0x10,
+        "QL_UITRAP_CVAR_UPDATE": 0x18,
+        "QL_UITRAP_CVAR_SET": 0x1C,
+        "QL_UITRAP_CVAR_VARIABLE_STRING_BUFFER": 0x24,
+        "QL_UITRAP_CVAR_VARIABLE_VALUE": 0x28,
+        "QL_UITRAP_FS_FOPENFILE": 0x38,
+        "QL_UITRAP_CMD_EXECUTETEXT": 0x50,
+        "QL_UITRAP_R_REGISTERMODEL": 0x54,
+        "QL_UITRAP_R_RENDERSCENE": 0x70,
+        "QL_UITRAP_R_SETCOLOR": 0x74,
+        "QL_UITRAP_GETCLIENTSTATE": 0xB8,
+        "QL_UITRAP_GETGLCONFIG": 0xBC,
+        "QL_UITRAP_GETCONFIGSTRING": 0xC0,
+        "QL_UITRAP_LAN_GETSERVERCOUNT": 0xC4,
+        "QL_UITRAP_R_REGISTERFONT": 0x118,
+        "QL_UITRAP_S_STARTBACKGROUNDTRACK": 0x120,
+        "QL_UITRAP_CIN_PLAYCINEMATIC": 0x124,
+        "QL_UITRAP_INIT_ADVERTISEMENT_BRIDGE": 0x148,
+        "QL_UITRAP_UNUSED_83": 0x14C,
+        "QL_UITRAP_UNUSED_85": 0x154,
+        "QL_UITRAP_PC_LOAD_SOURCE": 0x164,
+        "QL_UITRAP_PC_FREE_SOURCE": 0x168,
+        "QL_UITRAP_PC_READ_TOKEN": 0x16C,
+        "QL_UITRAP_PC_SOURCE_FILE_AND_LINE": 0x170,
+        "QL_UITRAP_IS_SUBSCRIBED_APP": 0x174,
+        "QL_UITRAP_DRAW_SCALED_TEXT": 0x178,
+        "QL_UITRAP_MEASURE_TEXT": 0x17C,
+        "QL_UITRAP_GET_ITEM_DOWNLOAD_INFO": 0x180,
+    }
+    for macro, byte_offset in hlil_offset_evidence.items():
+        assert f"data_106b40a8 + 0x{byte_offset:x}" in ui_hlil
+        assert expected_reference_values[macro] == byte_offset // 4
+
+
+def test_ui_native_import_slab_assigns_every_recovered_retail_slot() -> None:
+    ui_public = (REPO_ROOT / "src/code/ui/ui_public.h").read_text(encoding="utf-8")
+    cl_ui = (REPO_ROOT / "src/code/client/cl_ui.c").read_text(encoding="utf-8")
+    ql_imports_inc = (REPO_ROOT / "src/code/client/ql_ui_imports.inc").read_text(
+        encoding="utf-8"
+    )
+    init_block = _extract_function_block(cl_ui, "static void CL_InitUIImports( void ) {")
+    ql_import_values = _extract_enum_values(ui_public, "uiQlImport_t")
+    assignments = {
+        match.group(1): match.group(2)
+        for match in re.finditer(
+            r"ql_ui_imports\[(UI_QL_IMPORT_[A-Z0-9_]+)\]\s*=\s*"
+            r"\(ql_import_f\)([A-Za-z0-9_]+);",
+            init_block,
+        )
+    }
+
+    retail_native_imports = {
+        name
+        for name, value in ql_import_values.items()
+        if name.startswith("UI_QL_IMPORT_") and value <= 96
+    }
+    source_bridge_extensions = {
+        "UI_QL_IMPORT_CVAR_RESET",
+        "UI_QL_IMPORT_CVAR_INFOSTRINGBUFFER",
+        "UI_QL_IMPORT_CM_LOADMODEL",
+        "UI_QL_IMPORT_SET_PBCLSTATUS",
+        "UI_QL_IMPORT_LAUNCHER_READSCREENSHOT",
+    }
+
+    assert len(retail_native_imports) == 97
+    assert sorted(ql_import_values[name] for name in retail_native_imports) == list(range(97))
+    assert source_bridge_extensions.isdisjoint(retail_native_imports)
+    assert set(assignments) == {
+        name for name in ql_import_values if name.startswith("UI_QL_IMPORT_")
+    }
+    assert retail_native_imports.issubset(assignments)
+    assert source_bridge_extensions.issubset(assignments)
+
+    expected_direct_wrappers = {
+        "UI_QL_IMPORT_CMD_ARGS_BUFFER": "QL_UI_trap_Cmd_ArgsBuffer_QL",
+        "UI_QL_IMPORT_R_SETCOLOR": "QL_UI_trap_R_SetColor_QL",
+        "UI_QL_IMPORT_SET_CDKEY": "QL_UI_trap_SetCDKey_QL",
+        "UI_QL_IMPORT_SETUP_ADVERT_CELL_SHADER": "QL_UI_trap_SetupAdvertCellShader",
+        "UI_QL_IMPORT_REFRESH_ADVERT_CELL_SHADER": "QL_UI_trap_RefreshAdvertCellShader",
+        "UI_QL_IMPORT_INIT_ADVERTISEMENT_BRIDGE": "QL_UI_trap_InitAdvertisementBridge",
+        "UI_QL_IMPORT_UNUSED_83": "QL_UI_trap_UpdateAdvert",
+        "UI_QL_IMPORT_ACTIVATE_ADVERT": "QL_UI_trap_ActivateAdvert",
+        "UI_QL_IMPORT_UNUSED_85": "QL_UI_trap_Unused85",
+        "UI_QL_IMPORT_SET_CURSOR_POS": "QL_UI_trap_SetCursorPos",
+        "UI_QL_IMPORT_GET_CURSOR_POS": "QL_UI_trap_GetCursorPos",
+        "UI_QL_IMPORT_IS_SUBSCRIBED_APP": "QL_UI_trap_IsSubscribedApp",
+        "UI_QL_IMPORT_DRAW_SCALED_TEXT": "QL_UI_trap_DrawScaledText",
+        "UI_QL_IMPORT_MEASURE_TEXT": "QL_UI_trap_MeasureText",
+        "UI_QL_IMPORT_GET_ITEM_DOWNLOAD_INFO": "QL_UI_trap_GetItemDownloadInfo",
+    }
+    for import_name, wrapper_name in expected_direct_wrappers.items():
+        assert assignments[import_name] == wrapper_name
+
+    wrapper_sources = cl_ui + "\n" + ql_imports_inc
+    for import_name, wrapper_name in assignments.items():
+        assert re.search(rf"\b{re.escape(wrapper_name)}\s*\(", wrapper_sources), import_name
+
+    assert "Com_Memset( ql_ui_imports, 0, sizeof( ql_ui_imports ) );" in init_block
+    assert "ql_ui_imports[UI_QL_IMPORT_UNUSED_85] = (ql_import_f)QL_UI_trap_Unused85;" in init_block
+
+
 def test_ui_retail_keybind_pending_prompt_matches_width_and_paint_paths() -> None:
     ui_main = (REPO_ROOT / "src/code/ui/ui_main.c").read_text(encoding="utf-8")
     width_block = _extract_function_block(ui_main, "static int UI_OwnerDrawWidth(int ownerDraw, float scale) {")

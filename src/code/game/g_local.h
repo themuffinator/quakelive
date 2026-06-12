@@ -885,7 +885,7 @@ typedef struct {
 	int			voteCount;			// to prevent people from constantly calling votes
 	int			voteState;			// retail-style per-client vote role/state latch
 	int			teamVoteCount;		// to prevent people from constantly calling votes
-	qboolean	teamInfo;			// send team overlay updates?
+	qboolean	teamInfo;			// source compatibility; retail QL does not gate tinfo sends
 	qboolean	readyUpLatch;		// retail-style persistent ready latch mirrored into EF_READY
 	int			recordingPreferences;	// server-visible cg_autoAction bitfield for match media helpers
 	int		voteDelayTime;
@@ -1144,7 +1144,7 @@ typedef struct {
 
 	int			teamScores[TEAM_NUM_TEAMS];
 	qboolean	teamLocks[TEAM_NUM_TEAMS];
-	int			lastTeamLocationTime;		// last time of client team location update
+	int			lastTeamLocationTime;		// next scheduled client team location update
 	int			deathmatchSpawnPointCount;
 	int			redSpawnPointCount;
 	int			blueSpawnPointCount;
@@ -1721,6 +1721,7 @@ gentity_t *SelectCTFSpawnPoint ( team_t team, int teamstate, vec3_t origin, vec3
 gentity_t *Team_GetLocation(gentity_t *ent);
 qboolean Team_GetLocationMsg(gentity_t *ent, char *loc, int loclen);
 void TeamplayInfoMessage( gentity_t *ent );
+void G_ScheduleTeamOverlayRefresh( void );
 void CheckTeamStatus(void);
 qboolean Team_HasMinimumPlayersForWarmup( void );
 void Team_UpdateAutoShuffleState( void );

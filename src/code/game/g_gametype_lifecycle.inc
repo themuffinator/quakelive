@@ -154,26 +154,26 @@ Resets duel warmup and sudden-death state before the countdown begins.
 =============
 */
 static void G_DuelInit( void ) {
-        if ( level.warmupTime != -1 ) {
-                level.warmupTime = -1;
-                trap_SetConfigstring( CS_WARMUP, va( "%i", level.warmupTime ) );
-        }
+	if ( level.warmupTime != -1 ) {
+		G_SetWarmupTime( -1 );
+	} else {
+		G_UpdateReadyUpConfigstring();
+	}
 
-	G_UpdateReadyUpConfigstring();
 	level.suddenDeathActive = qfalse;
 	level.suddenDeathLastDelay = -1;
 	level.suddenDeathNoRespawnLogged = qfalse;
 	G_LogDuelMatchSimEvent(
-	"duel_sudden_death",
-	va(
-	"respawn=%i start=%i tick=%i max=%i increment=%i print=%i",
-	g_suddenDeathRespawn.integer,
-	g_suddenDeathRespawnStart.integer,
-	g_suddenDeathRespawnTick.integer,
-	g_suddenDeathRespawnMax.integer,
-	g_suddenDeathRespawnIncrement.integer,
-	g_suddenDeathRespawnPrint.integer
-	)
+		"duel_sudden_death",
+		va(
+			"respawn=%i start=%i tick=%i max=%i increment=%i print=%i",
+			g_suddenDeathRespawn.integer,
+			g_suddenDeathRespawnStart.integer,
+			g_suddenDeathRespawnTick.integer,
+			g_suddenDeathRespawnMax.integer,
+			g_suddenDeathRespawnIncrement.integer,
+			g_suddenDeathRespawnPrint.integer
+		)
 	);
 }
 
@@ -193,9 +193,7 @@ static void G_DuelClientBegin( gentity_t *ent ) {
 
 	if ( level.numPlayingClients < 2 ) {
 		if ( level.warmupTime != -1 ) {
-			level.warmupTime = -1;
-			trap_SetConfigstring( CS_WARMUP, va( "%i", level.warmupTime ) );
-			G_UpdateReadyUpConfigstring();
+			G_SetWarmupTime( -1 );
 		}
 		return;
 	}
@@ -209,9 +207,7 @@ static void G_DuelClientBegin( gentity_t *ent ) {
 		countdownSeconds = 1;
 	}
 
-	level.warmupTime = level.time + ( countdownSeconds - 1 ) * 1000;
-	trap_SetConfigstring( CS_WARMUP, va( "%i", level.warmupTime ) );
-	G_UpdateReadyUpConfigstring();
+	G_SetWarmupTime( level.time + ( countdownSeconds - 1 ) * 1000 );
 }
 
 /*

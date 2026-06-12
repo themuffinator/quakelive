@@ -4697,6 +4697,8 @@ def test_steam_gameserver_auth_session_wrapper_guards_track_round_628() -> None:
 
     assert "if ( !steamId || !ticketHex || !ticketHex[0] ) {" in begin_auth_block
     assert "if ( !state.gameServerInitialised ) {" in begin_auth_block
+    assert "if ( !QL_Steamworks_ServerIsLoggedOn() ) {" in begin_auth_block
+    assert 'QL_Backend_SetAuthResponse( response, QL_AUTH_RESULT_ERROR, "Steam GameServer not logged on" );' in begin_auth_block
     assert "gameServer = QL_Steamworks_GetGameServer();" in begin_auth_block
     assert "if ( !gameServer || !state.BeginAuthSession ) {" in begin_auth_block
     assert "QL_Steamworks_HexDecode( ticketHex, ticketData, sizeof( ticketData ), &ticketLength )" in begin_auth_block
@@ -4706,6 +4708,9 @@ def test_steam_gameserver_auth_session_wrapper_guards_track_round_628() -> None:
         "if ( !state.gameServerInitialised ) {"
     )
     assert begin_auth_block.index("if ( !state.gameServerInitialised ) {") < begin_auth_block.index(
+        "if ( !QL_Steamworks_ServerIsLoggedOn() ) {"
+    )
+    assert begin_auth_block.index("if ( !QL_Steamworks_ServerIsLoggedOn() ) {") < begin_auth_block.index(
         "gameServer = QL_Steamworks_GetGameServer();"
     )
     assert begin_auth_block.index("if ( !gameServer || !state.BeginAuthSession ) {") < begin_auth_block.index(
@@ -8482,6 +8487,11 @@ def test_client_auth_ticket_dispatch_boundary_tracks_round_596_evidence() -> Non
     assert handle_steamworks_block.index("QL_Steamworks_ValidateTicket") < handle_steamworks_block.index(
         "QL_ClientAuth_InvokeBackend( QL_PlatformBackendSteamworks_Authenticate"
     )
+    assert "if ( !QL_Steamworks_IsUserLoggedOn() ) {" in validate_ticket_block
+    assert 'QL_Backend_SetAuthResponse( response, QL_AUTH_RESULT_ERROR, "Steam user not logged on" );' in validate_ticket_block
+    assert validate_ticket_block.index("if ( !QL_Steamworks_IsUserLoggedOn() ) {") < validate_ticket_block.index(
+        "QL_Steamworks_HexDecode( ticketHex, ticketData, sizeof( ticketData ), &ticketLength )"
+    )
     assert "state.BeginAuthSession( user, ticketData, (int)ticketLength, steamId );" in validate_ticket_block
     assert "fallbackEligible = !handled || steamResponse.result == QL_AUTH_RESULT_PENDING;" in hybrid_block
     assert "steamResponse.result == QL_AUTH_RESULT_ACCEPTED" in hybrid_block
@@ -8630,7 +8640,11 @@ def test_steam_auth_ticket_replacement_and_cleanup_lifecycle_tracks_round_610() 
     )
     assert cancel_ticket_block.index("cl_steamAuthTicketHandle = 0u;") < cancel_ticket_block.index("return cancelled;")
 
+    assert "if ( !QL_Steamworks_IsUserLoggedOn() ) {" in request_platform_block
     assert "HAuthTicket handle = state.GetAuthSessionTicket( user, rawTicket, sizeof( rawTicket ), &rawLength );" in request_platform_block
+    assert request_platform_block.index("if ( !QL_Steamworks_IsUserLoggedOn() ) {") < request_platform_block.index(
+        "HAuthTicket handle = state.GetAuthSessionTicket"
+    )
     assert request_platform_block.index("HAuthTicket handle = state.GetAuthSessionTicket") < request_platform_block.index(
         "if ( handle == 0 || rawLength == 0 ) {"
     )
@@ -11250,9 +11264,12 @@ def test_steam_client_identity_utils_round_373_is_pinned() -> None:
     assert "fn = (QL_SteamUser_GetSteamIDFn)vtable[0x08 / 4];" in user_id_block
     assert "steamId.value = 0ull;" in user_id_block
     assert "*outIdLow = (uint32_t)( steamId.value & 0xffffffffu );" in user_id_block
+    assert "qboolean QL_Steamworks_IsUserLoggedOn( void )" in steamworks
+    assert "fn = (QL_SteamUser_BLoggedOnFn)vtable[0x04 / 4];" in steamworks
     assert "vtable[0] = QLR_SteamFriends_GetPersonaName;" in mock_friends_block
     assert "vtable[0x10 / 4] = QLR_SteamUtils_GetIPCountry;" in mock_utils_block
     assert "vtable[0x24 / 4] = QLR_SteamUtils_GetAppID;" in mock_utils_block
+    assert "vtable[0x04 / 4] = QLR_SteamUser_BLoggedOn;" in mock_user_block
     assert "vtable[0x08 / 4] = QLR_SteamUser_GetSteamID;" in mock_user_block
     assert "qlr_mock_state.persona_name_calls++;" in mock_persona_block
     assert "qlr_mock_state.ip_country_calls++;" in mock_country_block

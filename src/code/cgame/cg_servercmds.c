@@ -3184,6 +3184,84 @@ static void CG_ParseTeamCountConfigStrings( void ) {
 	cgs.matchTeamCount[TEAM_BLUE] = value;
 }
 
+/*
+=============
+CG_UsesCompactRoundStatePayload
+
+Returns qtrue for retail round modes whose qagame payload omits the state key.
+=============
+*/
+static qboolean CG_UsesCompactRoundStatePayload( int gametype ) {
+	switch ( gametype ) {
+	case GT_CLAN_ARENA:
+	case GT_FREEZE:
+	case GT_RED_ROVER:
+		return qtrue;
+	default:
+		return qfalse;
+	}
+}
+
+/*
+=============
+CG_UsesSparseRoundPayload
+
+Returns qtrue for retail round modes whose qagame payload omits some round keys.
+=============
+*/
+static qboolean CG_UsesSparseRoundPayload( int gametype ) {
+	switch ( gametype ) {
+	case GT_CLAN_ARENA:
+	case GT_ATTACK_DEFEND:
+	case GT_FREEZE:
+	case GT_RED_ROVER:
+		return qtrue;
+	default:
+		return qfalse;
+	}
+}
+
+/*
+=============
+CG_InfoStringHasValueForKey
+
+Returns qtrue when an info string contains a non-empty value for the key.
+=============
+*/
+static qboolean CG_InfoStringHasValueForKey( const char *info, const char *key ) {
+	const char	*value;
+
+	if ( !info || !key ) {
+		return qfalse;
+	}
+
+	value = Info_ValueForKey( info, key );
+	return ( value && *value ) ? qtrue : qfalse;
+}
+
+/*
+=============
+CG_InferCompactRoundState
+
+Infers round state from retail compact round payloads and the hidden start slot.
+=============
+*/
+static int CG_InferCompactRoundState( int transitionTime, int roundNumber ) {
+	if ( roundNumber <= 0 ) {
+		return ROUNDSTATE_INACTIVE;
+	}
+
+	if ( transitionTime > 0 || cg.warmup > 0 ) {
+		return ROUNDSTATE_WARMUP;
+	}
+
+	if ( cg_matchRoundStartTime > 0 ) {
+		return ROUNDSTATE_ACTIVE;
+	}
+
+	return ROUNDSTATE_COMPLETE;
+}
+
 static void CG_ParseSuddenDeathStatus( void );
 
 /*
@@ -3199,11 +3277,22 @@ static void CG_ParseMatchState( void ) {
 	int value;
 	qboolean wasOvertimeActive;
 	int previousOvertimeCount;
+	int previousRoundTransitionTime;
+	int previousRoundNumber;
+	int previousRoundTurn;
+	int previousRoundState;
+	qboolean sparseRoundPayload;
 
 	wasOvertimeActive = cgs.matchOvertimeActive;
 	previousOvertimeCount = cgs.matchOvertimeCount;
+	previousRoundTransitionTime = cgs.matchRoundTransitionTime;
+	previousRoundNumber = cgs.matchRoundNumber;
+	previousRoundTurn = cgs.matchRoundTurn;
+	previousRoundState = cgs.matchRoundState;
+	sparseRoundPayload = CG_UsesSparseRoundPayload( cgs.gametype );
 
 	CG_ResetMatchStateFields();
+	CG_ParseRoundStartTimeConfigString();
 
 	info = CG_ConfigString( CS_MATCH_STATE );
 	if ( !info || !*info ) {
@@ -3212,10 +3301,20 @@ static void CG_ParseMatchState( void ) {
 		return;
 	}
 
-	cgs.matchRoundTransitionTime = CG_InfoIntForMatchKey( info, MATCH_STATE_KEY_TIME, 0 );
-	cgs.matchRoundNumber = CG_InfoIntForMatchKey( info, MATCH_STATE_KEY_ROUND, 0 );
-	cgs.matchRoundTurn = CG_InfoIntForMatchKey( info, MATCH_STATE_KEY_TURN, 0 );
-	cgs.matchRoundState = CG_InfoIntForMatchKey( info, MATCH_STATE_KEY_STATE, 0 );
+	cgs.matchRoundTransitionTime = CG_InfoIntForMatchKey( info, MATCH_STATE_KEY_TIME,
+		sparseRoundPayload ? previousRoundTransitionTime : 0 );
+	cgs.matchRoundNumber = CG_InfoIntForMatchKey( info, MATCH_STATE_KEY_ROUND,
+		sparseRoundPayload ? previousRoundNumber : 0 );
+	cgs.matchRoundTurn = CG_InfoIntForMatchKey( info, MATCH_STATE_KEY_TURN,
+		sparseRoundPayload ? previousRoundTurn : 0 );
+	if ( CG_InfoStringHasValueForKey( info, MATCH_STATE_KEY_STATE ) ) {
+		cgs.matchRoundState = CG_InfoIntForMatchKey( info, MATCH_STATE_KEY_STATE,
+			sparseRoundPayload ? previousRoundState : 0 );
+	} else if ( CG_UsesCompactRoundStatePayload( cgs.gametype ) ) {
+		cgs.matchRoundState = CG_InferCompactRoundState( cgs.matchRoundTransitionTime, cgs.matchRoundNumber );
+	} else if ( sparseRoundPayload ) {
+		cgs.matchRoundState = previousRoundState;
+	}
 	cgs.matchOvertimeActive = CG_InfoIntForMatchKey( info, MATCH_STATE_KEY_OVERTIME_ACTIVE, 0 ) ? qtrue : qfalse;
 	cgs.matchSuddenDeathActive = cgs.matchOvertimeActive;
 	cgs.matchOvertimeStartTime = CG_InfoIntForMatchKey( info, MATCH_STATE_KEY_OVERTIME_START, 0 );
@@ -3785,9 +3884,31 @@ static void CG_ParseRotationVoteConfigStrings( void ) {
 	}
 }
 
-void CG_SetConfigValues( void ) {
-	const char *s;
+/*
+=====================
+CG_ParseFlagStatusConfigString
 
+Consumes the compact retail CS_FLAGSTATUS payload for CTF-family flag modes.
+=====================
+*/
+static void CG_ParseFlagStatusConfigString( const char *str ) {
+	if( cgs.gametype == GT_CTF || cgs.gametype == GT_ATTACK_DEFEND || cgs.gametype == GT_OBELISK ) {
+		cgs.redflag = str[0] - '0';
+		cgs.blueflag = str[1] - '0';
+	}
+	else if( cgs.gametype == GT_1FCTF ) {
+		cgs.flagStatus = str[0] - '0';
+	}
+}
+
+/*
+=====================
+CG_SetConfigValues
+
+Bootstraps the cgame state from the initial gamestate configstrings.
+=====================
+*/
+void CG_SetConfigValues( void ) {
 	cgs.scores1 = atoi( CG_ConfigString( CS_SCORES1 ) );
 	cgs.scores2 = atoi( CG_ConfigString( CS_SCORES2 ) );
 	Q_strncpyz( cgs.firstPlaceName, CG_ConfigString( CS_FIRST_PLACE_NAME ), sizeof( cgs.firstPlaceName ) );
@@ -3804,15 +3925,7 @@ void CG_SetConfigValues( void ) {
 	CG_SetTeamNameFromConfigString( TEAM_BLUE, CG_ConfigString( CS_BLUE_TEAM_NAME ) );
 	CG_ParseDisableLoadoutConfigString();
 	CG_ParseEnableBreathConfigString( CG_ConfigString( CS_ENABLE_BREATH ) );
-	if( cgs.gametype == GT_CTF || cgs.gametype == GT_ATTACK_DEFEND || cgs.gametype == GT_OBELISK ) {
-		s = CG_ConfigString( CS_FLAGSTATUS );
-		cgs.redflag = s[0] - '0';
-		cgs.blueflag = s[1] - '0';
-	}
-	else if( cgs.gametype == GT_1FCTF ) {
-		s = CG_ConfigString( CS_FLAGSTATUS );
-		cgs.flagStatus = s[0] - '0';
-	}
+	CG_ParseFlagStatusConfigString( CG_ConfigString( CS_FLAGSTATUS ) );
 	CG_ParseWarmup();
 	CG_ParseMatchState();
 	CG_ParseRoundStartTimeConfigString();
@@ -3999,23 +4112,14 @@ static void CG_ConfigStringModified( void ) {
 		CG_NewClientInfo( num - CS_PLAYERS );
 		CG_BuildSpectatorString();
 	} else if ( num == CS_FLAGSTATUS ) {
-	if( cgs.gametype == GT_CTF || cgs.gametype == GT_ATTACK_DEFEND || cgs.gametype == GT_OBELISK ) {
-// format is rb where its red/blue, 0 is at base, 1 is taken, 2 is dropped
-cgs.redflag = str[0] - '0';
-cgs.blueflag = str[1] - '0';
-}
-else if( cgs.gametype == GT_1FCTF ) {
-cgs.flagStatus = str[0] - '0';
-}
-}
-else if ( num == CS_SHADERSTATE ) {
-CG_ShaderStateChanged();
-} else if ( num == CS_WEAPON_RELOAD_TIMES ) {
-CG_ParseWeaponReloadConfigString();
-} else if ( num == CS_PMOVE_SETTINGS ) {
-CG_ParsePmoveConfigString( str );
-}
-
+		CG_ParseFlagStatusConfigString( str );
+	} else if ( num == CS_SHADERSTATE ) {
+		CG_ShaderStateChanged();
+	} else if ( num == CS_WEAPON_RELOAD_TIMES ) {
+		CG_ParseWeaponReloadConfigString();
+	} else if ( num == CS_PMOVE_SETTINGS ) {
+		CG_ParsePmoveConfigString( str );
+	}
 }
 
 

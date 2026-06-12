@@ -47,6 +47,290 @@ disabled, until a documented open replacement path exists.
 
 ## Active work
 
+### Task A533: Reconstruct all-gametype integration wiring [COMPLETED]
+Priority: High
+Primary areas: `src/code/game/bg_public.h`, `src/code/game/g_factory.c`,
+`src/code/game/g_gametype_lifecycle.inc`, `src/code/game/g_cmds.c`,
+`src/code/game/g_main.c`, `src/code/game/g_match_state.c`,
+`src/code/game/g_team.c`, `src/code/cgame/cg_servercmds.c`,
+`src/code/cgame/cg_main.c`, `src/code/cgame/cg_newdraw.c`,
+`tests/test_all_gametype_wiring_parity.py`,
+`docs/reverse-engineering/all-gametype-wiring-reconstruction-2026-06-12.md`
+Parity estimate: **before 98% -> after 99%** for focused all-gametype
+integration wiring across enum identity, retail factory defaults, qagame
+lifecycle/runframe/exit/scoreboard buckets, cgame parser and HUD feeder
+families, and objective configstring ownership. Repo-wide parity remains
+**99%**; the remaining uncertainty is mostly visual freshness and the
+mode-specific open questions recorded in the focused reconstruction notes.
+
+Completed work:
+
+1. Rechecked the complete Quake Live gametype enum matrix, including the Race
+   reuse of `GT_SINGLE_PLAYER`, against factory tokens/default ids and cgame
+   gametype info/icon publication.
+2. Mapped the full qagame-to-cgame scoreboard transport matrix:
+   `scores_ffa`, `scores_duel`, `scores_race`, `scores_tdm`, `scores_ca`,
+   `scores_ctf`, `scores_ft`, `scores_ad`, `scores_rr`, `tdmstats`,
+   `castats`, `ctfstats`, `smscores`, and generic `scores`.
+3. Added executable parity coverage for shared gametype lifecycle, frame-tail,
+   exit-rule, CTF-style stats, team-count, flag-status, and shared
+   Race/Domination configstring buckets.
+
+### Task A532: Reconstruct shared match warmup state wiring [COMPLETED]
+Priority: High
+Primary areas: `src/code/game/g_active.c`, `src/code/game/g_main.c`,
+`src/code/game/g_cmds.c`, `src/code/game/g_team.c`,
+`src/code/game/g_gametype_lifecycle.inc`,
+`tests/test_game_active_pmove_wiring_parity.py`,
+`tests/test_game_helper_seam_parity.py`, `tests/test_gametype_lifecycle.py`,
+`docs/reverse-engineering/match-warmup-state-wiring-reconstruction-2026-06-12.md`
+Parity estimate: **before 94% -> after 98%** for focused match warmup
+qagame/cgame state wiring, including warmup deadline publication, ready-up
+deadline side effects, auto-record coupling, duel lifecycle reset/countdown,
+round-controller countdowns, timeout pause adjustment, auto-shuffle clamping,
+admin abort reset, and cgame parser/HUD consumer validation. Repo-wide parity
+remains **99%**; remaining uncertainty is exact retail helper body shape and
+visual freshness for warmup overlays.
+
+Completed work:
+
+1. Rechecked qagame warmup ownership across metadata/import/export/function
+   evidence, Ghidra decompile hints, promoted symbol-map rows, and cgame
+   configstring parser mappings.
+2. Routed public source-side warmup deadline mutations through
+   `G_SetWarmupTime` instead of hand-writing `level.warmupTime` and
+   `CS_WARMUP` from duel lifecycle, round-controller, timeout, shuffle, and
+   abort paths.
+3. Preserved the internal pre-`map_restart` grace bump in
+   `G_RequestWarmupMapRestart` as a documented non-public countdown mutation.
+4. Strengthened warmup/ready-up static and lifecycle harness tests covering
+   the shared helper boundary and the affected wiring paths.
+
+### Task A531: Reconstruct Capture the Flag and One Flag wiring [COMPLETED]
+Priority: High
+Primary areas: `src/code/game/g_team.c`, `src/code/game/g_combat.c`,
+`src/code/game/g_active.c`, `src/code/game/g_misc.c`,
+`src/code/game/g_target.c`, `src/code/game/bg_misc.c`,
+`src/code/cgame/cg_servercmds.c`, `src/code/cgame/cg_predict.c`,
+`src/code/cgame/cg_newdraw.c`, `src/code/cgame/cg_consolecmds.c`,
+`references/symbol-maps/qagame.json`, `references/symbol-maps/cgame.json`,
+`tests/test_ctf_oneflag_retail_parity.py`,
+`docs/reverse-engineering/ctf-oneflag-gametype-wiring-reconstruction-2026-06-12.md`
+Parity estimate: **before 97% -> after 98%** for focused CTF and One Flag
+qagame/cgame objective, flag-status, drop/return, prediction, HUD, scoreboard,
+legacy capturezone, and bot-goal wiring. Repo-wide parity remains **99%**;
+remaining uncertainty is mostly the neutral dropped-flag ping/timer extension
+and visual freshness for the objective-status strip.
+
+Completed work:
+
+1. Rechecked retail CTF and One Flag ownership across qagame HLIL, Ghidra,
+   cgame HLIL, symbol maps, shared bg item rules, command surfaces, and bot
+   goal/order state.
+2. Consolidated cgame `CS_FLAGSTATUS` parsing so initial configstring bootstrap
+   and live configstring updates share the same CTF red/blue and One Flag
+   single-status parser.
+3. Corrected qagame source reconstruction headers around the flag-status,
+   reset, return, pickup-status, and touch handlers, and strengthened parity
+   tests for red/blue/neutral drop and forced-return wiring.
+
+### Task A530: Reconcile retail team-overlay scheduling and cvar wiring [COMPLETED]
+Priority: High
+Primary areas: `src/code/cgame/cg_main.c`, `src/code/game/g_client.c`,
+`src/code/game/g_team.c`, `references/symbol-maps/cgame.json`,
+`references/symbol-maps/qagame.json`, `tests/test_cgame_hud_parity.py`,
+`docs/reverse-engineering/cgame-mapping.md`,
+`docs/reverse-engineering/qagame-mapping.md`
+Parity estimate: **before 96% -> after 100%** for focused retail team-overlay
+transport, cvar, snapshot-vital, and scheduled qagame refresh wiring. Repo-wide
+parity remains **99%**; remaining uncertainty is visual pixel/layout freshness,
+not the row-list/vitals transport contract.
+
+Completed work:
+
+1. Removed the source-era lowercase `"teamoverlay"` userinfo cvar and
+   `CG_UpdateCvars` setter path after confirming retail cgame only retains the
+   `cg_drawTeamOverlay*` local HUD cvars.
+2. Removed the qagame `pers.teamInfo` send gate and reconstructed the retail
+   one-shot `lastTeamLocationTime = level.time + 1000` scheduling path from
+   spawn/disconnect events into `CheckTeamStatus`.
+3. Updated symbol maps, reverse-engineering notes, and parity tests to pin the
+   compact `tinfo` row-list producer/parser plus entity-state teammate vitals.
+
+### Task A529: Recheck Domination point and scoring wiring [COMPLETED]
+Priority: High
+Primary areas: `src/code/game/g_team.c`, `src/code/game/g_main.c`,
+`src/code/game/g_client.c`, `src/code/cgame/cg_servercmds.c`,
+`tests/test_game_domination_parity.py`,
+`tests/test_cgame_domination_count_parity.py`,
+`tests/test_game_runframe_parity.py`,
+`docs/reverse-engineering/domination-gametype-wiring-reconstruction-2026-06-12.md`
+Parity estimate: **before 95% -> after 98%** for focused Domination qagame/cgame
+point entity, trigger, respawn, capture, reward, defense, scoring,
+configstring, HUD, and feeder wiring. Repo-wide parity remains **99%**;
+remaining Domination uncertainty is mostly exact point metadata slab naming and
+the shared objective-strip presentation tail.
+
+Completed work:
+
+1. Rechecked retail Domination point spawn, activation, capture-reward,
+   primary-capturer, owned-count, defense-bonus, and linked respawn helpers
+   against Binary Ninja HLIL, Ghidra, and symbol-map evidence.
+2. Confirmed the existing source already reconstructs the non-Domination point
+   free path, delayed point activation, capture trigger binding, linked
+   point-spawn selection, per-frame capture/scoring pass, capture/assist
+   rewards, defense bonus, and owned-count configstring bridge.
+3. Strengthened static parity tests for `SP_team_dom_point`,
+   `Team_SelectDominationSpawnPoint`, `G_SelectClientSpawnPoint`,
+   `Team_RunDomination`, `G_UpdateDominationPointCountConfigstrings`, cgame
+   shared owned-count parsing, and the generic runframe Domination call.
+
+### Task A528: Reconstruct Harvester skull-drop and gametype wiring [COMPLETED]
+Priority: High
+Primary areas: `src/code/game/g_combat.c`, `src/code/game/g_active.c`,
+`src/code/game/g_items.c`, `src/code/game/g_team.c`, `src/code/game/g_cmds.c`,
+`src/code/cgame/cg_newdraw.c`, `tests/test_game_active_pmove_wiring_parity.py`,
+`tests/test_game_helper_seam_parity.py`,
+`docs/reverse-engineering/harvester-gametype-wiring-reconstruction-2026-06-12.md`
+Parity estimate: **before 94% -> after 97%** for focused Harvester qagame/cgame
+objective, skull-drop, scoreboard, HUD, and bot-goal wiring. Repo-wide parity
+remains **99%**; remaining Harvester uncertainty is mostly live bot behavior and
+minor cgame intro text exactness.
+
+Completed work:
+
+1. Rechecked retail Harvester ownership across qagame symbol-map entries,
+   Ghidra decompile evidence, cgame parser/ownerdraw evidence, and existing
+   source seams.
+2. Reconstructed the `TossClientCubes` lower-six-bit carried-skull count,
+   `ps.generic1 &= 0xc0` clear, generated death skull, and `g_dropSkulls`
+   carried-skull loop.
+3. Replaced stale Harvester `Red Cube` / `Blue Cube` gameplay lookups with the
+   retail item-table names `Red Skull` / `Blue Skull`.
+4. Restored the retail `MOD_SWITCHTEAM` team-change death reason and the
+   matching exclusion before Harvester death skull ejection.
+5. Revalidated the CTF-family `scores_ctf` / `ctfstats`, Harvester skull HUD,
+   obelisk objective validation, and bot goal mapping in the dedicated
+   reconstruction note and static parity gates.
+
+### Task A527: Reconstruct Red Rover compact round wiring [COMPLETED]
+Priority: High
+Primary areas: `src/code/game/g_match_state.c`,
+`src/code/game/g_active.c`, `src/code/cgame/cg_servercmds.c`,
+`tests/test_match_state_configstring.py`,
+`tests/test_game_team_count_parity.py`,
+`tests/test_game_helper_seam_parity.py`,
+`tests/test_game_round_controller_helper_parity.py`,
+`docs/reverse-engineering/red-rover-gametype-wiring-reconstruction-2026-06-12.md`
+Parity estimate: **before 93% -> after 98%** for focused Red Rover qagame/cgame
+round-state, configstring, infection-role, scoreboard, marker, sound, and HUD
+wiring. Repo-wide parity remains **99%**; remaining RR uncertainty is mostly
+the lower award tail and exact zero-delay state publication ordering.
+
+Completed work:
+
+1. Rechecked retail `RR_RoundStateTransition` against Binary Ninja HLIL,
+   Ghidra, and the promoted symbol-map/string evidence.
+2. Reconstructed the compact Red Rover `CS_MATCH_STATE` publisher in qagame:
+   inactive `time=-1/round=0`, warmup `time/round`, and active/complete/exit
+   `round` payloads.
+3. Reconstructed the Red Rover complete/exit `CS_ROUND_START_TIME = -1`
+   side-channel clear.
+4. Added a Red Rover round-number fallback for pre-active infection-seed
+   publication so compact payloads do not regress to `round 0`.
+5. Replaced the silent RR controller default case with the retail
+   `RR_RoundStateTransition: invalid state` fatal diagnostic.
+6. Revalidated existing `scores_rr`, infected marker/media, survivor-warning
+   sound, autojoin, exit-rule, and infection cvar wiring with focused tests.
+
+### Task A526: Reconstruct Attack and Defend compact round wiring [COMPLETED]
+Priority: High
+Primary areas: `src/code/game/g_match_state.c`,
+`src/code/cgame/cg_servercmds.c`,
+`tests/test_attack_defend_retail_parity.py`,
+`tests/test_game_team_count_parity.py`,
+`tests/test_game_helper_seam_parity.py`,
+`tests/test_match_state_configstring.py`,
+`docs/reverse-engineering/attack-defend-gametype-wiring-reconstruction-2026-06-12.md`
+Parity estimate: **before 92% -> after 98%** for focused Attack and
+Defend qagame/cgame round-state, configstring, score-history, objective, HUD,
+and feeder wiring. Repo-wide parity remains **99%**; the remaining uncertainty
+is lower A/D award-tail confidence and exact unchanged-slot semantics during
+the complete-to-warmup delay.
+
+Completed work:
+
+1. Rechecked retail `AD_RoundStateTransition` against Binary Ninja HLIL and
+   Ghidra, including compact configstring `0x295`, round-start side channel
+   `0x296`, and the invalid-state diagnostic.
+2. Revalidated the promoted qagame A/D owners for round-state resolution,
+   attacking/defending side resolution, score-history reset/update, objective
+   touches, damage bonuses, and exit rules.
+3. Reconstructed the compact Attack and Defend match-state publisher in qagame:
+   inactive `time/round/turn/state`, warmup `time/round/turn/state=1`, and
+   active retained `turn/state=2` payloads.
+4. Reconstructed the A/D complete/exit `CS_ROUND_START_TIME = -1` side-channel
+   clear.
+5. Added cgame sparse round-payload parsing so A/D active payloads that omit
+   `time` and `round` preserve the previous round cache and keep the hidden
+   round-start slot live after parser resets.
+6. Revalidated the existing `scores_ad`, A/D round-score panel, attack/defend
+   banner, POI media, CTF-family feeder, and owned-objective HUD wiring in the
+   focused reconstruction note and static parity gates.
+
+### Task A525: Reconstruct Clan Arena round-state and client wiring [COMPLETED]
+Priority: High
+Primary areas: `src/code/game/g_active.c`,
+`src/code/game/g_match_state.c`, `src/code/cgame/cg_servercmds.c`,
+`tests/test_game_round_controller_helper_parity.py`,
+`tests/test_game_team_count_parity.py`,
+`tests/test_game_helper_seam_parity.py`,
+`tests/test_match_state_configstring.py`,
+`docs/reverse-engineering/clan-arena-gametype-wiring-reconstruction-2026-06-12.md`
+Parity estimate: **before 87% -> after 96%** for focused Clan Arena
+qagame/cgame round, configstring, scoreboard, stat, and HUD feeder wiring.
+Repo-wide parity remains **99%** because the remaining uncertainty is CA
+award/stat tail confidence and adjacent Freeze/Red Rover compact-payload
+publishing, not an active repo-wide regression.
+
+Completed work:
+
+1. Rechecked retail `CA_RoundStateTransition` against Binary Ninja HLIL and
+   Ghidra, including compact configstring `0x295`, round-start side channel
+   `0x296`, survivor/health result prints, and the invalid-state fatal.
+2. Reconstructed the compact Clan Arena match-state publisher in qagame while
+   leaving the richer SRP match-state payload for the other round modes.
+3. Reconstructed the CA complete-round `CS_ROUND_START_TIME = -1` clear.
+4. Added cgame compact-payload round-state inference for retail-style CA
+   payloads that omit an explicit `state` key.
+5. Replaced the source-only CA round centerprint with the retail winner print
+   variants and fataled unexpected CA controller states.
+6. Revalidated the existing `scores_ca`, `castats`, CA stat parser, and CA HUD
+   feeder wiring in the focused reconstruction note and static parity gates.
+
+### Task A524: Keep WebUI match browser app-id interop rows visible [COMPLETED]
+Priority: High
+Primary areas: `src/common/platform/platform_steamworks.c`,
+`tests/test_steamworks_harness.py`, `tests/test_netcode_parity_manifest.py`,
+`docs/reverse-engineering/steam-retail-server-browser-appid-interop-2026-06-06.md`
+Parity estimate: **before 94% -> after 98%** for the focused opted-in
+WebUI/Steam server-browser retrieval interop slice, with strict-retail
+row-reader evidence still documented separately because public/reference app-id
+acceptance is an explicit compatibility lane. Repo-wide parity remains **99%**.
+
+Completed work:
+
+1. Rechecked the retail `SteamMatchmakingServers` browser owner and callback
+   HLIL in `quakelive_steam.exe`, including the retained row app-id gate.
+2. Preserved exact app-id validation while accepting only the documented public
+   retail (`282440`) and reference (`0x54100`) Quake Live app-id pair used by
+   SRP's native browser interop path.
+3. Strengthened the Steamworks harness so public discovery can receive
+   reference-tagged rows and current/reference wrappers can receive
+   public-tagged rows without publishing unrelated app ids.
+4. Updated the static netcode parity gate and interop note to keep the
+   compatibility exception explicit.
+
 ### Task A523: Reconstruct botlib item-goal visibility tail gate [COMPLETED]
 Priority: High
 Primary areas: `src/code/botlib/be_ai_goal.c`,
@@ -10532,6 +10816,53 @@ Verification:
   - Result: `35 passed, 2 failed`; the two failures are unrelated existing
     HUD assertions for `CG_DrawTeamInfoRow` width and `CG_DrawAreaPowerUp`
     sprite gating on the dirty worktree.
+
+### Task A129b: Reconcile team overlay compact transport and snapshot vitals [COMPLETED]
+Priority: High
+Primary areas: `src/code/game/g_team.c`,
+`src/code/cgame/cg_snapshot.c`, `src/code/cgame/cg_draw.c`,
+`docs/reverse-engineering/cgame-clientinfo.md`,
+`docs/reverse-engineering/cgame-mapping.md`,
+`docs/reverse-engineering/qagame-mapping.md`,
+`tests/test_cgame_hud_parity.py`, `tests/test_cgame_snapshot_parity.py`,
+`tests/test_cgame_displaycontext_parity.py`
+Parity estimate: **before 99% -> after 100%** for the focused team-overlay
+transport, snapshot-vitals, and classic HUD draw wiring. Repo-wide parity
+remains **98%** because unrelated dirty worktree changes and non-Windows/runtime
+evidence lanes are unchanged.
+
+Completed work:
+
+1. Rechecked Binary Ninja HLIL for qagame `0x10068490 ->
+   TeamplayInfoMessage`, cgame `0x100487B0 -> CG_ParseTeamInfo`, and cgame
+   `0x10009DA0 -> CG_DrawTeamOverlay`.
+2. Reconstructed qagame `TeamplayInfoMessage` as the compact retail `tinfo`
+   producer: rows now serialize only client numbers after the existing
+   top-eight selection and stable client-number sort.
+3. Preserved cgame compatibility with legacy six-field `tinfo` rows while
+   keeping retail compact rows as the normal producer/consumer contract.
+4. Added snapshot handoff wiring that mirrors replicated `entityState_t`
+   location, health, armor, current weapon, and powerup bits into the existing
+   source-compatibility `clientInfo_t` sidecars after server-command clientinfo
+   refreshes.
+5. Updated the classic team overlay drawer to read row vitals from
+   `cg_entities[client].currentState`, matching retail `CG_DrawTeamOverlay`,
+   and refreshed the clientinfo/qagame/cgame mapping notes.
+
+Verification:
+
+- `python -m pytest tests/test_cgame_hud_parity.py -k "team_overlay or team_info_overlay" -q`
+  - Result: `5 passed, 27 deselected`.
+- `python -m pytest tests/test_cgame_snapshot_parity.py -k "snapshot_handoff_wiring or team_overlay_snapshot_sync" -q`
+  - Result: `2 passed, 15 deselected`.
+- `python -m pytest tests/test_cgame_displaycontext_parity.py -k "clientinfo_score_tinfo" -q`
+  - Result: `1 passed, 209 deselected`.
+- `python -m pytest tests/test_cgame_hud_parity.py tests/test_cgame_snapshot_parity.py tests/test_bg_playerstate_bridge_parity.py -q`
+  - Result: `54 passed`.
+- `python -m pytest tests/test_cgame_displaycontext_parity.py -k "clientinfo_score_tinfo or clientinfo_early_retail_offset_map or server_command_dispatch" -q`
+  - Result: `2 passed, 208 deselected`.
+- `python -m pytest tests/test_netcode_parity_manifest.py -k "entity_state or playerstate" -q`
+  - Result: `2 passed, 42 deselected`.
 
 ### Task A128: Close map selection UI ownerdraw parity [COMPLETED]
 Priority: High
@@ -21061,3 +21392,38 @@ exports, confirmed retail export names are tried before SDK aliases, and
 documented that neither retail nor SRP uses `SteamAPI_RestartAppIfNecessary`
 for self-relaunch. The evidence is recorded in
 `docs/reverse-engineering/quakelive_steam_mapping_round_485.md`.
+
+### Task 154: Team Deathmatch gametype wiring and scoring lockout recheck [COMPLETED]
+Parity estimate: **before 96% -> after 98%** for the focused Team Deathmatch
+qagame/cgame wiring surface, and **before 99% -> after 99%** for broader
+gameplay/gametype parity. This pass rechecked retail `GT_TEAM` factory aliases,
+normal-deathmatch spawn routing, ready-up/team-presence gates, `scores_tdm`,
+`tdmstats`, cgame TDM/Freeze feeders, and the `AddScore` team-score forwarding
+lane, then restored the missing retail intermission guard before score plums,
+personal score mutation, TDM team-score mutation, and rank recalculation. The
+evidence is recorded in
+`docs/reverse-engineering/team-deathmatch-gametype-wiring-reconstruction-2026-06-12.md`.
+
+### Task 155: Freeze Tag gametype wiring and round-complete medal recheck [COMPLETED]
+Parity estimate: **before 94% -> after 95%** for the focused Freeze Tag
+qagame/cgame wiring surface, and **before 99% -> after 99%** for broader
+gameplay/gametype parity. This pass rechecked retail `GT_FREEZE` round-state
+helpers, frozen-player marker transport, helper thaw events, `scores_ft`,
+`tdmstats`, cgame TDM/Freeze feeders, thaw-progress export visibility, and the
+round-complete controller tail, then mapped the Freeze `ACCURACY` / `PERFECT`
+round-end medal pass and restored rank recalculation after round score updates.
+Exact medal reconstruction remains a follow-up because retail uses round-scoped
+shot/hit/damage counters that need their producer sites wired first. The evidence is recorded in
+`docs/reverse-engineering/freezetag-gametype-wiring-reconstruction-2026-06-12.md`.
+
+### Task 156: Duel gametype wiring and queued-intermission scoreboard detail recheck [COMPLETED]
+Parity estimate: **before 96% -> after 97%** for the focused Duel
+qagame/cgame wiring surface, and **before 99% -> after 99%** for broader
+gameplay/gametype parity. This pass rechecked retail `GT_TOURNAMENT` / Duel
+lifecycle, queue promotion/demotion, `so` / `pq` spectator metadata, ready-delay
+actions, `scores_duel`, cgame placement scorestats, spectator HUD wiring,
+forfeit, tie/overtime, and exit-level loser demotion. It restored the retail
+queued-intermission Duel scoreboard detail reveal by extending
+`G_ShouldRevealDuelScoreboardDetails` to treat both `level.intermissionQueued`
+and `level.intermissiontime` as all-detail states. The evidence is recorded in
+`docs/reverse-engineering/duel-gametype-wiring-reconstruction-2026-06-12.md`.

@@ -80,7 +80,7 @@ def test_setteam_recovered_executor_boundary_matches_retail_wiring() -> None:
 	assert "client->pers.teamState.state = TEAM_BEGIN;" in apply_block
 	assert "G_RankSendPlayerStats( ent, qtrue );" in apply_block
 	assert "G_RankResetClientStats( client );" in apply_block
-	assert "player_die( ent, ent, ent, 100000, MOD_SUICIDE );" in apply_block
+	assert "player_die( ent, ent, ent, 100000, MOD_SWITCHTEAM );" in apply_block
 	assert "client->sess.spectatorTime = (int)time( NULL );" in apply_block
 	assert "client->sess.sessionTeam = team;" in apply_block
 	assert "client->sess.spectatorState = specState;" in apply_block
@@ -662,7 +662,7 @@ def test_game_direct_admin_access_command_tranche_matches_retail_table() -> None
 	assert 'trap_SendServerCommand( -1, va( "pcp \\"%s has aborted the match\\\\n\\"", callerName ) );' in abort_block
 	assert 'trap_SendServerCommand( -1, "pcp \\"The server has aborted the match\\\\n\\"" );' in abort_block
 	assert "G_ResetTimeoutState();" in abort_block
-	assert "G_SetGameState( GAME_STATE_PRE_GAME );" in abort_block
+	assert "G_SetWarmupTime( -1 );" in abort_block
 	assert "G_UpdateMatchStateConfigString();" in abort_block
 	assert 'trap_SendConsoleCommand( EXEC_APPEND, "map_restart 3\\n" );' in abort_block
 
@@ -1330,7 +1330,13 @@ def test_timeout_race_and_direct_command_helpers_match_recovered_boundaries() ->
 
 	assert "void G_UpdateTimeoutConfigStrings( void ) {" in game_match_state
 	assert "static void G_UpdateRoundStartConfigString( void ) {" in game_match_state
-	assert "if ( level.roundState != ROUNDSTATE_ACTIVE ) {" in game_match_state
+	assert "if ( level.roundState == ROUNDSTATE_ACTIVE ) {" in game_match_state
+	assert "g_gametype.integer == GT_CLAN_ARENA && level.roundState == ROUNDSTATE_COMPLETE" in game_match_state
+	assert "g_gametype.integer == GT_ATTACK_DEFEND" in game_match_state
+	assert "level.adRoundState == AD_ROUNDSTATE_COMPLETE || level.adRoundState == AD_ROUNDSTATE_EXIT" in game_match_state
+	assert "g_gametype.integer == GT_RED_ROVER" in game_match_state
+	assert "level.rrRoundState == RR_ROUNDSTATE_COMPLETE || level.rrRoundState == RR_ROUNDSTATE_EXIT" in game_match_state
+	assert "trap_SetConfigstring( CS_ROUND_START_TIME, va( \"%i\", -1 ) );" in game_match_state
 	assert "trap_SetConfigstring( CS_ROUND_START_TIME" in game_match_state
 	assert "trap_SetConfigstring( CS_TIMEOUT_START_TIME" in game_match_state
 	assert "trap_SetConfigstring( CS_TIMEOUT_EXPIRE_TIME" in game_match_state

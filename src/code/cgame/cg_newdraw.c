@@ -1378,7 +1378,6 @@ static void CG_DrawRaceStatusAndTimes( rectDef_t *rect, float scale, vec4_t colo
 
 //static int sortedTeamPlayers[TEAM_MAXOVERLAY];
 //static int numSortedTeamPlayers;
-int drawTeamOverlayModificationCount = -1;
 
 //static char systemChat[256];
 //static char teamChat1[256];

@@ -1566,7 +1566,7 @@ spectators while leaving the public row redacted for active opponents.
 ==================
 */
 static qboolean G_ShouldRevealDuelScoreboardDetails( const gentity_t *viewer, int clientNum ) {
-	if ( level.intermissiontime ) {
+	if ( level.intermissionQueued || level.intermissiontime ) {
 		return qtrue;
 	}
 
@@ -3836,7 +3836,7 @@ static void G_ApplyTeamChange( gentity_t *ent, team_t team, spectatorState_t spe
 		// Kill him (makes sure he loses flags, etc)
 		ent->flags &= ~FL_GODMODE;
 		client->ps.stats[STAT_HEALTH] = ent->health = 0;
-		player_die( ent, ent, ent, 100000, MOD_SUICIDE );
+		player_die( ent, ent, ent, 100000, MOD_SWITCHTEAM );
 	} else if ( g_gametype.integer != GT_RED_ROVER || team == TEAM_SPECTATOR ) {
 		G_RankResetClientStats( client );
 	}
@@ -7504,9 +7504,7 @@ static void Cmd_Abort_f( gentity_t *ent ) {
 	}
 
 	G_ResetTimeoutState();
-	level.warmupTime = -1;
-	trap_SetConfigstring( CS_WARMUP, va( "%i", level.warmupTime ) );
-	G_SetGameState( GAME_STATE_PRE_GAME );
+	G_SetWarmupTime( -1 );
 	G_UpdateMatchStateConfigString();
 	trap_SendConsoleCommand( EXEC_APPEND, "map_restart 3\n" );
 }

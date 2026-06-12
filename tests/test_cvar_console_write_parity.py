@@ -152,7 +152,7 @@ def test_cvar_vm_bounded_registration_matches_retail_wrapper_and_layout() -> Non
 	)
 	register_bounded_block = _extract_function_block(
 		cvar,
-		"void\tCvar_RegisterBounded( vmCvar_t *vmCvar, const char *varName, const char *defaultValue, const char *minimumValue, const char *maximumValue, int flags ) {",
+		"cvar_t\t*Cvar_RegisterBounded( vmCvar_t *vmCvar, const char *varName, const char *defaultValue, const char *minimumValue, const char *maximumValue, int flags ) {",
 	)
 	range_import_block = _extract_function_block(
 		cl_cgame,
@@ -163,10 +163,11 @@ def test_cvar_vm_bounded_registration_matches_retail_wrapper_and_layout() -> Non
 	assert "004ce460    int32_t* sub_4ce460" in hlil
 	assert "arg6 | 0x1000" in hlil
 	assert "int\t\t\tinteger;\n\tint\t\t\tflags;\n\tchar\t\tstring[MAX_CVAR_VALUE_STRING];" in q_shared
-	assert "void\tCvar_RegisterBounded(" in qcommon
+	assert "cvar_t\t*Cvar_RegisterBounded(" in qcommon
 	assert "flags |= CVAR_VM_CREATED;" in get_bounded_block
 	assert 'Com_Error( ERR_FATAL, "Cvar_Get: NULL parameter" );' in get_bounded_block
 	assert "vmCvar->flags = cv->flags;" in register_block
 	assert "Cvar_GetBounded( varName, defaultValue, minimumValue, maximumValue, flags | CVAR_VM_CREATED );" in register_bounded_block
+	assert "return cv;" in register_bounded_block
 	assert "vmCvar->flags = cv->flags;" in register_bounded_block
 	assert "Cvar_RegisterBounded( vmCvar, varName, defaultValue, minimumValue, maximumValue, flags );" in range_import_block

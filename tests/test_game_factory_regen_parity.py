@@ -605,10 +605,15 @@ def test_weapon_respawn_zero_drives_retail_weapon_stay_pickup_path() -> None:
 	pickup_weapon_body = _function_body(g_items, "int Pickup_Weapon (gentity_t *ent, gentity_t *other)")
 	touch_item_body = _function_body(g_items, "void Touch_Item (gentity_t *ent, gentity_t *other, trace_t *trace)")
 	sync_weapon_respawn_body = _function_body(g_items, "static void G_SyncWeaponRespawnCvarForItem( const gitem_t *item )")
+	weapon_stay_event_body = _function_body(g_items, "static void G_AddWeaponStayPickupEvent( gentity_t *ent, gentity_t *other )")
 
 	assert "1004e95d  if (data_1059c4ac == 0)" in qagame_hlil
 	assert "1004e9fe  if (data_1059c4ac == 0 && *(arg3 + 0xac) == 0)" in qagame_hlil
+	assert "1004ea59  if (data_1059c4ac == 0)" in qagame_hlil
+	assert "1004eaa4          sub_1006c660(arg1, *(arg3 + 0xa8), 0xf)" in qagame_hlil
 	assert "1004eab0  return data_1059c4ac" in qagame_hlil
+	assert "1004f1c8                      if ((*(arg1 i+ 0x250) & 0x1000) != 0)" in qagame_hlil
+	assert "1004f1d5                      if (arg2 != 0)" in qagame_hlil
 	assert '10071aac  char const data_10071aac[0x10] = "g_weaponRespawn", 0' in cgame_strings
 	assert "if (arg5 != 0 || (*(arg1 + 0xcc) & 1 << ecx.b) == 0" in cgame_hlil
 
@@ -629,12 +634,19 @@ def test_weapon_respawn_zero_drives_retail_weapon_stay_pickup_path() -> None:
 	assert "g_weaponRespawn.integer = cvarInteger;" in sync_weapon_respawn_body
 	assert touch_item_body.index("G_SyncWeaponRespawnCvarForItem( ent->item );") < touch_item_body.index("BG_CanItemBeGrabbed")
 	assert touch_item_body.index("BG_CanItemBeGrabbed") < touch_item_body.index("respawn = Pickup_Weapon(ent, other);")
+	assert touch_item_body.index("if ( ent->flags & FL_DROPPED_ITEM )") < touch_item_body.index("if ( !respawn )")
 	assert "if ( g_weaponRespawn.integer == 0 && !( ent->flags & FL_DROPPED_ITEM )" in pickup_weapon_body
 	assert "&& other->client->ps.ammo[weapon] != 0 ) {" in pickup_weapon_body
 	assert "quantity = ent->count;" in pickup_weapon_body
 	assert "if ( quantity == 0 ) {" in pickup_weapon_body
 	assert "quantity = ent->item->quantity;" in pickup_weapon_body
 	assert "other->client->ps.ammo[weapon] = ent->item->quantity;" in pickup_weapon_body
+	assert "if ( g_weaponRespawn.integer == 0 ) {" in pickup_weapon_body
+	assert "G_AddWeaponStayPickupEvent( ent, other );" in pickup_weapon_body
+	assert pickup_weapon_body.index("G_AddWeaponStayPickupEvent( ent, other );") < pickup_weapon_body.index("return g_weaponRespawn.integer;")
+	assert "other->client->pers.predictItemPickup" in weapon_stay_event_body
+	assert "G_AddPredictableEvent( other, EV_ITEM_PICKUP, ent->s.modelindex );" in weapon_stay_event_body
+	assert "G_AddEvent( other, EV_ITEM_PICKUP, ent->s.modelindex );" in weapon_stay_event_body
 	assert "G_GetConfiguredWeaponRespawnSeconds" not in g_items
 	assert "G_GetAmmoPackPickupCount" not in pickup_weapon_body
 	assert 'Com_Error( ERR_DROP, "Pickup_Weapon: item has infinite ammo" );' in pickup_weapon_body

@@ -24,6 +24,11 @@ def test_clan_arena_round_controller_helpers_match_retail_mapping_surface() -> N
 	assert "if ( g_gametype.integer == GT_CLAN_ARENA ) {" in active_c
 	assert "CA_RoundStateTransition( qtrue );" in active_c
 	assert "level.roundPendingExit = G_CAFZCheckExitRules( qfalse );" in active_c
+	assert "static void G_CASendRoundWinnerPrint( team_t winner, const int counts[TEAM_NUM_TEAMS], const int health[TEAM_NUM_TEAMS] ) {" in active_c
+	assert 'print \\"%s%s TEAM^3 WINS the round!^7 (%i hp remaining)\\n\\"' in active_c
+	assert 'print \\"%s%s TEAM^3 WINS the round!^7 (%i players remaining)\\n\\"' in active_c
+	assert 'print \\"%s%s TEAM^3 WINS the round!^7 (%s%i^7 hp vs %s%i^7 hp)\\n\\"' in active_c
+	assert 'G_Error( "CA_RoundStateTransition: invalid state" );' in active_c
 	assert "G_SetAllActiveClientAttackLockout( qtrue );" in active_c
 	assert "G_SetAllActiveClientAttackLockout( qfalse );" in active_c
 	assert "state = G_CAResolveRoundState();" in team_c
@@ -62,6 +67,7 @@ def test_freeze_round_controller_helpers_match_retail_mapping_surface() -> None:
 	client_c = _read("src/code/game/g_client.c")
 	freeze_c = _read("src/code/game/g_freeze.c")
 	main_c = _read("src/code/game/g_main.c")
+	qagame_hlil = _read("references/hlil/quakelive/qagamex86.dll/qagamex86.dll.bndb_hlil_split/qagamex86.dll.bndb_hlil_part02.txt")
 
 	assert "int G_FreezeResolveRoundState( void ) {" in active_c
 	assert "static qboolean G_FreezeShouldCompleteRound( const int counts[TEAM_NUM_TEAMS] ) {" in active_c
@@ -86,6 +92,11 @@ def test_freeze_round_controller_helpers_match_retail_mapping_surface() -> None:
 	assert "G_SetAllActiveClientAttackLockout( qtrue );" in active_c
 	assert "G_SetAllActiveClientAttackLockout( qfalse );" in active_c
 	assert "Freeze_RoundStateTransition( qtrue );" in active_c
+	freeze_handle_index = active_c.index("static void G_FreezeHandleRoundEnd( team_t winner ) {")
+	freeze_rank_index = active_c.index("CalculateRanks();", freeze_handle_index)
+	assert active_c.index("trap_SetConfigstring( CS_SCORES1", freeze_handle_index) < freeze_rank_index
+	assert active_c.index("level.freezeLivingHealth[TEAM_RED]", freeze_handle_index) < freeze_rank_index
+	assert freeze_rank_index < active_c.index("level.roundState = ROUNDSTATE_COMPLETE;", freeze_handle_index)
 	assert "if ( G_FreezeResolveRoundState() != ROUNDSTATE_ACTIVE ) {" in freeze_c
 	assert "roundState = G_FreezeResolveRoundState();" in client_c
 	assert "client->freezeThawHelperActive = qfalse;" in client_c
@@ -97,6 +108,14 @@ def test_freeze_round_controller_helpers_match_retail_mapping_surface() -> None:
 	assert "for ( i = 0; i < level.maxclients; i++ )" not in freeze_c
 	assert "freezeNextThawTick" not in main_c
 	assert "client->freezeProtectedUntil = G_ShiftTimeoutAbsoluteTime( client->freezeProtectedUntil, msec );" in main_c
+	assert "1004c619                      *(*ecx_20 + 0xbcc) = 0" in qagame_hlil
+	assert "1004c621                      *(*ecx_20 + 0xbc8) = 0" in qagame_hlil
+	assert "1004c629                      *(*ecx_20 + 0xbc4) = 0" in qagame_hlil
+	assert "1004c8df                      int32_t ecx_31 = *(eax_69 + 0xbc4)" in qagame_hlil
+	assert '1004c92c                              "ACCURACY")' in qagame_hlil
+	assert "1004c949                      if (*(eax_75 + 0x348) == ebx_1 && *(eax_75 + 0xbcc) == 0)" in qagame_hlil
+	assert '1004c96e                              "PERFECT")' in qagame_hlil
+	assert "1004c99b          sub_10056070()" in qagame_hlil
 
 
 def test_red_rover_controller_readback_helpers_match_retail_mapping_surface() -> None:
@@ -132,6 +151,7 @@ def test_red_rover_controller_readback_helpers_match_retail_mapping_surface() ->
 	assert "level.rrPendingRoundState = RR_ROUNDSTATE_ACTIVE;" in active_c
 	assert "state == RR_ROUNDSTATE_INACTIVE && level.roundTransitionTime == ROUND_TRANSITION_NONE" in active_c
 	assert "state == RR_ROUNDSTATE_ACTIVE || state == RR_ROUNDSTATE_INFECTION_SEED" in active_c
+	assert 'G_Error( "RR_RoundStateTransition: invalid state" );' in active_c
 	assert "G_RRResolveRoundState();" in cmds_c
 	assert "if ( G_RRResolveRoundState() != RR_ROUNDSTATE_ACTIVE ) {" in client_c
 	assert "void G_RRResetClientForRound( gentity_t *ent ) {" in client_c

@@ -542,6 +542,8 @@ const char *QL_Steamworks_GetAuthTicketApiLabel( void );
 
 const char *QL_Steamworks_GetAuthTicketModernGapLabel( void );
 
+qboolean QL_Steamworks_IsUserLoggedOn( void );
+
 qboolean QL_Steamworks_RequestAuthTicket( char *ticketBuffer, size_t ticketBufferSize, int *ticketLength, uint32_t *ticketHandle );
 
 qboolean QL_Steamworks_CancelAuthTicket( uint32_t ticketHandle );
@@ -1427,6 +1429,15 @@ QL_Steamworks_GetAuthTicketModernGapLabel
 */
 static inline const char *QL_Steamworks_GetAuthTicketModernGapLabel( void ) {
 	return "unavailable";
+}
+
+/*
+=============
+QL_Steamworks_IsUserLoggedOn
+=============
+*/
+static inline qboolean QL_Steamworks_IsUserLoggedOn( void ) {
+	return qfalse;
 }
 
 /*

@@ -103,6 +103,8 @@ typedef struct {
 	qboolean library_available;
 	qboolean init_result;
 	qboolean user_available;
+	qboolean user_logged_on_result;
+	int user_logged_on_calls;
 	EBeginAuthSessionResult auth_result;
 	uint8_t ticket[QLR_TICKET_BUFFER];
 	uint32_t ticket_length;
@@ -462,6 +464,8 @@ static qlr_steamworks_mock_state_t qlr_mock_state = {
 	.library_available = qtrue,
 	.init_result = qtrue,
 	.user_available = qtrue,
+	.user_logged_on_result = qtrue,
+	.user_logged_on_calls = 0,
 	.auth_result = k_EBeginAuthSessionResultOK,
 	.ticket = { 0x12, 0x34, 0x56, 0x78 },
 	.ticket_length = 4,
@@ -866,6 +870,8 @@ void *QLR_SteamAPI_SteamGameServerNetworking( void );
 
 static CSteamID *QLR_FASTCALL QLR_SteamUser_GetSteamID( void *self, void *unused, CSteamID *outSteamId );
 
+static qboolean QLR_FASTCALL QLR_SteamUser_BLoggedOn( void *self, void *unused );
+
 static void QLR_FASTCALL QLR_SteamUser_StartVoiceRecording( void *self, void *unused );
 
 static void QLR_FASTCALL QLR_SteamUser_StopVoiceRecording( void *self, void *unused );
@@ -962,6 +968,8 @@ QLR_EXPORT void QLR_SteamworksMock_Reset( void ) {
 	qlr_mock_state.library_available = qtrue;
 	qlr_mock_state.init_result = qtrue;
 	qlr_mock_state.user_available = qtrue;
+	qlr_mock_state.user_logged_on_result = qtrue;
+	qlr_mock_state.user_logged_on_calls = 0;
 	qlr_mock_state.auth_result = k_EBeginAuthSessionResultOK;
 	memcpy( qlr_mock_state.ticket, (uint8_t[]){ 0x12, 0x34, 0x56, 0x78 }, 4 );
 	qlr_mock_state.ticket_length = 4;
@@ -1339,6 +1347,17 @@ Toggle whether SteamAPI_SteamUser returns a valid handle.
 */
 QLR_EXPORT void QLR_SteamworksMock_SetUserAvailable( qboolean available ) {
 	qlr_mock_state.user_available = available;
+}
+
+/*
+=============
+QLR_SteamworksMock_SetUserLoggedOn
+
+Toggle whether SteamUser()->BLoggedOn reports an authenticated user.
+=============
+*/
+QLR_EXPORT void QLR_SteamworksMock_SetUserLoggedOn( qboolean loggedOn ) {
+	qlr_mock_state.user_logged_on_result = loggedOn ? qtrue : qfalse;
 }
 
 /*
@@ -2385,6 +2404,15 @@ QLR_SteamworksMock_GetSteamGameServerLoggedOnCalls
 */
 QLR_EXPORT int QLR_SteamworksMock_GetSteamGameServerLoggedOnCalls( void ) {
 	return qlr_mock_state.steam_game_server_logged_on_calls;
+}
+
+/*
+=============
+QLR_SteamworksMock_GetUserLoggedOnCalls
+=============
+*/
+QLR_EXPORT int QLR_SteamworksMock_GetUserLoggedOnCalls( void ) {
+	return qlr_mock_state.user_logged_on_calls;
 }
 
 /*
@@ -4383,6 +4411,7 @@ void *QLR_SteamAPI_SteamUser( void ) {
 	static void *vtable[0x30 / 4 + 1];
 	static qlr_steamworks_mock_interface_t iface = { vtable };
 
+	vtable[0x04 / 4] = QLR_SteamUser_BLoggedOn;
 	vtable[0x08 / 4] = QLR_SteamUser_GetSteamID;
 	vtable[0x1c / 4] = QLR_SteamUser_StartVoiceRecording;
 	vtable[0x20 / 4] = QLR_SteamUser_StopVoiceRecording;
@@ -4402,6 +4431,19 @@ static qboolean QLR_SteamworksMock_IsAvatarHandle( int image ) {
 		( image == qlr_mock_state.avatar_handle_small ||
 			image == qlr_mock_state.avatar_handle_medium ||
 			image == qlr_mock_state.avatar_handle_large );
+}
+
+/*
+=============
+QLR_SteamUser_BLoggedOn
+=============
+*/
+static qboolean QLR_FASTCALL QLR_SteamUser_BLoggedOn( void *self, void *unused ) {
+	(void)self;
+	(void)unused;
+
+	qlr_mock_state.user_logged_on_calls++;
+	return qlr_mock_state.user_logged_on_result ? qtrue : qfalse;
 }
 
 /*
@@ -8021,6 +8063,15 @@ QLR_EXPORT qboolean QLR_Steamworks_Request( char *ticketBuffer, size_t ticketBuf
 
 /*
 =============
+QLR_Steamworks_IsUserLoggedOn
+=============
+*/
+QLR_EXPORT qboolean QLR_Steamworks_IsUserLoggedOn( void ) {
+	return QL_Steamworks_IsUserLoggedOn();
+}
+
+/*
+=============
 QLR_Steamworks_CancelTicket
 
 Wrapper exposing QL_Steamworks_CancelAuthTicket for ctypes.
@@ -9363,6 +9414,15 @@ QLR_Steamworks_Validate
 */
 QLR_EXPORT qboolean QLR_Steamworks_Validate( const char *ticketHex, ql_auth_response_t *response ) {
 	return QL_Steamworks_ValidateTicket( ticketHex, response );
+}
+
+/*
+=============
+QLR_Steamworks_IsUserLoggedOn
+=============
+*/
+QLR_EXPORT qboolean QLR_Steamworks_IsUserLoggedOn( void ) {
+	return qfalse;
 }
 
 /*

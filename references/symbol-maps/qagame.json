@@ -5455,7 +5455,7 @@
         "0x1007E814"
       ],
       "relocation_refs": [],
-      "comment": "Harvester skull-drop helper matched by the carried-skull count in client persistant state, the exact `Red Skull` / `Blue Skull` item lookups, and the death-path call that spawns the dropped cubes before the corpse cleanup continues."
+      "comment": "Harvester skull-drop helper matched by the `ps.generic1 & 0x3f` carried-skull count, the `ps.generic1 &= 0xc0` clear, the exact `Red Skull` / `Blue Skull` item lookups, the `g_dropSkulls` carried-skull loop, and the `GT_HARVESTER && meansOfDeath != MOD_SWITCHTEAM` death-path call before corpse cleanup."
     },
     {
       "address": "0x10046D80",
@@ -5967,7 +5967,7 @@
         "0x100855B4"
       ],
       "relocation_refs": [],
-      "comment": "Exact weapon pickup helper from g_items.c, anchored by `Pickup_Weapon: item has infinite ammo`. Retail grants the weapon bit, applies the dropped-versus-map ammo split, preserves the grappling-hook infinite-ammo path, and returns the team or duel weapon respawn cvar."
+      "comment": "Exact weapon pickup helper from g_items.c, anchored by `Pickup_Weapon: item has infinite ammo`. Retail grants the weapon bit, applies the dropped-versus-map ammo split, preserves the grappling-hook infinite-ammo path, emits the item pickup event inside the zero-respawn weapon-stay branch, and returns the weapon respawn cvar."
     },
     {
       "address": "0x1004EAC0",
@@ -8188,7 +8188,7 @@
         "0x10089DA4"
       ],
       "relocation_refs": [],
-      "comment": "Team overlay payload builder using the retail tinfo client-command format."
+      "comment": "Team overlay payload builder using the compact retail `tinfo %i %s` client-command format. HLIL formats one ` %i` client-number entry per selected teammate; health, armor, weapon, powerups, and location are not serialized here."
     },
     {
       "address": "0x10068670",
@@ -8198,7 +8198,7 @@
       "signature": "void CheckTeamStatus(void)",
       "string_refs": [],
       "relocation_refs": [],
-      "comment": "Exact periodic team-status updater from g_team.c::CheckTeamStatus. It refreshes each connected red and blue client's cached location via Team_GetLocation and then emits the current TeamplayInfoMessage overlay for those clients."
+      "comment": "Scheduled team-status updater from g_team.c::CheckTeamStatus. HLIL runs when lastTeamLocationTime is a due absolute timestamp, resets it to -1, refreshes each connected red/blue client's ps.location via Team_GetLocation, and emits compact TeamplayInfoMessage overlays."
     },
     {
       "address": "0x10068770",
@@ -8208,7 +8208,7 @@
       "signature": "void Team_SetFlagStatus(int team, flagStatus_t status)",
       "string_refs": [],
       "relocation_refs": [],
-      "comment": "Exact flag-status publisher from g_team.c::Team_SetFlagStatus. It updates the stored red, blue, or neutral flag state, republishes CS_FLAGSTATUS with the One Flag remap when needed, and fans out the adjacent rankings flag-status event helper."
+      "comment": "Exact flag-status publisher from g_team.c::Team_SetFlagStatus. It updates the stored red, blue, or neutral flag state, republishes CS_FLAGSTATUS with the retail CTF remap `0/1/*/*/2` or One Flag remap `0/1/2/3/4`, and fans out the adjacent rankings flag-status event helper."
     },
     {
       "address": "0x10068850",
@@ -8328,7 +8328,7 @@
       "signature": "int Team_TouchOurFlag(gentity_t *ent, gentity_t *other, int team)",
       "string_refs": [],
       "relocation_refs": [],
-      "comment": "Home-flag touch handler anchored by the exact returned the %s flag and TEAM CAPTURED the flag prints plus the assist/capture award side effects from g_team.c::Team_TouchOurFlag."
+      "comment": "Home/base touch handler anchored by the exact returned the %s flag and TEAM CAPTURED the flag prints plus the assist/capture award side effects from g_team.c::Team_TouchOurFlag. In One Flag it treats the red/blue base entities as capture targets for a neutral-flag carrier and clears PW_NEUTRALFLAG on score."
     },
     {
       "address": "0x10069E30",
@@ -8338,7 +8338,7 @@
       "signature": "int Team_TouchEnemyFlag(gentity_t *ent, gentity_t *other, int team)",
       "string_refs": [],
       "relocation_refs": [],
-      "comment": "Exact enemy-flag touch handler from g_team.c::Team_TouchEnemyFlag. It applies the Attack and Defend active-phase gate, updates the carried-flag powerup and status configstring, awards the pickup bonus, starts the hold timer, and plays the pickup sound."
+      "comment": "Exact enemy-flag touch handler from g_team.c::Team_TouchEnemyFlag. It applies the Attack and Defend active-phase gate, grants PW_REDFLAG/PW_BLUEFLAG or PW_NEUTRALFLAG, publishes FLAG_TAKEN or the One Flag FLAG_TAKEN_RED/FLAG_TAKEN_BLUE status, awards the pickup bonus, starts the hold timer, and plays the pickup sound."
     },
     {
       "address": "0x1006A040",
@@ -8348,7 +8348,7 @@
       "signature": "int Pickup_Team(gentity_t *ent, gentity_t *other)",
       "string_refs": [],
       "relocation_refs": [],
-      "comment": "Exact team-item pickup dispatcher from g_team.c::Pickup_Team. It handles obelisk and harvester team items inline, resolves red, blue, or neutral flag ownership from the classname, and routes CTF, One Flag, and Attack and Defend touches into Team_TouchOurFlag or Team_TouchEnemyFlag with the retail team gating."
+      "comment": "Exact team-item pickup dispatcher from g_team.c::Pickup_Team. It handles obelisk and harvester team items inline, resolves red, blue, or neutral flag ownership from the classname, routes neutral-flag touches through Team_TouchEnemyFlag in GT_1FCTF, routes enemy base touches through Team_TouchOurFlag for One Flag captures, and keeps the CTF/Attack-Defend red-blue flag split."
     },
     {
       "address": "0x1006AAF0",
@@ -9953,7 +9953,7 @@
       "signature": "int G_DroppedPowerupTouchCaptureZone(gentity_t *trigger, gentity_t *ent)",
       "string_refs": [],
       "relocation_refs": [],
-      "comment": "Descriptive retail-only dropped-powerup trigger bridge for legacy `trigger_capturezone` volumes. It resolves the red or blue base flag from the trigger-side team token, falls back through the linked owner entity when the powerup is proxied through a client-backed wrapper, and then routes the touch through `Team_TouchOurFlag`."
+      "comment": "Descriptive retail-only dropped-powerup trigger bridge for legacy `trigger_capturezone` volumes. It resolves the red or blue base flag from the trigger-side team token, falls back through the linked owner entity when the powerup is proxied through a client-backed wrapper, and then routes the touch through `Team_TouchOurFlag`, covering the older non-item CTF capture wiring."
     },
     {
       "address": "0x1006BE70",
