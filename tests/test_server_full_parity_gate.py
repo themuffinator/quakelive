@@ -160,9 +160,13 @@ def _build_server_full_parity_gate_report() -> dict[str, Any]:
 		and "QL_Steamworks_ServerShutdown();" in sv_init
 		and "void SV_SteamServerInitCallbacks( void ) {" in sv_client
 		and "qboolean QL_Steamworks_RegisterServerCallbacks( const ql_steam_server_callback_bindings_t *bindings ) {" in platform_steamworks
+		and "if ( !com_sv_running || !com_sv_running->integer ) {" in sv_main
+		and "if ( svs.clients && sv_maxclients ) {" in sv_main
+		and "if ( !sv.gameClients || sv.gameClientSize <= 0 ) {" in sv_main
 		and "test_server_game_server_wrappers_reconstruct_mapped_server_slots" in platform_services_tests
 		and "test_server_callback_auth_owner_reconstructs_retail_steam_gameserver_bundle" in platform_services_tests
 		and "test_server_spawn_and_shutdown_reconstruct_retail_steam_identity_and_heartbeat_control" in platform_services_tests
+		and "test_steam_gameserver_published_state_launch_callback_is_startup_safe" in platform_services_tests
 		and "test_fake_vacban_constants_match_hlil" in fake_vacban_tests
 		and "test_fake_vacban_telemetry_payload" in fake_vacban_tests
 	)
@@ -180,10 +184,28 @@ def _build_server_full_parity_gate_report() -> dict[str, Any]:
 			"shutdown_owner_present": "QL_Steamworks_ServerShutdown();" in sv_init,
 			"callback_owner_present": "void SV_SteamServerInitCallbacks( void ) {" in sv_client,
 			"platform_callback_registration_present": "qboolean QL_Steamworks_RegisterServerCallbacks( const ql_steam_server_callback_bindings_t *bindings ) {" in platform_steamworks,
+			"server_frame_startup_guard_present": (
+				"if ( !QL_Steamworks_ServerIsInitialised() ) {" in sv_main
+				and "if ( !com_sv_running || !com_sv_running->integer ) {" in sv_main
+				and "QL_Steamworks_RunServerCallbacks();" in sv_main
+				and sv_main.index("if ( !QL_Steamworks_ServerIsInitialised() ) {") < sv_main.index(
+					"if ( !com_sv_running || !com_sv_running->integer ) {"
+				)
+				and sv_main.index("if ( !com_sv_running || !com_sv_running->integer ) {") < sv_main.index(
+					"QL_Steamworks_RunServerCallbacks();"
+				)
+			),
+			"published_state_startup_guard_present": (
+				"if ( svs.clients && sv_maxclients ) {" in sv_main
+				and "for ( i = 0, cl = svs.clients; i < sv_maxclients->integer; i++, cl++ ) {" in sv_main
+				and "if ( !sv.gameClients || sv.gameClientSize <= 0 ) {" in sv_main
+				and "playerState = SV_GameClientNum( i );" in sv_main
+			),
 			"focused_validation_present": (
 				"test_server_game_server_wrappers_reconstruct_mapped_server_slots" in platform_services_tests
 				and "test_server_callback_auth_owner_reconstructs_retail_steam_gameserver_bundle" in platform_services_tests
 				and "test_server_spawn_and_shutdown_reconstruct_retail_steam_identity_and_heartbeat_control" in platform_services_tests
+				and "test_steam_gameserver_published_state_launch_callback_is_startup_safe" in platform_services_tests
 				and "test_fake_vacban_constants_match_hlil" in fake_vacban_tests
 				and "test_fake_vacban_telemetry_payload" in fake_vacban_tests
 			),
@@ -197,17 +219,285 @@ def _build_server_full_parity_gate_report() -> dict[str, Any]:
 		and "void Zmq_InitStatsPublisher( void ) {" in sv_zmq
 		and "void Zmq_PumpRcon( void ) {" in sv_zmq
 		and "void Zmq_ShutdownRuntime( void ) {" in sv_zmq
-		and 'static void idZMQ_ApplyPasswords( qboolean rconModeChanged, qboolean statsModeChanged ) {' in sv_zmq
+		and "static void idZMQ_ApplyPasswords( void ) {" in sv_zmq
+		and "if ( !s_zmq.authActorReady ) {" in sv_zmq
+		and '#define QL_ZMQ_RUNTIME_UNAVAILABLE_FORMAT "ZMQ runtime unavailable: %s\\n"' in sv_zmq
+		and '#define QL_ZMQ_RUNTIME_DISABLED_MESSAGE "ZMQ runtime disabled by build policy (QL_BUILD_ONLINE_SERVICES=0); keeping retained fallback paths.\\n"' in sv_zmq
+		and '#define QL_ZMQ_RUNTIME_LOAD_FAILED_REASON "unable to load libzmq"' in sv_zmq
+		and '#define QL_ZMQ_RUNTIME_EXPORTS_MISSING_REASON "libzmq is missing required exports"' in sv_zmq
+		and '#define QL_ZMQ_EXPORT_CTX_NEW "zmq_ctx_new"' in sv_zmq
+		and '#define QL_ZMQ_EXPORT_CTX_TERM "zmq_ctx_term"' in sv_zmq
+		and '#define QL_ZMQ_EXPORT_SOCKET "zmq_socket"' in sv_zmq
+		and '#define QL_ZMQ_EXPORT_CLOSE "zmq_close"' in sv_zmq
+		and '#define QL_ZMQ_EXPORT_BIND "zmq_bind"' in sv_zmq
+		and '#define QL_ZMQ_EXPORT_SEND "zmq_send"' in sv_zmq
+		and '#define QL_ZMQ_EXPORT_RECV "zmq_recv"' in sv_zmq
+		and '#define QL_ZMQ_EXPORT_POLL "zmq_poll"' in sv_zmq
+		and '#define QL_ZMQ_EXPORT_ERRNO "zmq_errno"' in sv_zmq
+		and '#define QL_ZMQ_EXPORT_STRERROR "zmq_strerror"' in sv_zmq
+		and '#define QL_ZMQ_EXPORT_SETSOCKOPT "zmq_setsockopt"' in sv_zmq
+		and '#define QL_ZMQ_EXPORT_GETSOCKOPT "zmq_getsockopt"' in sv_zmq
+		and "idZMQ_LoadSymbol( (void **)&s_zmq.zmq_ctx_new, QL_ZMQ_EXPORT_CTX_NEW )" in sv_zmq
+		and "idZMQ_LoadSymbol( (void **)&s_zmq.zmq_ctx_term, QL_ZMQ_EXPORT_CTX_TERM )" in sv_zmq
+		and "idZMQ_LoadSymbol( (void **)&s_zmq.zmq_socket, QL_ZMQ_EXPORT_SOCKET )" in sv_zmq
+		and "idZMQ_LoadSymbol( (void **)&s_zmq.zmq_close, QL_ZMQ_EXPORT_CLOSE )" in sv_zmq
+		and "#define QL_ZMQ_CONTEXT_SLOT_EMPTY NULL" in sv_zmq
+		and "s_zmq.context = QL_ZMQ_CONTEXT_SLOT_EMPTY;" in sv_zmq
+		and "s_zmq.context = NULL;" not in sv_zmq
+		and "#define QL_ZMQ_LIBRARY_SLOT_EMPTY NULL" in sv_zmq
+		and "s_zmq.library = QL_ZMQ_LIBRARY_SLOT_EMPTY;" in sv_zmq
+		and "s_zmq.library = NULL;" not in sv_zmq
+		and "#define QL_ZMQ_SYMBOL_SLOT_EMPTY NULL" in sv_zmq
+		and "s_zmq.zmq_ctx_new = QL_ZMQ_SYMBOL_SLOT_EMPTY;" in sv_zmq
+		and "s_zmq.zmq_strerror = QL_ZMQ_SYMBOL_SLOT_EMPTY;" in sv_zmq
+		and "s_zmq.zmq_ctx_new = NULL;" not in sv_zmq
+		and "#define QL_ZMQ_RCON_POLL_SLOT_EMPTY NULL" in sv_zmq
+		and "s_zmq.rconPollSocket = QL_ZMQ_RCON_POLL_SLOT_EMPTY;" in sv_zmq
+		and "s_zmq.rconPollSocket = NULL;" not in sv_zmq
+		and "#define QL_ZMQ_SOCKET_SLOT_EMPTY NULL" in sv_zmq
+		and "*socketPointer = QL_ZMQ_SOCKET_SLOT_EMPTY;" in sv_zmq
+		and "*socketPointer = NULL;" not in sv_zmq
+		and "idZMQ_CloseSocket( &socket );" in sv_zmq
+		and "s_zmq.zmq_close( socket );" not in sv_zmq
+		and sv_zmq.count("s_zmq.zmq_close(") == 1
+		and "idZMQ_LoadSymbol( (void **)&s_zmq.zmq_bind, QL_ZMQ_EXPORT_BIND )" in sv_zmq
+		and "idZMQ_LoadSymbol( (void **)&s_zmq.zmq_send, QL_ZMQ_EXPORT_SEND )" in sv_zmq
+		and "idZMQ_LoadSymbol( (void **)&s_zmq.zmq_recv, QL_ZMQ_EXPORT_RECV )" in sv_zmq
+		and "idZMQ_LoadSymbol( (void **)&s_zmq.zmq_poll, QL_ZMQ_EXPORT_POLL )" in sv_zmq
+		and "idZMQ_LoadSymbol( (void **)&s_zmq.zmq_errno, QL_ZMQ_EXPORT_ERRNO )" in sv_zmq
+		and "idZMQ_LoadSymbol( (void **)&s_zmq.zmq_strerror, QL_ZMQ_EXPORT_STRERROR )" in sv_zmq
+		and "idZMQ_LoadOptionalSymbol( (void **)&s_zmq.zmq_setsockopt, QL_ZMQ_EXPORT_SETSOCKOPT );" in sv_zmq
+		and "idZMQ_LoadOptionalSymbol( (void **)&s_zmq.zmq_getsockopt, QL_ZMQ_EXPORT_GETSOCKOPT );" in sv_zmq
+		and "Com_Printf( QL_ZMQ_RUNTIME_DISABLED_MESSAGE );" in sv_zmq
+		and "Com_Printf( QL_ZMQ_RUNTIME_UNAVAILABLE_FORMAT, reason );" in sv_zmq
+		and "idZMQ_LogRuntimeUnavailable( QL_ZMQ_RUNTIME_LOAD_FAILED_REASON );" in sv_zmq
+		and "idZMQ_LogRuntimeUnavailable( QL_ZMQ_RUNTIME_EXPORTS_MISSING_REASON );" in sv_zmq
 		and '#define QL_ZMQ_PASSFILE "zmqpass.txt"' in sv_zmq
-		and 'Com_sprintf( line, sizeof( line ), "stats_stats=%s\\n", s_zmq.statsPassword );' in sv_zmq
-		and 'Com_sprintf( line, sizeof( line ), "rcon_rcon=%s\\n", s_zmq.rconPassword );' in sv_zmq
-		and 'idZMQ_TrySetSocketString( socket, QL_ZMQ_ZAP_DOMAIN, "rcon" );' in sv_zmq
-		and 'idZMQ_TrySetSocketString( socket, QL_ZMQ_ZAP_DOMAIN, "stats" );' in sv_zmq
+		and '#define QL_ZMQ_PASSFILE_OPEN_FAILED_FORMAT "Failed to open %s\\n"' in sv_zmq
+		and '#define QL_ZMQ_PASSWORD_STATS_RECORD_FORMAT "stats_stats=%s\\n"' in sv_zmq
+		and '#define QL_ZMQ_PASSWORD_RCON_RECORD_FORMAT "rcon_rcon=%s\\n"' in sv_zmq
+		and "#define QL_ZMQ_PASSFILE_RECORD_SLACK 32" in sv_zmq
+		and "#define QL_ZMQ_PASSFILE_RECORD_BUFFER_SIZE ( MAX_STRING_CHARS + QL_ZMQ_PASSFILE_RECORD_SLACK )" in sv_zmq
+		and "char line[QL_ZMQ_PASSFILE_RECORD_BUFFER_SIZE];" in sv_zmq
+		and "char line[MAX_STRING_CHARS + 32];" not in sv_zmq
+		and '#define QL_ZMQ_AUTH_KEY_FORMAT "%s_%s"' in sv_zmq
+		and "#define QL_ZMQ_ENDPOINT_EMPTY QL_ZMQ_STRING_TERMINATOR" in sv_zmq
+		and "s_zmq.rconEndpoint[0] = QL_ZMQ_ENDPOINT_EMPTY;" in sv_zmq
+		and "s_zmq.statsEndpoint[0] = QL_ZMQ_ENDPOINT_EMPTY;" in sv_zmq
+		and "s_zmq.rconEndpoint[0] = '\\0';" not in sv_zmq
+		and "s_zmq.statsEndpoint[0] = '\\0';" not in sv_zmq
+		and "Com_Printf( QL_ZMQ_PASSFILE_OPEN_FAILED_FORMAT, QL_ZMQ_PASSFILE );" in sv_zmq
+		and "Com_sprintf( line, sizeof( line ), QL_ZMQ_PASSWORD_STATS_RECORD_FORMAT, s_zmq.statsPassword );" in sv_zmq
+		and "Com_sprintf( line, sizeof( line ), QL_ZMQ_PASSWORD_RCON_RECORD_FORMAT, s_zmq.rconPassword );" in sv_zmq
+		and '#define QL_ZMQ_DOMAIN_RCON "rcon"' in sv_zmq
+		and '#define QL_ZMQ_DOMAIN_STATS "stats"' in sv_zmq
+		and '#define QL_ZMQ_AUTH_EMPTY_FRAME ""' in sv_zmq
+		and "#define QL_ZMQ_AUTH_EMPTY_USER_ID QL_ZMQ_AUTH_EMPTY_FRAME" in sv_zmq
+		and "#define QL_ZMQ_AUTH_EMPTY_CREDENTIAL QL_ZMQ_AUTH_EMPTY_FRAME" in sv_zmq
+		and "idZMQ_SendAuthFrame( s_zmq.authSocket, QL_ZMQ_AUTH_EMPTY_FRAME, qfalse );" in sv_zmq
+		and "userId = QL_ZMQ_AUTH_EMPTY_USER_ID;" in sv_zmq
+		and "*userId = QL_ZMQ_AUTH_EMPTY_USER_ID;" in sv_zmq
+		and "#define QL_ZMQ_ZAP_VERSION_BUFFER_SIZE 16" in sv_zmq
+		and "#define QL_ZMQ_ZAP_REQUEST_ID_BUFFER_SIZE 64" in sv_zmq
+		and "#define QL_ZMQ_ZAP_DOMAIN_BUFFER_SIZE 64" in sv_zmq
+		and "#define QL_ZMQ_ZAP_ADDRESS_BUFFER_SIZE 128" in sv_zmq
+		and "#define QL_ZMQ_ZAP_IDENTITY_BUFFER_SIZE QL_ZMQ_MAX_IDENTITY" in sv_zmq
+		and "#define QL_ZMQ_ZAP_MECHANISM_BUFFER_SIZE 16" in sv_zmq
+		and "#define QL_ZMQ_ZAP_USERNAME_BUFFER_SIZE QL_ZMQ_MAX_IDENTITY" in sv_zmq
+		and "#define QL_ZMQ_ZAP_PASSWORD_BUFFER_SIZE MAX_STRING_CHARS" in sv_zmq
+		and "#define QL_ZMQ_ZAP_EMPTY_FIELD QL_ZMQ_STRING_TERMINATOR" in sv_zmq
+		and "char version[QL_ZMQ_ZAP_VERSION_BUFFER_SIZE];" in sv_zmq
+		and "char requestId[QL_ZMQ_ZAP_REQUEST_ID_BUFFER_SIZE];" in sv_zmq
+		and "char domain[QL_ZMQ_ZAP_DOMAIN_BUFFER_SIZE];" in sv_zmq
+		and "char address[QL_ZMQ_ZAP_ADDRESS_BUFFER_SIZE];" in sv_zmq
+		and "char identity[QL_ZMQ_ZAP_IDENTITY_BUFFER_SIZE];" in sv_zmq
+		and "char mechanism[QL_ZMQ_ZAP_MECHANISM_BUFFER_SIZE];" in sv_zmq
+		and "char username[QL_ZMQ_ZAP_USERNAME_BUFFER_SIZE];" in sv_zmq
+		and "char password[QL_ZMQ_ZAP_PASSWORD_BUFFER_SIZE];" in sv_zmq
+		and "requestId[0] = QL_ZMQ_ZAP_EMPTY_FIELD;" in sv_zmq
+		and '#define QL_ZMQ_DRAIN_SCRATCH_SIZE MAX_STRING_CHARS' in sv_zmq
+		and "#define QL_ZMQ_STRING_TERMINATOR_LENGTH 1" in sv_zmq
+		and "#define QL_ZMQ_STRING_TERMINATOR '\\0'" in sv_zmq
+		and "#define QL_ZMQ_RCVMORE_NONE 0" in sv_zmq
+		and "#define QL_ZMQ_GETSOCKOPT_SUCCESS 0" in sv_zmq
+		and "#define QL_ZMQ_FRAME_MORE qtrue" in sv_zmq
+		and "#define QL_ZMQ_FRAME_NO_MORE qfalse" in sv_zmq
+		and "length = s_zmq.zmq_recv( socket, buffer, bufferSize > 0 ? bufferSize - QL_ZMQ_STRING_TERMINATOR_LENGTH : 0, QL_ZMQ_DONTWAIT );" in sv_zmq
+		and "*more = QL_ZMQ_FRAME_NO_MORE;" in sv_zmq
+		and "*more = QL_ZMQ_FRAME_MORE;" in sv_zmq
+		and "more = QL_ZMQ_FRAME_NO_MORE;" in sv_zmq
+		and "s_zmq.zmq_getsockopt( socket, QL_ZMQ_RCVMORE, &moreValue, &moreSize ) == QL_ZMQ_GETSOCKOPT_SUCCESS && moreValue != QL_ZMQ_RCVMORE_NONE" in sv_zmq
+		and "s_zmq.zmq_getsockopt( socket, QL_ZMQ_RCVMORE, &moreValue, &moreSize ) == 0 && moreValue" not in sv_zmq
+		and "*more = qfalse;" not in sv_zmq
+		and "*more = qtrue;" not in sv_zmq
+		and "char scratch[QL_ZMQ_DRAIN_SCRATCH_SIZE];" in sv_zmq
+		and "#define QL_ZMQ_SOCKET_OPTION_DISABLED 0" in sv_zmq
+		and "#define QL_ZMQ_SOCKET_OPTION_ENABLED 1" in sv_zmq
+		and "#define QL_ZMQ_SOCKET_OPTION_INT_SIZE sizeof( int )" in sv_zmq
+		and "s_zmq.zmq_setsockopt( socket, option, &value, QL_ZMQ_SOCKET_OPTION_INT_SIZE );" in sv_zmq
+		and "s_zmq.zmq_setsockopt( socket, option, &value, sizeof( value ) );" not in sv_zmq
+		and "#define QL_ZMQ_SOCKET_OPTION_STRING_SIZE( value ) strlen( value )" in sv_zmq
+		and "s_zmq.zmq_setsockopt( socket, option, value, QL_ZMQ_SOCKET_OPTION_STRING_SIZE( value ) );" in sv_zmq
+		and "s_zmq.zmq_setsockopt( socket, option, value, strlen( value ) );" not in sv_zmq
+		and "idZMQ_TrySetSocketInt( socket, QL_ZMQ_ROUTER_MANDATORY, QL_ZMQ_SOCKET_OPTION_ENABLED );" in sv_zmq
+		and "idZMQ_TrySetSocketInt( socket, QL_ZMQ_PLAIN_SERVER, s_zmq.rconPassword[0] ? QL_ZMQ_SOCKET_OPTION_ENABLED : QL_ZMQ_SOCKET_OPTION_DISABLED );" in sv_zmq
+		and "idZMQ_TrySetSocketInt( socket, QL_ZMQ_PLAIN_SERVER, s_zmq.statsPassword[0] ? QL_ZMQ_SOCKET_OPTION_ENABLED : QL_ZMQ_SOCKET_OPTION_DISABLED );" in sv_zmq
+		and "#define QL_ZMQ_NO_FLAGS 0" in sv_zmq
+		and "#define QL_ZMQ_POLL_FD_NONE 0" in sv_zmq
+		and "#define QL_ZMQ_POLL_REVENTS_NONE 0" in sv_zmq
+		and "#define QL_ZMQ_SINGLE_POLL_ITEM 1" in sv_zmq
+		and "#define QL_ZMQ_POLL_TIMEOUT_IMMEDIATE 0" in sv_zmq
+		and "#define QL_ZMQ_POLL_READY_MIN 1" in sv_zmq
+		and "#define QL_ZMQ_BIND_SUCCESS 0" in sv_zmq
+		and "#define QL_ZMQ_RCON_IDENTITY_BUFFER_SIZE QL_ZMQ_MAX_IDENTITY" in sv_zmq
+		and "#define QL_ZMQ_RCON_COMMAND_BUFFER_SIZE MAX_STRING_CHARS" in sv_zmq
+		and "#define QL_ZMQ_FRAME_READ_SUCCESS_MIN 0" in sv_zmq
+		and "#define QL_ZMQ_RCON_MIN_IDENTITY_LENGTH 1" in sv_zmq
+		and "#define QL_ZMQ_RCON_MIN_COMMAND_LENGTH 1" in sv_zmq
+		and "#define QL_ZMQ_RCON_PEER_COUNT_EMPTY 0" in sv_zmq
+		and "char identity[QL_ZMQ_RCON_IDENTITY_BUFFER_SIZE];" in sv_zmq
+		and "char command[QL_ZMQ_RCON_COMMAND_BUFFER_SIZE];" in sv_zmq
+		and "commandLength >= QL_ZMQ_FRAME_READ_SUCCESS_MIN" in sv_zmq
+		and "identityLength < QL_ZMQ_RCON_MIN_IDENTITY_LENGTH" in sv_zmq
+		and "commandLength < QL_ZMQ_RCON_MIN_COMMAND_LENGTH" in sv_zmq
+		and "if ( s_zmq.rconPeerCount > QL_ZMQ_RCON_PEER_COUNT_EMPTY ) {" in sv_zmq
+		and "s_zmq.rconPeerCount = QL_ZMQ_RCON_PEER_COUNT_EMPTY;" in sv_zmq
+		and "s_zmq.rconPeerCount > 0" not in sv_zmq
+		and "s_zmq.rconPeerCount = 0;" not in sv_zmq
+		and "commandLength >= 0" not in sv_zmq
+		and "identityLength <= 0" not in sv_zmq
+		and "commandLength <= 0" not in sv_zmq
+		and "flags = more ? QL_ZMQ_SNDMORE : QL_ZMQ_NO_FLAGS;" in sv_zmq
+		and "s_zmq.zmq_send( s_zmq.pubSocket, message, strlen( message ), QL_ZMQ_NO_FLAGS );" in sv_zmq
+		and "#define QL_ZMQ_SEND_DONTWAIT QL_ZMQ_DONTWAIT" in sv_zmq
+		and "#define QL_ZMQ_SEND_MORE_DONTWAIT ( QL_ZMQ_SNDMORE | QL_ZMQ_DONTWAIT )" in sv_zmq
+		and "#define QL_ZMQ_SEND_SUCCESS_MIN 0" in sv_zmq
+		and "idZMQ_SendAuthFrame( s_zmq.authSocket, version, qtrue ) < QL_ZMQ_SEND_SUCCESS_MIN" in sv_zmq
+		and "s_zmq.zmq_send( s_zmq.rconSocket, peer->identity, peer->identityLength, QL_ZMQ_SEND_MORE_DONTWAIT ) < QL_ZMQ_SEND_SUCCESS_MIN" in sv_zmq
+		and "s_zmq.zmq_send( s_zmq.rconSocket, payload, strlen( payload ), QL_ZMQ_SEND_DONTWAIT );" in sv_zmq
+		and "QL_ZMQ_SEND_MORE_DONTWAIT ) < 0" not in sv_zmq
+		and "s_zmq.zmq_poll( &item, QL_ZMQ_SINGLE_POLL_ITEM, QL_ZMQ_POLL_TIMEOUT_IMMEDIATE )" in sv_zmq
+		and "while ( s_zmq.zmq_poll( &item, QL_ZMQ_SINGLE_POLL_ITEM, QL_ZMQ_POLL_TIMEOUT_IMMEDIATE ) >= QL_ZMQ_POLL_READY_MIN && ( item.revents & QL_ZMQ_POLLIN ) ) {" in sv_zmq
+		and "if ( s_zmq.zmq_poll( &item, QL_ZMQ_SINGLE_POLL_ITEM, QL_ZMQ_POLL_TIMEOUT_IMMEDIATE ) < QL_ZMQ_POLL_READY_MIN || !( item.revents & QL_ZMQ_POLLIN ) ) {" in sv_zmq
+		and "QL_ZMQ_POLL_TIMEOUT_IMMEDIATE ) > 0" not in sv_zmq
+		and "QL_ZMQ_POLL_TIMEOUT_IMMEDIATE ) <= 0" not in sv_zmq
+		and "item.fd = QL_ZMQ_POLL_FD_NONE;" in sv_zmq
+		and "item.revents = QL_ZMQ_POLL_REVENTS_NONE;" in sv_zmq
+		and "item.fd = 0;" not in sv_zmq
+		and "item.revents = 0;" not in sv_zmq
+		and "idZMQ_TrySetSocketString( socket, QL_ZMQ_ZAP_DOMAIN, QL_ZMQ_DOMAIN_RCON );" in sv_zmq
+		and "idZMQ_TrySetSocketString( socket, QL_ZMQ_ZAP_DOMAIN, QL_ZMQ_DOMAIN_STATS );" in sv_zmq
+		and '#define QL_ZMQ_DEFAULT_NET_PORT_FORMAT "%i"' in sv_zmq
+		and "#define QL_ZMQ_CVAR_INIT_FLAGS CVAR_INIT" in sv_zmq
+		and "#define QL_ZMQ_CVAR_PASSWORD_FLAGS CVAR_ARCHIVE" in sv_zmq
+		and "#define QL_ZMQ_CVAR_NET_FALLBACK_FLAGS CVAR_LATCH" in sv_zmq
+		and "Cvar_Get( QL_ZMQ_CVAR_RCON_ENABLE, QL_ZMQ_DEFAULT_DISABLED, QL_ZMQ_CVAR_INIT_FLAGS );" in sv_zmq
+		and "Cvar_Get( QL_ZMQ_CVAR_STATS_ENABLE, QL_ZMQ_DEFAULT_DISABLED, QL_ZMQ_CVAR_INIT_FLAGS );" in sv_zmq
+		and "Cvar_Get( QL_ZMQ_CVAR_STATS_PASSWORD, QL_ZMQ_DEFAULT_EMPTY, QL_ZMQ_CVAR_PASSWORD_FLAGS );" in sv_zmq
+		and "Cvar_Get( QL_ZMQ_CVAR_RCON_PASSWORD, QL_ZMQ_DEFAULT_EMPTY, QL_ZMQ_CVAR_PASSWORD_FLAGS );" in sv_zmq
+		and "Cvar_Get( QL_ZMQ_CVAR_NET_PORT, va( QL_ZMQ_DEFAULT_NET_PORT_FORMAT, PORT_SERVER ), QL_ZMQ_CVAR_NET_FALLBACK_FLAGS );" in sv_zmq
+		and "#define QL_ZMQ_ENDPOINT_IP_BUFFER_SIZE 64" in sv_zmq
+		and "char resolvedIp[QL_ZMQ_ENDPOINT_IP_BUFFER_SIZE];" in sv_zmq
+		and "char resolvedIp[64];" not in sv_zmq
+		and "qboolean\t\t\t\tauthActorReady;" in sv_zmq
 		and "idZMQ_PumpAuthSocket();" in sv_zmq
-		and 'idZMQ_Publish( "MATCH_REPORT", (const char *)report );' in sv_zmq
-		and 'Com_Printf( "zmq RCON socket: %s\\n", s_zmq.rconEndpoint );' in sv_zmq
-		and 'Com_Printf( "zmq PUB socket: %s\\n", s_zmq.statsEndpoint );' in sv_zmq
+		and '#define QL_ZMQ_PUBLICATION_TYPE_KEY "TYPE"' in sv_zmq
+		and '#define QL_ZMQ_PUBLICATION_DATA_KEY "DATA"' in sv_zmq
+		and '#define QL_ZMQ_MATCH_REPORT_TYPE "MATCH_REPORT"' in sv_zmq
+		and '#define QL_ZMQ_STATS_TRANSCRIPT "zmq_stats.ndjson"' in sv_zmq
+		and "#define QL_ZMQ_STATS_TRANSCRIPT_HANDLE_EMPTY 0" in sv_zmq
+		and '#define QL_ZMQ_STATS_TRANSCRIPT_RECORD_TERMINATOR "\\n"' in sv_zmq
+		and "#define QL_ZMQ_STATS_TRANSCRIPT_RECORD_TERMINATOR_LENGTH 1" in sv_zmq
+		and "s_zmq.statsTranscript = QL_ZMQ_STATS_TRANSCRIPT_HANDLE_EMPTY;" in sv_zmq
+		and "s_zmq.statsTranscript = 0;" not in sv_zmq
+		and "FS_Write( QL_ZMQ_STATS_TRANSCRIPT_RECORD_TERMINATOR, QL_ZMQ_STATS_TRANSCRIPT_RECORD_TERMINATOR_LENGTH, s_zmq.statsTranscript );" in sv_zmq
+		and "idZMQ_Publish( QL_ZMQ_MATCH_REPORT_TYPE, (const char *)report );" in sv_zmq
+		and '#define QL_ZMQ_RCON_BIND_SUCCESS_FORMAT "zmq RCON socket: %s\\n"' in sv_zmq
+		and '#define QL_ZMQ_STATS_BIND_SUCCESS_FORMAT "zmq PUB socket: %s\\n"' in sv_zmq
+		and "#define QL_ZMQ_RCON_BROADCAST_ACTIVE qtrue" in sv_zmq
+		and "#define QL_ZMQ_RCON_BROADCAST_IDLE qfalse" in sv_zmq
+		and '#define QL_ZMQ_RCON_CLIENT_DISCONNECT_FORMAT "zmq RCON client disconnected: %s\\n"' in sv_zmq
+		and '#define QL_ZMQ_RCON_CLIENT_CONNECT_FORMAT "zmq RCON client connected: %s\\n"' in sv_zmq
+		and '#define QL_ZMQ_RCON_COMMAND_FORMAT "zmq RCON command from %s: %s\\n"' in sv_zmq
+		and "#define QL_ZMQ_RCON_EMPTY_PAYLOAD QL_ZMQ_DEFAULT_EMPTY" in sv_zmq
+		and "#define QL_ZMQ_RCON_PEER_SLOT_EMPTY NULL" in sv_zmq
+		and "payload = message ? message : QL_ZMQ_RCON_EMPTY_PAYLOAD;" in sv_zmq
+		and "s_zmq.rconPeers = QL_ZMQ_RCON_PEER_SLOT_EMPTY;" in sv_zmq
+		and "s_zmq.rconPeerRoot = QL_ZMQ_RCON_PEER_SLOT_EMPTY;" in sv_zmq
+		and "s_zmq.rconPeerLast = QL_ZMQ_RCON_PEER_SLOT_EMPTY;" in sv_zmq
+		and "s_zmq.rconPeers = NULL;" not in sv_zmq
+		and "Com_Printf( QL_ZMQ_RCON_BIND_SUCCESS_FORMAT, s_zmq.rconEndpoint );" in sv_zmq
+		and "Com_Printf( QL_ZMQ_STATS_BIND_SUCCESS_FORMAT, s_zmq.statsEndpoint );" in sv_zmq
+		and "if ( s_zmq.zmq_bind( socket, QL_ZMQ_ZAP_ENDPOINT ) != QL_ZMQ_BIND_SUCCESS ) {" in sv_zmq
+		and "if ( s_zmq.zmq_bind( socket, s_zmq.rconEndpoint ) != QL_ZMQ_BIND_SUCCESS ) {" in sv_zmq
+		and "if ( s_zmq.zmq_bind( socket, s_zmq.statsEndpoint ) != QL_ZMQ_BIND_SUCCESS ) {" in sv_zmq
+		and "zmq_bind( socket, QL_ZMQ_ZAP_ENDPOINT ) != 0" not in sv_zmq
+		and "zmq_bind( socket, s_zmq.rconEndpoint ) != 0" not in sv_zmq
+		and "zmq_bind( socket, s_zmq.statsEndpoint ) != 0" not in sv_zmq
+		and "Com_Printf( QL_ZMQ_RCON_CLIENT_DISCONNECT_FORMAT, peer->label );" in sv_zmq
+		and "s_zmq.broadcastingRconOutput = QL_ZMQ_RCON_BROADCAST_ACTIVE;" in sv_zmq
+		and "s_zmq.broadcastingRconOutput = QL_ZMQ_RCON_BROADCAST_IDLE;" in sv_zmq
+		and "s_zmq.broadcastingRconOutput = qtrue;" not in sv_zmq
+		and "s_zmq.broadcastingRconOutput = qfalse;" not in sv_zmq
+		and "Com_Printf( QL_ZMQ_RCON_CLIENT_CONNECT_FORMAT, peer->label );" in sv_zmq
+		and "Com_Printf( QL_ZMQ_RCON_COMMAND_FORMAT, peer->label, command );" in sv_zmq
 		and "test_server_zmq_runtime_reconstructs_retail_publication_and_rcon_owners" in platform_services_tests
+		and "test_zmq_password_refresh_actor_source_shape_round_643_is_pinned" in platform_services_tests
+		and "test_zmq_stats_init_idempotent_wrapper_round_644_is_pinned" in platform_services_tests
+		and "test_zmq_rcon_frame_pump_is_poll_only_round_645_is_pinned" in platform_services_tests
+		and "test_zmq_rcon_broadcast_disconnect_branch_round_646_is_pinned" in platform_services_tests
+		and "test_zmq_rcon_broadcast_null_payload_round_647_is_pinned" in platform_services_tests
+		and "test_zmq_rcon_broadcast_reentrancy_guard_round_751_is_pinned" in platform_services_tests
+		and "test_zmq_stats_endpoint_net_ip_round_648_is_pinned" in platform_services_tests
+		and "test_zmq_socket_bind_failure_retention_round_649_is_pinned" in platform_services_tests
+		and "test_zmq_rcon_resolved_poll_slot_round_650_is_pinned" in platform_services_tests
+		and "test_zmq_auth_actor_ready_shutdown_order_round_651_is_pinned" in platform_services_tests
+		and "test_zmq_password_apply_auth_gate_round_652_is_pinned" in platform_services_tests
+		and "test_zmq_shutdown_owner_split_round_653_is_pinned" in platform_services_tests
+		and "test_zmq_endpoint_empty_clear_boundary_round_691_is_pinned" in platform_services_tests
+		and "test_zmq_runtime_shutdown_skips_peer_clear_round_654_is_pinned" in platform_services_tests
+		and "test_zmq_peer_tree_iterator_boundary_round_655_is_pinned" in platform_services_tests
+		and "test_zmq_rcon_peer_count_floor_round_724_is_pinned" in platform_services_tests
+		and "test_zmq_rcon_peer_table_slot_clear_round_747_is_pinned" in platform_services_tests
+		and "test_zmq_public_wrapper_tailcalls_round_656_are_pinned" in platform_services_tests
+		and "test_zmq_retained_idzmq_layout_boundary_round_657_is_pinned" in platform_services_tests
+		and "test_zmq_checked_zsock_lifecycle_provenance_round_658_is_pinned" in platform_services_tests
+		and "test_zmq_socket_close_slot_clear_round_736_is_pinned" in platform_services_tests
+		and "test_zmq_auth_bind_failure_close_slot_round_738_is_pinned" in platform_services_tests
+		and "test_zmq_context_shutdown_slot_clear_round_740_is_pinned" in platform_services_tests
+		and "test_zmq_external_runtime_library_slot_clear_round_742_is_pinned" in platform_services_tests
+		and "test_zmq_external_runtime_resolved_symbol_slot_clear_round_743_is_pinned" in platform_services_tests
+		and "test_zmq_rcon_poll_slot_clear_order_round_746_is_pinned" in platform_services_tests
+		and "test_zmq_auth_actor_verbose_handshake_boundary_round_659_is_pinned" in platform_services_tests
+		and "test_zmq_password_plain_notification_boundary_round_660_is_pinned" in platform_services_tests
+		and "test_zmq_endpoint_cvar_literal_boundary_round_661_is_pinned" in platform_services_tests
+		and "test_zmq_cvar_flag_boundary_round_697_is_pinned" in platform_services_tests
+		and "test_zmq_rcon_positive_frame_gate_round_698_is_pinned" in platform_services_tests
+		and "test_zmq_endpoint_ip_scratch_buffer_round_721_is_pinned" in platform_services_tests
+		and "test_zmq_zap_domain_constant_boundary_round_662_is_pinned" in platform_services_tests
+		and "test_zmq_rcon_peer_log_format_boundary_round_663_is_pinned" in platform_services_tests
+		and "test_zmq_stats_publication_envelope_boundary_round_664_is_pinned" in platform_services_tests
+		and "test_zmq_passfile_failed_open_boundary_round_665_is_pinned" in platform_services_tests
+		and "test_zmq_passfile_record_buffer_round_722_is_pinned" in platform_services_tests
+		and "test_zmq_external_runtime_loader_boundary_round_666_is_pinned" in platform_services_tests
+		and "test_zmq_external_runtime_export_names_round_692_is_pinned" in platform_services_tests
+		and "test_zmq_manual_zap_auth_response_boundary_round_667_is_pinned" in platform_services_tests
+		and "test_zmq_zap_request_buffer_boundary_round_689_is_pinned" in platform_services_tests
+		and "test_zmq_receive_frame_drain_boundary_round_668_is_pinned" in platform_services_tests
+		and "test_zmq_receive_frame_more_flag_round_752_is_pinned" in platform_services_tests
+		and "test_zmq_receive_string_terminator_boundary_round_684_is_pinned" in platform_services_tests
+		and "test_zmq_stats_transcript_line_boundary_round_669_is_pinned" in platform_services_tests
+		and "test_zmq_stats_transcript_handle_clear_round_749_is_pinned" in platform_services_tests
+		and "test_zmq_stats_default_port_format_boundary_round_671_is_pinned" in platform_services_tests
+		and "test_zmq_rcon_empty_payload_constant_boundary_round_672_is_pinned" in platform_services_tests
+		and "test_zmq_socket_option_boolean_boundary_round_674_is_pinned" in platform_services_tests
+		and "test_zmq_socket_option_int_size_round_733_is_pinned" in platform_services_tests
+		and "test_zmq_socket_option_string_size_round_734_is_pinned" in platform_services_tests
+		and "test_zmq_no_flags_and_immediate_poll_boundary_round_676_is_pinned" in platform_services_tests
+		and "test_zmq_single_poll_item_boundary_round_679_is_pinned" in platform_services_tests
+		and "test_zmq_poll_item_zero_state_boundary_round_680_is_pinned" in platform_services_tests
+		and "test_zmq_rcon_receive_buffer_boundary_round_682_is_pinned" in platform_services_tests
+		and "test_zmq_rcon_broadcast_send_flag_boundary_round_686_is_pinned" in platform_services_tests
 	)
 	report["tranches"]["SV-G02"] = _entry(
 		"SV-G02",
@@ -224,18 +514,497 @@ def _build_server_full_parity_gate_report() -> dict[str, Any]:
 			"rcon_pump_owner_present": "void Zmq_PumpRcon( void ) {" in sv_zmq,
 			"runtime_shutdown_owner_present": "void Zmq_ShutdownRuntime( void ) {" in sv_zmq,
 			"password_apply_owner_present": (
-				'static void idZMQ_ApplyPasswords( qboolean rconModeChanged, qboolean statsModeChanged ) {' in sv_zmq
+				"static void idZMQ_ApplyPasswords( void ) {" in sv_zmq
+				and "if ( !s_zmq.authActorReady ) {" in sv_zmq
 				and '#define QL_ZMQ_PASSFILE "zmqpass.txt"' in sv_zmq
-				and 'Com_sprintf( line, sizeof( line ), "stats_stats=%s\\n", s_zmq.statsPassword );' in sv_zmq
-				and 'Com_sprintf( line, sizeof( line ), "rcon_rcon=%s\\n", s_zmq.rconPassword );' in sv_zmq
+				and '#define QL_ZMQ_PASSFILE_OPEN_FAILED_FORMAT "Failed to open %s\\n"' in sv_zmq
+				and '#define QL_ZMQ_PASSWORD_STATS_RECORD_FORMAT "stats_stats=%s\\n"' in sv_zmq
+				and '#define QL_ZMQ_PASSWORD_RCON_RECORD_FORMAT "rcon_rcon=%s\\n"' in sv_zmq
+				and "#define QL_ZMQ_PASSFILE_RECORD_BUFFER_SIZE ( MAX_STRING_CHARS + QL_ZMQ_PASSFILE_RECORD_SLACK )" in sv_zmq
+				and "char line[QL_ZMQ_PASSFILE_RECORD_BUFFER_SIZE];" in sv_zmq
+				and '#define QL_ZMQ_AUTH_KEY_FORMAT "%s_%s"' in sv_zmq
+				and "Com_Printf( QL_ZMQ_PASSFILE_OPEN_FAILED_FORMAT, QL_ZMQ_PASSFILE );" in sv_zmq
+				and "Com_sprintf( line, sizeof( line ), QL_ZMQ_PASSWORD_STATS_RECORD_FORMAT, s_zmq.statsPassword );" in sv_zmq
+				and "Com_sprintf( line, sizeof( line ), QL_ZMQ_PASSWORD_RCON_RECORD_FORMAT, s_zmq.rconPassword );" in sv_zmq
+			),
+			"endpoint_empty_clears_present": (
+				"#define QL_ZMQ_ENDPOINT_EMPTY QL_ZMQ_STRING_TERMINATOR" in sv_zmq
+				and "s_zmq.rconEndpoint[0] = QL_ZMQ_ENDPOINT_EMPTY;" in sv_zmq
+				and "s_zmq.statsEndpoint[0] = QL_ZMQ_ENDPOINT_EMPTY;" in sv_zmq
+				and "s_zmq.rconEndpoint[0] = '\\0';" not in sv_zmq
+				and "s_zmq.statsEndpoint[0] = '\\0';" not in sv_zmq
+			),
+			"passfile_record_buffer_present": (
+				"#define QL_ZMQ_PASSFILE_RECORD_SLACK 32" in sv_zmq
+				and "#define QL_ZMQ_PASSFILE_RECORD_BUFFER_SIZE ( MAX_STRING_CHARS + QL_ZMQ_PASSFILE_RECORD_SLACK )" in sv_zmq
+				and "char line[QL_ZMQ_PASSFILE_RECORD_BUFFER_SIZE];" in sv_zmq
+				and "char line[MAX_STRING_CHARS + 32];" not in sv_zmq
+				and "Com_sprintf( line, sizeof( line ), QL_ZMQ_PASSWORD_STATS_RECORD_FORMAT, s_zmq.statsPassword );" in sv_zmq
+				and "Com_sprintf( line, sizeof( line ), QL_ZMQ_PASSWORD_RCON_RECORD_FORMAT, s_zmq.rconPassword );" in sv_zmq
 			),
 			"zap_domain_wiring_present": (
-				'idZMQ_TrySetSocketString( socket, QL_ZMQ_ZAP_DOMAIN, "rcon" );' in sv_zmq
-				and 'idZMQ_TrySetSocketString( socket, QL_ZMQ_ZAP_DOMAIN, "stats" );' in sv_zmq
+				"idZMQ_TrySetSocketString( socket, QL_ZMQ_ZAP_DOMAIN, QL_ZMQ_DOMAIN_RCON );" in sv_zmq
+				and "idZMQ_TrySetSocketString( socket, QL_ZMQ_ZAP_DOMAIN, QL_ZMQ_DOMAIN_STATS );" in sv_zmq
+			),
+			"socket_option_string_size_present": (
+				"#define QL_ZMQ_SOCKET_OPTION_STRING_SIZE( value ) strlen( value )" in sv_zmq
+				and "s_zmq.zmq_setsockopt( socket, option, value, QL_ZMQ_SOCKET_OPTION_STRING_SIZE( value ) );" in sv_zmq
+				and "s_zmq.zmq_setsockopt( socket, option, value, strlen( value ) );" not in sv_zmq
+				and "zsock_set_zap_domain" not in sv_zmq
+			),
+			"stats_default_port_present": (
+				'#define QL_ZMQ_DEFAULT_NET_PORT_FORMAT "%i"' in sv_zmq
+				and "Cvar_Get( QL_ZMQ_CVAR_NET_PORT, va( QL_ZMQ_DEFAULT_NET_PORT_FORMAT, PORT_SERVER ), QL_ZMQ_CVAR_NET_FALLBACK_FLAGS );" in sv_zmq
+			),
+			"cvar_flag_boundary_present": (
+				"#define QL_ZMQ_CVAR_INIT_FLAGS CVAR_INIT" in sv_zmq
+				and "#define QL_ZMQ_CVAR_PASSWORD_FLAGS CVAR_ARCHIVE" in sv_zmq
+				and "#define QL_ZMQ_CVAR_NET_FALLBACK_FLAGS CVAR_LATCH" in sv_zmq
+				and "Cvar_Get( QL_ZMQ_CVAR_RCON_ENABLE, QL_ZMQ_DEFAULT_DISABLED, QL_ZMQ_CVAR_INIT_FLAGS );" in sv_zmq
+				and "Cvar_Get( QL_ZMQ_CVAR_STATS_ENABLE, QL_ZMQ_DEFAULT_DISABLED, QL_ZMQ_CVAR_INIT_FLAGS );" in sv_zmq
+				and "Cvar_Get( QL_ZMQ_CVAR_RCON_IP, QL_ZMQ_DEFAULT_RCON_IP, QL_ZMQ_CVAR_INIT_FLAGS );" in sv_zmq
+				and "Cvar_Get( QL_ZMQ_CVAR_RCON_PORT, QL_ZMQ_DEFAULT_RCON_PORT, QL_ZMQ_CVAR_INIT_FLAGS );" in sv_zmq
+				and "Cvar_Get( QL_ZMQ_CVAR_STATS_IP, QL_ZMQ_DEFAULT_EMPTY, QL_ZMQ_CVAR_INIT_FLAGS );" in sv_zmq
+				and "Cvar_Get( QL_ZMQ_CVAR_STATS_PORT, QL_ZMQ_DEFAULT_EMPTY, QL_ZMQ_CVAR_INIT_FLAGS );" in sv_zmq
+				and "Cvar_Get( QL_ZMQ_CVAR_STATS_PASSWORD, QL_ZMQ_DEFAULT_EMPTY, QL_ZMQ_CVAR_PASSWORD_FLAGS );" in sv_zmq
+				and "Cvar_Get( QL_ZMQ_CVAR_RCON_PASSWORD, QL_ZMQ_DEFAULT_EMPTY, QL_ZMQ_CVAR_PASSWORD_FLAGS );" in sv_zmq
+				and "Cvar_Get( QL_ZMQ_CVAR_NET_IP, QL_ZMQ_DEFAULT_NET_IP, QL_ZMQ_CVAR_NET_FALLBACK_FLAGS );" in sv_zmq
+				and "Cvar_Get( QL_ZMQ_CVAR_NET_PORT, va( QL_ZMQ_DEFAULT_NET_PORT_FORMAT, PORT_SERVER ), QL_ZMQ_CVAR_NET_FALLBACK_FLAGS );" in sv_zmq
+				and "Cvar_Get( QL_ZMQ_CVAR_RCON_ENABLE, QL_ZMQ_DEFAULT_DISABLED, CVAR_INIT );" not in sv_zmq
+				and "Cvar_Get( QL_ZMQ_CVAR_RCON_PASSWORD, QL_ZMQ_DEFAULT_EMPTY, CVAR_ARCHIVE );" not in sv_zmq
+			),
+			"endpoint_ip_scratch_buffer_present": (
+				"#define QL_ZMQ_ENDPOINT_IP_BUFFER_SIZE 64" in sv_zmq
+				and "char resolvedIp[QL_ZMQ_ENDPOINT_IP_BUFFER_SIZE];" in sv_zmq
+				and "char resolvedIp[64];" not in sv_zmq
+				and "idZMQ_ResolveStatsHost( resolvedIp, sizeof( resolvedIp ) );" in sv_zmq
+				and "Q_strncpyz( resolvedIp, QL_ZMQ_DEFAULT_RCON_IP, sizeof( resolvedIp ) );" in sv_zmq
 			),
 			"auth_pump_present": "idZMQ_PumpAuthSocket();" in sv_zmq,
-			"typed_publication_present": 'idZMQ_Publish( "MATCH_REPORT", (const char *)report );' in sv_zmq,
-			"focused_validation_present": "test_server_zmq_runtime_reconstructs_retail_publication_and_rcon_owners" in platform_services_tests,
+			"auth_actor_ready_present": "qboolean\t\t\t\tauthActorReady;" in sv_zmq,
+			"manual_zap_response_present": (
+				'#define QL_ZMQ_AUTH_EMPTY_FRAME ""' in sv_zmq
+				and "#define QL_ZMQ_AUTH_EMPTY_USER_ID QL_ZMQ_AUTH_EMPTY_FRAME" in sv_zmq
+				and "#define QL_ZMQ_AUTH_EMPTY_CREDENTIAL QL_ZMQ_AUTH_EMPTY_FRAME" in sv_zmq
+				and "idZMQ_SendAuthFrame( s_zmq.authSocket, version, qtrue )" in sv_zmq
+				and "idZMQ_SendAuthFrame( s_zmq.authSocket, requestId, qtrue )" in sv_zmq
+				and "idZMQ_SendAuthFrame( s_zmq.authSocket, statusCode, qtrue )" in sv_zmq
+				and "idZMQ_SendAuthFrame( s_zmq.authSocket, statusText, qtrue )" in sv_zmq
+				and "idZMQ_SendAuthFrame( s_zmq.authSocket, userId, qtrue )" in sv_zmq
+				and "idZMQ_SendAuthFrame( s_zmq.authSocket, QL_ZMQ_AUTH_EMPTY_FRAME, qfalse );" in sv_zmq
+				and "userId = QL_ZMQ_AUTH_EMPTY_USER_ID;" in sv_zmq
+				and "*userId = QL_ZMQ_AUTH_EMPTY_USER_ID;" in sv_zmq
+			),
+			"zap_request_buffers_present": (
+				"#define QL_ZMQ_ZAP_VERSION_BUFFER_SIZE 16" in sv_zmq
+				and "#define QL_ZMQ_ZAP_REQUEST_ID_BUFFER_SIZE 64" in sv_zmq
+				and "#define QL_ZMQ_ZAP_DOMAIN_BUFFER_SIZE 64" in sv_zmq
+				and "#define QL_ZMQ_ZAP_ADDRESS_BUFFER_SIZE 128" in sv_zmq
+				and "#define QL_ZMQ_ZAP_IDENTITY_BUFFER_SIZE QL_ZMQ_MAX_IDENTITY" in sv_zmq
+				and "#define QL_ZMQ_ZAP_MECHANISM_BUFFER_SIZE 16" in sv_zmq
+				and "#define QL_ZMQ_ZAP_USERNAME_BUFFER_SIZE QL_ZMQ_MAX_IDENTITY" in sv_zmq
+				and "#define QL_ZMQ_ZAP_PASSWORD_BUFFER_SIZE MAX_STRING_CHARS" in sv_zmq
+				and "#define QL_ZMQ_ZAP_EMPTY_FIELD QL_ZMQ_STRING_TERMINATOR" in sv_zmq
+				and "char version[QL_ZMQ_ZAP_VERSION_BUFFER_SIZE];" in sv_zmq
+				and "char requestId[QL_ZMQ_ZAP_REQUEST_ID_BUFFER_SIZE];" in sv_zmq
+				and "char domain[QL_ZMQ_ZAP_DOMAIN_BUFFER_SIZE];" in sv_zmq
+				and "char address[QL_ZMQ_ZAP_ADDRESS_BUFFER_SIZE];" in sv_zmq
+				and "char identity[QL_ZMQ_ZAP_IDENTITY_BUFFER_SIZE];" in sv_zmq
+				and "char mechanism[QL_ZMQ_ZAP_MECHANISM_BUFFER_SIZE];" in sv_zmq
+				and "char username[QL_ZMQ_ZAP_USERNAME_BUFFER_SIZE];" in sv_zmq
+				and "char password[QL_ZMQ_ZAP_PASSWORD_BUFFER_SIZE];" in sv_zmq
+				and "requestId[0] = QL_ZMQ_ZAP_EMPTY_FIELD;" in sv_zmq
+				and "char version[16];" not in sv_zmq
+				and "char requestId[64];" not in sv_zmq
+				and "requestId[0] = '\\0';" not in sv_zmq
+			),
+			"receive_frame_drain_present": (
+				'#define QL_ZMQ_DRAIN_SCRATCH_SIZE MAX_STRING_CHARS' in sv_zmq
+				and "length = s_zmq.zmq_recv( socket, buffer, bufferSize > 0 ? bufferSize - QL_ZMQ_STRING_TERMINATOR_LENGTH : 0, QL_ZMQ_DONTWAIT );" in sv_zmq
+				and "if ( length < QL_ZMQ_FRAME_READ_SUCCESS_MIN ) {" in sv_zmq
+				and "s_zmq.zmq_getsockopt( socket, QL_ZMQ_RCVMORE, &moreValue, &moreSize ) == QL_ZMQ_GETSOCKOPT_SUCCESS && moreValue != QL_ZMQ_RCVMORE_NONE" in sv_zmq
+				and "char scratch[QL_ZMQ_DRAIN_SCRATCH_SIZE];" in sv_zmq
+				and "idZMQ_ReadFrameString( socket, scratch, sizeof( scratch ), &more ) < QL_ZMQ_FRAME_READ_SUCCESS_MIN" in sv_zmq
+				and "idZMQ_DrainRemainingFrames( s_zmq.authSocket, more );" in sv_zmq
+				and "idZMQ_DrainRemainingFrames( s_zmq.rconSocket, more );" in sv_zmq
+			),
+			"rcvmore_getsockopt_success_present": (
+				"#define QL_ZMQ_GETSOCKOPT_SUCCESS 0" in sv_zmq
+				and "#define QL_ZMQ_RCVMORE_NONE 0" in sv_zmq
+				and "moreValue = QL_ZMQ_RCVMORE_NONE;" in sv_zmq
+				and "s_zmq.zmq_getsockopt( socket, QL_ZMQ_RCVMORE, &moreValue, &moreSize ) == QL_ZMQ_GETSOCKOPT_SUCCESS && moreValue != QL_ZMQ_RCVMORE_NONE" in sv_zmq
+				and "s_zmq.zmq_getsockopt( socket, QL_ZMQ_RCVMORE, &moreValue, &moreSize ) == 0 && moreValue" not in sv_zmq
+				and "zsock_rcvmore(" not in sv_zmq
+			),
+			"receive_frame_more_flag_present": (
+				"#define QL_ZMQ_FRAME_MORE qtrue" in sv_zmq
+				and "#define QL_ZMQ_FRAME_NO_MORE qfalse" in sv_zmq
+				and "*more = QL_ZMQ_FRAME_NO_MORE;" in sv_zmq
+				and "*more = QL_ZMQ_FRAME_MORE;" in sv_zmq
+				and "more = QL_ZMQ_FRAME_NO_MORE;" in sv_zmq
+				and "*more = qfalse;" not in sv_zmq
+				and "*more = qtrue;" not in sv_zmq
+				and "moreValue = QL_ZMQ_RCVMORE_NONE;" in sv_zmq
+				and "s_zmq.zmq_getsockopt( socket, QL_ZMQ_RCVMORE, &moreValue, &moreSize ) == QL_ZMQ_GETSOCKOPT_SUCCESS && moreValue != QL_ZMQ_RCVMORE_NONE" in sv_zmq
+				and "zstr_recv(" not in sv_zmq
+				and "zsock_rcvmore(" not in sv_zmq
+			),
+			"frame_read_failure_threshold_present": (
+				"#define QL_ZMQ_FRAME_READ_SUCCESS_MIN 0" in sv_zmq
+				and "if ( length < QL_ZMQ_FRAME_READ_SUCCESS_MIN ) {" in sv_zmq
+				and "idZMQ_ReadFrameString( socket, scratch, sizeof( scratch ), &more ) < QL_ZMQ_FRAME_READ_SUCCESS_MIN" in sv_zmq
+				and "commandLength >= QL_ZMQ_FRAME_READ_SUCCESS_MIN" in sv_zmq
+				and "if ( length < 0 ) {" not in sv_zmq
+				and "idZMQ_ReadFrameString( socket, scratch, sizeof( scratch ), &more ) < 0" not in sv_zmq
+				and "zstr_recv(" not in sv_zmq
+				and "zstr_free(" not in sv_zmq
+				and "zmq_msg_recv(" not in sv_zmq
+			),
+			"receive_string_terminator_present": (
+				"#define QL_ZMQ_STRING_TERMINATOR_LENGTH 1" in sv_zmq
+				and "#define QL_ZMQ_STRING_TERMINATOR '\\0'" in sv_zmq
+				and "#define QL_ZMQ_RCVMORE_NONE 0" in sv_zmq
+				and "buffer[0] = QL_ZMQ_STRING_TERMINATOR;" in sv_zmq
+				and "bufferSize > 0 ? bufferSize - QL_ZMQ_STRING_TERMINATOR_LENGTH : 0" in sv_zmq
+				and "length = (int)bufferSize - QL_ZMQ_STRING_TERMINATOR_LENGTH;" in sv_zmq
+				and "buffer[length] = QL_ZMQ_STRING_TERMINATOR;" in sv_zmq
+				and "moreValue = QL_ZMQ_RCVMORE_NONE;" in sv_zmq
+				and "bufferSize - 1" not in sv_zmq
+			),
+			"socket_option_booleans_present": (
+				"#define QL_ZMQ_SOCKET_OPTION_DISABLED 0" in sv_zmq
+				and "#define QL_ZMQ_SOCKET_OPTION_ENABLED 1" in sv_zmq
+				and "idZMQ_TrySetSocketInt( socket, QL_ZMQ_ROUTER_MANDATORY, QL_ZMQ_SOCKET_OPTION_ENABLED );" in sv_zmq
+				and "idZMQ_TrySetSocketInt( socket, QL_ZMQ_PLAIN_SERVER, s_zmq.rconPassword[0] ? QL_ZMQ_SOCKET_OPTION_ENABLED : QL_ZMQ_SOCKET_OPTION_DISABLED );" in sv_zmq
+				and "idZMQ_TrySetSocketInt( socket, QL_ZMQ_PLAIN_SERVER, s_zmq.statsPassword[0] ? QL_ZMQ_SOCKET_OPTION_ENABLED : QL_ZMQ_SOCKET_OPTION_DISABLED );" in sv_zmq
+			),
+			"socket_option_int_size_present": (
+				"#define QL_ZMQ_SOCKET_OPTION_INT_SIZE sizeof( int )" in sv_zmq
+				and "s_zmq.zmq_setsockopt( socket, option, &value, QL_ZMQ_SOCKET_OPTION_INT_SIZE );" in sv_zmq
+				and "s_zmq.zmq_setsockopt( socket, option, &value, sizeof( value ) );" not in sv_zmq
+				and "zsock_set_plain_server" not in sv_zmq
+				and "zsock_set_router_mandatory" not in sv_zmq
+			),
+			"no_flags_and_immediate_poll_present": (
+				"#define QL_ZMQ_NO_FLAGS 0" in sv_zmq
+				and "#define QL_ZMQ_POLL_TIMEOUT_IMMEDIATE 0" in sv_zmq
+				and "flags = more ? QL_ZMQ_SNDMORE : QL_ZMQ_NO_FLAGS;" in sv_zmq
+				and "s_zmq.zmq_send( s_zmq.pubSocket, message, strlen( message ), QL_ZMQ_NO_FLAGS );" in sv_zmq
+				and "s_zmq.zmq_poll( &item, QL_ZMQ_SINGLE_POLL_ITEM, QL_ZMQ_POLL_TIMEOUT_IMMEDIATE )" in sv_zmq
+			),
+			"single_poll_item_present": (
+				"#define QL_ZMQ_SINGLE_POLL_ITEM 1" in sv_zmq
+				and "while ( s_zmq.zmq_poll( &item, QL_ZMQ_SINGLE_POLL_ITEM, QL_ZMQ_POLL_TIMEOUT_IMMEDIATE ) >= QL_ZMQ_POLL_READY_MIN && ( item.revents & QL_ZMQ_POLLIN ) ) {" in sv_zmq
+				and "if ( s_zmq.zmq_poll( &item, QL_ZMQ_SINGLE_POLL_ITEM, QL_ZMQ_POLL_TIMEOUT_IMMEDIATE ) < QL_ZMQ_POLL_READY_MIN || !( item.revents & QL_ZMQ_POLLIN ) ) {" in sv_zmq
+				and "s_zmq.zmq_poll( &item, 1, QL_ZMQ_POLL_TIMEOUT_IMMEDIATE )" not in sv_zmq
+			),
+			"poll_ready_threshold_present": (
+				"#define QL_ZMQ_POLL_READY_MIN 1" in sv_zmq
+				and "while ( s_zmq.zmq_poll( &item, QL_ZMQ_SINGLE_POLL_ITEM, QL_ZMQ_POLL_TIMEOUT_IMMEDIATE ) >= QL_ZMQ_POLL_READY_MIN && ( item.revents & QL_ZMQ_POLLIN ) ) {" in sv_zmq
+				and "if ( s_zmq.zmq_poll( &item, QL_ZMQ_SINGLE_POLL_ITEM, QL_ZMQ_POLL_TIMEOUT_IMMEDIATE ) < QL_ZMQ_POLL_READY_MIN || !( item.revents & QL_ZMQ_POLLIN ) ) {" in sv_zmq
+				and "QL_ZMQ_POLL_TIMEOUT_IMMEDIATE ) > 0" not in sv_zmq
+				and "QL_ZMQ_POLL_TIMEOUT_IMMEDIATE ) <= 0" not in sv_zmq
+				and "zmq_poll(" not in sv_zmq.replace("s_zmq.zmq_poll(", "")
+			),
+			"poll_item_zero_state_present": (
+				"#define QL_ZMQ_POLL_FD_NONE 0" in sv_zmq
+				and "#define QL_ZMQ_POLL_REVENTS_NONE 0" in sv_zmq
+				and "item.fd = QL_ZMQ_POLL_FD_NONE;" in sv_zmq
+				and "item.revents = QL_ZMQ_POLL_REVENTS_NONE;" in sv_zmq
+				and "item.fd = 0;" not in sv_zmq
+				and "item.revents = 0;" not in sv_zmq
+			),
+			"rcon_receive_buffers_present": (
+				"#define QL_ZMQ_RCON_IDENTITY_BUFFER_SIZE QL_ZMQ_MAX_IDENTITY" in sv_zmq
+				and "#define QL_ZMQ_RCON_COMMAND_BUFFER_SIZE MAX_STRING_CHARS" in sv_zmq
+				and "char identity[QL_ZMQ_RCON_IDENTITY_BUFFER_SIZE];" in sv_zmq
+				and "char command[QL_ZMQ_RCON_COMMAND_BUFFER_SIZE];" in sv_zmq
+				and "identityLength = idZMQ_ReadFrameString( s_zmq.rconSocket, identity, sizeof( identity ), &more );" in sv_zmq
+				and "commandLength = idZMQ_ReadRconCommand( command, sizeof( command ) );" in sv_zmq
+			),
+			"rcon_positive_frame_gate_present": (
+				"#define QL_ZMQ_FRAME_READ_SUCCESS_MIN 0" in sv_zmq
+				and "#define QL_ZMQ_RCON_MIN_IDENTITY_LENGTH 1" in sv_zmq
+				and "#define QL_ZMQ_RCON_MIN_COMMAND_LENGTH 1" in sv_zmq
+				and "commandLength >= QL_ZMQ_FRAME_READ_SUCCESS_MIN" in sv_zmq
+				and "identityLength < QL_ZMQ_RCON_MIN_IDENTITY_LENGTH" in sv_zmq
+				and "commandLength < QL_ZMQ_RCON_MIN_COMMAND_LENGTH" in sv_zmq
+				and "commandLength >= 0" not in sv_zmq
+				and "identityLength <= 0" not in sv_zmq
+				and "commandLength <= 0" not in sv_zmq
+			),
+			"rcon_peer_count_floor_present": (
+				"#define QL_ZMQ_RCON_PEER_COUNT_EMPTY 0" in sv_zmq
+				and "s_zmq.rconPeerCount++;" in sv_zmq
+				and "if ( s_zmq.rconPeerCount > QL_ZMQ_RCON_PEER_COUNT_EMPTY ) {" in sv_zmq
+				and "s_zmq.rconPeerCount--;" in sv_zmq
+				and "s_zmq.rconPeerCount = QL_ZMQ_RCON_PEER_COUNT_EMPTY;" in sv_zmq
+				and "s_zmq.rconPeerCount > 0" not in sv_zmq
+				and "s_zmq.rconPeerCount = 0;" not in sv_zmq
+			),
+			"rcon_peer_table_slot_clear_present": (
+				"#define QL_ZMQ_RCON_PEER_SLOT_EMPTY NULL" in sv_zmq
+				and "idZMQ_FreeRconPeerSubtree( s_zmq.rconPeerRoot );" in sv_zmq
+				and "s_zmq.rconPeers = QL_ZMQ_RCON_PEER_SLOT_EMPTY;" in sv_zmq
+				and "s_zmq.rconPeerRoot = QL_ZMQ_RCON_PEER_SLOT_EMPTY;" in sv_zmq
+				and "s_zmq.rconPeerLast = QL_ZMQ_RCON_PEER_SLOT_EMPTY;" in sv_zmq
+				and "s_zmq.rconPeerCount = QL_ZMQ_RCON_PEER_COUNT_EMPTY;" in sv_zmq
+				and "s_zmq.rconPeers = NULL;" not in sv_zmq
+				and "idZMQ_EraseRconPeerRange( s_zmq.rconPeers, NULL );" in sv_zmq
+				and "idZMQ_ClearRconPeers();" in sv_zmq
+				and "std_tree_" not in sv_zmq
+			),
+			"external_runtime_loader_present": (
+				'#define QL_ZMQ_RUNTIME_UNAVAILABLE_FORMAT "ZMQ runtime unavailable: %s\\n"' in sv_zmq
+				and '#define QL_ZMQ_RUNTIME_DISABLED_MESSAGE "ZMQ runtime disabled by build policy (QL_BUILD_ONLINE_SERVICES=0); keeping retained fallback paths.\\n"' in sv_zmq
+				and '#define QL_ZMQ_RUNTIME_LOAD_FAILED_REASON "unable to load libzmq"' in sv_zmq
+				and '#define QL_ZMQ_RUNTIME_EXPORTS_MISSING_REASON "libzmq is missing required exports"' in sv_zmq
+				and "Com_Printf( QL_ZMQ_RUNTIME_DISABLED_MESSAGE );" in sv_zmq
+				and "Com_Printf( QL_ZMQ_RUNTIME_UNAVAILABLE_FORMAT, reason );" in sv_zmq
+				and "idZMQ_LogRuntimeUnavailable( QL_ZMQ_RUNTIME_LOAD_FAILED_REASON );" in sv_zmq
+				and "idZMQ_LogRuntimeUnavailable( QL_ZMQ_RUNTIME_EXPORTS_MISSING_REASON );" in sv_zmq
+			),
+			"external_runtime_export_names_present": (
+				'#define QL_ZMQ_EXPORT_CTX_NEW "zmq_ctx_new"' in sv_zmq
+				and '#define QL_ZMQ_EXPORT_CTX_TERM "zmq_ctx_term"' in sv_zmq
+				and '#define QL_ZMQ_EXPORT_SOCKET "zmq_socket"' in sv_zmq
+				and '#define QL_ZMQ_EXPORT_CLOSE "zmq_close"' in sv_zmq
+				and '#define QL_ZMQ_EXPORT_BIND "zmq_bind"' in sv_zmq
+				and '#define QL_ZMQ_EXPORT_SEND "zmq_send"' in sv_zmq
+				and '#define QL_ZMQ_EXPORT_RECV "zmq_recv"' in sv_zmq
+				and '#define QL_ZMQ_EXPORT_POLL "zmq_poll"' in sv_zmq
+				and '#define QL_ZMQ_EXPORT_ERRNO "zmq_errno"' in sv_zmq
+				and '#define QL_ZMQ_EXPORT_STRERROR "zmq_strerror"' in sv_zmq
+				and '#define QL_ZMQ_EXPORT_SETSOCKOPT "zmq_setsockopt"' in sv_zmq
+				and '#define QL_ZMQ_EXPORT_GETSOCKOPT "zmq_getsockopt"' in sv_zmq
+				and "idZMQ_LoadSymbol( (void **)&s_zmq.zmq_ctx_new, QL_ZMQ_EXPORT_CTX_NEW )" in sv_zmq
+				and "idZMQ_LoadSymbol( (void **)&s_zmq.zmq_ctx_term, QL_ZMQ_EXPORT_CTX_TERM )" in sv_zmq
+				and "idZMQ_LoadSymbol( (void **)&s_zmq.zmq_socket, QL_ZMQ_EXPORT_SOCKET )" in sv_zmq
+				and "idZMQ_LoadSymbol( (void **)&s_zmq.zmq_close, QL_ZMQ_EXPORT_CLOSE )" in sv_zmq
+				and "idZMQ_LoadSymbol( (void **)&s_zmq.zmq_bind, QL_ZMQ_EXPORT_BIND )" in sv_zmq
+				and "idZMQ_LoadSymbol( (void **)&s_zmq.zmq_send, QL_ZMQ_EXPORT_SEND )" in sv_zmq
+				and "idZMQ_LoadSymbol( (void **)&s_zmq.zmq_recv, QL_ZMQ_EXPORT_RECV )" in sv_zmq
+				and "idZMQ_LoadSymbol( (void **)&s_zmq.zmq_poll, QL_ZMQ_EXPORT_POLL )" in sv_zmq
+				and "idZMQ_LoadSymbol( (void **)&s_zmq.zmq_errno, QL_ZMQ_EXPORT_ERRNO )" in sv_zmq
+				and "idZMQ_LoadSymbol( (void **)&s_zmq.zmq_strerror, QL_ZMQ_EXPORT_STRERROR )" in sv_zmq
+				and "idZMQ_LoadOptionalSymbol( (void **)&s_zmq.zmq_setsockopt, QL_ZMQ_EXPORT_SETSOCKOPT );" in sv_zmq
+				and "idZMQ_LoadOptionalSymbol( (void **)&s_zmq.zmq_getsockopt, QL_ZMQ_EXPORT_GETSOCKOPT );" in sv_zmq
+				and 'idZMQ_LoadSymbol( (void **)&s_zmq.zmq_ctx_new, "zmq_ctx_new" )' not in sv_zmq
+				and 'idZMQ_LoadOptionalSymbol( (void **)&s_zmq.zmq_setsockopt, "zmq_setsockopt" );' not in sv_zmq
+			),
+			"context_shutdown_slot_clear_present": (
+				"#define QL_ZMQ_CONTEXT_SLOT_EMPTY NULL" in sv_zmq
+				and "if ( s_zmq.context && s_zmq.zmq_ctx_term ) {" in sv_zmq
+				and "s_zmq.zmq_ctx_term( s_zmq.context );" in sv_zmq
+				and "s_zmq.context = QL_ZMQ_CONTEXT_SLOT_EMPTY;" in sv_zmq
+				and "s_zmq.context = NULL;" not in sv_zmq
+				and "zmq_ctx_t_term(" not in sv_zmq
+				and "zmq_term(" not in sv_zmq
+			),
+			"external_runtime_library_slot_clear_present": (
+				"#define QL_ZMQ_LIBRARY_SLOT_EMPTY NULL" in sv_zmq
+				and "QL_ZMQ_CLOSE();" in sv_zmq
+				and "s_zmq.library = QL_ZMQ_LIBRARY_SLOT_EMPTY;" in sv_zmq
+				and sv_zmq.count("s_zmq.library = QL_ZMQ_LIBRARY_SLOT_EMPTY;") == 2
+				and "s_zmq.library = NULL;" not in sv_zmq
+				and "idZMQ_ResetResolvedSymbols();" in sv_zmq
+				and "idZMQ_UnloadLibrary();" in sv_zmq
+				and "#include <zmq.h>" not in sv_zmq
+				and "zsys_shutdown(" not in sv_zmq
+			),
+			"external_runtime_resolved_symbol_slot_clear_present": (
+				"#define QL_ZMQ_SYMBOL_SLOT_EMPTY NULL" in sv_zmq
+				and "s_zmq.zmq_ctx_new = QL_ZMQ_SYMBOL_SLOT_EMPTY;" in sv_zmq
+				and "s_zmq.zmq_ctx_term = QL_ZMQ_SYMBOL_SLOT_EMPTY;" in sv_zmq
+				and "s_zmq.zmq_socket = QL_ZMQ_SYMBOL_SLOT_EMPTY;" in sv_zmq
+				and "s_zmq.zmq_close = QL_ZMQ_SYMBOL_SLOT_EMPTY;" in sv_zmq
+				and "s_zmq.zmq_bind = QL_ZMQ_SYMBOL_SLOT_EMPTY;" in sv_zmq
+				and "s_zmq.zmq_setsockopt = QL_ZMQ_SYMBOL_SLOT_EMPTY;" in sv_zmq
+				and "s_zmq.zmq_getsockopt = QL_ZMQ_SYMBOL_SLOT_EMPTY;" in sv_zmq
+				and "s_zmq.zmq_send = QL_ZMQ_SYMBOL_SLOT_EMPTY;" in sv_zmq
+				and "s_zmq.zmq_recv = QL_ZMQ_SYMBOL_SLOT_EMPTY;" in sv_zmq
+				and "s_zmq.zmq_poll = QL_ZMQ_SYMBOL_SLOT_EMPTY;" in sv_zmq
+				and "s_zmq.zmq_errno = QL_ZMQ_SYMBOL_SLOT_EMPTY;" in sv_zmq
+				and "s_zmq.zmq_strerror = QL_ZMQ_SYMBOL_SLOT_EMPTY;" in sv_zmq
+				and sv_zmq.count("= QL_ZMQ_SYMBOL_SLOT_EMPTY;") == 12
+				and "s_zmq.zmq_ctx_new = NULL;" not in sv_zmq
+				and "idZMQ_ResetResolvedSymbols();" in sv_zmq
+				and "#include <zmq.h>" not in sv_zmq
+			),
+			"rcon_poll_slot_clear_present": (
+				"#define QL_ZMQ_RCON_POLL_SLOT_EMPTY NULL" in sv_zmq
+				and "s_zmq.rconPollSocket = QL_ZMQ_RCON_POLL_SLOT_EMPTY;" in sv_zmq
+				and sv_zmq.count("s_zmq.rconPollSocket = QL_ZMQ_RCON_POLL_SLOT_EMPTY;") == 2
+				and "s_zmq.rconPollSocket = NULL;" not in sv_zmq
+				and "s_zmq.rconPollSocket = s_zmq.rconSocket;" in sv_zmq
+				and "if ( !s_zmq.rconSocket || !s_zmq.rconPollSocket || !s_zmq.zmq_poll || !s_zmq.zmq_recv ) {" in sv_zmq
+				and "item.socket = s_zmq.rconPollSocket;" in sv_zmq
+				and "zsock_resolve(" not in sv_zmq
+				and "zsock_destroy_checked" not in sv_zmq
+			),
+			"socket_close_slot_clear_present": (
+				"#define QL_ZMQ_SOCKET_SLOT_EMPTY NULL" in sv_zmq
+				and "if ( *socketPointer && s_zmq.zmq_close ) {" in sv_zmq
+				and "s_zmq.zmq_close( *socketPointer );" in sv_zmq
+				and "*socketPointer = QL_ZMQ_SOCKET_SLOT_EMPTY;" in sv_zmq
+				and "*socketPointer = NULL;" not in sv_zmq
+				and "zsock_destroy_checked" not in sv_zmq
+				and "zsys_close(" not in sv_zmq
+			),
+			"auth_bind_failure_close_slot_present": (
+				"if ( s_zmq.zmq_bind( socket, QL_ZMQ_ZAP_ENDPOINT ) != QL_ZMQ_BIND_SUCCESS ) {" in sv_zmq
+				and "idZMQ_LogRuntimeUnavailable( va( QL_ZMQ_AUTH_SOCKET_BIND_FAILED_FORMAT, idZMQ_LastErrorString() ) );" in sv_zmq
+				and "idZMQ_CloseSocket( &socket );" in sv_zmq
+				and "s_zmq.zmq_close( socket );" not in sv_zmq
+				and sv_zmq.count("s_zmq.zmq_close(") == 1
+			),
+			"bind_success_threshold_present": (
+				"#define QL_ZMQ_BIND_SUCCESS 0" in sv_zmq
+				and "if ( s_zmq.zmq_bind( socket, QL_ZMQ_ZAP_ENDPOINT ) != QL_ZMQ_BIND_SUCCESS ) {" in sv_zmq
+				and "if ( s_zmq.zmq_bind( socket, s_zmq.rconEndpoint ) != QL_ZMQ_BIND_SUCCESS ) {" in sv_zmq
+				and "if ( s_zmq.zmq_bind( socket, s_zmq.statsEndpoint ) != QL_ZMQ_BIND_SUCCESS ) {" in sv_zmq
+				and "zmq_bind( socket, QL_ZMQ_ZAP_ENDPOINT ) != 0" not in sv_zmq
+				and "zmq_bind( socket, s_zmq.rconEndpoint ) != 0" not in sv_zmq
+				and "zmq_bind( socket, s_zmq.statsEndpoint ) != 0" not in sv_zmq
+				and "zsock_bind(" not in sv_zmq
+			),
+			"typed_publication_present": (
+				'#define QL_ZMQ_PUBLICATION_TYPE_KEY "TYPE"' in sv_zmq
+				and '#define QL_ZMQ_PUBLICATION_DATA_KEY "DATA"' in sv_zmq
+				and '#define QL_ZMQ_MATCH_REPORT_TYPE "MATCH_REPORT"' in sv_zmq
+				and "Com_sprintf( buffer, bufferSize, QL_ZMQ_PUBLICATION_PAYLOAD_FORMAT, type, payload );" in sv_zmq
+				and "Com_sprintf( buffer, bufferSize, QL_ZMQ_PUBLICATION_NULL_PAYLOAD_FORMAT, type );" in sv_zmq
+				and "idZMQ_Publish( QL_ZMQ_MATCH_REPORT_TYPE, (const char *)report );" in sv_zmq
+			),
+			"stats_transcript_line_present": (
+				'#define QL_ZMQ_STATS_TRANSCRIPT "zmq_stats.ndjson"' in sv_zmq
+				and '#define QL_ZMQ_STATS_TRANSCRIPT_RECORD_TERMINATOR "\\n"' in sv_zmq
+				and "#define QL_ZMQ_STATS_TRANSCRIPT_RECORD_TERMINATOR_LENGTH 1" in sv_zmq
+				and "s_zmq.statsTranscript = FS_FOpenFileWrite( QL_ZMQ_STATS_TRANSCRIPT );" in sv_zmq
+				and "FS_Write( QL_ZMQ_STATS_TRANSCRIPT_RECORD_TERMINATOR, QL_ZMQ_STATS_TRANSCRIPT_RECORD_TERMINATOR_LENGTH, s_zmq.statsTranscript );" in sv_zmq
+			),
+			"stats_transcript_handle_clear_present": (
+				"#define QL_ZMQ_STATS_TRANSCRIPT_HANDLE_EMPTY 0" in sv_zmq
+				and "if ( s_zmq.statsTranscript ) {" in sv_zmq
+				and "FS_FCloseFile( s_zmq.statsTranscript );" in sv_zmq
+				and "s_zmq.statsTranscript = QL_ZMQ_STATS_TRANSCRIPT_HANDLE_EMPTY;" in sv_zmq
+				and "s_zmq.statsTranscript = 0;" not in sv_zmq
+				and "idZMQ_CloseStatsTranscript();" in sv_zmq
+				and "idZMQ_CloseSocket( &s_zmq.pubSocket );" in sv_zmq
+				and "Zmq_ShutdownStatsPublisher();" in sv_init
+				and "Zmq_ShutdownStatsPublisher();" not in sv_zmq[sv_zmq.index("void Zmq_ShutdownRuntime( void ) {"):]
+				and "zstr_send(" not in sv_zmq
+			),
+			"rcon_peer_log_formats_present": (
+				'#define QL_ZMQ_RCON_CLIENT_DISCONNECT_FORMAT "zmq RCON client disconnected: %s\\n"' in sv_zmq
+				and '#define QL_ZMQ_RCON_CLIENT_CONNECT_FORMAT "zmq RCON client connected: %s\\n"' in sv_zmq
+				and '#define QL_ZMQ_RCON_COMMAND_FORMAT "zmq RCON command from %s: %s\\n"' in sv_zmq
+				and "Com_Printf( QL_ZMQ_RCON_CLIENT_DISCONNECT_FORMAT, peer->label );" in sv_zmq
+				and "Com_Printf( QL_ZMQ_RCON_CLIENT_CONNECT_FORMAT, peer->label );" in sv_zmq
+				and "Com_Printf( QL_ZMQ_RCON_COMMAND_FORMAT, peer->label, command );" in sv_zmq
+			),
+			"rcon_broadcast_reentrancy_guard_present": (
+				"#define QL_ZMQ_RCON_BROADCAST_ACTIVE qtrue" in sv_zmq
+				and "#define QL_ZMQ_RCON_BROADCAST_IDLE qfalse" in sv_zmq
+				and "qboolean\t\t\t\tbroadcastingRconOutput;" in sv_zmq
+				and "if ( s_zmq.broadcastingRconOutput ) {" in sv_zmq
+				and "s_zmq.broadcastingRconOutput = QL_ZMQ_RCON_BROADCAST_ACTIVE;" in sv_zmq
+				and "s_zmq.broadcastingRconOutput = QL_ZMQ_RCON_BROADCAST_IDLE;" in sv_zmq
+				and "s_zmq.broadcastingRconOutput = qtrue;" not in sv_zmq
+				and "s_zmq.broadcastingRconOutput = qfalse;" not in sv_zmq
+				and "Com_Printf( QL_ZMQ_RCON_CLIENT_DISCONNECT_FORMAT, peer->label );" in sv_zmq
+				and "Zmq_BroadcastRconOutput( msg );" in common
+				and "zstr_send(" not in sv_zmq
+				and "zstr_sendm(" not in sv_zmq
+			),
+			"rcon_empty_payload_present": (
+				"#define QL_ZMQ_RCON_EMPTY_PAYLOAD QL_ZMQ_DEFAULT_EMPTY" in sv_zmq
+				and "payload = message ? message : QL_ZMQ_RCON_EMPTY_PAYLOAD;" in sv_zmq
+				and "s_zmq.zmq_send( s_zmq.rconSocket, payload, strlen( payload ), QL_ZMQ_SEND_DONTWAIT );" in sv_zmq
+			),
+			"rcon_broadcast_send_flags_present": (
+				"#define QL_ZMQ_SEND_DONTWAIT QL_ZMQ_DONTWAIT" in sv_zmq
+				and "#define QL_ZMQ_SEND_MORE_DONTWAIT ( QL_ZMQ_SNDMORE | QL_ZMQ_DONTWAIT )" in sv_zmq
+				and "s_zmq.zmq_send( s_zmq.rconSocket, peer->identity, peer->identityLength, QL_ZMQ_SEND_MORE_DONTWAIT ) < QL_ZMQ_SEND_SUCCESS_MIN" in sv_zmq
+				and "s_zmq.zmq_send( s_zmq.rconSocket, payload, strlen( payload ), QL_ZMQ_SEND_DONTWAIT );" in sv_zmq
+				and "peer->identity, peer->identityLength, QL_ZMQ_SNDMORE | QL_ZMQ_DONTWAIT" not in sv_zmq
+			),
+			"send_success_threshold_present": (
+				"#define QL_ZMQ_SEND_SUCCESS_MIN 0" in sv_zmq
+				and "idZMQ_SendAuthFrame( s_zmq.authSocket, version, qtrue ) < QL_ZMQ_SEND_SUCCESS_MIN" in sv_zmq
+				and "idZMQ_SendAuthFrame( s_zmq.authSocket, requestId, qtrue ) < QL_ZMQ_SEND_SUCCESS_MIN" in sv_zmq
+				and "idZMQ_SendAuthFrame( s_zmq.authSocket, statusCode, qtrue ) < QL_ZMQ_SEND_SUCCESS_MIN" in sv_zmq
+				and "idZMQ_SendAuthFrame( s_zmq.authSocket, statusText, qtrue ) < QL_ZMQ_SEND_SUCCESS_MIN" in sv_zmq
+				and "idZMQ_SendAuthFrame( s_zmq.authSocket, userId, qtrue ) < QL_ZMQ_SEND_SUCCESS_MIN" in sv_zmq
+				and "s_zmq.zmq_send( s_zmq.rconSocket, peer->identity, peer->identityLength, QL_ZMQ_SEND_MORE_DONTWAIT ) < QL_ZMQ_SEND_SUCCESS_MIN" in sv_zmq
+				and "QL_ZMQ_SEND_MORE_DONTWAIT ) < 0" not in sv_zmq
+				and "zstr_send(" not in sv_zmq
+				and "zstr_sendm(" not in sv_zmq
+				and "s_send_string(" not in sv_zmq
+			),
+			"focused_validation_present": (
+				"test_server_zmq_runtime_reconstructs_retail_publication_and_rcon_owners" in platform_services_tests
+				and "test_zmq_password_refresh_actor_source_shape_round_643_is_pinned" in platform_services_tests
+				and "test_zmq_stats_init_idempotent_wrapper_round_644_is_pinned" in platform_services_tests
+				and "test_zmq_rcon_frame_pump_is_poll_only_round_645_is_pinned" in platform_services_tests
+				and "test_zmq_rcon_broadcast_disconnect_branch_round_646_is_pinned" in platform_services_tests
+				and "test_zmq_rcon_broadcast_null_payload_round_647_is_pinned" in platform_services_tests
+				and "test_zmq_stats_endpoint_net_ip_round_648_is_pinned" in platform_services_tests
+				and "test_zmq_socket_bind_failure_retention_round_649_is_pinned" in platform_services_tests
+				and "test_zmq_bind_success_threshold_round_730_is_pinned" in platform_services_tests
+				and "test_zmq_rcon_resolved_poll_slot_round_650_is_pinned" in platform_services_tests
+				and "test_zmq_auth_actor_ready_shutdown_order_round_651_is_pinned" in platform_services_tests
+				and "test_zmq_password_apply_auth_gate_round_652_is_pinned" in platform_services_tests
+				and "test_zmq_shutdown_owner_split_round_653_is_pinned" in platform_services_tests
+				and "test_zmq_endpoint_empty_clear_boundary_round_691_is_pinned" in platform_services_tests
+				and "test_zmq_runtime_shutdown_skips_peer_clear_round_654_is_pinned" in platform_services_tests
+				and "test_zmq_peer_tree_iterator_boundary_round_655_is_pinned" in platform_services_tests
+				and "test_zmq_rcon_peer_count_floor_round_724_is_pinned" in platform_services_tests
+				and "test_zmq_rcon_peer_table_slot_clear_round_747_is_pinned" in platform_services_tests
+				and "test_zmq_public_wrapper_tailcalls_round_656_are_pinned" in platform_services_tests
+				and "test_zmq_retained_idzmq_layout_boundary_round_657_is_pinned" in platform_services_tests
+				and "test_zmq_checked_zsock_lifecycle_provenance_round_658_is_pinned" in platform_services_tests
+				and "test_zmq_socket_close_slot_clear_round_736_is_pinned" in platform_services_tests
+				and "test_zmq_auth_bind_failure_close_slot_round_738_is_pinned" in platform_services_tests
+				and "test_zmq_context_shutdown_slot_clear_round_740_is_pinned" in platform_services_tests
+				and "test_zmq_external_runtime_library_slot_clear_round_742_is_pinned" in platform_services_tests
+				and "test_zmq_external_runtime_resolved_symbol_slot_clear_round_743_is_pinned" in platform_services_tests
+				and "test_zmq_rcon_poll_slot_clear_order_round_746_is_pinned" in platform_services_tests
+				and "test_zmq_auth_actor_verbose_handshake_boundary_round_659_is_pinned" in platform_services_tests
+				and "test_zmq_password_plain_notification_boundary_round_660_is_pinned" in platform_services_tests
+				and "test_zmq_endpoint_cvar_literal_boundary_round_661_is_pinned" in platform_services_tests
+				and "test_zmq_cvar_flag_boundary_round_697_is_pinned" in platform_services_tests
+				and "test_zmq_endpoint_ip_scratch_buffer_round_721_is_pinned" in platform_services_tests
+				and "test_zmq_zap_domain_constant_boundary_round_662_is_pinned" in platform_services_tests
+				and "test_zmq_rcon_peer_log_format_boundary_round_663_is_pinned" in platform_services_tests
+				and "test_zmq_rcon_broadcast_reentrancy_guard_round_751_is_pinned" in platform_services_tests
+				and "test_zmq_stats_publication_envelope_boundary_round_664_is_pinned" in platform_services_tests
+				and "test_zmq_passfile_failed_open_boundary_round_665_is_pinned" in platform_services_tests
+				and "test_zmq_passfile_record_buffer_round_722_is_pinned" in platform_services_tests
+				and "test_zmq_external_runtime_loader_boundary_round_666_is_pinned" in platform_services_tests
+				and "test_zmq_external_runtime_export_names_round_692_is_pinned" in platform_services_tests
+				and "test_zmq_manual_zap_auth_response_boundary_round_667_is_pinned" in platform_services_tests
+				and "test_zmq_zap_request_buffer_boundary_round_689_is_pinned" in platform_services_tests
+				and "test_zmq_receive_frame_drain_boundary_round_668_is_pinned" in platform_services_tests
+				and "test_zmq_rcvmore_getsockopt_success_round_732_is_pinned" in platform_services_tests
+				and "test_zmq_receive_frame_more_flag_round_752_is_pinned" in platform_services_tests
+				and "test_zmq_frame_read_failure_threshold_round_728_is_pinned" in platform_services_tests
+				and "test_zmq_receive_string_terminator_boundary_round_684_is_pinned" in platform_services_tests
+				and "test_zmq_stats_transcript_line_boundary_round_669_is_pinned" in platform_services_tests
+				and "test_zmq_stats_transcript_handle_clear_round_749_is_pinned" in platform_services_tests
+				and "test_zmq_stats_default_port_format_boundary_round_671_is_pinned" in platform_services_tests
+				and "test_zmq_rcon_empty_payload_constant_boundary_round_672_is_pinned" in platform_services_tests
+				and "test_zmq_socket_option_boolean_boundary_round_674_is_pinned" in platform_services_tests
+				and "test_zmq_socket_option_int_size_round_733_is_pinned" in platform_services_tests
+				and "test_zmq_socket_option_string_size_round_734_is_pinned" in platform_services_tests
+				and "test_zmq_no_flags_and_immediate_poll_boundary_round_676_is_pinned" in platform_services_tests
+				and "test_zmq_single_poll_item_boundary_round_679_is_pinned" in platform_services_tests
+				and "test_zmq_poll_item_zero_state_boundary_round_680_is_pinned" in platform_services_tests
+				and "test_zmq_poll_ready_threshold_round_727_is_pinned" in platform_services_tests
+				and "test_zmq_rcon_receive_buffer_boundary_round_682_is_pinned" in platform_services_tests
+				and "test_zmq_rcon_broadcast_send_flag_boundary_round_686_is_pinned" in platform_services_tests
+				and "test_zmq_send_success_threshold_round_726_is_pinned" in platform_services_tests
+			),
 		},
 	)
 

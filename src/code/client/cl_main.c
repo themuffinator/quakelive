@@ -747,8 +747,8 @@ static qboolean cl_statsClearRegistered;
 #define CL_STEAM_BROWSER_EVENT_COUNT 32
 #define CL_STEAM_BROWSER_EVENT_NAME_LENGTH 96
 #define CL_STEAM_BROWSER_EVENT_PAYLOAD_LENGTH 65536
-#define CL_STEAM_STATS_FIELD_COUNT 88
-#define CL_STEAM_ACHIEVEMENT_COUNT 59
+#define CL_STEAM_STATS_FIELD_COUNT 0x58
+#define CL_STEAM_ACHIEVEMENT_COUNT 0x3b
 #define CL_STEAM_UGC_TITLE_LENGTH 256
 #define CL_STEAM_UGC_DESCRIPTION_LENGTH 8192
 #define CL_STEAM_UGC_PREVIEW_URL_LENGTH 1024
@@ -926,6 +926,13 @@ static const char *s_clSteamAchievementNames[CL_STEAM_ACHIEVEMENT_COUNT] = {
 	"AW_TRIFECTA",
 	"AW_MAX"
 };
+
+#define CL_STEAM_STATIC_ASSERT_ARRAY_LEN( name, array, count ) typedef char name[( ARRAY_LEN( array ) == ( count ) ) ? 1 : -1]
+
+CL_STEAM_STATIC_ASSERT_ARRAY_LEN( cl_steam_stats_field_count_matches_descriptor_table, s_clSteamStatDescriptors, CL_STEAM_STATS_FIELD_COUNT );
+CL_STEAM_STATIC_ASSERT_ARRAY_LEN( cl_steam_achievement_count_matches_name_table, s_clSteamAchievementNames, CL_STEAM_ACHIEVEMENT_COUNT );
+
+#undef CL_STEAM_STATIC_ASSERT_ARRAY_LEN
 
 typedef struct {
 	int sequence;
@@ -3968,7 +3975,10 @@ static void CL_SteamBrowser_CompleteNativeRefresh( qboolean timedOut ) {
 			CL_GetMatchmakingServicePolicyLabel() );
 	}
 
-	QL_Steamworks_CompleteServerBrowserOwnerRequest( &cl_steamNativeBrowserOwner );
+	if ( !QL_Steamworks_CompleteServerBrowserOwnerRequest( &cl_steamNativeBrowserOwner ) ) {
+		return;
+	}
+
 	cl_steamBrowserState.nativeRefreshActive = qfalse;
 	cl_steamBrowserState.refreshActive = qfalse;
 	CL_Steam_PublishBrowserEvent( "servers.refresh.end", NULL );
@@ -4243,7 +4253,7 @@ CL_SteamBrowser_CompleteNativeDetailTerminal
 Advances the retained three-callback JSBrowserDetails release counter.
 =============
 */
-static void CL_SteamBrowser_CompleteNativeDetailTerminal( clSteamNativeServerDetail_t *detail ) {
+static void CL_SteamBrowser_CompleteNativeDetailTerminal( clSteamNativeServerDetail_t *detail, uint32_t terminalChannel ) {
 	qboolean releaseReady;
 
 	if ( !detail ) {
@@ -4251,7 +4261,7 @@ static void CL_SteamBrowser_CompleteNativeDetailTerminal( clSteamNativeServerDet
 	}
 
 	releaseReady = qfalse;
-	if ( QL_Steamworks_CompleteServerBrowserDetailRequestCallback( &detail->request, &releaseReady ) ) {
+	if ( QL_Steamworks_CompleteServerBrowserDetailRequestTerminal( &detail->request, terminalChannel, &releaseReady ) ) {
 		detail->completedCallbacks = detail->request.lifecycle.completedCallbacks;
 	}
 
@@ -4278,7 +4288,7 @@ static void CL_SteamBrowser_NativePingRespondedImpl( clSteamNativeServerPingResp
 
 	if ( QL_Steamworks_ReadServerBrowserPingResponseForApp( serverDetails, detail->appId, &response ) ) {
 		CL_SteamBrowser_PublishNativeServerResponse( &response );
-		CL_SteamBrowser_CompleteNativeDetailTerminal( detail );
+		CL_SteamBrowser_CompleteNativeDetailTerminal( detail, QL_STEAM_SERVER_BROWSER_DETAIL_TERMINAL_PING );
 	}
 }
 
@@ -4290,7 +4300,7 @@ Handles the ISteamMatchmakingPingResponse::ServerFailedToRespond callback.
 =============
 */
 static void CL_SteamBrowser_NativePingFailedImpl( clSteamNativeServerPingResponse_t *self ) {
-	CL_SteamBrowser_CompleteNativeDetailTerminal( CL_SteamBrowser_NativeDetailFromPing( self ) );
+	CL_SteamBrowser_CompleteNativeDetailTerminal( CL_SteamBrowser_NativeDetailFromPing( self ), QL_STEAM_SERVER_BROWSER_DETAIL_TERMINAL_PING );
 }
 
 /*
@@ -4333,7 +4343,7 @@ static void CL_SteamBrowser_NativeRulesFailedImpl( clSteamNativeServerRulesRespo
 	if ( QL_Steamworks_BuildServerBrowserDetailEvent( &detail->request.lifecycle.identity, QL_STEAM_SERVER_BROWSER_DETAIL_RULES, QL_STEAM_SERVER_BROWSER_DETAIL_FAILED, &event ) ) {
 		CL_SteamBrowser_PublishNativeDetailEvent( &event, qtrue );
 	}
-	CL_SteamBrowser_CompleteNativeDetailTerminal( detail );
+	CL_SteamBrowser_CompleteNativeDetailTerminal( detail, QL_STEAM_SERVER_BROWSER_DETAIL_TERMINAL_RULES );
 }
 
 /*
@@ -4355,7 +4365,7 @@ static void CL_SteamBrowser_NativeRulesRefreshCompleteImpl( clSteamNativeServerR
 	if ( QL_Steamworks_BuildServerBrowserDetailEvent( &detail->request.lifecycle.identity, QL_STEAM_SERVER_BROWSER_DETAIL_RULES, QL_STEAM_SERVER_BROWSER_DETAIL_END, &event ) ) {
 		CL_SteamBrowser_PublishNativeDetailEvent( &event, qtrue );
 	}
-	CL_SteamBrowser_CompleteNativeDetailTerminal( detail );
+	CL_SteamBrowser_CompleteNativeDetailTerminal( detail, QL_STEAM_SERVER_BROWSER_DETAIL_TERMINAL_RULES );
 }
 
 /*
@@ -4398,7 +4408,7 @@ static void CL_SteamBrowser_NativePlayersFailedImpl( clSteamNativeServerPlayersR
 	if ( QL_Steamworks_BuildServerBrowserDetailEvent( &detail->request.lifecycle.identity, QL_STEAM_SERVER_BROWSER_DETAIL_PLAYERS, QL_STEAM_SERVER_BROWSER_DETAIL_FAILED, &event ) ) {
 		CL_SteamBrowser_PublishNativeDetailEvent( &event, qtrue );
 	}
-	CL_SteamBrowser_CompleteNativeDetailTerminal( detail );
+	CL_SteamBrowser_CompleteNativeDetailTerminal( detail, QL_STEAM_SERVER_BROWSER_DETAIL_TERMINAL_PLAYERS );
 }
 
 /*
@@ -4420,7 +4430,7 @@ static void CL_SteamBrowser_NativePlayersRefreshCompleteImpl( clSteamNativeServe
 	if ( QL_Steamworks_BuildServerBrowserDetailEvent( &detail->request.lifecycle.identity, QL_STEAM_SERVER_BROWSER_DETAIL_PLAYERS, QL_STEAM_SERVER_BROWSER_DETAIL_END, &event ) ) {
 		CL_SteamBrowser_PublishNativeDetailEvent( &event, qtrue );
 	}
-	CL_SteamBrowser_CompleteNativeDetailTerminal( detail );
+	CL_SteamBrowser_CompleteNativeDetailTerminal( detail, QL_STEAM_SERVER_BROWSER_DETAIL_TERMINAL_PLAYERS );
 }
 
 #if CL_STEAM_BROWSER_USE_MSVC_C_THISCALL_THUNKS

@@ -752,6 +752,24 @@ def _compile_and_run(
 
                 /*
                 =============
+                SteamClient_InitForFilesystem
+                =============
+                */
+                qboolean SteamClient_InitForFilesystem( void ) {
+                    return QL_Steamworks_Init();
+                }
+
+                /*
+                =============
+                SteamClient_IsInitialized
+                =============
+                */
+                qboolean SteamClient_IsInitialized( void ) {
+                    return QL_Steamworks_Init();
+                }
+
+                /*
+                =============
                 SteamClient_GetSteamID
                 =============
                 */
@@ -1111,6 +1129,27 @@ def test_platform_service_table_respects_runtime_external_disable_env(tmp_path) 
     assert services == expected
 
 
+def test_platform_service_table_respects_runtime_steamworks_disable_env(tmp_path) -> None:
+    workdir = tmp_path / "service_probe_steamworks_disable"
+    output = _compile_and_run(
+        workdir,
+        _SERVICE_TABLE_PROBE,
+        {"QL_BUILD_ONLINE_SERVICES": 1, "QL_BUILD_STEAMWORKS": 1, "QL_BUILD_OPEN_STEAM": 1},
+        extra_env={"QL_DISABLE_STEAMWORKS": "1"},
+    )
+
+    services = _parse_service_output(output)
+    expected = {
+        "auth": ("Disabled by QL_DISABLE_STEAMWORKS", "compatibility-disabled (QL_DISABLE_STEAMWORKS)", True, False),
+        "matchmaking": ("Disabled by QL_DISABLE_STEAMWORKS", "compatibility-disabled (QL_DISABLE_STEAMWORKS)", True, False),
+        "workshop": ("Disabled by QL_DISABLE_STEAMWORKS", "compatibility-disabled (QL_DISABLE_STEAMWORKS)", True, False),
+        "overlay": ("Disabled by QL_DISABLE_STEAMWORKS", "compatibility-disabled (QL_DISABLE_STEAMWORKS)", True, False),
+        "stats": ("Disabled by QL_DISABLE_STEAMWORKS", "compatibility-disabled (QL_DISABLE_STEAMWORKS)", True, False),
+    }
+
+    assert services == expected
+
+
 def test_online_services_mode_labels_track_build_flags_and_runtime_policy(tmp_path) -> None:
     scenarios = [
         (
@@ -1182,6 +1221,16 @@ def test_online_services_mode_labels_track_build_flags_and_runtime_policy(tmp_pa
                 "reason": "runtime policy disables the opted-in online-service compatibility lane",
             },
             {"QL_DISABLE_EXTERNAL_ECOSYSTEMS": "1"},
+        ),
+        (
+            {"QL_BUILD_ONLINE_SERVICES": 1, "QL_BUILD_STEAMWORKS": 1, "QL_BUILD_OPEN_STEAM": 1},
+            {
+                "mode": "Steamworks-disabled compatibility lane",
+                "policy": "compatibility-disabled (QL_DISABLE_STEAMWORKS)",
+                "scope": "runtime-disabled-bounded-divergence",
+                "reason": "runtime policy disables the opted-in Steamworks compatibility lane",
+            },
+            {"QL_DISABLE_STEAMWORKS": "1"},
         ),
     ]
 
@@ -1461,8 +1510,8 @@ def test_steam_resource_bridge_reconstructs_avatar_url_fetches() -> None:
     assert "friendsVTable" in request_avatar_image_block
     assert "utilsVTable" in load_avatar_block
     assert "QL_Steamworks_GetAvatarMethodIndex( size )" in request_avatar_image_block
-    assert "utilsVTable[0x14 / 4]" in load_avatar_block
-    assert "utilsVTable[0x18 / 4]" in load_avatar_block
+    assert "utilsVTable[QL_STEAM_UTILS_GET_IMAGE_SIZE_SLOT]" in load_avatar_block
+    assert "utilsVTable[QL_STEAM_UTILS_GET_IMAGE_RGBA_SLOT]" in load_avatar_block
 
 
 def test_client_steam_callback_owner_reconstructs_retail_frame_pump_and_lifecycle() -> None:
@@ -1914,7 +1963,7 @@ def test_steam_callback_bootstrap_recovery_unwinds_partial_registrations() -> No
     assert "CL_Steam_ClearCurrentLobby();" in callback_shutdown_block
     assert "CL_Steam_ClearBrowserEvents();" in callback_shutdown_block
 
-    assert "if ( callbackState->registered ) {" in register_client_block
+    assert "if ( callbackState->registered || ( callbackState->webApiTicketResponse.callbackFlags & QL_STEAM_CALLBACK_FLAG_REGISTERED ) ) {" in register_client_block
     assert "QL_Steamworks_UnregisterClientCallbacks();" in register_client_block
     assert "memset( callbackState, 0, sizeof( *callbackState ) );" in register_client_block
     assert "memcpy( &callbackState->bindings, bindings, sizeof( callbackState->bindings ) );" in register_client_block
@@ -2203,12 +2252,12 @@ def test_steam_user_stats_presence_callbacks_track_round_616() -> None:
     ):
         assert hlil_anchor in hlil_part02
 
-    assert "QL_STEAMWORKS_STATIC_ASSERT_SIZE( ql_steam_size_user_stats_received_raw, ql_steam_user_stats_received_raw_t, 0x18 );" in steamworks
-    assert "QL_STEAMWORKS_STATIC_ASSERT_SIZE( ql_steam_size_friend_rich_presence_update_raw, ql_steam_friend_rich_presence_update_raw_t, 0x0c );" in steamworks
+    assert "QL_STEAMWORKS_STATIC_ASSERT_SIZE( ql_steam_size_user_stats_received_raw, ql_steam_user_stats_received_raw_t, QL_STEAM_CALLBACK_SIZE_USER_STATS_RECEIVED );" in steamworks
+    assert "QL_STEAMWORKS_STATIC_ASSERT_SIZE( ql_steam_size_friend_rich_presence_update_raw, ql_steam_friend_rich_presence_update_raw_t, QL_STEAM_CALLBACK_SIZE_FRIEND_RICH_PRESENCE_UPDATE );" in steamworks
     assert "#define QL_STEAM_CALLBACK_USER_STATS_RECEIVED 0x44d" in steamworks
     assert "#define QL_STEAM_CALLBACK_FRIEND_RICH_PRESENCE_UPDATE 0x150" in steamworks
-    assert "QL_Steamworks_PrepareCallbackObject( &callbackState->userStatsReceived, QL_STEAM_CALLBACK_USER_STATS_RECEIVED, sizeof( ql_steam_user_stats_received_raw_t ), qfalse, callbackState, QL_Steamworks_DispatchUserStatsReceived, NULL );" in register_client_block
-    assert "QL_Steamworks_PrepareCallbackObject( &callbackState->friendRichPresenceUpdate, QL_STEAM_CALLBACK_FRIEND_RICH_PRESENCE_UPDATE, sizeof( ql_steam_friend_rich_presence_update_raw_t ), qfalse, callbackState, QL_Steamworks_DispatchFriendRichPresenceUpdate, NULL );" in register_client_block
+    assert "QL_Steamworks_PrepareCallbackObject( &callbackState->userStatsReceived, QL_STEAM_CALLBACK_USER_STATS_RECEIVED, QL_STEAM_CALLBACK_SIZE_USER_STATS_RECEIVED, qfalse, callbackState, QL_Steamworks_DispatchUserStatsReceived, NULL );" in register_client_block
+    assert "QL_Steamworks_PrepareCallbackObject( &callbackState->friendRichPresenceUpdate, QL_STEAM_CALLBACK_FRIEND_RICH_PRESENCE_UPDATE, QL_STEAM_CALLBACK_SIZE_FRIEND_RICH_PRESENCE_UPDATE, qfalse, callbackState, QL_Steamworks_DispatchFriendRichPresenceUpdate, NULL );" in register_client_block
     assert register_client_block.index("QL_Steamworks_RegisterCallbackObject( &callbackState->userStatsReceived )") < register_client_block.index(
         "QL_Steamworks_RegisterCallbackObject( &callbackState->friendRichPresenceUpdate )"
     )
@@ -2243,10 +2292,10 @@ def test_steam_user_stats_presence_callbacks_track_round_616() -> None:
     assert '"appId"' not in presence_callback_block
     assert '"friend"' not in presence_callback_block
     assert '"{\\"id\\":\\"%s\\",\\"status\\":\\"%s\\",\\"lanIp\\":\\"%s\\"}"' in presence_json_block
-    assert "getFriendRichPresenceFn = (QL_SteamFriends_GetFriendRichPresenceFn)vtable[0xb4 / 4];" in friend_summary_block
+    assert "getFriendRichPresenceFn = (QL_SteamFriends_GetFriendRichPresenceFn)vtable[QL_STEAM_FRIENDS_GET_FRIEND_RICH_PRESENCE_SLOT];" in friend_summary_block
     assert 'getFriendRichPresenceFn( friends, NULL, steamId, "status" )' in friend_summary_block
     assert 'getFriendRichPresenceFn( friends, NULL, steamId, "lanIp" )' in friend_summary_block
-    assert "fn = (QL_SteamUserStats_RequestUserStatsFn)vtable[0x40 / 4];" in request_user_stats_block
+    assert "fn = (QL_SteamUserStats_RequestUserStatsFn)vtable[QL_STEAM_USERSTATS_REQUEST_USER_STATS_SLOT];" in request_user_stats_block
 
     for declaration in (
         "qboolean QL_Steamworks_RequestUserStats( uint32_t idLow, uint32_t idHigh );",
@@ -2519,14 +2568,14 @@ def test_steam_lobby_callback_publication_lifecycle_tracks_round_617() -> None:
         assert raw_layout in steamworks
 
     for static_assert in (
-        "QL_STEAMWORKS_STATIC_ASSERT_SIZE( ql_steam_size_lobby_created_raw, ql_steam_lobby_created_raw_t, 0x10 );",
-        "QL_STEAMWORKS_STATIC_ASSERT_SIZE( ql_steam_size_lobby_enter_raw, ql_steam_lobby_enter_raw_t, 0x18 );",
-        "QL_STEAMWORKS_STATIC_ASSERT_SIZE( ql_steam_size_lobby_chat_update_raw, ql_steam_lobby_chat_update_raw_t, 0x20 );",
-        "QL_STEAMWORKS_STATIC_ASSERT_SIZE( ql_steam_size_lobby_chat_message_raw, ql_steam_lobby_chat_message_raw_t, 0x18 );",
-        "QL_STEAMWORKS_STATIC_ASSERT_SIZE( ql_steam_size_lobby_data_update_raw, ql_steam_lobby_data_update_raw_t, 0x18 );",
-        "QL_STEAMWORKS_STATIC_ASSERT_SIZE( ql_steam_size_lobby_game_created_raw, ql_steam_lobby_game_created_raw_t, 0x18 );",
-        "QL_STEAMWORKS_STATIC_ASSERT_SIZE( ql_steam_size_lobby_kicked_raw, ql_steam_lobby_kicked_raw_t, 0x18 );",
-        "QL_STEAMWORKS_STATIC_ASSERT_SIZE( ql_steam_size_game_lobby_join_requested_raw, ql_steam_game_lobby_join_requested_raw_t, 0x10 );",
+        "QL_STEAMWORKS_STATIC_ASSERT_SIZE( ql_steam_size_lobby_created_raw, ql_steam_lobby_created_raw_t, QL_STEAM_CALLBACK_SIZE_LOBBY_CREATED );",
+        "QL_STEAMWORKS_STATIC_ASSERT_SIZE( ql_steam_size_lobby_enter_raw, ql_steam_lobby_enter_raw_t, QL_STEAM_CALLBACK_SIZE_LOBBY_ENTER );",
+        "QL_STEAMWORKS_STATIC_ASSERT_SIZE( ql_steam_size_lobby_chat_update_raw, ql_steam_lobby_chat_update_raw_t, QL_STEAM_CALLBACK_SIZE_LOBBY_CHAT_UPDATE );",
+        "QL_STEAMWORKS_STATIC_ASSERT_SIZE( ql_steam_size_lobby_chat_message_raw, ql_steam_lobby_chat_message_raw_t, QL_STEAM_CALLBACK_SIZE_LOBBY_CHAT_MESSAGE );",
+        "QL_STEAMWORKS_STATIC_ASSERT_SIZE( ql_steam_size_lobby_data_update_raw, ql_steam_lobby_data_update_raw_t, QL_STEAM_CALLBACK_SIZE_LOBBY_DATA_UPDATE );",
+        "QL_STEAMWORKS_STATIC_ASSERT_SIZE( ql_steam_size_lobby_game_created_raw, ql_steam_lobby_game_created_raw_t, QL_STEAM_CALLBACK_SIZE_LOBBY_GAME_CREATED );",
+        "QL_STEAMWORKS_STATIC_ASSERT_SIZE( ql_steam_size_lobby_kicked_raw, ql_steam_lobby_kicked_raw_t, QL_STEAM_CALLBACK_SIZE_LOBBY_KICKED );",
+        "QL_STEAMWORKS_STATIC_ASSERT_SIZE( ql_steam_size_game_lobby_join_requested_raw, ql_steam_game_lobby_join_requested_raw_t, QL_STEAM_CALLBACK_SIZE_GAME_LOBBY_JOIN_REQUESTED );",
     ):
         assert static_assert in steamworks
 
@@ -2543,14 +2592,14 @@ def test_steam_lobby_callback_publication_lifecycle_tracks_round_617() -> None:
         assert callback_define in steamworks
 
     register_prepare_order = (
-        "QL_Steamworks_PrepareCallbackObject( &callbackState->lobbyCreated, QL_STEAM_CALLBACK_LOBBY_CREATED, sizeof( ql_steam_lobby_created_raw_t ), qfalse, callbackState, QL_Steamworks_DispatchLobbyCreated, NULL );",
-        "QL_Steamworks_PrepareCallbackObject( &callbackState->lobbyEnter, QL_STEAM_CALLBACK_LOBBY_ENTER, sizeof( ql_steam_lobby_enter_raw_t ), qfalse, callbackState, QL_Steamworks_DispatchLobbyEnter, NULL );",
-        "QL_Steamworks_PrepareCallbackObject( &callbackState->lobbyChatUpdate, QL_STEAM_CALLBACK_LOBBY_CHAT_UPDATE, sizeof( ql_steam_lobby_chat_update_raw_t ), qfalse, callbackState, QL_Steamworks_DispatchLobbyChatUpdate, NULL );",
-        "QL_Steamworks_PrepareCallbackObject( &callbackState->lobbyChatMessage, QL_STEAM_CALLBACK_LOBBY_CHAT_MESSAGE, sizeof( ql_steam_lobby_chat_message_raw_t ), qfalse, callbackState, QL_Steamworks_DispatchLobbyChatMessage, NULL );",
-        "QL_Steamworks_PrepareCallbackObject( &callbackState->lobbyDataUpdate, QL_STEAM_CALLBACK_LOBBY_DATA_UPDATE, sizeof( ql_steam_lobby_data_update_raw_t ), qfalse, callbackState, QL_Steamworks_DispatchLobbyDataUpdate, NULL );",
-        "QL_Steamworks_PrepareCallbackObject( &callbackState->lobbyGameCreated, QL_STEAM_CALLBACK_LOBBY_GAME_CREATED, sizeof( ql_steam_lobby_game_created_raw_t ), qfalse, callbackState, QL_Steamworks_DispatchLobbyGameCreated, NULL );",
-        "QL_Steamworks_PrepareCallbackObject( &callbackState->lobbyKicked, QL_STEAM_CALLBACK_LOBBY_KICKED, sizeof( ql_steam_lobby_kicked_raw_t ), qfalse, callbackState, QL_Steamworks_DispatchLobbyKicked, NULL );",
-        "QL_Steamworks_PrepareCallbackObject( &callbackState->gameLobbyJoinRequested, QL_STEAM_CALLBACK_GAME_LOBBY_JOIN_REQUESTED, sizeof( ql_steam_game_lobby_join_requested_raw_t ), qfalse, callbackState, QL_Steamworks_DispatchGameLobbyJoinRequested, NULL );",
+        "QL_Steamworks_PrepareCallbackObject( &callbackState->lobbyCreated, QL_STEAM_CALLBACK_LOBBY_CREATED, QL_STEAM_CALLBACK_SIZE_LOBBY_CREATED, qfalse, callbackState, QL_Steamworks_DispatchLobbyCreated, NULL );",
+        "QL_Steamworks_PrepareCallbackObject( &callbackState->lobbyEnter, QL_STEAM_CALLBACK_LOBBY_ENTER, QL_STEAM_CALLBACK_SIZE_LOBBY_ENTER, qfalse, callbackState, QL_Steamworks_DispatchLobbyEnter, NULL );",
+        "QL_Steamworks_PrepareCallbackObject( &callbackState->lobbyChatUpdate, QL_STEAM_CALLBACK_LOBBY_CHAT_UPDATE, QL_STEAM_CALLBACK_SIZE_LOBBY_CHAT_UPDATE, qfalse, callbackState, QL_Steamworks_DispatchLobbyChatUpdate, NULL );",
+        "QL_Steamworks_PrepareCallbackObject( &callbackState->lobbyChatMessage, QL_STEAM_CALLBACK_LOBBY_CHAT_MESSAGE, QL_STEAM_CALLBACK_SIZE_LOBBY_CHAT_MESSAGE, qfalse, callbackState, QL_Steamworks_DispatchLobbyChatMessage, NULL );",
+        "QL_Steamworks_PrepareCallbackObject( &callbackState->lobbyDataUpdate, QL_STEAM_CALLBACK_LOBBY_DATA_UPDATE, QL_STEAM_CALLBACK_SIZE_LOBBY_DATA_UPDATE, qfalse, callbackState, QL_Steamworks_DispatchLobbyDataUpdate, NULL );",
+        "QL_Steamworks_PrepareCallbackObject( &callbackState->lobbyGameCreated, QL_STEAM_CALLBACK_LOBBY_GAME_CREATED, QL_STEAM_CALLBACK_SIZE_LOBBY_GAME_CREATED, qfalse, callbackState, QL_Steamworks_DispatchLobbyGameCreated, NULL );",
+        "QL_Steamworks_PrepareCallbackObject( &callbackState->lobbyKicked, QL_STEAM_CALLBACK_LOBBY_KICKED, QL_STEAM_CALLBACK_SIZE_LOBBY_KICKED, qfalse, callbackState, QL_Steamworks_DispatchLobbyKicked, NULL );",
+        "QL_Steamworks_PrepareCallbackObject( &callbackState->gameLobbyJoinRequested, QL_STEAM_CALLBACK_GAME_LOBBY_JOIN_REQUESTED, QL_STEAM_CALLBACK_SIZE_GAME_LOBBY_JOIN_REQUESTED, qfalse, callbackState, QL_Steamworks_DispatchGameLobbyJoinRequested, NULL );",
     )
     assert list(register_lobby_block.index(anchor) for anchor in register_prepare_order) == sorted(
         register_lobby_block.index(anchor) for anchor in register_prepare_order
@@ -2871,8 +2920,8 @@ def test_steam_workshop_callback_bootstrap_finalization_tracks_round_618() -> No
     ):
         assert raw_layout in steamworks
 
-    assert "QL_STEAMWORKS_STATIC_ASSERT_SIZE( ql_steam_size_item_installed_raw, ql_steam_item_installed_raw_t, 0x10 );" in steamworks
-    assert "QL_STEAMWORKS_STATIC_ASSERT_SIZE( ql_steam_size_download_item_result_raw, ql_steam_download_item_result_raw_t, 0x18 );" in steamworks
+    assert "QL_STEAMWORKS_STATIC_ASSERT_SIZE( ql_steam_size_item_installed_raw, ql_steam_item_installed_raw_t, QL_STEAM_CALLBACK_SIZE_ITEM_INSTALLED );" in steamworks
+    assert "QL_STEAMWORKS_STATIC_ASSERT_SIZE( ql_steam_size_download_item_result_raw, ql_steam_download_item_result_raw_t, QL_STEAM_CALLBACK_SIZE_DOWNLOAD_ITEM_RESULT );" in steamworks
     assert "#define QL_STEAM_CALLBACK_ITEM_INSTALLED 0xd4d" in steamworks
     assert "#define QL_STEAM_CALLBACK_DOWNLOAD_ITEM_RESULT 0xd4e" in steamworks
 
@@ -2887,8 +2936,8 @@ def test_steam_workshop_callback_bootstrap_finalization_tracks_round_618() -> No
     assert "resultPadding" not in dispatch_download_block
 
     register_prepare_order = (
-        "QL_Steamworks_PrepareCallbackObject( &callbackState->itemInstalled, QL_STEAM_CALLBACK_ITEM_INSTALLED, sizeof( ql_steam_item_installed_raw_t ), qfalse, callbackState, QL_Steamworks_DispatchItemInstalled, NULL );",
-        "QL_Steamworks_PrepareCallbackObject( &callbackState->downloadItemResult, QL_STEAM_CALLBACK_DOWNLOAD_ITEM_RESULT, sizeof( ql_steam_download_item_result_raw_t ), qfalse, callbackState, QL_Steamworks_DispatchDownloadItemResult, NULL );",
+        "QL_Steamworks_PrepareCallbackObject( &callbackState->itemInstalled, QL_STEAM_CALLBACK_ITEM_INSTALLED, QL_STEAM_CALLBACK_SIZE_ITEM_INSTALLED, qfalse, callbackState, QL_Steamworks_DispatchItemInstalled, NULL );",
+        "QL_Steamworks_PrepareCallbackObject( &callbackState->downloadItemResult, QL_STEAM_CALLBACK_DOWNLOAD_ITEM_RESULT, QL_STEAM_CALLBACK_SIZE_DOWNLOAD_ITEM_RESULT, qfalse, callbackState, QL_Steamworks_DispatchDownloadItemResult, NULL );",
     )
     assert list(register_workshop_platform_block.index(anchor) for anchor in register_prepare_order) == sorted(
         register_workshop_platform_block.index(anchor) for anchor in register_prepare_order
@@ -3222,7 +3271,7 @@ def test_steam_ugc_query_call_result_publication_lifecycle_tracks_round_619() ->
     assert 'return "unpromoted GetAllUGC filter semantic";' in ugc_filter_gap_block
 
     assert "typedef struct {\n\tuint64_t queryHandle;\n\tint result;\n\tuint32_t numResultsReturned;\n\tuint32_t totalMatchingResults;\n\tqboolean cachedData;\n} ql_steam_ugc_query_completed_raw_t;" in steamworks
-    assert "QL_STEAMWORKS_STATIC_ASSERT_SIZE( ql_steam_size_ugc_query_completed_raw, ql_steam_ugc_query_completed_raw_t, 0x18 );" in steamworks
+    assert "QL_STEAMWORKS_STATIC_ASSERT_SIZE( ql_steam_size_ugc_query_completed_raw, ql_steam_ugc_query_completed_raw_t, QL_STEAM_CALLBACK_SIZE_UGC_QUERY_COMPLETED );" in steamworks
     assert "#define QL_STEAM_CALLBACK_UGC_QUERY_COMPLETED 0xd49" in steamworks
 
     assert "event.callHandle = callHandle;" in dispatch_ugc_block
@@ -3235,7 +3284,7 @@ def test_steam_ugc_query_call_result_publication_lifecycle_tracks_round_619() ->
     assert "callbackState->bindings.onUGCQueryCompleted( callbackState->bindings.context, &event );" in dispatch_ugc_block
 
     assert "clientBindings.onUGCQueryCompleted = CL_Steam_Client_OnUGCQueryCompleted;" in steam_callbacks_init_block
-    assert "QL_Steamworks_PrepareCallbackObject( &callbackState->ugcQueryCompleted, QL_STEAM_CALLBACK_UGC_QUERY_COMPLETED, sizeof( ql_steam_ugc_query_completed_raw_t ), qfalse, callbackState, NULL, QL_Steamworks_DispatchUGCQueryCompleted );" in register_client_block
+    assert "QL_Steamworks_PrepareCallbackObject( &callbackState->ugcQueryCompleted, QL_STEAM_CALLBACK_UGC_QUERY_COMPLETED, QL_STEAM_CALLBACK_SIZE_UGC_QUERY_COMPLETED, qfalse, callbackState, NULL, QL_Steamworks_DispatchUGCQueryCompleted );" in register_client_block
     assert "QL_Steamworks_RegisterCallbackObject( &callbackState->ugcQueryCompleted )" not in register_client_block
     assert "QL_Steamworks_UnbindCallResultObject( &callbackState->ugcQueryCompleted, &callbackState->ugcCallHandle, &callbackState->ugcCallBound );" in bind_call_result_block
     assert "state.SteamAPI_RegisterCallResult( &callbackState->ugcQueryCompleted, callHandle );" in bind_call_result_block
@@ -3249,9 +3298,9 @@ def test_steam_ugc_query_call_result_publication_lifecycle_tracks_round_619() ->
         "appId = QL_Steamworks_GetAppID();",
         "if ( appId == 0u ) {",
         "ugc = QL_Steamworks_GetUGCInterface();",
-        "createQueryFn = (QL_SteamUGC_CreateQueryAllUGCRequestFn)vtable[0x04 / 4];",
-        "sendQueryFn = (QL_SteamUGC_SendQueryUGCRequestFn)vtable[0x0c / 4];",
-        "queryHandle = createQueryFn( ugc, NULL, 1, 0, appId, appId, filter );",
+        "createQueryFn = (QL_SteamUGC_CreateQueryAllUGCRequestFn)vtable[QL_STEAM_UGC_CREATE_QUERY_ALL_UGC_REQUEST_SLOT];",
+        "sendQueryFn = (QL_SteamUGC_SendQueryUGCRequestFn)vtable[QL_STEAM_UGC_SEND_QUERY_UGC_REQUEST_SLOT];",
+        "queryHandle = createQueryFn( ugc, NULL, QL_STEAM_UGC_GET_ALL_QUERY_TYPE, QL_STEAM_UGC_GET_ALL_MATCHING_TYPE, appId, appId, filter );",
         "callHandle = sendQueryFn( ugc, NULL, queryHandleLow, queryHandleHigh );",
         "if ( !QL_Steamworks_BindUGCQueryCallResult( (SteamAPICall_t)callHandle ) ) {",
     )
@@ -3264,12 +3313,12 @@ def test_steam_ugc_query_call_result_publication_lifecycle_tracks_round_619() ->
     assert "filter >" not in request_query_block
     assert "matchingType" in request_query_block
 
-    assert "fn = (QL_SteamUGC_GetQueryUGCResultFn)vtable[0x10 / 4];" in result_query_block
-    assert "memcpy( outPublishedFileId, details, sizeof( *outPublishedFileId ) );" in result_query_block
+    assert "fn = (QL_SteamUGC_GetQueryUGCResultFn)vtable[QL_STEAM_UGC_GET_QUERY_UGC_RESULT_SLOT];" in result_query_block
+    assert "memcpy( outPublishedFileId, details + QL_STEAM_UGC_DETAILS_PUBLISHED_FILE_ID_OFFSET, QL_STEAM_UGC_DETAILS_PUBLISHED_FILE_ID_SIZE );" in result_query_block
     assert "QL_STEAM_UGC_DETAILS_TITLE_OFFSET" in result_query_block
     assert "QL_STEAM_UGC_DETAILS_DESCRIPTION_OFFSET" in result_query_block
-    assert "fn = (QL_SteamUGC_GetQueryUGCPreviewURLFn)vtable[0x14 / 4];" in preview_query_block
-    assert "fn = (QL_SteamUGC_ReleaseQueryUGCRequestFn)vtable[0x34 / 4];" in release_query_block
+    assert "fn = (QL_SteamUGC_GetQueryUGCPreviewURLFn)vtable[QL_STEAM_UGC_GET_QUERY_UGC_PREVIEW_URL_SLOT];" in preview_query_block
+    assert "fn = (QL_SteamUGC_ReleaseQueryUGCRequestFn)vtable[QL_STEAM_UGC_RELEASE_QUERY_UGC_REQUEST_SLOT];" in release_query_block
     assert "(void)fn( ugc, NULL, queryHandleLow, queryHandleHigh );" in release_query_block
 
     assert "QL_Steamworks_GetQueryUGCResult( queryHandle, i, &publishedFileId, title, sizeof( title ), description, sizeof( description ) )" in ugc_results_block
@@ -3534,10 +3583,10 @@ def test_steam_server_callback_registration_dispatch_lifecycle_tracks_round_620(
     assert "typedef struct {\n\tint result;\n} ql_steam_server_connect_failure_raw_t;" in steamworks
     assert "typedef struct {\n\tint result;\n} ql_steam_servers_disconnected_raw_t;" in steamworks
     assert "typedef struct {\n\tuint32_t steamIdLow;\n\tuint32_t steamIdHigh;\n\tint authSessionResponse;\n\tuint32_t ownerSteamIdLow;\n\tuint32_t ownerSteamIdHigh;\n} ql_steam_validate_auth_ticket_response_raw_t;" in steamworks
-    assert "QL_STEAMWORKS_STATIC_ASSERT_SIZE( ql_steam_size_servers_connected_raw, ql_steam_servers_connected_raw_t, 0x01 );" in steamworks
-    assert "QL_STEAMWORKS_STATIC_ASSERT_SIZE( ql_steam_size_validate_auth_ticket_response_raw, ql_steam_validate_auth_ticket_response_raw_t, 0x14 );" in steamworks
-    assert "QL_STEAMWORKS_STATIC_ASSERT_SIZE( ql_steam_size_gs_stats_received_raw, ql_steam_gs_stats_received_raw_t, 0x0c );" in steamworks
-    assert "QL_STEAMWORKS_STATIC_ASSERT_SIZE( ql_steam_size_gs_stats_stored_raw, ql_steam_gs_stats_stored_raw_t, 0x0c );" in steamworks
+    assert "QL_STEAMWORKS_STATIC_ASSERT_SIZE( ql_steam_size_servers_connected_raw, ql_steam_servers_connected_raw_t, QL_STEAM_CALLBACK_SIZE_SERVERS_CONNECTED );" in steamworks
+    assert "QL_STEAMWORKS_STATIC_ASSERT_SIZE( ql_steam_size_validate_auth_ticket_response_raw, ql_steam_validate_auth_ticket_response_raw_t, QL_STEAM_CALLBACK_SIZE_VALIDATE_AUTH_TICKET_RESPONSE );" in steamworks
+    assert "QL_STEAMWORKS_STATIC_ASSERT_SIZE( ql_steam_size_gs_stats_received_raw, ql_steam_gs_stats_received_raw_t, QL_STEAM_CALLBACK_SIZE_GS_STATS_RECEIVED );" in steamworks
+    assert "QL_STEAMWORKS_STATIC_ASSERT_SIZE( ql_steam_size_gs_stats_stored_raw, ql_steam_gs_stats_stored_raw_t, QL_STEAM_CALLBACK_SIZE_GS_STATS_STORED );" in steamworks
 
     for callback_id in (
         "#define QL_STEAM_CALLBACK_STEAM_SERVERS_CONNECTED 0x65",
@@ -3567,13 +3616,13 @@ def test_steam_server_callback_registration_dispatch_lifecycle_tracks_round_620(
     assert "event.steamId = QL_Steamworks_CombineIdentityWords( raw->steamIdLow, raw->steamIdHigh );" in dispatch_gs_stored_block
 
     register_prepare_order = (
-        "QL_Steamworks_PrepareCallbackObject( &callbackState->serversConnected, QL_STEAM_CALLBACK_STEAM_SERVERS_CONNECTED, sizeof( ql_steam_servers_connected_raw_t ), qtrue, callbackState, QL_Steamworks_DispatchServersConnected, NULL );",
-        "QL_Steamworks_PrepareCallbackObject( &callbackState->connectFailure, QL_STEAM_CALLBACK_STEAM_SERVER_CONNECT_FAILURE, sizeof( ql_steam_server_connect_failure_raw_t ), qtrue, callbackState, QL_Steamworks_DispatchServerConnectFailure, NULL );",
-        "QL_Steamworks_PrepareCallbackObject( &callbackState->serversDisconnected, QL_STEAM_CALLBACK_STEAM_SERVERS_DISCONNECTED, sizeof( ql_steam_servers_disconnected_raw_t ), qtrue, callbackState, QL_Steamworks_DispatchServersDisconnected, NULL );",
-        "QL_Steamworks_PrepareCallbackObject( &callbackState->validateAuthTicketResponse, QL_STEAM_CALLBACK_VALIDATE_AUTH_TICKET_RESPONSE, sizeof( ql_steam_validate_auth_ticket_response_raw_t ), qtrue, callbackState, QL_Steamworks_DispatchValidateAuthTicketResponse, NULL );",
-        "QL_Steamworks_PrepareCallbackObject( &callbackState->p2pSessionRequest, QL_STEAM_CALLBACK_P2P_SESSION_REQUEST, sizeof( ql_steam_p2p_session_request_raw_t ), qtrue, callbackState, QL_Steamworks_DispatchServerP2PSessionRequest, NULL );",
-        "QL_Steamworks_PrepareCallbackObject( &callbackState->gsStatsReceived, QL_STEAM_CALLBACK_GS_STATS_RECEIVED, sizeof( ql_steam_gs_stats_received_raw_t ), qtrue, callbackState, QL_Steamworks_DispatchGSStatsReceived, NULL );",
-        "QL_Steamworks_PrepareCallbackObject( &callbackState->gsStatsStored, QL_STEAM_CALLBACK_GS_STATS_STORED, sizeof( ql_steam_gs_stats_stored_raw_t ), qtrue, callbackState, QL_Steamworks_DispatchGSStatsStored, NULL );",
+        "QL_Steamworks_PrepareCallbackObject( &callbackState->serversConnected, QL_STEAM_CALLBACK_STEAM_SERVERS_CONNECTED, QL_STEAM_CALLBACK_SIZE_SERVERS_CONNECTED, qtrue, callbackState, QL_Steamworks_DispatchServersConnected, NULL );",
+        "QL_Steamworks_PrepareCallbackObject( &callbackState->connectFailure, QL_STEAM_CALLBACK_STEAM_SERVER_CONNECT_FAILURE, QL_STEAM_CALLBACK_SIZE_SERVER_CONNECT_FAILURE, qtrue, callbackState, QL_Steamworks_DispatchServerConnectFailure, NULL );",
+        "QL_Steamworks_PrepareCallbackObject( &callbackState->serversDisconnected, QL_STEAM_CALLBACK_STEAM_SERVERS_DISCONNECTED, QL_STEAM_CALLBACK_SIZE_SERVERS_DISCONNECTED, qtrue, callbackState, QL_Steamworks_DispatchServersDisconnected, NULL );",
+        "QL_Steamworks_PrepareCallbackObject( &callbackState->validateAuthTicketResponse, QL_STEAM_CALLBACK_VALIDATE_AUTH_TICKET_RESPONSE, QL_STEAM_CALLBACK_SIZE_VALIDATE_AUTH_TICKET_RESPONSE, qtrue, callbackState, QL_Steamworks_DispatchValidateAuthTicketResponse, NULL );",
+        "QL_Steamworks_PrepareCallbackObject( &callbackState->p2pSessionRequest, QL_STEAM_CALLBACK_P2P_SESSION_REQUEST, QL_STEAM_CALLBACK_SIZE_P2P_SESSION_REQUEST, qtrue, callbackState, QL_Steamworks_DispatchServerP2PSessionRequest, NULL );",
+        "QL_Steamworks_PrepareCallbackObject( &callbackState->gsStatsReceived, QL_STEAM_CALLBACK_GS_STATS_RECEIVED, QL_STEAM_CALLBACK_SIZE_GS_STATS_RECEIVED, qtrue, callbackState, QL_Steamworks_DispatchGSStatsReceived, NULL );",
+        "QL_Steamworks_PrepareCallbackObject( &callbackState->gsStatsStored, QL_STEAM_CALLBACK_GS_STATS_STORED, QL_STEAM_CALLBACK_SIZE_GS_STATS_STORED, qtrue, callbackState, QL_Steamworks_DispatchGSStatsStored, NULL );",
     )
     last_index = -1
     for anchor in register_prepare_order:
@@ -3943,7 +3992,7 @@ def test_steam_datasource_avatar_response_lifecycle_tracks_round_621() -> None:
     assert "return CL_Steam_RegisterShader( url );" in steamclient_avatar_block
 
     assert "#define QL_STEAM_CALLBACK_AVATAR_IMAGE_LOADED 0x14e" in steamworks
-    assert "QL_STEAMWORKS_STATIC_ASSERT_SIZE( ql_steam_size_avatar_image_loaded_raw, ql_steam_avatar_image_loaded_raw_t, 0x14 );" in steamworks
+    assert "QL_STEAMWORKS_STATIC_ASSERT_SIZE( ql_steam_size_avatar_image_loaded_raw, ql_steam_avatar_image_loaded_raw_t, QL_STEAM_CALLBACK_SIZE_AVATAR_IMAGE_LOADED );" in steamworks
     assert "uint32_t steamIDLow;\n\tuint32_t steamIDHigh;\n\tint image;\n\tint wide;\n\tint tall;\n} ql_steam_avatar_image_loaded_raw_t;" in steamworks
     assert "void (*onAvatarImageLoaded)( void *context, const ql_steam_avatar_image_loaded_t *event );" in steamworks_h
     assert "event.steamId = QL_Steamworks_CombineIdentityWords( raw->steamIDLow, raw->steamIDHigh );" in dispatch_avatar_block
@@ -3951,25 +4000,25 @@ def test_steam_datasource_avatar_response_lifecycle_tracks_round_621() -> None:
     assert "event.width = raw->wide;" in dispatch_avatar_block
     assert "event.height = raw->tall;" in dispatch_avatar_block
     assert "callbackState->bindings.onAvatarImageLoaded( callbackState->bindings.context, &event );" in dispatch_avatar_block
-    assert "QL_Steamworks_PrepareCallbackObject( &callbackState->avatarImageLoaded, QL_STEAM_CALLBACK_AVATAR_IMAGE_LOADED, sizeof( ql_steam_avatar_image_loaded_raw_t ), qfalse, callbackState, QL_Steamworks_DispatchAvatarImageLoaded, NULL );" in platform_register_block
+    assert "QL_Steamworks_PrepareCallbackObject( &callbackState->avatarImageLoaded, QL_STEAM_CALLBACK_AVATAR_IMAGE_LOADED, QL_STEAM_CALLBACK_SIZE_AVATAR_IMAGE_LOADED, qfalse, callbackState, QL_Steamworks_DispatchAvatarImageLoaded, NULL );" in platform_register_block
     assert "QL_Steamworks_RegisterCallbackObject( &callbackState->avatarImageLoaded )" in platform_register_block
     assert "callbackState->registered = qtrue;" in platform_register_block
     assert "QL_Steamworks_UnregisterCallbackObject( &callbackState->avatarImageLoaded );" in platform_unregister_block
     assert "memset( callbackState, 0, sizeof( *callbackState ) );" in platform_unregister_block
 
     assert "case QL_STEAM_AVATAR_SMALL:" in avatar_method_block
-    assert "return 0x88 / 4;" in avatar_method_block
+    assert "return QL_STEAM_FRIENDS_GET_SMALL_FRIEND_AVATAR_SLOT;" in avatar_method_block
     assert "case QL_STEAM_AVATAR_MEDIUM:" in avatar_method_block
-    assert "return 0x8c / 4;" in avatar_method_block
-    assert "return 0x90 / 4;" in avatar_method_block
+    assert "return QL_STEAM_FRIENDS_GET_MEDIUM_FRIEND_AVATAR_SLOT;" in avatar_method_block
+    assert "return QL_STEAM_FRIENDS_GET_LARGE_FRIEND_AVATAR_SLOT;" in avatar_method_block
     assert "friendsVTable[QL_Steamworks_GetAvatarMethodIndex( size )]" in platform_request_block
     assert "image = getAvatar( friends, NULL, steamId );" in platform_request_block
     assert "image == -1" in platform_request_block
     assert "return QL_STEAM_AVATAR_IMAGE_PENDING;" in platform_request_block
     assert "return QL_STEAM_AVATAR_IMAGE_READY;" in platform_request_block
     assert "QL_Steamworks_RequestAvatarImage( idLow, idHigh, size, &image ) != QL_STEAM_AVATAR_IMAGE_READY" in platform_load_block
-    assert "utilsVTable[0x14 / 4]" in platform_load_block
-    assert "utilsVTable[0x18 / 4]" in platform_load_block
+    assert "utilsVTable[QL_STEAM_UTILS_GET_IMAGE_SIZE_SLOT]" in platform_load_block
+    assert "utilsVTable[QL_STEAM_UTILS_GET_IMAGE_RGBA_SLOT]" in platform_load_block
     assert "pixelCount > ( (size_t)INT_MAX / 4 )" in platform_load_block
     assert "getImageRGBA( utils, NULL, image, pixels, (int)bufferSize )" in platform_load_block
 
@@ -4147,10 +4196,16 @@ def test_steamworks_cached_service_refresh_tracks_round_622(tmp_path) -> None:
     assert cached_init_block.index("ql_platformSteamworksNextAttemptTime = now + QL_STEAMWORKS_RETRY_SECONDS;") < cached_init_block.rindex("return qfalse;")
 
     assert "qboolean externalDisabled;" in build_table_block
+    assert "const char *externalDisabledProvider;" in build_table_block
     assert "#if !QL_PLATFORM_HAS_ONLINE_SERVICES" in build_table_block
     assert 'table.auth.provider = "Build-disabled (QL_BUILD_ONLINE_SERVICES=0)";' in build_table_block
     assert "externalDisabled = QL_PlatformExternalEcosystemsDisabled();" in build_table_block
-    assert 'table.auth.provider = "Disabled by QL_DISABLE_EXTERNAL_ECOSYSTEMS";' in build_table_block
+    assert "externalDisabledProvider = QL_PlatformExternalEcosystemsDisableProviderLabel();" in build_table_block
+    assert "table.auth.provider = externalDisabledProvider;" in build_table_block
+    assert "table.matchmaking.provider = externalDisabledProvider;" in build_table_block
+    assert "table.workshop.provider = externalDisabledProvider;" in build_table_block
+    assert "table.overlay.provider = externalDisabledProvider;" in build_table_block
+    assert "table.stats.provider = externalDisabledProvider;" in build_table_block
     assert "qboolean steamInitialised = QL_PlatformSteamworks_InitCached();" in build_table_block
     assert "table.auth.initialised = steamInitialised;" in build_table_block
     assert "table.matchmaking.initialised = steamInitialised;" in build_table_block
@@ -4160,6 +4215,9 @@ def test_steamworks_cached_service_refresh_tracks_round_622(tmp_path) -> None:
     assert build_table_block.index("externalDisabled = QL_PlatformExternalEcosystemsDisabled();") < build_table_block.index(
         "qboolean steamInitialised = QL_PlatformSteamworks_InitCached();"
     )
+    assert build_table_block.index("externalDisabledProvider = QL_PlatformExternalEcosystemsDisableProviderLabel();") < build_table_block.index(
+        "table.auth.provider = externalDisabledProvider;"
+    )
 
     assert "if ( !ql_platformServicesInitialised ) {" in get_services_block
     assert "ql_platformServices = QL_BuildServiceTable();" in get_services_block
@@ -4168,9 +4226,9 @@ def test_steamworks_cached_service_refresh_tracks_round_622(tmp_path) -> None:
     assert "ql_platformServicesInitialised = qtrue;" in refresh_services_block
     assert "if ( !ql_platformServicesInitialised )" not in refresh_services_block
 
-    assert 'QL_Steamworks_LoadSymbol( (void **)&state.SteamAPI_Init, "SteamAPI_Init" )' in steamworks_load_block
-    assert 'QL_Steamworks_LoadSymbol( (void **)&state.SteamAPI_Shutdown, "SteamAPI_Shutdown" )' in steamworks_load_block
-    assert 'QL_Steamworks_LoadSymbol( (void **)&state.SteamAPI_RunCallbacks, "SteamAPI_RunCallbacks" )' in steamworks_load_block
+    assert "QL_Steamworks_LoadSymbol( (void **)&state.SteamAPI_Init, QL_STEAMWORKS_EXPORT_STEAM_API_INIT )" in steamworks_load_block
+    assert "QL_Steamworks_LoadSymbol( (void **)&state.SteamAPI_Shutdown, QL_STEAMWORKS_EXPORT_STEAM_API_SHUTDOWN )" in steamworks_load_block
+    assert "QL_Steamworks_LoadSymbol( (void **)&state.SteamAPI_RunCallbacks, QL_STEAMWORKS_EXPORT_STEAM_API_RUN_CALLBACKS )" in steamworks_load_block
     assert "if ( state.initialised ) {" in steamworks_init_block
     assert "if ( !QL_Steamworks_LoadLibrary() ) {" in steamworks_init_block
     assert "if ( !state.SteamAPI_Init() ) {" in steamworks_init_block
@@ -4235,6 +4293,103 @@ def test_steamworks_cached_service_refresh_tracks_round_622(tmp_path) -> None:
 
     assert "Task A491: Pin cached Steamworks launch refresh boundary" in implementation_plan
     assert "overall Steam launch/runtime\nintegration mapping confidence **93.46% -> 93.48%**" in implementation_plan
+
+
+def test_steamworks_runtime_disable_reason_labels_track_round_739() -> None:
+    aliases = json.loads(
+        (REPO_ROOT / "references/analysis/quakelive_symbol_aliases.json").read_text(encoding="utf-8")
+    )["quakelive_steam_srp"]
+    imports_txt = (
+        REPO_ROOT / "references/reverse-engineering/ghidra/quakelive_steam/imports.txt"
+    ).read_text(encoding="utf-8")
+    hlil_part02 = (
+        REPO_ROOT
+        / "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part02.txt"
+    ).read_text(encoding="utf-8")
+    hlil_part04 = (
+        REPO_ROOT
+        / "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part04.txt"
+    ).read_text(encoding="utf-8")
+    common = (REPO_ROOT / "src/code/qcommon/common.c").read_text(encoding="utf-8")
+    platform_services = (REPO_ROOT / "src/common/platform/platform_services.c").read_text(encoding="utf-8")
+    round_note = (
+        REPO_ROOT / "docs/reverse-engineering/quakelive_steam_mapping_round_739.md"
+    ).read_text(encoding="utf-8")
+    implementation_plan = (REPO_ROOT / "IMPLEMENTATION_PLAN.md").read_text(encoding="utf-8")
+
+    build_policy_block = _extract_function_block(common, "static void Com_ApplyOnlineServicesBuildPolicy( void ) {")
+    disable_reason_block = _extract_function_block(
+        platform_services, "static const char *QL_PlatformExternalEcosystemsDisableReason( void ) {"
+    )
+    disabled_block = _extract_function_block(
+        platform_services, "static qboolean QL_PlatformExternalEcosystemsDisabled( void ) {"
+    )
+    provider_label_block = _extract_function_block(
+        platform_services, "static const char *QL_PlatformExternalEcosystemsDisableProviderLabel( void ) {"
+    )
+    describe_policy_block = _extract_function_block(
+        platform_services, "const char *QL_DescribePlatformFeaturePolicy( const ql_platform_feature_descriptor *descriptor ) {"
+    )
+    mode_label_block = _extract_function_block(platform_services, "const char *QL_GetOnlineServicesModeLabel( void ) {")
+    reason_label_block = _extract_function_block(
+        platform_services, "const char *QL_GetOnlineServicesParityReasonLabel( void ) {"
+    )
+    build_table_block = _extract_function_block(
+        platform_services, "static ql_platform_service_table QL_BuildServiceTable( void ) {"
+    )
+
+    assert aliases["FUN_00461500"] == "SteamClient_Init"
+    assert aliases["FUN_00460510"] == "SteamClient_IsInitialized"
+    assert "STEAM_API.DLL!SteamAPI_Init @ 00159264" in imports_txt
+    assert "STEAM_API.DLL!SteamAPI_Shutdown @ 001591cc" in imports_txt
+    assert "0046151b      uint32_t eax_1 = zx.d(SteamAPI_Init())" in hlil_part02
+    assert "0046151e      data_e30218 = eax_1" in hlil_part02
+    assert "004cc16e          sub_461500()" in hlil_part04
+    assert '004cc5fd      if (sub_460510() == 0 && sub_4ccd80("com_build") == 0 && sub_4ccd80("dedicated") == 0)' in hlil_part04
+
+    assert 'Com_SetEnvironmentVariable( "QL_DISABLE_EXTERNAL_ECOSYSTEMS", "1" );' in build_policy_block
+    assert 'Com_SetEnvironmentVariable( "QL_DISABLE_STEAMWORKS", "1" );' in build_policy_block
+    assert 'flag = getenv( "QL_DISABLE_EXTERNAL_ECOSYSTEMS" );' in disable_reason_block
+    assert 'return "QL_DISABLE_EXTERNAL_ECOSYSTEMS";' in disable_reason_block
+    assert 'flag = getenv( "QL_DISABLE_STEAMWORKS" );' in disable_reason_block
+    assert 'return "QL_DISABLE_STEAMWORKS";' in disable_reason_block
+    assert 'return NULL;' in disable_reason_block
+    assert disable_reason_block.index('flag = getenv( "QL_DISABLE_EXTERNAL_ECOSYSTEMS" );') < disable_reason_block.index(
+        'flag = getenv( "QL_DISABLE_STEAMWORKS" );'
+    )
+    assert "return QL_PlatformExternalEcosystemsDisableReason() != NULL ? qtrue : qfalse;" in disabled_block
+    assert 'if ( reason && !strcmp( reason, "QL_DISABLE_STEAMWORKS" ) ) {' in provider_label_block
+    assert 'return "Disabled by QL_DISABLE_STEAMWORKS";' in provider_label_block
+    assert 'return "Disabled by QL_DISABLE_EXTERNAL_ECOSYSTEMS";' in provider_label_block
+
+    assert 'if ( strstr( provider, "QL_DISABLE_STEAMWORKS" ) != NULL ) {' in describe_policy_block
+    assert 'return "compatibility-disabled (QL_DISABLE_STEAMWORKS)";' in describe_policy_block
+    assert 'if ( strstr( provider, "QL_DISABLE_STEAMWORKS" ) != NULL ) {' in mode_label_block
+    assert 'return "Steamworks-disabled compatibility lane";' in mode_label_block
+    assert 'if ( strstr( policyLabel, "QL_DISABLE_STEAMWORKS" ) != NULL ) {' in reason_label_block
+    assert 'return "runtime policy disables the opted-in Steamworks compatibility lane";' in reason_label_block
+    assert "externalDisabledProvider = QL_PlatformExternalEcosystemsDisableProviderLabel();" in build_table_block
+    assert "table.auth.provider = externalDisabledProvider;" in build_table_block
+    assert "table.matchmaking.provider = externalDisabledProvider;" in build_table_block
+    assert "table.workshop.provider = externalDisabledProvider;" in build_table_block
+    assert "table.overlay.provider = externalDisabledProvider;" in build_table_block
+    assert "table.stats.provider = externalDisabledProvider;" in build_table_block
+    assert build_table_block.index("externalDisabled = QL_PlatformExternalEcosystemsDisabled();") < build_table_block.index(
+        "qboolean steamInitialised = QL_PlatformSteamworks_InitCached();"
+    )
+
+    for doc_anchor in (
+        "# Quake Live Steam Mapping Round 739: Steamworks Runtime Disable Reason Wiring",
+        "`QL_DISABLE_STEAMWORKS`",
+        "`Disabled by QL_DISABLE_STEAMWORKS`",
+        "`compatibility-disabled (QL_DISABLE_STEAMWORKS)`",
+        "Focused Steamworks runtime-disable reason wiring confidence:\n**82% -> 99%**.",
+        "overall Steam launch/runtime integration mapping confidence **94.34% -> 94.36%**",
+    ):
+        assert doc_anchor in round_note
+
+    assert "Task A641: Pin Steamworks runtime disable reason wiring [COMPLETED]" in implementation_plan
+    assert "overall Steam launch/runtime\nintegration mapping confidence **94.34% -> 94.36%**" in implementation_plan
 
 
 def test_steamworks_shutdown_resets_platform_service_cache_tracks_round_625(tmp_path) -> None:
@@ -4605,7 +4760,8 @@ def test_steam_gameserver_incoming_packet_wrapper_guard_tracks_round_627() -> No
     assert "if ( !data || dataSize <= 0 ) {" in handle_incoming_block
     assert "if ( !state.gameServerInitialised ) {" in handle_incoming_block
     assert "gameServer = QL_Steamworks_GetGameServer();" in handle_incoming_block
-    assert "handlePacket = (QL_SteamGameServer_HandleIncomingPacketFn)vtable[0x94 / 4];" in handle_incoming_block
+    assert "#define QL_STEAM_GAMESERVER_HANDLE_INCOMING_PACKET_SLOT (0x94 / 4)" in steamworks
+    assert "handlePacket = (QL_SteamGameServer_HandleIncomingPacketFn)vtable[QL_STEAM_GAMESERVER_HANDLE_INCOMING_PACKET_SLOT];" in handle_incoming_block
     assert "return handlePacket( gameServer, NULL, data, dataSize, ip, port ) ? qtrue : qfalse;" in handle_incoming_block
     assert handle_incoming_block.index("if ( !data || dataSize <= 0 ) {") < handle_incoming_block.index(
         "if ( !state.gameServerInitialised ) {"
@@ -4614,10 +4770,10 @@ def test_steam_gameserver_incoming_packet_wrapper_guard_tracks_round_627() -> No
         "gameServer = QL_Steamworks_GetGameServer();"
     )
     assert handle_incoming_block.index("gameServer = QL_Steamworks_GetGameServer();") < handle_incoming_block.index(
-        "handlePacket = (QL_SteamGameServer_HandleIncomingPacketFn)vtable[0x94 / 4];"
+        "handlePacket = (QL_SteamGameServer_HandleIncomingPacketFn)vtable[QL_STEAM_GAMESERVER_HANDLE_INCOMING_PACKET_SLOT];"
     )
     assert handle_incoming_block.index(
-        "handlePacket = (QL_SteamGameServer_HandleIncomingPacketFn)vtable[0x94 / 4];"
+        "handlePacket = (QL_SteamGameServer_HandleIncomingPacketFn)vtable[QL_STEAM_GAMESERVER_HANDLE_INCOMING_PACKET_SLOT];"
     ) < handle_incoming_block.index(
         "return handlePacket( gameServer, NULL, data, dataSize, ip, port ) ? qtrue : qfalse;"
     )
@@ -4724,18 +4880,20 @@ def test_steam_gameserver_auth_session_wrapper_guards_track_round_628() -> None:
         "0046621f  (*(edx + 0x78))(edi, arg2)"
     )
 
-    assert 'QL_Steamworks_LoadSymbol( (void **)&state.BeginAuthSession, "SteamAPI_ISteamUser_BeginAuthSession" )' in load_library_block
-    assert 'QL_Steamworks_LoadSymbol( (void **)&state.EndAuthSession, "SteamAPI_ISteamUser_EndAuthSession" )' in load_library_block
+    assert "QL_Steamworks_LoadSymbol( (void **)&state.BeginAuthSession, QL_STEAMWORKS_EXPORT_STEAM_API_ISTEAMUSER_BEGIN_AUTH_SESSION )" in load_library_block
+    assert "QL_Steamworks_LoadSymbol( (void **)&state.EndAuthSession, QL_STEAMWORKS_EXPORT_STEAM_API_ISTEAMUSER_END_AUTH_SESSION )" in load_library_block
     assert "!state.initialised || !state.gameServerInitialised || !state.SteamGameServer" in get_gameserver_block
+    assert "#define QL_STEAM_GAMESERVER_BEGIN_AUTH_SESSION_SLOT (0x74 / 4)" in steamworks
+    assert "#define QL_STEAM_GAMESERVER_END_AUTH_SESSION_SLOT (0x78 / 4)" in steamworks
 
     assert "if ( !steamId || !ticketHex || !ticketHex[0] ) {" in begin_auth_block
     assert "if ( !state.gameServerInitialised ) {" in begin_auth_block
     assert "if ( !QL_Steamworks_ServerIsLoggedOn() ) {" in begin_auth_block
     assert 'QL_Backend_SetAuthResponse( response, QL_AUTH_RESULT_ERROR, "Steam GameServer not logged on" );' in begin_auth_block
     assert "gameServer = QL_Steamworks_GetGameServer();" in begin_auth_block
-    assert "if ( !gameServer || !state.BeginAuthSession ) {" in begin_auth_block
+    assert "beginAuthSession = (QL_SteamGameServer_BeginAuthSessionFn)vtable[QL_STEAM_GAMESERVER_BEGIN_AUTH_SESSION_SLOT];" in begin_auth_block
     assert "QL_Steamworks_HexDecode( ticketHex, ticketData, sizeof( ticketData ), &ticketLength )" in begin_auth_block
-    assert "result = state.BeginAuthSession( gameServer, ticketData, (int)ticketLength, *steamId );" in begin_auth_block
+    assert "result = beginAuthSession( gameServer, NULL, ticketData, (int)ticketLength, *steamId );" in begin_auth_block
     assert "QL_Steamworks_MapAuthResult( result, response );" in begin_auth_block
     assert begin_auth_block.index("if ( !steamId || !ticketHex || !ticketHex[0] ) {") < begin_auth_block.index(
         "if ( !state.gameServerInitialised ) {"
@@ -4746,26 +4904,30 @@ def test_steam_gameserver_auth_session_wrapper_guards_track_round_628() -> None:
     assert begin_auth_block.index("if ( !QL_Steamworks_ServerIsLoggedOn() ) {") < begin_auth_block.index(
         "gameServer = QL_Steamworks_GetGameServer();"
     )
-    assert begin_auth_block.index("if ( !gameServer || !state.BeginAuthSession ) {") < begin_auth_block.index(
+    assert begin_auth_block.index(
+        "beginAuthSession = (QL_SteamGameServer_BeginAuthSessionFn)vtable[QL_STEAM_GAMESERVER_BEGIN_AUTH_SESSION_SLOT];"
+    ) < begin_auth_block.index(
         "QL_Steamworks_HexDecode( ticketHex, ticketData, sizeof( ticketData ), &ticketLength )"
     )
     assert begin_auth_block.index(
         "QL_Steamworks_HexDecode( ticketHex, ticketData, sizeof( ticketData ), &ticketLength )"
     ) < begin_auth_block.index(
-        "result = state.BeginAuthSession( gameServer, ticketData, (int)ticketLength, *steamId );"
+        "result = beginAuthSession( gameServer, NULL, ticketData, (int)ticketLength, *steamId );"
     )
 
     assert "if ( !steamId ) {" in end_auth_block
     assert "if ( !state.gameServerInitialised ) {" in end_auth_block
     assert "gameServer = QL_Steamworks_GetGameServer();" in end_auth_block
-    assert "if ( !gameServer || !state.EndAuthSession ) {" in end_auth_block
-    assert "state.EndAuthSession( gameServer, *steamId );" in end_auth_block
+    assert "endAuthSession = (QL_SteamGameServer_EndAuthSessionFn)vtable[QL_STEAM_GAMESERVER_END_AUTH_SESSION_SLOT];" in end_auth_block
+    assert "endAuthSession( gameServer, NULL, *steamId );" in end_auth_block
     assert end_auth_block.index("if ( !steamId ) {") < end_auth_block.index("if ( !state.gameServerInitialised ) {")
     assert end_auth_block.index("if ( !state.gameServerInitialised ) {") < end_auth_block.index(
         "gameServer = QL_Steamworks_GetGameServer();"
     )
-    assert end_auth_block.index("if ( !gameServer || !state.EndAuthSession ) {") < end_auth_block.index(
-        "state.EndAuthSession( gameServer, *steamId );"
+    assert end_auth_block.index(
+        "endAuthSession = (QL_SteamGameServer_EndAuthSessionFn)vtable[QL_STEAM_GAMESERVER_END_AUTH_SESSION_SLOT];"
+    ) < end_auth_block.index(
+        "endAuthSession( gameServer, NULL, *steamId );"
     )
 
     assert "QL_Steamworks_ServerBeginAuthSession( &steamId, cl->platformAuthToken, &response )" in begin_server_block
@@ -4855,7 +5017,8 @@ def test_steam_gameserver_outgoing_packet_drain_guard_tracks_round_629() -> None
     assert "if ( !data || dataSize <= 0 || !outIp || !outPort ) {" in outgoing_packet_block
     assert "if ( !state.gameServerInitialised ) {" in outgoing_packet_block
     assert "gameServer = QL_Steamworks_GetGameServer();" in outgoing_packet_block
-    assert "getPacket = (QL_SteamGameServer_GetNextOutgoingPacketFn)vtable[0x98 / 4];" in outgoing_packet_block
+    assert "#define QL_STEAM_GAMESERVER_GET_NEXT_OUTGOING_PACKET_SLOT (0x98 / 4)" in steamworks
+    assert "getPacket = (QL_SteamGameServer_GetNextOutgoingPacketFn)vtable[QL_STEAM_GAMESERVER_GET_NEXT_OUTGOING_PACKET_SLOT];" in outgoing_packet_block
     assert "return getPacket( gameServer, NULL, data, dataSize, outIp, outPort );" in outgoing_packet_block
     assert outgoing_packet_block.index("if ( !data || dataSize <= 0 || !outIp || !outPort ) {") < outgoing_packet_block.index(
         "if ( !state.gameServerInitialised ) {"
@@ -4864,7 +5027,7 @@ def test_steam_gameserver_outgoing_packet_drain_guard_tracks_round_629() -> None
         "gameServer = QL_Steamworks_GetGameServer();"
     )
     assert outgoing_packet_block.index("gameServer = QL_Steamworks_GetGameServer();") < outgoing_packet_block.index(
-        "getPacket = (QL_SteamGameServer_GetNextOutgoingPacketFn)vtable[0x98 / 4];"
+        "getPacket = (QL_SteamGameServer_GetNextOutgoingPacketFn)vtable[QL_STEAM_GAMESERVER_GET_NEXT_OUTGOING_PACKET_SLOT];"
     )
     assert "!state.initialised || !state.gameServerInitialised || !state.SteamGameServer" in get_gameserver_block
 
@@ -4885,12 +5048,16 @@ def test_steam_gameserver_outgoing_packet_drain_guard_tracks_round_629() -> None
     )
 
     assert "if ( !QL_Steamworks_ServerIsInitialised() ) {" in networking_frame_block
+    assert "if ( !com_sv_running || !com_sv_running->integer ) {" in networking_frame_block
     assert "QL_Steamworks_RunServerCallbacks();" in networking_frame_block
     assert "SV_SteamServerUpdatePublishedState( qfalse );" in networking_frame_block
     assert "SV_SteamServerSendKeepAlive();" in networking_frame_block
     assert "SV_SteamServerRelayP2PPackets();" in networking_frame_block
     assert "SV_SteamServerDrainOutgoingPackets();" in networking_frame_block
     assert networking_frame_block.index("if ( !QL_Steamworks_ServerIsInitialised() ) {") < networking_frame_block.index(
+        "if ( !com_sv_running || !com_sv_running->integer ) {"
+    )
+    assert networking_frame_block.index("if ( !com_sv_running || !com_sv_running->integer ) {") < networking_frame_block.index(
         "QL_Steamworks_RunServerCallbacks();"
     )
     assert networking_frame_block.index("QL_Steamworks_RunServerCallbacks();") < networking_frame_block.index(
@@ -5000,11 +5167,14 @@ def test_steam_gameserver_p2p_networking_wrapper_guards_track_round_630() -> Non
         assert wrapper_block.index(input_guard) < wrapper_block.index("if ( !state.gameServerInitialised ) {")
         assert wrapper_block.index("if ( !state.gameServerInitialised ) {") < wrapper_block.index(lookup)
 
-    assert "sendPacket = (QL_SteamNetworking_SendP2PPacketFn)vtable[0];" in server_send_block
+    assert "#define QL_STEAM_NETWORKING_SEND_P2P_PACKET_SLOT 0" in steamworks
+    assert "#define QL_STEAM_NETWORKING_IS_P2P_PACKET_AVAILABLE_SLOT 1" in steamworks
+    assert "#define QL_STEAM_NETWORKING_READ_P2P_PACKET_SLOT 2" in steamworks
+    assert "sendPacket = (QL_SteamNetworking_SendP2PPacketFn)vtable[QL_STEAM_NETWORKING_SEND_P2P_PACKET_SLOT];" in server_send_block
     assert "return sendPacket( networking, NULL, *steamId, data, length, sendType, channel );" in server_send_block
-    assert "isAvailable = (QL_SteamNetworking_IsP2PPacketAvailableFn)vtable[1];" in server_available_block
+    assert "isAvailable = (QL_SteamNetworking_IsP2PPacketAvailableFn)vtable[QL_STEAM_NETWORKING_IS_P2P_PACKET_AVAILABLE_SLOT];" in server_available_block
     assert "return isAvailable( networking, NULL, outSize, channel );" in server_available_block
-    assert "readPacket = (QL_SteamNetworking_ReadP2PPacketFn)vtable[2];" in server_read_block
+    assert "readPacket = (QL_SteamNetworking_ReadP2PPacketFn)vtable[QL_STEAM_NETWORKING_READ_P2P_PACKET_SLOT];" in server_read_block
     assert "return readPacket( networking, NULL, data, dataSize, outSize, outSteamId, channel );" in server_read_block
 
     assert 'QL_Steamworks_ServerSendP2PPacket( &steamId, keepAlive, (uint32_t)sizeof( keepAlive ), 2, 16 )' in keepalive_block
@@ -5066,42 +5236,42 @@ def test_steam_gameserver_published_state_wrapper_guards_track_round_631() -> No
         "description": (
             _extract_function_block(steamworks, "qboolean QL_Steamworks_ServerSetGameDescription( const char *description )"),
             "if ( !description || !description[0] ) {",
-            "vtable[0x08 / 4]",
+            "vtable[QL_STEAM_GAMESERVER_SET_GAME_DESCRIPTION_SLOT]",
         ),
         "max_players": (
             _extract_function_block(steamworks, "qboolean QL_Steamworks_ServerSetMaxPlayerCount( int maxPlayers )"),
             "if ( maxPlayers < 0 ) {",
-            "vtable[0x30 / 4]",
+            "vtable[QL_STEAM_GAMESERVER_SET_MAX_PLAYER_COUNT_SLOT]",
         ),
         "bot_players": (
             _extract_function_block(steamworks, "qboolean QL_Steamworks_ServerSetBotPlayerCount( int botPlayers )"),
             "if ( botPlayers < 0 ) {",
-            "vtable[0x34 / 4]",
+            "vtable[QL_STEAM_GAMESERVER_SET_BOT_PLAYER_COUNT_SLOT]",
         ),
         "server_name": (
             _extract_function_block(steamworks, "qboolean QL_Steamworks_ServerSetServerName( const char *name )"),
             "if ( !name || !name[0] ) {",
-            "vtable[0x38 / 4]",
+            "vtable[QL_STEAM_GAMESERVER_SET_SERVER_NAME_SLOT]",
         ),
         "map_name": (
             _extract_function_block(steamworks, "qboolean QL_Steamworks_ServerSetMapName( const char *mapName )"),
             "if ( !mapName || !mapName[0] ) {",
-            "vtable[0x3c / 4]",
+            "vtable[QL_STEAM_GAMESERVER_SET_MAP_NAME_SLOT]",
         ),
         "game_tags": (
             _extract_function_block(steamworks, "qboolean QL_Steamworks_ServerSetGameTags( const char *tags )"),
             "if ( !tags ) {",
-            "vtable[0x54 / 4]",
+            "vtable[QL_STEAM_GAMESERVER_SET_GAME_TAGS_SLOT]",
         ),
         "key_value": (
             _extract_function_block(steamworks, "qboolean QL_Steamworks_ServerSetKeyValue( const char *key, const char *value )"),
             "if ( !key || !key[0] || !value ) {",
-            "vtable[0x50 / 4]",
+            "vtable[QL_STEAM_GAMESERVER_SET_KEY_VALUE_SLOT]",
         ),
         "user_data": (
             _extract_function_block(steamworks, "qboolean QL_Steamworks_ServerUpdateUserData( const CSteamID *steamId, const char *playerName, uint32_t score )"),
             "if ( !steamId || steamId->value == 0ull || !playerName || !playerName[0] ) {",
-            "vtable[0x6c / 4]",
+            "vtable[QL_STEAM_GAMESERVER_UPDATE_USER_DATA_SLOT]",
         ),
     }
     password_block = _extract_function_block(
@@ -5151,11 +5321,13 @@ def test_steam_gameserver_published_state_wrapper_guards_track_round_631() -> No
 
     assert "if ( !state.gameServerInitialised ) {" in password_block
     assert "gameServer = QL_Steamworks_GetGameServer();" in password_block
-    assert "vtable[0x40 / 4]" in password_block
+    assert "vtable[QL_STEAM_GAMESERVER_SET_PASSWORD_PROTECTED_SLOT]" in password_block
     assert password_block.index("if ( !state.gameServerInitialised ) {") < password_block.index(
         "gameServer = QL_Steamworks_GetGameServer();"
     )
-    assert password_block.index("gameServer = QL_Steamworks_GetGameServer();") < password_block.index("vtable[0x40 / 4]")
+    assert password_block.index("gameServer = QL_Steamworks_GetGameServer();") < password_block.index(
+        "vtable[QL_STEAM_GAMESERVER_SET_PASSWORD_PROTECTED_SLOT]"
+    )
 
     for source_call in (
         'QL_Steamworks_ServerSetMaxPlayerCount( sv_maxclients ? sv_maxclients->integer : 0 )',
@@ -5265,10 +5437,10 @@ def test_steam_gameserver_bootstrap_setter_wrapper_guards_track_round_632() -> N
 
     assert "!state.initialised || !state.gameServerInitialised || !state.SteamGameServer" in get_gameserver_block
     for wrapper_name, wrapper_block, slot_anchor in (
-        ("dedicated", dedicated_block, "vtable[0x10 / 4]"),
-        ("logon", logon_block, "vtable[0x14 / 4]"),
-        ("product", product_block, "vtable[0x04 / 4]"),
-        ("game_dir", game_dir_block, "vtable[0x0c / 4]"),
+        ("dedicated", dedicated_block, "vtable[QL_STEAM_GAMESERVER_SET_DEDICATED_SLOT]"),
+        ("logon", logon_block, "vtable[QL_STEAM_GAMESERVER_LOG_ON_SLOT]"),
+        ("product", product_block, "vtable[QL_STEAM_GAMESERVER_SET_PRODUCT_SLOT]"),
+        ("game_dir", game_dir_block, "vtable[QL_STEAM_GAMESERVER_SET_GAME_DIR_SLOT]"),
     ):
         assert "if ( !state.gameServerInitialised ) {" in wrapper_block, wrapper_name
         assert "gameServer = QL_Steamworks_GetGameServer();" in wrapper_block, wrapper_name
@@ -5278,13 +5450,13 @@ def test_steam_gameserver_bootstrap_setter_wrapper_guards_track_round_632() -> N
         )
         assert wrapper_block.index("gameServer = QL_Steamworks_GetGameServer();") < wrapper_block.index(slot_anchor)
 
-    assert "vtable[0x18 / 4]" in logon_block
+    assert "vtable[QL_STEAM_GAMESERVER_LOG_ON_ANONYMOUS_SLOT]" in logon_block
     assert logon_block.index("if ( !state.gameServerInitialised ) {") < logon_block.index(
         "if ( account && account[0] ) {"
     )
     for wrapper_block, input_guard, slot_anchor in (
-        (product_block, "if ( !product || !product[0] ) {", "vtable[0x04 / 4]"),
-        (game_dir_block, "if ( !gameDir || !gameDir[0] ) {", "vtable[0x0c / 4]"),
+        (product_block, "if ( !product || !product[0] ) {", "vtable[QL_STEAM_GAMESERVER_SET_PRODUCT_SLOT]"),
+        (game_dir_block, "if ( !gameDir || !gameDir[0] ) {", "vtable[QL_STEAM_GAMESERVER_SET_GAME_DIR_SLOT]"),
     ):
         assert wrapper_block.index(input_guard) < wrapper_block.index("if ( !state.gameServerInitialised ) {")
         assert wrapper_block.index("if ( !state.gameServerInitialised ) {") < wrapper_block.index(slot_anchor)
@@ -5436,48 +5608,60 @@ def test_steam_gameserver_stats_wrapper_guards_track_round_633() -> None:
     assert "!state.initialised || !state.gameServerInitialised || !state.SteamGameServerStats" in stats_interface_block
     assert "if ( !state.gameServerInitialised ) {" in is_logged_on_block
     assert "gameServer = QL_Steamworks_GetGameServer();" in is_logged_on_block
-    assert "vtable[0x20 / 4]" in is_logged_on_block
+    assert "vtable[QL_STEAM_GAMESERVER_BLOGGED_ON_SLOT]" in is_logged_on_block
     assert is_logged_on_block.index("if ( !state.gameServerInitialised ) {") < is_logged_on_block.index(
         "gameServer = QL_Steamworks_GetGameServer();"
     )
     assert is_logged_on_block.index("gameServer = QL_Steamworks_GetGameServer();") < is_logged_on_block.index(
-        "vtable[0x20 / 4]"
+        "vtable[QL_STEAM_GAMESERVER_BLOGGED_ON_SLOT]"
     )
 
     stats_wrappers = {
-        "request": (request_block, "if ( !steamId || steamId->value == 0ull ) {", "vtable[0x00 / 4]"),
+        "request": (
+            request_block,
+            "if ( !steamId || steamId->value == 0ull ) {",
+            "vtable[QL_STEAM_GAMESERVERSTATS_REQUEST_USER_STATS_SLOT]",
+        ),
         "get_int": (
             get_int_block,
             "if ( !steamId || steamId->value == 0ull || !name || !name[0] || !outValue ) {",
-            "vtable[0x08 / 4]",
+            "vtable[QL_STEAM_GAMESERVERSTATS_GET_USER_STAT_INT_SLOT]",
         ),
         "get_float": (
             get_float_block,
             "if ( !steamId || steamId->value == 0ull || !name || !name[0] || !outValue ) {",
-            "vtable[0x04 / 4]",
+            "vtable[QL_STEAM_GAMESERVERSTATS_GET_USER_STAT_FLOAT_SLOT]",
         ),
         "get_achievement": (
             get_achievement_block,
             "if ( !steamId || steamId->value == 0ull || !name || !name[0] || !outAchieved ) {",
-            "vtable[0x0c / 4]",
+            "vtable[QL_STEAM_GAMESERVERSTATS_GET_USER_ACHIEVEMENT_SLOT]",
         ),
-        "set_int": (set_int_block, "if ( !steamId || steamId->value == 0ull || !name || !name[0] ) {", "vtable[0x14 / 4]"),
+        "set_int": (
+            set_int_block,
+            "if ( !steamId || steamId->value == 0ull || !name || !name[0] ) {",
+            "vtable[QL_STEAM_GAMESERVERSTATS_SET_USER_STAT_INT_SLOT]",
+        ),
         "set_float": (
             set_float_block,
             "if ( !steamId || steamId->value == 0ull || !name || !name[0] ) {",
-            "vtable[0x10 / 4]",
+            "vtable[QL_STEAM_GAMESERVERSTATS_SET_USER_STAT_FLOAT_SLOT]",
         ),
         "update_avg_rate": (
             update_avg_rate_block,
             "if ( !steamId || steamId->value == 0ull || !name || !name[0] ) {",
-            "vtable[0x18 / 4]",
+            "vtable[QL_STEAM_GAMESERVERSTATS_UPDATE_AVG_RATE_STAT_SLOT]",
         ),
         "set_achievement": (
             set_achievement_block,
             "if ( !steamId || steamId->value == 0ull || !name || !name[0] ) {",
-            "vtable[0x1c / 4]",
+            "vtable[QL_STEAM_GAMESERVERSTATS_SET_USER_ACHIEVEMENT_SLOT]",
         ),
-        "store": (store_block, "if ( !steamId || steamId->value == 0ull ) {", "vtable[0x24 / 4]"),
+        "store": (
+            store_block,
+            "if ( !steamId || steamId->value == 0ull ) {",
+            "vtable[QL_STEAM_GAMESERVERSTATS_STORE_USER_STATS_SLOT]",
+        ),
     }
     for wrapper_name, (wrapper_block, input_guard, slot_anchor) in stats_wrappers.items():
         assert "if ( !state.gameServerInitialised ) {" in wrapper_block, wrapper_name
@@ -5594,14 +5778,14 @@ def test_steam_gameserver_p2p_accept_wrapper_guard_tracks_round_634() -> None:
     assert "if ( !steamId ) {" in accept_block
     assert "if ( !state.gameServerInitialised ) {" in accept_block
     assert "networking = QL_Steamworks_GetGameServerNetworking();" in accept_block
-    assert "vtable[0x0c / 4]" in accept_block
+    assert "vtable[QL_STEAM_NETWORKING_ACCEPT_P2P_SESSION_SLOT]" in accept_block
     assert "return acceptSession( networking, NULL, *steamId ) ? qtrue : qfalse;" in accept_block
     assert accept_block.index("if ( !steamId ) {") < accept_block.index("if ( !state.gameServerInitialised ) {")
     assert accept_block.index("if ( !state.gameServerInitialised ) {") < accept_block.index(
         "networking = QL_Steamworks_GetGameServerNetworking();"
     )
     assert accept_block.index("networking = QL_Steamworks_GetGameServerNetworking();") < accept_block.index(
-        "vtable[0x0c / 4]"
+        "vtable[QL_STEAM_NETWORKING_ACCEPT_P2P_SESSION_SLOT]"
     )
 
     for source_anchor in (
@@ -5703,7 +5887,7 @@ def test_steam_gameserver_identity_publish_wrapper_guard_tracks_round_635() -> N
     assert "if ( !outIdLow || !outIdHigh ) {" in steam_id_block
     assert "if ( !state.gameServerInitialised ) {" in steam_id_block
     assert "gameServer = QL_Steamworks_GetGameServer();" in steam_id_block
-    assert "vtable[0x28 / 4]" in steam_id_block
+    assert "vtable[QL_STEAM_GAMESERVER_GET_STEAM_ID_SLOT]" in steam_id_block
     assert "if ( !fn( gameServer, NULL, &steamId ) ) {" in steam_id_block
     assert "*outIdLow = (uint32_t)( steamId.value & 0xffffffffu );" in steam_id_block
     assert "*outIdHigh = (uint32_t)( ( steamId.value >> 32 ) & 0xffffffffu );" in steam_id_block
@@ -5713,7 +5897,9 @@ def test_steam_gameserver_identity_publish_wrapper_guard_tracks_round_635() -> N
     assert steam_id_block.index("if ( !state.gameServerInitialised ) {") < steam_id_block.index(
         "gameServer = QL_Steamworks_GetGameServer();"
     )
-    assert steam_id_block.index("gameServer = QL_Steamworks_GetGameServer();") < steam_id_block.index("vtable[0x28 / 4]")
+    assert steam_id_block.index("gameServer = QL_Steamworks_GetGameServer();") < steam_id_block.index(
+        "vtable[QL_STEAM_GAMESERVER_GET_STEAM_ID_SLOT]"
+    )
 
     for source_anchor in (
         "if ( !QL_Steamworks_ServerGetSteamID( &steamIdLow, &steamIdHigh ) ) {",
@@ -5829,13 +6015,13 @@ def test_steam_gameserver_utility_public_ip_wrapper_guards_track_round_636() -> 
             "app_id",
             app_id_block,
             "gameServerUtils = QL_Steamworks_GetGameServerUtilsInterface();",
-            "vtable[0x24 / 4]",
+            "vtable[QL_STEAM_GAMESERVER_UTILS_GET_APP_ID_SLOT]",
         ),
         (
             "public_ip",
             public_ip_block,
             "gameServer = QL_Steamworks_GetGameServer();",
-            "vtable[0x90 / 4]",
+            "vtable[QL_STEAM_GAMESERVER_GET_PUBLIC_IP_SLOT]",
         ),
     ):
         assert "if ( !state.gameServerInitialised ) {" in wrapper_block, wrapper_name
@@ -5940,9 +6126,9 @@ def test_steam_ugc_get_all_query_appid_order_tracks_round_637() -> None:
         "appId = QL_Steamworks_GetAppID();",
         "if ( appId == 0u ) {",
         "ugc = QL_Steamworks_GetUGCInterface();",
-        "createQueryFn = (QL_SteamUGC_CreateQueryAllUGCRequestFn)vtable[0x04 / 4];",
-        "sendQueryFn = (QL_SteamUGC_SendQueryUGCRequestFn)vtable[0x0c / 4];",
-        "queryHandle = createQueryFn( ugc, NULL, 1, 0, appId, appId, filter );",
+        "createQueryFn = (QL_SteamUGC_CreateQueryAllUGCRequestFn)vtable[QL_STEAM_UGC_CREATE_QUERY_ALL_UGC_REQUEST_SLOT];",
+        "sendQueryFn = (QL_SteamUGC_SendQueryUGCRequestFn)vtable[QL_STEAM_UGC_SEND_QUERY_UGC_REQUEST_SLOT];",
+        "queryHandle = createQueryFn( ugc, NULL, QL_STEAM_UGC_GET_ALL_QUERY_TYPE, QL_STEAM_UGC_GET_ALL_MATCHING_TYPE, appId, appId, filter );",
         "callHandle = sendQueryFn( ugc, NULL, queryHandleLow, queryHandleHigh );",
         "if ( !QL_Steamworks_BindUGCQueryCallResult( (SteamAPICall_t)callHandle ) ) {",
     )
@@ -5956,7 +6142,7 @@ def test_steam_ugc_get_all_query_appid_order_tracks_round_637() -> None:
         "ugc = QL_Steamworks_GetUGCInterface();"
     )
     assert request_query_block.index("ugc = QL_Steamworks_GetUGCInterface();") < request_query_block.index(
-        "queryHandle = createQueryFn( ugc, NULL, 1, 0, appId, appId, filter );"
+        "queryHandle = createQueryFn( ugc, NULL, QL_STEAM_UGC_GET_ALL_QUERY_TYPE, QL_STEAM_UGC_GET_ALL_MATCHING_TYPE, appId, appId, filter );"
     )
 
     assert "QL_Steamworks_GetAllUGCFilterContractLabel()" in request_ugc_block
@@ -6158,7 +6344,8 @@ def test_client_p2p_session_request_tracks_retail_peer_accept_gate() -> None:
     assert '"accepted tracked peer %s"' in p2p_callback_block
 
     assert "QL_Steamworks_GetNetworkingInterface();" in accept_p2p_block
-    assert "acceptSession = (QL_SteamNetworking_AcceptP2PSessionWithUserFn)vtable[0x0c / 4];" in accept_p2p_block
+    assert "#define QL_STEAM_NETWORKING_ACCEPT_P2P_SESSION_SLOT (0x0c / 4)" in steamworks
+    assert "acceptSession = (QL_SteamNetworking_AcceptP2PSessionWithUserFn)vtable[QL_STEAM_NETWORKING_ACCEPT_P2P_SESSION_SLOT];" in accept_p2p_block
     assert "return acceptSession( networking, NULL, *steamId ) ? qtrue : qfalse;" in accept_p2p_block
 
     for doc_anchor in (
@@ -6397,6 +6584,9 @@ def test_steam_browser_and_datasource_alias_bridge_tracks_ghidra_and_hlil_rows()
     functions_csv = (
         REPO_ROOT / "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
     ).read_text(encoding="utf-8")
+    imports_txt = (
+        REPO_ROOT / "references/reverse-engineering/ghidra/quakelive_steam/imports.txt"
+    ).read_text(encoding="utf-8")
     analysis_symbols = (
         REPO_ROOT / "references/reverse-engineering/ghidra/quakelive_steam/analysis_symbols.txt"
     ).read_text(encoding="utf-8")
@@ -6513,7 +6703,7 @@ def test_steam_browser_and_datasource_alias_bridge_tracks_ghidra_and_hlil_rows()
     assert "CL_SteamBrowser_PublishNativeServerResponse( &response );" in cl_main
     assert "CL_SteamBrowser_PublishNativeRuleResponse( &response );" in cl_main
     assert "CL_SteamBrowser_PublishNativePlayerResponse( &response );" in cl_main
-    assert "CL_SteamBrowser_CompleteNativeDetailTerminal( detail );" in cl_main
+    assert "CL_SteamBrowser_CompleteNativeDetailTerminal( detail, QL_STEAM_SERVER_BROWSER_DETAIL_TERMINAL_PING );" in cl_main
 
     assert '{ "SteamDataSource", "OnRequest", 0x00532B80u, 0x04u, 0x004640C0u, "CL_SteamDataSource_Request", CL_STEAM_DATA_SOURCE_SCOPE_COMPATIBILITY_OWNER },' in steam_resources
     assert '{ "SteamDataSource", "StartResponseThread", 0u, 0u, 0x00463550u, "CL_SteamResources_RequestAvatarRGBA", CL_STEAM_DATA_SOURCE_SCOPE_ASYNC_BOUNDARY },' in steam_resources
@@ -6607,16 +6797,16 @@ def test_steam_browser_detail_datasource_helper_aliases_track_retail_reference_r
     )
     native_detail_complete_block = _extract_function_block(
         cl_main,
-        "static void CL_SteamBrowser_CompleteNativeDetailTerminal( clSteamNativeServerDetail_t *detail ) {",
+        "static void CL_SteamBrowser_CompleteNativeDetailTerminal( clSteamNativeServerDetail_t *detail, uint32_t terminalChannel ) {",
     )
 
     assert '"%u.%u.%u.%u:%i"' in fallback_name_block
     assert "( raw->ip >> 24 ) & 0xffu" in fallback_name_block
     assert "QL_Steamworks_FormatServerListFallbackName( outServer->displayName, sizeof( outServer->displayName ), raw );" in copy_display_name_block
-    assert "QL_Steamworks_CompleteServerBrowserDetailCallback( &request->lifecycle, &releaseReady )" in complete_callback_block
-    assert "request->queriesActive = qfalse;" in complete_callback_block
-    assert "CL_SteamBrowser_CompleteNativeDetailTerminal( CL_SteamBrowser_NativeDetailFromPing( self ) );" in native_ping_failed_block
-    assert "QL_Steamworks_CompleteServerBrowserDetailRequestCallback( &detail->request, &releaseReady )" in native_detail_complete_block
+    assert "QL_Steamworks_NextServerBrowserDetailTerminalChannel( request ? &request->lifecycle : NULL )" in complete_callback_block
+    assert "QL_Steamworks_CompleteServerBrowserDetailRequestTerminal( request, terminalChannel, outReleaseReady )" in complete_callback_block
+    assert "CL_SteamBrowser_CompleteNativeDetailTerminal( CL_SteamBrowser_NativeDetailFromPing( self ), QL_STEAM_SERVER_BROWSER_DETAIL_TERMINAL_PING );" in native_ping_failed_block
+    assert "QL_Steamworks_CompleteServerBrowserDetailRequestTerminal( &detail->request, terminalChannel, &releaseReady )" in native_detail_complete_block
 
 
 def test_platform_steamworks_reconstructs_retail_callback_bundle_registration_surface() -> None:
@@ -6730,8 +6920,13 @@ def test_platform_steamworks_reconstructs_retail_callback_bundle_registration_su
     assert "qboolean QL_Steamworks_IsInitialized( void );" in steamworks_h
     assert "return state.initialised ? qtrue : qfalse;" in init_state_block
     assert "return qfalse;" in init_state_stub_block
-    assert "ql_steam_callback_run_fn run;\n\tql_steam_callback_run_call_result_fn runCallResult;\n\tql_steam_callback_get_size_fn getSize;" in steamworks
-    assert "static const ql_steam_callback_vtable_t ql_steam_callback_vtable = {\n\tQL_Steamworks_CallbackRun,\n\tQL_Steamworks_CallbackRunCallResult,\n\tQL_Steamworks_CallbackGetSize\n};" in steamworks
+    assert "typedef void (QL_STEAMWORKS_THISCALL *ql_steam_call_result_member_fn)( ql_steam_callback_base_t *self, void *payload, qboolean ioFailure );" in steamworks
+    assert "typedef void (*ql_steam_callback_vfunc_t)( void );" in steamworks
+    assert "ql_steam_callback_vfunc_t run;\n\tql_steam_callback_vfunc_t runAdapter;\n\tql_steam_callback_vfunc_t getSize;" in steamworks
+    assert "typedef void (QL_STEAMWORKS_THISCALL *ql_steam_callback_member_fn)( ql_steam_callback_base_t *self, void *payload );" in steamworks
+    assert "int callbackId;\n\tql_steam_callback_base_t *owner;\n\tunion {\n\t\tql_steam_callback_member_fn memberFunction;\n\t\tuint32_t callResultHandleLow;\n\t};\n\tuint32_t callResultHandleHigh;\n\tql_steam_callback_base_t *callResultOwner;\n\tql_steam_call_result_member_fn callResultMemberFunction;\n\tint payloadSize;" in steamworks
+    assert "static const ql_steam_callback_vtable_t ql_steam_callback_vtable = {\n\t(ql_steam_callback_vfunc_t)QL_Steamworks_CallbackRun,\n\t(ql_steam_callback_vfunc_t)QL_Steamworks_CallbackRunAdapter,\n\t(ql_steam_callback_vfunc_t)QL_Steamworks_CallbackGetSize\n};" in steamworks
+    assert "static const ql_steam_callback_vtable_t ql_steam_call_result_vtable = {\n\t(ql_steam_callback_vfunc_t)QL_Steamworks_CallbackRunCallResult,\n\t(ql_steam_callback_vfunc_t)QL_Steamworks_CallbackRunCallResultAdapter,\n\t(ql_steam_callback_vfunc_t)QL_Steamworks_CallbackGetSize\n};" in steamworks
     for callback_define in (
         '#define QL_STEAM_CALLBACK_RICH_PRESENCE_JOIN_REQUESTED 0x151',
         '#define QL_STEAM_CALLBACK_USER_STATS_RECEIVED 0x44d',
@@ -6759,10 +6954,21 @@ def test_platform_steamworks_reconstructs_retail_callback_bundle_registration_su
     assert '#define QL_STEAM_CALLBACK_MICROTXN_AUTHORIZATION_RESPONSE 0x98' in steamworks
     assert "#define QL_STEAM_CALLBACK_FLAG_REGISTERED 0x01" in steamworks
     assert "#define QL_STEAM_CALLBACK_FLAG_GAMESERVER 0x02" in steamworks
-    assert 'QL_Steamworks_LoadOptionalSymbol( (void **)&state.SteamAPI_RegisterCallback, "SteamAPI_RegisterCallback" );' in steamworks
-    assert 'QL_Steamworks_LoadOptionalSymbol( (void **)&state.SteamAPI_RegisterCallResult, "SteamAPI_RegisterCallResult" );' in steamworks
+    assert "QL_Steamworks_LoadOptionalSymbol( (void **)&state.SteamAPI_RegisterCallback, QL_STEAMWORKS_EXPORT_STEAM_API_REGISTER_CALLBACK );" in steamworks
+    assert "QL_Steamworks_LoadOptionalSymbol( (void **)&state.SteamAPI_RegisterCallResult, QL_STEAMWORKS_EXPORT_STEAM_API_REGISTER_CALL_RESULT );" in steamworks
+    assert "object->vtable = dispatchCallResult ? &ql_steam_call_result_vtable : &ql_steam_callback_vtable;" in prepare_callback_block
     assert "if ( gameServer ) {" in prepare_callback_block
     assert "object->callbackFlags |= QL_STEAM_CALLBACK_FLAG_GAMESERVER;" in prepare_callback_block
+    assert "object->owner = object;" in prepare_callback_block
+    assert "object->memberFunction = QL_Steamworks_CallbackMemberRun;" in prepare_callback_block
+    assert "object->callResultOwner = object;" in prepare_callback_block
+    assert "object->callResultMemberFunction = QL_Steamworks_CallbackCallResultMemberRun;" in prepare_callback_block
+    assert prepare_callback_block.index("object->callbackId = callbackId;") < prepare_callback_block.index(
+        "object->owner = object;"
+    )
+    assert prepare_callback_block.index("object->memberFunction = QL_Steamworks_CallbackMemberRun;") < prepare_callback_block.index(
+        "object->payloadSize = payloadSize;"
+    )
     assert "object->callbackFlags |= QL_STEAM_CALLBACK_FLAG_REGISTERED;" in register_callback_object_block
     for non_server_callback_symbol in (
         "CCallback<class_SteamCallbacks,struct_GameRichPresenceJoinRequested_t,0>::vftable",
@@ -6916,6 +7122,8 @@ def test_platform_steamworks_reconstructs_retail_callback_bundle_registration_su
         "*callHandle = 0;"
     )
     assert "QL_Steamworks_UnbindCallResultObject( &callbackState->ugcQueryCompleted, &callbackState->ugcCallHandle, &callbackState->ugcCallBound );" in bind_ugc_block
+    assert "callbackState->ugcQueryCompleted.callResultHandleLow = QL_Steamworks_CallHandleLow( callHandle );" in bind_ugc_block
+    assert "callbackState->ugcQueryCompleted.callResultHandleHigh = QL_Steamworks_CallHandleHigh( callHandle );" in bind_ugc_block
     assert "state.SteamAPI_RegisterCallResult( &callbackState->ugcQueryCompleted, callHandle );" in bind_ugc_block
     assert bind_ugc_block.index("QL_Steamworks_UnbindCallResultObject(") < bind_ugc_block.index(
         "state.SteamAPI_RegisterCallResult( &callbackState->ugcQueryCompleted, callHandle );"
@@ -7058,77 +7266,81 @@ def test_platform_steamworks_loader_reconstructs_retail_import_surface_and_launc
     assert '#define QL_STEAMWORKS_LIB_SECONDARY "steam_api64.dll"' in steamworks
     assert '#define QL_STEAMWORKS_OPEN( name ) LoadLibraryA( name )' in steamworks
     assert '#define QL_STEAMWORKS_LIB_PRIMARY "libsteam_api.so"' in steamworks
+    assert '#define QL_STEAMWORKS_EXPORT_STEAM_API_INIT "SteamAPI_Init"' in steamworks
+    assert '#define QL_STEAMWORKS_EXPORT_STEAM_USER "SteamUser"' in steamworks
+    assert '#define QL_STEAMWORKS_EXPORT_STEAM_API_STEAM_USER "SteamAPI_SteamUser"' in steamworks
+    assert '#define QL_STEAMWORKS_EXPORT_STEAM_GAME_SERVER_INIT "SteamGameServer_Init"' in steamworks
     assert 'QL_STEAMWORKS_OPEN( candidates[i] )' in load_block
     assert 'Com_Printf( "Steamworks: loaded %s with retail-compatible exports\\n", loadedName ? loadedName : "Steam runtime" );' in load_block
 
     for required_symbol in [
-        'QL_Steamworks_LoadSymbol( (void **)&state.SteamAPI_Init, "SteamAPI_Init" )',
-        'QL_Steamworks_LoadSymbol( (void **)&state.SteamAPI_Shutdown, "SteamAPI_Shutdown" )',
-        'QL_Steamworks_LoadSymbol( (void **)&state.SteamAPI_RunCallbacks, "SteamAPI_RunCallbacks" )',
-        'QL_Steamworks_LoadSymbol( (void **)&state.GetAuthSessionTicket, "SteamAPI_ISteamUser_GetAuthSessionTicket" )',
-        'QL_Steamworks_LoadSymbol( (void **)&state.BeginAuthSession, "SteamAPI_ISteamUser_BeginAuthSession" )',
-        'QL_Steamworks_LoadSymbol( (void **)&state.CancelAuthTicket, "SteamAPI_ISteamUser_CancelAuthTicket" )',
-        'QL_Steamworks_LoadSymbol( (void **)&state.EndAuthSession, "SteamAPI_ISteamUser_EndAuthSession" )',
-        'QL_Steamworks_LoadSymbol( (void **)&state.GetSteamID, "SteamAPI_ISteamUser_GetSteamID" )',
+        "QL_Steamworks_LoadSymbol( (void **)&state.SteamAPI_Init, QL_STEAMWORKS_EXPORT_STEAM_API_INIT )",
+        "QL_Steamworks_LoadSymbol( (void **)&state.SteamAPI_Shutdown, QL_STEAMWORKS_EXPORT_STEAM_API_SHUTDOWN )",
+        "QL_Steamworks_LoadSymbol( (void **)&state.SteamAPI_RunCallbacks, QL_STEAMWORKS_EXPORT_STEAM_API_RUN_CALLBACKS )",
+        "QL_Steamworks_LoadSymbol( (void **)&state.GetAuthSessionTicket, QL_STEAMWORKS_EXPORT_STEAM_API_ISTEAMUSER_GET_AUTH_SESSION_TICKET )",
+        "QL_Steamworks_LoadSymbol( (void **)&state.BeginAuthSession, QL_STEAMWORKS_EXPORT_STEAM_API_ISTEAMUSER_BEGIN_AUTH_SESSION )",
+        "QL_Steamworks_LoadSymbol( (void **)&state.CancelAuthTicket, QL_STEAMWORKS_EXPORT_STEAM_API_ISTEAMUSER_CANCEL_AUTH_TICKET )",
+        "QL_Steamworks_LoadSymbol( (void **)&state.EndAuthSession, QL_STEAMWORKS_EXPORT_STEAM_API_ISTEAMUSER_END_AUTH_SESSION )",
+        "QL_Steamworks_LoadSymbol( (void **)&state.GetSteamID, QL_STEAMWORKS_EXPORT_STEAM_API_ISTEAMUSER_GET_STEAM_ID )",
     ]:
         assert required_symbol in load_block
 
     for required_alias in [
-        'QL_Steamworks_LoadSymbolAlias( (void **)&state.SteamUser, "SteamUser", "SteamAPI_SteamUser" )',
-        'QL_Steamworks_LoadSymbolAlias( (void **)&state.SteamFriends, "SteamFriends", "SteamAPI_SteamFriends" )',
-        'QL_Steamworks_LoadSymbolAlias( (void **)&state.SteamMatchmaking, "SteamMatchmaking", "SteamAPI_SteamMatchmaking" )',
-        'QL_Steamworks_LoadSymbolAlias( (void **)&state.SteamApps, "SteamApps", "SteamAPI_SteamApps" )',
-        'QL_Steamworks_LoadSymbolAlias( (void **)&state.SteamUGC, "SteamUGC", "SteamAPI_SteamUGC" )',
+        "QL_Steamworks_LoadSymbolAlias( (void **)&state.SteamUser, QL_STEAMWORKS_EXPORT_STEAM_USER, QL_STEAMWORKS_EXPORT_STEAM_API_STEAM_USER )",
+        "QL_Steamworks_LoadSymbolAlias( (void **)&state.SteamFriends, QL_STEAMWORKS_EXPORT_STEAM_FRIENDS, QL_STEAMWORKS_EXPORT_STEAM_API_STEAM_FRIENDS )",
+        "QL_Steamworks_LoadSymbolAlias( (void **)&state.SteamMatchmaking, QL_STEAMWORKS_EXPORT_STEAM_MATCHMAKING, QL_STEAMWORKS_EXPORT_STEAM_API_STEAM_MATCHMAKING )",
+        "QL_Steamworks_LoadSymbolAlias( (void **)&state.SteamApps, QL_STEAMWORKS_EXPORT_STEAM_APPS, QL_STEAMWORKS_EXPORT_STEAM_API_STEAM_APPS )",
+        "QL_Steamworks_LoadSymbolAlias( (void **)&state.SteamUGC, QL_STEAMWORKS_EXPORT_STEAM_UGC, QL_STEAMWORKS_EXPORT_STEAM_API_STEAM_UGC )",
     ]:
         assert required_alias in load_block
 
     for optional_symbol in [
-        'QL_Steamworks_LoadOptionalSymbol( (void **)&state.SteamAPI_RegisterCallback, "SteamAPI_RegisterCallback" );',
-        'QL_Steamworks_LoadOptionalSymbol( (void **)&state.SteamAPI_UnregisterCallback, "SteamAPI_UnregisterCallback" );',
-        'QL_Steamworks_LoadOptionalSymbol( (void **)&state.SteamAPI_RegisterCallResult, "SteamAPI_RegisterCallResult" );',
-        'QL_Steamworks_LoadOptionalSymbol( (void **)&state.SteamAPI_UnregisterCallResult, "SteamAPI_UnregisterCallResult" );',
-        'QL_Steamworks_LoadOptionalSymbol( (void **)&state.SteamGameServer, "SteamGameServer" );',
-        'QL_Steamworks_LoadOptionalSymbol( (void **)&state.SteamGameServerStats, "SteamGameServerStats" );',
-        'QL_Steamworks_LoadOptionalSymbol( (void **)&state.SteamGameServerUtils, "SteamGameServerUtils" );',
-        'QL_Steamworks_LoadOptionalSymbol( (void **)&state.SteamGameServerUGC, "SteamGameServerUGC" );',
-        'QL_Steamworks_LoadOptionalSymbol( (void **)&state.SteamGameServer_Init, "SteamGameServer_Init" );',
-        'QL_Steamworks_LoadOptionalSymbol( (void **)&state.SteamGameServer_Shutdown, "SteamGameServer_Shutdown" );',
-        'QL_Steamworks_LoadOptionalSymbol( (void **)&state.SteamGameServer_RunCallbacks, "SteamGameServer_RunCallbacks" );',
-        'QL_Steamworks_LoadOptionalSymbol( (void **)&state.SteamGameServerNetworking, "SteamGameServerNetworking" );',
+        "QL_Steamworks_LoadOptionalSymbol( (void **)&state.SteamAPI_RegisterCallback, QL_STEAMWORKS_EXPORT_STEAM_API_REGISTER_CALLBACK );",
+        "QL_Steamworks_LoadOptionalSymbol( (void **)&state.SteamAPI_UnregisterCallback, QL_STEAMWORKS_EXPORT_STEAM_API_UNREGISTER_CALLBACK );",
+        "QL_Steamworks_LoadOptionalSymbol( (void **)&state.SteamAPI_RegisterCallResult, QL_STEAMWORKS_EXPORT_STEAM_API_REGISTER_CALL_RESULT );",
+        "QL_Steamworks_LoadOptionalSymbol( (void **)&state.SteamAPI_UnregisterCallResult, QL_STEAMWORKS_EXPORT_STEAM_API_UNREGISTER_CALL_RESULT );",
+        "QL_Steamworks_LoadOptionalSymbol( (void **)&state.SteamGameServer, QL_STEAMWORKS_EXPORT_STEAM_GAME_SERVER );",
+        "QL_Steamworks_LoadOptionalSymbol( (void **)&state.SteamGameServerStats, QL_STEAMWORKS_EXPORT_STEAM_GAME_SERVER_STATS );",
+        "QL_Steamworks_LoadOptionalSymbol( (void **)&state.SteamGameServerUtils, QL_STEAMWORKS_EXPORT_STEAM_GAME_SERVER_UTILS );",
+        "QL_Steamworks_LoadOptionalSymbol( (void **)&state.SteamGameServerUGC, QL_STEAMWORKS_EXPORT_STEAM_GAME_SERVER_UGC );",
+        "QL_Steamworks_LoadOptionalSymbol( (void **)&state.SteamGameServer_Init, QL_STEAMWORKS_EXPORT_STEAM_GAME_SERVER_INIT );",
+        "QL_Steamworks_LoadOptionalSymbol( (void **)&state.SteamGameServer_Shutdown, QL_STEAMWORKS_EXPORT_STEAM_GAME_SERVER_SHUTDOWN );",
+        "QL_Steamworks_LoadOptionalSymbol( (void **)&state.SteamGameServer_RunCallbacks, QL_STEAMWORKS_EXPORT_STEAM_GAME_SERVER_RUN_CALLBACKS );",
+        "QL_Steamworks_LoadOptionalSymbol( (void **)&state.SteamGameServerNetworking, QL_STEAMWORKS_EXPORT_STEAM_GAME_SERVER_NETWORKING );",
     ]:
         assert optional_symbol in load_block
 
     for optional_alias in [
-        'QL_Steamworks_LoadOptionalSymbolAlias( (void **)&state.SteamNetworking, "SteamNetworking", "SteamAPI_SteamNetworking" );',
-        'QL_Steamworks_LoadOptionalSymbolAlias( (void **)&state.SteamUtils, "SteamUtils", "SteamAPI_SteamUtils" );',
-        'QL_Steamworks_LoadOptionalSymbolAlias( (void **)&state.SteamUserStats, "SteamUserStats", "SteamAPI_SteamUserStats" );',
-        'QL_Steamworks_LoadOptionalSymbolAlias( (void **)&state.SteamMatchmakingServers, "SteamMatchmakingServers", "SteamAPI_SteamMatchmakingServers" );',
+        "QL_Steamworks_LoadOptionalSymbolAlias( (void **)&state.SteamNetworking, QL_STEAMWORKS_EXPORT_STEAM_NETWORKING, QL_STEAMWORKS_EXPORT_STEAM_API_STEAM_NETWORKING );",
+        "QL_Steamworks_LoadOptionalSymbolAlias( (void **)&state.SteamUtils, QL_STEAMWORKS_EXPORT_STEAM_UTILS, QL_STEAMWORKS_EXPORT_STEAM_API_STEAM_UTILS );",
+        "QL_Steamworks_LoadOptionalSymbolAlias( (void **)&state.SteamUserStats, QL_STEAMWORKS_EXPORT_STEAM_USER_STATS, QL_STEAMWORKS_EXPORT_STEAM_API_STEAM_USER_STATS );",
+        "QL_Steamworks_LoadOptionalSymbolAlias( (void **)&state.SteamMatchmakingServers, QL_STEAMWORKS_EXPORT_STEAM_MATCHMAKING_SERVERS, QL_STEAMWORKS_EXPORT_STEAM_API_STEAM_MATCHMAKING_SERVERS );",
     ]:
         assert optional_alias in load_block
 
-    assert load_block.index('QL_Steamworks_LoadSymbol( (void **)&state.SteamAPI_Init, "SteamAPI_Init" )') < load_block.index(
-        'QL_Steamworks_LoadSymbol( (void **)&state.SteamAPI_Shutdown, "SteamAPI_Shutdown" )'
+    assert load_block.index("QL_Steamworks_LoadSymbol( (void **)&state.SteamAPI_Init, QL_STEAMWORKS_EXPORT_STEAM_API_INIT )") < load_block.index(
+        "QL_Steamworks_LoadSymbol( (void **)&state.SteamAPI_Shutdown, QL_STEAMWORKS_EXPORT_STEAM_API_SHUTDOWN )"
     )
-    assert load_block.index('QL_Steamworks_LoadSymbol( (void **)&state.SteamAPI_Shutdown, "SteamAPI_Shutdown" )') < load_block.index(
-        'QL_Steamworks_LoadSymbol( (void **)&state.SteamAPI_RunCallbacks, "SteamAPI_RunCallbacks" )'
+    assert load_block.index("QL_Steamworks_LoadSymbol( (void **)&state.SteamAPI_Shutdown, QL_STEAMWORKS_EXPORT_STEAM_API_SHUTDOWN )") < load_block.index(
+        "QL_Steamworks_LoadSymbol( (void **)&state.SteamAPI_RunCallbacks, QL_STEAMWORKS_EXPORT_STEAM_API_RUN_CALLBACKS )"
     )
-    assert load_block.index('QL_Steamworks_LoadSymbol( (void **)&state.SteamAPI_RunCallbacks, "SteamAPI_RunCallbacks" )') < load_block.index(
-        'QL_Steamworks_LoadOptionalSymbol( (void **)&state.SteamAPI_RegisterCallback, "SteamAPI_RegisterCallback" );'
+    assert load_block.index("QL_Steamworks_LoadSymbol( (void **)&state.SteamAPI_RunCallbacks, QL_STEAMWORKS_EXPORT_STEAM_API_RUN_CALLBACKS )") < load_block.index(
+        "QL_Steamworks_LoadOptionalSymbol( (void **)&state.SteamAPI_RegisterCallback, QL_STEAMWORKS_EXPORT_STEAM_API_REGISTER_CALLBACK );"
     )
-    assert load_block.index('QL_Steamworks_LoadOptionalSymbol( (void **)&state.SteamAPI_RegisterCallback, "SteamAPI_RegisterCallback" );') < load_block.index(
-        'QL_Steamworks_LoadOptionalSymbol( (void **)&state.SteamAPI_UnregisterCallResult, "SteamAPI_UnregisterCallResult" );'
+    assert load_block.index("QL_Steamworks_LoadOptionalSymbol( (void **)&state.SteamAPI_RegisterCallback, QL_STEAMWORKS_EXPORT_STEAM_API_REGISTER_CALLBACK );") < load_block.index(
+        "QL_Steamworks_LoadOptionalSymbol( (void **)&state.SteamAPI_UnregisterCallResult, QL_STEAMWORKS_EXPORT_STEAM_API_UNREGISTER_CALL_RESULT );"
     )
-    assert load_block.index('QL_Steamworks_LoadOptionalSymbol( (void **)&state.SteamAPI_RegisterCallback, "SteamAPI_RegisterCallback" );') < load_block.index(
-        'QL_Steamworks_LoadSymbolAlias( (void **)&state.SteamUser, "SteamUser", "SteamAPI_SteamUser" )'
+    assert load_block.index("QL_Steamworks_LoadOptionalSymbol( (void **)&state.SteamAPI_RegisterCallback, QL_STEAMWORKS_EXPORT_STEAM_API_REGISTER_CALLBACK );") < load_block.index(
+        "QL_Steamworks_LoadSymbolAlias( (void **)&state.SteamUser, QL_STEAMWORKS_EXPORT_STEAM_USER, QL_STEAMWORKS_EXPORT_STEAM_API_STEAM_USER )"
     )
-    assert load_block.index('QL_Steamworks_LoadSymbolAlias( (void **)&state.SteamUser, "SteamUser", "SteamAPI_SteamUser" )') < load_block.index(
-        'QL_Steamworks_LoadSymbolAlias( (void **)&state.SteamFriends, "SteamFriends", "SteamAPI_SteamFriends" )'
+    assert load_block.index("QL_Steamworks_LoadSymbolAlias( (void **)&state.SteamUser, QL_STEAMWORKS_EXPORT_STEAM_USER, QL_STEAMWORKS_EXPORT_STEAM_API_STEAM_USER )") < load_block.index(
+        "QL_Steamworks_LoadSymbolAlias( (void **)&state.SteamFriends, QL_STEAMWORKS_EXPORT_STEAM_FRIENDS, QL_STEAMWORKS_EXPORT_STEAM_API_STEAM_FRIENDS )"
     )
-    assert load_block.index('QL_Steamworks_LoadSymbolAlias( (void **)&state.SteamApps, "SteamApps", "SteamAPI_SteamApps" )') < load_block.index(
-        'QL_Steamworks_LoadSymbol( (void **)&state.GetAuthSessionTicket, "SteamAPI_ISteamUser_GetAuthSessionTicket" )'
+    assert load_block.index("QL_Steamworks_LoadSymbolAlias( (void **)&state.SteamApps, QL_STEAMWORKS_EXPORT_STEAM_APPS, QL_STEAMWORKS_EXPORT_STEAM_API_STEAM_APPS )") < load_block.index(
+        "QL_Steamworks_LoadSymbol( (void **)&state.GetAuthSessionTicket, QL_STEAMWORKS_EXPORT_STEAM_API_ISTEAMUSER_GET_AUTH_SESSION_TICKET )"
     )
-    assert load_block.index('QL_Steamworks_LoadSymbol( (void **)&state.GetSteamID, "SteamAPI_ISteamUser_GetSteamID" )') < load_block.index(
-        'QL_Steamworks_LoadOptionalSymbol( (void **)&state.SteamGameServer, "SteamGameServer" );'
+    assert load_block.index("QL_Steamworks_LoadSymbol( (void **)&state.GetSteamID, QL_STEAMWORKS_EXPORT_STEAM_API_ISTEAMUSER_GET_STEAM_ID )") < load_block.index(
+        "QL_Steamworks_LoadOptionalSymbol( (void **)&state.SteamGameServer, QL_STEAMWORKS_EXPORT_STEAM_GAME_SERVER );"
     )
     assert "QL_Steamworks_LoadSymbol( target, retailName )" in load_alias_block
     assert "QL_Steamworks_LoadSymbol( target, sdkName )" in load_alias_block
@@ -8295,7 +8507,7 @@ def test_steamworks_modern_adapter_gaps_stay_explicit_until_owned() -> None:
         assert "SteamAPI_ISteamNetworkingMessages" not in source_text
         assert "SteamAPI_ISteamMatchmakingServers" not in source_text
 
-    assert 'QL_Steamworks_LoadOptionalSymbolAlias( (void **)&state.SteamMatchmakingServers, "SteamMatchmakingServers", "SteamAPI_SteamMatchmakingServers" );' in steamworks
+    assert "QL_Steamworks_LoadOptionalSymbolAlias( (void **)&state.SteamMatchmakingServers, QL_STEAMWORKS_EXPORT_STEAM_MATCHMAKING_SERVERS, QL_STEAMWORKS_EXPORT_STEAM_API_STEAM_MATCHMAKING_SERVERS );" in steamworks
 
     assert 'return QL_Steamworks_HasWebApiAuthTicketAdapter() ? "GetAuthTicketForWebApi" : "retail GetAuthSessionTicket";' in auth_api_label_block
     assert 'return QL_Steamworks_HasWebApiAuthTicketAdapter() ? "GetAuthTicketForWebApi adapter available" : "missing GetAuthTicketForWebApi adapter";' in auth_modern_gap_label_block
@@ -8370,12 +8582,15 @@ def test_legacy_p2p_read_boundary_round_366_is_pinned() -> None:
     assert "edx_4 = *(*SteamNetworking() + 8)" in hlil
     assert "(*(*SteamGameServerNetworking() + 4))(&var_424, 1)" in hlil
     assert "edx_6 = *(*SteamGameServerNetworking() + 8)" in hlil
-    assert "readPacket = (QL_SteamNetworking_ReadP2PPacketFn)vtable[2];" in client_read_block
-    assert "readPacket = (QL_SteamNetworking_ReadP2PPacketFn)vtable[2];" in server_read_block
-    assert "isAvailable = (QL_SteamNetworking_IsP2PPacketAvailableFn)vtable[1];" in client_available_block
-    assert "isAvailable = (QL_SteamNetworking_IsP2PPacketAvailableFn)vtable[1];" in server_available_block
-    assert "sendPacket = (QL_SteamNetworking_SendP2PPacketFn)vtable[0];" in client_send_block
-    assert "sendPacket = (QL_SteamNetworking_SendP2PPacketFn)vtable[0];" in server_send_block
+    assert "#define QL_STEAM_NETWORKING_SEND_P2P_PACKET_SLOT 0" in steamworks
+    assert "#define QL_STEAM_NETWORKING_IS_P2P_PACKET_AVAILABLE_SLOT 1" in steamworks
+    assert "#define QL_STEAM_NETWORKING_READ_P2P_PACKET_SLOT 2" in steamworks
+    assert "readPacket = (QL_SteamNetworking_ReadP2PPacketFn)vtable[QL_STEAM_NETWORKING_READ_P2P_PACKET_SLOT];" in client_read_block
+    assert "readPacket = (QL_SteamNetworking_ReadP2PPacketFn)vtable[QL_STEAM_NETWORKING_READ_P2P_PACKET_SLOT];" in server_read_block
+    assert "isAvailable = (QL_SteamNetworking_IsP2PPacketAvailableFn)vtable[QL_STEAM_NETWORKING_IS_P2P_PACKET_AVAILABLE_SLOT];" in client_available_block
+    assert "isAvailable = (QL_SteamNetworking_IsP2PPacketAvailableFn)vtable[QL_STEAM_NETWORKING_IS_P2P_PACKET_AVAILABLE_SLOT];" in server_available_block
+    assert "sendPacket = (QL_SteamNetworking_SendP2PPacketFn)vtable[QL_STEAM_NETWORKING_SEND_P2P_PACKET_SLOT];" in client_send_block
+    assert "sendPacket = (QL_SteamNetworking_SendP2PPacketFn)vtable[QL_STEAM_NETWORKING_SEND_P2P_PACKET_SLOT];" in server_send_block
     assert "return readPacket( networking, NULL, data, dataSize, outSize, outSteamId, channel );" in client_read_block
     assert "return readPacket( networking, NULL, data, dataSize, outSize, outSteamId, channel );" in server_read_block
     assert "*outSize = 0u;" in mock_client_read_block
@@ -9464,27 +9679,27 @@ def test_client_browser_lobby_social_shims_reconstruct_retail_qz_instance_dispat
     assert "(uint32_t)( parsedSteamId >> 32 )" in activate_overlay_block
     assert 'return "raw GetAllUGC integer filter";' in ugc_filter_label_block
     assert 'return "unpromoted GetAllUGC filter semantic";' in ugc_filter_semantic_gap_block
-    assert "queryHandle = createQueryFn( ugc, NULL, 1, 0, appId, appId, filter );" in request_all_ugc_query_block
+    assert "queryHandle = createQueryFn( ugc, NULL, QL_STEAM_UGC_GET_ALL_QUERY_TYPE, QL_STEAM_UGC_GET_ALL_MATCHING_TYPE, appId, appId, filter );" in request_all_ugc_query_block
     assert "if ( filter < 1u ) {" not in request_all_ugc_query_block
     assert "callHandle = sendQueryFn( ugc, NULL, queryHandleLow, queryHandleHigh );" in request_all_ugc_query_block
     assert "!QL_Steamworks_BindUGCQueryCallResult( (SteamAPICall_t)callHandle )" in request_all_ugc_query_block
     assert "QL_Steamworks_ReleaseQueryUGCRequest( queryHandle );" in request_all_ugc_query_block
-    assert "vtable[0x04 / 4]" in request_all_ugc_query_block
-    assert "vtable[0x0c / 4]" in request_all_ugc_query_block
-    assert "memcpy( outPublishedFileId, details, sizeof( *outPublishedFileId ) );" in query_ugc_result_block
+    assert "vtable[QL_STEAM_UGC_CREATE_QUERY_ALL_UGC_REQUEST_SLOT]" in request_all_ugc_query_block
+    assert "vtable[QL_STEAM_UGC_SEND_QUERY_UGC_REQUEST_SLOT]" in request_all_ugc_query_block
+    assert "memcpy( outPublishedFileId, details + QL_STEAM_UGC_DETAILS_PUBLISHED_FILE_ID_OFFSET, QL_STEAM_UGC_DETAILS_PUBLISHED_FILE_ID_SIZE );" in query_ugc_result_block
     assert "QL_Steamworks_CopySteamString( title, titleSize, (const char *)( details + QL_STEAM_UGC_DETAILS_TITLE_OFFSET ) );" in query_ugc_result_block
     assert "QL_Steamworks_CopySteamString( description, descriptionSize, (const char *)( details + QL_STEAM_UGC_DETAILS_DESCRIPTION_OFFSET ) );" in query_ugc_result_block
-    assert "vtable[0x10 / 4]" in query_ugc_result_block
-    assert "vtable[0x14 / 4]" in query_ugc_preview_block
-    assert "vtable[0x34 / 4]" in release_ugc_query_block
+    assert "vtable[QL_STEAM_UGC_GET_QUERY_UGC_RESULT_SLOT]" in query_ugc_result_block
+    assert "vtable[QL_STEAM_UGC_GET_QUERY_UGC_PREVIEW_URL_SLOT]" in query_ugc_preview_block
+    assert "vtable[QL_STEAM_UGC_RELEASE_QUERY_UGC_REQUEST_SLOT]" in release_ugc_query_block
     assert "typedef void (__fastcall *QL_SteamFriends_ActivateGameOverlayToWebPageFn)( void *self, void *unused, const char *url );" in activate_overlay_web_page_block
     assert 'if ( !url ) {' in activate_overlay_web_page_block
-    assert "fn = (QL_SteamFriends_ActivateGameOverlayToWebPageFn)vtable[0x78 / 4];" in activate_overlay_web_page_block
+    assert "fn = (QL_SteamFriends_ActivateGameOverlayToWebPageFn)vtable[QL_STEAM_FRIENDS_ACTIVATE_GAME_OVERLAY_TO_WEB_PAGE_SLOT];" in activate_overlay_web_page_block
     assert "fn( friends, NULL, url );" in activate_overlay_web_page_block
     assert 'if ( !dialog ) {' in platform_block
-    assert "vtable[0x40 / 4]" in invite_user_to_lobby_block
+    assert "vtable[QL_STEAM_MATCHMAKING_INVITE_USER_TO_LOBBY_SLOT]" in invite_user_to_lobby_block
     assert "return fn( matchmaking, NULL, lobbyIdLow, lobbyIdHigh, userIdLow, userIdHigh ) ? qtrue : qfalse;" in invite_user_to_lobby_block
-    assert "vtable[0xc4 / 4]" in invite_user_to_game_block
+    assert "vtable[QL_STEAM_FRIENDS_INVITE_USER_TO_GAME_SLOT]" in invite_user_to_game_block
     assert "return fn( friends, NULL, idLow, idHigh, connectString ) ? qtrue : qfalse;" in invite_user_to_game_block
     assert "OpenClipboard( NULL ) == 0" in win_set_clipboard_block
     assert "EmptyClipboard();" in win_set_clipboard_block
@@ -9551,8 +9766,8 @@ def test_client_browser_favorite_server_lane_reconstructs_retail_steam_matchmaki
     assert "if ( appId == 0u ) {" in steamworks_block
     assert "typedef int (__fastcall *QL_SteamMatchmaking_AddFavoriteGameFn)" in steamworks_block
     assert "typedef qboolean (__fastcall *QL_SteamMatchmaking_RemoveFavoriteGameFn)" in steamworks_block
-    assert "addFavoriteGameFn = (QL_SteamMatchmaking_AddFavoriteGameFn)vtable[0x08 / 4];" in steamworks_block
-    assert "removeFavoriteGameFn = (QL_SteamMatchmaking_RemoveFavoriteGameFn)vtable[0x0c / 4];" in steamworks_block
+    assert "addFavoriteGameFn = (QL_SteamMatchmaking_AddFavoriteGameFn)vtable[QL_STEAM_MATCHMAKING_ADD_FAVORITE_GAME_SLOT];" in steamworks_block
+    assert "removeFavoriteGameFn = (QL_SteamMatchmaking_RemoveFavoriteGameFn)vtable[QL_STEAM_MATCHMAKING_REMOVE_FAVORITE_GAME_SLOT];" in steamworks_block
     assert "lastPlayedTime = time( NULL );" in steamworks_block
     assert "serverPort," in steamworks_block
     assert "QL_STEAM_FAVORITE_FLAG_FAVORITE" in steamworks_block
@@ -9658,7 +9873,7 @@ def test_client_browser_server_shims_reconstruct_retail_server_browser_surface()
         "static void CL_SteamBrowser_NativePlayersRefreshCompleteImpl( clSteamNativeServerPlayersResponse_t *self )",
     )
     complete_native_detail_block = _extract_function_block(
-        cl_main, "static void CL_SteamBrowser_CompleteNativeDetailTerminal( clSteamNativeServerDetail_t *detail )"
+        cl_main, "static void CL_SteamBrowser_CompleteNativeDetailTerminal( clSteamNativeServerDetail_t *detail, uint32_t terminalChannel )"
     )
     release_native_detail_block = _extract_function_block(
         cl_main, "static void CL_SteamBrowser_ReleaseNativeDetailRequests( void )"
@@ -9825,17 +10040,17 @@ def test_client_browser_server_shims_reconstruct_retail_server_browser_surface()
     assert "static clSteamNativeServerDetail_t *cl_steamNativeDetails;" in cl_main
     assert "QL_Steamworks_ReadServerBrowserPingResponseForApp( serverDetails, detail->appId, &response )" in native_ping_responded_block
     assert "CL_SteamBrowser_PublishNativeServerResponse( &response );" in native_ping_responded_block
-    assert "CL_SteamBrowser_CompleteNativeDetailTerminal( detail );" in native_ping_responded_block
+    assert "CL_SteamBrowser_CompleteNativeDetailTerminal( detail, QL_STEAM_SERVER_BROWSER_DETAIL_TERMINAL_PING );" in native_ping_responded_block
     assert "QL_Steamworks_BuildServerBrowserRuleResponse( &detail->request.lifecycle.identity, rule, value, &response )" in native_rule_responded_block
     assert "CL_SteamBrowser_PublishNativeRuleResponse( &response );" in native_rule_responded_block
     assert "QL_Steamworks_BuildServerBrowserDetailEvent( &detail->request.lifecycle.identity, QL_STEAM_SERVER_BROWSER_DETAIL_RULES, QL_STEAM_SERVER_BROWSER_DETAIL_END, &event )" in native_rules_complete_block
     assert "CL_SteamBrowser_PublishNativeDetailEvent( &event, qtrue );" in native_rules_complete_block
-    assert "CL_SteamBrowser_CompleteNativeDetailTerminal( detail );" in native_rules_complete_block
+    assert "CL_SteamBrowser_CompleteNativeDetailTerminal( detail, QL_STEAM_SERVER_BROWSER_DETAIL_TERMINAL_RULES );" in native_rules_complete_block
     assert "QL_Steamworks_BuildServerBrowserPlayerResponse( &detail->request.lifecycle.identity, name, score, (int)timePlayed, &response )" in native_player_responded_block
     assert "CL_SteamBrowser_PublishNativePlayerResponse( &response );" in native_player_responded_block
     assert "QL_Steamworks_BuildServerBrowserDetailEvent( &detail->request.lifecycle.identity, QL_STEAM_SERVER_BROWSER_DETAIL_PLAYERS, QL_STEAM_SERVER_BROWSER_DETAIL_END, &event )" in native_players_complete_block
-    assert "CL_SteamBrowser_CompleteNativeDetailTerminal( detail );" in native_players_complete_block
-    assert "QL_Steamworks_CompleteServerBrowserDetailRequestCallback( &detail->request, &releaseReady )" in complete_native_detail_block
+    assert "CL_SteamBrowser_CompleteNativeDetailTerminal( detail, QL_STEAM_SERVER_BROWSER_DETAIL_TERMINAL_PLAYERS );" in native_players_complete_block
+    assert "QL_Steamworks_CompleteServerBrowserDetailRequestTerminal( &detail->request, terminalChannel, &releaseReady )" in complete_native_detail_block
     assert "CL_SteamBrowser_FreeNativeDetail( detail, qfalse );" in complete_native_detail_block
     assert "CL_SteamBrowser_FreeNativeDetail( cl_steamNativeDetails, qtrue );" in release_native_detail_block
     assert "CL_SteamBrowser_NativeListAvailable()" in begin_native_detail_block
@@ -9859,7 +10074,10 @@ def test_client_browser_server_shims_reconstruct_retail_server_browser_surface()
     assert "cl_steamBrowserState.refreshTimeoutTime = cls.realtime + CL_STEAM_BROWSER_REFRESH_TIMEOUT_MSEC;" not in refresh_list_block
     assert "return CL_Steam_RequestServers( cl_steamBrowserState.requestMode );" in refresh_list_block
     assert "if ( timedOut && !cl_steamBrowserState.nativeRefreshActive ) {" in complete_native_refresh_block
-    assert "QL_Steamworks_CompleteServerBrowserOwnerRequest( &cl_steamNativeBrowserOwner );" in complete_native_refresh_block
+    assert "if ( !QL_Steamworks_CompleteServerBrowserOwnerRequest( &cl_steamNativeBrowserOwner ) ) {" in complete_native_refresh_block
+    assert complete_native_refresh_block.index(
+        "if ( !QL_Steamworks_CompleteServerBrowserOwnerRequest( &cl_steamNativeBrowserOwner ) ) {"
+    ) < complete_native_refresh_block.index("cl_steamBrowserState.nativeRefreshActive = qfalse;")
     assert 'CL_Steam_PublishBrowserEvent( "servers.refresh.end", NULL );' in complete_native_refresh_block
 
     assert 'Com_sprintf( eventName, sizeof( eventName ), "servers.details.%i.failed", serverIndex );' in publish_server_failed_block
@@ -10077,16 +10295,16 @@ def test_steam_browser_request_mode_matrix_tracks_retail_hlil_and_source_fallbac
     assert "owner->request = request;" in begin_owner_block
     assert "if ( QL_Steamworks_ServerBrowserRequestModeUsesGamedirFilter( requestMode ) ) {" in request_list_block
     assert "case QL_STEAM_SERVER_BROWSER_LAN:" in request_list_block
-    assert "lanFn = (QL_SteamMatchmakingServers_RequestLANListFn)vtable[0x04 / 4];" in request_list_block
+    assert "lanFn = (QL_SteamMatchmakingServers_RequestLANListFn)vtable[QL_STEAM_MATCHMAKING_SERVERS_REQUEST_LAN_SERVER_LIST_SLOT];" in request_list_block
     assert "return lanFn( serverBrowser, NULL, appId, responseObject );" in request_list_block
-    assert "filteredFn = (QL_SteamMatchmakingServers_RequestFilteredListFn)vtable[0x08 / 4];" in request_list_block
-    assert "filteredFn = (QL_SteamMatchmakingServers_RequestFilteredListFn)vtable[0x0c / 4];" in request_list_block
-    assert "filteredFn = (QL_SteamMatchmakingServers_RequestFilteredListFn)vtable[0x10 / 4];" in request_list_block
-    assert "filteredFn = (QL_SteamMatchmakingServers_RequestFilteredListFn)vtable[0x00 / 4];" in request_list_block
+    assert "filteredFn = (QL_SteamMatchmakingServers_RequestFilteredListFn)vtable[QL_STEAM_MATCHMAKING_SERVERS_REQUEST_FRIENDS_SERVER_LIST_SLOT];" in request_list_block
+    assert "filteredFn = (QL_SteamMatchmakingServers_RequestFilteredListFn)vtable[QL_STEAM_MATCHMAKING_SERVERS_REQUEST_FAVORITES_SERVER_LIST_SLOT];" in request_list_block
+    assert "filteredFn = (QL_SteamMatchmakingServers_RequestFilteredListFn)vtable[QL_STEAM_MATCHMAKING_SERVERS_REQUEST_HISTORY_SERVER_LIST_SLOT];" in request_list_block
+    assert "filteredFn = (QL_SteamMatchmakingServers_RequestFilteredListFn)vtable[QL_STEAM_MATCHMAKING_SERVERS_REQUEST_INTERNET_SERVER_LIST_SLOT];" in request_list_block
     assert "if ( !filteredFn || !filterPtr ) {" in request_list_block
     assert "return filteredFn( serverBrowser, NULL, appId, &filterPtr, 1u, responseObject );" in request_list_block
-    assert "fn = (QL_SteamMatchmakingServers_RequestHandleFn)vtable[0x18 / 4];" in release_request_block
-    assert "fn = (QL_SteamMatchmakingServers_RequestHandleFn)vtable[0x24 / 4];" in refresh_request_block
+    assert "fn = (QL_SteamMatchmakingServers_RequestHandleFn)vtable[QL_STEAM_MATCHMAKING_SERVERS_RELEASE_REQUEST_SLOT];" in release_request_block
+    assert "fn = (QL_SteamMatchmakingServers_RequestHandleFn)vtable[QL_STEAM_MATCHMAKING_SERVERS_REFRESH_QUERY_SLOT];" in refresh_request_block
 
     for row in (
         "| `0` or default/out-of-range | internet | `0x00` | `gamedir=baseq3` | `AS_GLOBAL` | native-compatible source |",
@@ -10311,15 +10529,15 @@ def test_client_microtransaction_authorization_callback_tracks_retail_browser_pa
     assert "00465a19  return SteamAPI_RegisterCallback(result, 0x98)" in hlil_part02
 
     assert "#define QL_STEAM_CALLBACK_MICROTXN_AUTHORIZATION_RESPONSE 0x98" in steamworks
-    assert "QL_STEAMWORKS_STATIC_ASSERT_SIZE( ql_steam_size_microtxn_authorization_response_raw, ql_steam_microtxn_authorization_response_raw_t, 0x18 );" in steamworks
+    assert "QL_STEAMWORKS_STATIC_ASSERT_SIZE( ql_steam_size_microtxn_authorization_response_raw, ql_steam_microtxn_authorization_response_raw_t, QL_STEAM_CALLBACK_SIZE_MICROTXN_AUTHORIZATION_RESPONSE );" in steamworks
     assert "typedef struct {\n\tuint32_t appId;\n\tuint64_t orderId;\n\tqboolean authorized;\n} ql_steam_microtxn_authorization_response_raw_t;" in steamworks
     assert "event.appId = raw->appId;" in dispatch_block
     assert "event.orderId = raw->orderId;" in dispatch_block
     assert "event.authorized = raw->authorized ? qtrue : qfalse;" in dispatch_block
     assert "callbackState->bindings.onAuthorizationResponse( callbackState->bindings.context, &event );" in dispatch_block
     assert "QL_STEAM_CALLBACK_MICROTXN_AUTHORIZATION_RESPONSE" in register_micro_block
-    assert "sizeof( ql_steam_microtxn_authorization_response_raw_t )" in register_micro_block
-    assert "QL_Steamworks_PrepareCallbackObject( &callbackState->authorizationResponse, QL_STEAM_CALLBACK_MICROTXN_AUTHORIZATION_RESPONSE, sizeof( ql_steam_microtxn_authorization_response_raw_t ), qfalse, callbackState, QL_Steamworks_DispatchMicroAuthorizationResponse, NULL );" in register_micro_block
+    assert "QL_STEAM_CALLBACK_SIZE_MICROTXN_AUTHORIZATION_RESPONSE" in register_micro_block
+    assert "QL_Steamworks_PrepareCallbackObject( &callbackState->authorizationResponse, QL_STEAM_CALLBACK_MICROTXN_AUTHORIZATION_RESPONSE, QL_STEAM_CALLBACK_SIZE_MICROTXN_AUTHORIZATION_RESPONSE, qfalse, callbackState, QL_Steamworks_DispatchMicroAuthorizationResponse, NULL );" in register_micro_block
     assert "QL_Steamworks_RegisterCallbackObject( &callbackState->authorizationResponse )" in register_micro_block
     assert "microBindings.onAuthorizationResponse = CL_Steam_Micro_OnAuthorizationResponse;" in init_micro_block
     assert "QL_Steamworks_RegisterMicroCallbacks( &microBindings )" in init_micro_block
@@ -10592,7 +10810,7 @@ def test_steam_datasource_lifecycle_callback_boundary_tracks_retail_hlil() -> No
         "CL_ClearSteamResourceCache( qfalse );"
     )
 
-    assert "QL_Steamworks_PrepareCallbackObject( &callbackState->avatarImageLoaded, QL_STEAM_CALLBACK_AVATAR_IMAGE_LOADED, sizeof( ql_steam_avatar_image_loaded_raw_t ), qfalse, callbackState, QL_Steamworks_DispatchAvatarImageLoaded, NULL );" in platform_register_block
+    assert "QL_Steamworks_PrepareCallbackObject( &callbackState->avatarImageLoaded, QL_STEAM_CALLBACK_AVATAR_IMAGE_LOADED, QL_STEAM_CALLBACK_SIZE_AVATAR_IMAGE_LOADED, qfalse, callbackState, QL_Steamworks_DispatchAvatarImageLoaded, NULL );" in platform_register_block
     assert "QL_Steamworks_RegisterCallbackObject( &callbackState->avatarImageLoaded )" in platform_register_block
     assert "callbackState->registered = qtrue;" in platform_register_block
     assert "QL_Steamworks_UnregisterCallbackObject( &callbackState->avatarImageLoaded );" in platform_unregister_block
@@ -10869,7 +11087,7 @@ def test_client_overlay_commands_reconstruct_retail_steam_surface() -> None:
     assert 'Cmd_AddCommand ("clientfriendinvite", CL_Steam_OverlayCommand_f );' in init_block
     assert 'Cmd_RemoveCommand ("clientviewprofile");' not in shutdown_block
     assert 'Cmd_RemoveCommand ("clientfriendinvite");' not in shutdown_block
-    assert "vtable[0x74 / 4]" in platform_block
+    assert "vtable[QL_STEAM_FRIENDS_ACTIVATE_GAME_OVERLAY_TO_USER_SLOT]" in platform_block
     assert "QL_Steamworks_CombineIdentityWords( idLow, idHigh )" in platform_block
 
 
@@ -11032,12 +11250,12 @@ def test_steam_social_overlay_command_and_browser_handoff_tracks_round_613() -> 
 
     assert "typedef void (__fastcall *QL_SteamFriends_ActivateGameOverlayToUserFn)( void *self, void *unused, const char *dialog, CSteamID steamId );" in platform_user_block
     assert 'if ( !dialog ) {' in platform_user_block
-    assert "fn = (QL_SteamFriends_ActivateGameOverlayToUserFn)vtable[0x74 / 4];" in platform_user_block
+    assert "fn = (QL_SteamFriends_ActivateGameOverlayToUserFn)vtable[QL_STEAM_FRIENDS_ACTIVATE_GAME_OVERLAY_TO_USER_SLOT];" in platform_user_block
     assert "fn( friends, NULL, dialog, QL_Steamworks_CombineIdentityWords( idLow, idHigh ) );" in platform_user_block
     assert "if ( !idLow && !idHigh ) {" not in platform_user_block
     assert "typedef void (__fastcall *QL_SteamFriends_ActivateGameOverlayToWebPageFn)( void *self, void *unused, const char *url );" in platform_web_page_block
     assert 'if ( !url ) {' in platform_web_page_block
-    assert "fn = (QL_SteamFriends_ActivateGameOverlayToWebPageFn)vtable[0x78 / 4];" in platform_web_page_block
+    assert "fn = (QL_SteamFriends_ActivateGameOverlayToWebPageFn)vtable[QL_STEAM_FRIENDS_ACTIVATE_GAME_OVERLAY_TO_WEB_PAGE_SLOT];" in platform_web_page_block
     assert "fn( friends, NULL, url );" in platform_web_page_block
 
     assert "# Quake Live Steam Mapping Round 613: Social Overlay Command And Browser Handoff" in round_note
@@ -11134,18 +11352,24 @@ def test_steam_user_voice_wrapper_round_367_is_pinned() -> None:
     assert "(*(*SteamUser() + 0x28))(1, 0xe2c218, 0x4000, &data_e2c210, 0, 0, 0, 0, 0)" in hlil
     assert "edx_5 = *(*SteamUser() + 0x2c)" in hlil
     assert "(*(*SteamUser() + 0x30))()" in hlil
-    assert "vtable[0x1c / 4]" in start_block
-    assert "vtable[0x20 / 4]" in stop_block
-    assert "vtable[0x28 / 4]" in get_voice_block
-    assert "vtable[0x2c / 4]" in decompress_block
-    assert "vtable[0x30 / 4]" in optimal_rate_block
+    assert "#define QL_STEAM_USER_START_VOICE_RECORDING_SLOT (0x1c / 4)" in steamworks
+    assert "#define QL_STEAM_USER_STOP_VOICE_RECORDING_SLOT (0x20 / 4)" in steamworks
+    assert "#define QL_STEAM_USER_GET_VOICE_SLOT (0x28 / 4)" in steamworks
+    assert "#define QL_STEAM_USER_DECOMPRESS_VOICE_SLOT (0x2c / 4)" in steamworks
+    assert "#define QL_STEAM_USER_GET_VOICE_OPTIMAL_SAMPLE_RATE_SLOT (0x30 / 4)" in steamworks
+    assert "vtable[QL_STEAM_USER_START_VOICE_RECORDING_SLOT]" in start_block
+    assert "vtable[QL_STEAM_USER_STOP_VOICE_RECORDING_SLOT]" in stop_block
+    assert "vtable[QL_STEAM_USER_GET_VOICE_SLOT]" in get_voice_block
+    assert "vtable[QL_STEAM_USER_DECOMPRESS_VOICE_SLOT]" in decompress_block
+    assert "vtable[QL_STEAM_USER_GET_VOICE_OPTIMAL_SAMPLE_RATE_SLOT]" in optimal_rate_block
     assert "result = fn( user, NULL, qtrue, data, dataSize, outSize, qfalse, NULL, 0u, NULL, 0u );" in get_voice_block
     assert "result = fn( user, NULL, compressedData, compressedSize, data, dataSize, outSize, sampleRate );" in decompress_block
-    assert "vtable[0x1c / 4] = QLR_SteamUser_StartVoiceRecording;" in mock_user_block
-    assert "vtable[0x20 / 4] = QLR_SteamUser_StopVoiceRecording;" in mock_user_block
-    assert "vtable[0x28 / 4] = QLR_SteamUser_GetVoice;" in mock_user_block
-    assert "vtable[0x2c / 4] = QLR_SteamUser_DecompressVoice;" in mock_user_block
-    assert "vtable[0x30 / 4] = QLR_SteamUser_GetVoiceOptimalSampleRate;" in mock_user_block
+    assert "vtable[QLR_STEAM_USER_START_VOICE_RECORDING_SLOT] = QLR_SteamUser_StartVoiceRecording;" in mock_user_block
+    assert "vtable[QLR_STEAM_USER_STOP_VOICE_RECORDING_SLOT] = QLR_SteamUser_StopVoiceRecording;" in mock_user_block
+    assert "vtable[QLR_STEAM_USER_GET_VOICE_SLOT] = QLR_SteamUser_GetVoice;" in mock_user_block
+    assert "vtable[QLR_STEAM_USER_DECOMPRESS_VOICE_SLOT] = QLR_SteamUser_DecompressVoice;" in mock_user_block
+    assert "vtable[QLR_STEAM_USER_GET_VOICE_OPTIMAL_SAMPLE_RATE_SLOT] = QLR_SteamUser_GetVoiceOptimalSampleRate;" in mock_user_block
+    assert "vtable[0x" not in mock_user_block
     assert "qlr_mock_state.voice_last_want_compressed = wantCompressed;" in mock_get_voice_block
     assert "qlr_mock_state.voice_last_want_uncompressed = wantUncompressed;" in mock_get_voice_block
     assert "*outCompressedBytes = 0u;" in mock_get_voice_block
@@ -11182,9 +11406,10 @@ def test_steam_friends_voice_speaking_round_368_is_pinned() -> None:
     assert "(*(esi_1 + 0x6c))(*eax_4, eax_4[1], 1)" in hlil
     assert "(*(esi_1 + 0x6c))(*eax_5, eax_5[1], 0)" in hlil
     assert "typedef void (__fastcall *QL_SteamFriends_SetInGameVoiceSpeakingFn)( void *self, void *unused, CSteamID steamId, int speaking );" in platform_block
-    assert "fn = (QL_SteamFriends_SetInGameVoiceSpeakingFn)vtable[0x6c / 4];" in platform_block
+    assert "fn = (QL_SteamFriends_SetInGameVoiceSpeakingFn)vtable[QL_STEAM_FRIENDS_SET_IN_GAME_VOICE_SPEAKING_SLOT];" in platform_block
     assert "fn( friends, NULL, QL_Steamworks_CombineIdentityWords( idLow, idHigh ), speaking ? 1 : 0 );" in platform_block
-    assert "vtable[0x6c / 4] = QLR_SteamFriends_SetInGameVoiceSpeaking;" in mock_friends_block
+    assert "vtable[QLR_STEAM_FRIENDS_SET_IN_GAME_VOICE_SPEAKING_SLOT] = QLR_SteamFriends_SetInGameVoiceSpeaking;" in mock_friends_block
+    assert "vtable[0x6c / 4]" not in mock_friends_block
     assert "qlr_mock_state.friend_voice_speaking_calls++;" in mock_speaking_block
     assert "qlr_mock_state.friend_voice_last_steam_id = steamId.value;" in mock_speaking_block
     assert "qlr_mock_state.friend_voice_last_speaking = speaking;" in mock_speaking_block
@@ -11235,20 +11460,22 @@ def test_steam_friends_enumeration_round_372_is_pinned() -> None:
     assert "00433663                  int32_t edx_13 = *(*SteamFriends() + 0x1c)" in hlil
     assert "004338be                  int32_t edx_22 = *(*SteamFriends() + 0xb4)" in hlil
     assert "00433a00                  int32_t edx_26 = *(*SteamFriends() + 0x20)" in hlil
-    assert "fn = (QL_SteamFriends_GetFriendCountFn)vtable[0x0c / 4];" in count_block
+    assert "fn = (QL_SteamFriends_GetFriendCountFn)vtable[QL_STEAM_FRIENDS_GET_FRIEND_COUNT_SLOT];" in count_block
     assert "return fn( friends, NULL, flags );" in count_block
-    assert "fn = (QL_SteamFriends_GetFriendByIndexFn)vtable[0x10 / 4];" in by_index_block
+    assert "fn = (QL_SteamFriends_GetFriendByIndexFn)vtable[QL_STEAM_FRIENDS_GET_FRIEND_BY_INDEX_SLOT];" in by_index_block
     assert "steamId.value = 0ull;" in by_index_block
     assert "if ( steamId.value == 0ull ) {" in by_index_block
-    assert "getRelationshipFn = (QL_SteamFriends_GetFriendRelationshipFn)vtable[0x14 / 4];" in summary_block
-    assert "getPersonaStateFn = (QL_SteamFriends_GetFriendPersonaStateFn)vtable[0x18 / 4];" in summary_block
-    assert "getFriendNameFn = (QL_SteamFriends_GetFriendPersonaNameFn)vtable[0x1c / 4];" in summary_block
-    assert "getFriendGamePlayedFn = (QL_SteamFriends_GetFriendGamePlayedFn)vtable[0x20 / 4];" in summary_block
-    assert "getPlayerNicknameFn = (QL_SteamFriends_GetPlayerNicknameFn)vtable[0x2c / 4];" in summary_block
-    assert "getFriendRichPresenceFn = (QL_SteamFriends_GetFriendRichPresenceFn)vtable[0xb4 / 4];" in summary_block
-    assert "fn = (QL_SteamFriends_GetFriendPersonaNameFn)vtable[0x1c / 4];" in persona_block
-    assert "vtable[0x0c / 4] = QLR_SteamFriends_GetFriendCount;" in mock_friends_block
-    assert "vtable[0x10 / 4] = QLR_SteamFriends_GetFriendByIndex;" in mock_friends_block
+    assert "getRelationshipFn = (QL_SteamFriends_GetFriendRelationshipFn)vtable[QL_STEAM_FRIENDS_GET_FRIEND_RELATIONSHIP_SLOT];" in summary_block
+    assert "getPersonaStateFn = (QL_SteamFriends_GetFriendPersonaStateFn)vtable[QL_STEAM_FRIENDS_GET_FRIEND_PERSONA_STATE_SLOT];" in summary_block
+    assert "getFriendNameFn = (QL_SteamFriends_GetFriendPersonaNameFn)vtable[QL_STEAM_FRIENDS_GET_FRIEND_PERSONA_NAME_SLOT];" in summary_block
+    assert "getFriendGamePlayedFn = (QL_SteamFriends_GetFriendGamePlayedFn)vtable[QL_STEAM_FRIENDS_GET_FRIEND_GAME_PLAYED_SLOT];" in summary_block
+    assert "getPlayerNicknameFn = (QL_SteamFriends_GetPlayerNicknameFn)vtable[QL_STEAM_FRIENDS_GET_PLAYER_NICKNAME_SLOT];" in summary_block
+    assert "getFriendRichPresenceFn = (QL_SteamFriends_GetFriendRichPresenceFn)vtable[QL_STEAM_FRIENDS_GET_FRIEND_RICH_PRESENCE_SLOT];" in summary_block
+    assert "fn = (QL_SteamFriends_GetFriendPersonaNameFn)vtable[QL_STEAM_FRIENDS_GET_FRIEND_PERSONA_NAME_SLOT];" in persona_block
+    assert "vtable[QLR_STEAM_FRIENDS_GET_FRIEND_COUNT_SLOT] = QLR_SteamFriends_GetFriendCount;" in mock_friends_block
+    assert "vtable[QLR_STEAM_FRIENDS_GET_FRIEND_BY_INDEX_SLOT] = QLR_SteamFriends_GetFriendByIndex;" in mock_friends_block
+    assert "vtable[0x0c / 4]" not in mock_friends_block
+    assert "vtable[0x10 / 4]" not in mock_friends_block
     assert "qlr_mock_state.friend_count_calls++;" in mock_count_block
     assert "qlr_mock_state.friend_last_count_flags = flags;" in mock_count_block
     assert "outSteamId->value = 0ull;" in mock_by_index_block
@@ -11312,22 +11539,26 @@ def test_steam_client_identity_utils_round_373_is_pinned() -> None:
     assert "00460dd6  int32_t eax_2 = (*(*SteamUtils() + 0x24))()" in hlil_part02
     assert "QL_Steamworks_GetAppID()" not in init_block
     assert 'Com_Printf( "Steamworks: SteamAPI_Init succeeded\\n" );' in init_block
-    assert "fn = (QL_SteamFriends_GetPersonaNameFn)vtable[0];" in persona_block
+    assert "fn = (QL_SteamFriends_GetPersonaNameFn)vtable[QL_STEAM_FRIENDS_GET_PERSONA_NAME_SLOT];" in persona_block
     assert "Q_strncpyz( buffer, personaName, bufferSize );" in persona_block
-    assert "fn = (QL_SteamUtils_GetIPCountryFn)vtable[0x10 / 4];" in country_block
+    assert "fn = (QL_SteamUtils_GetIPCountryFn)vtable[QL_STEAM_UTILS_GET_IP_COUNTRY_SLOT];" in country_block
     assert "Q_strncpyz( buffer, country, bufferSize );" in country_block
-    assert "fn = (QL_SteamUtils_GetAppIDFn)vtable[0x24 / 4];" in app_id_block
+    assert "fn = (QL_SteamUtils_GetAppIDFn)vtable[QL_STEAM_UTILS_GET_APP_ID_SLOT];" in app_id_block
     assert "return fn( utils, NULL );" in app_id_block
-    assert "fn = (QL_SteamUser_GetSteamIDFn)vtable[0x08 / 4];" in user_id_block
+    assert "fn = (QL_SteamUser_GetSteamIDFn)vtable[QL_STEAM_USER_GET_STEAM_ID_SLOT];" in user_id_block
     assert "steamId.value = 0ull;" in user_id_block
     assert "*outIdLow = (uint32_t)( steamId.value & 0xffffffffu );" in user_id_block
     assert "qboolean QL_Steamworks_IsUserLoggedOn( void )" in steamworks
-    assert "fn = (QL_SteamUser_BLoggedOnFn)vtable[0x04 / 4];" in steamworks
-    assert "vtable[0] = QLR_SteamFriends_GetPersonaName;" in mock_friends_block
-    assert "vtable[0x10 / 4] = QLR_SteamUtils_GetIPCountry;" in mock_utils_block
-    assert "vtable[0x24 / 4] = QLR_SteamUtils_GetAppID;" in mock_utils_block
-    assert "vtable[0x04 / 4] = QLR_SteamUser_BLoggedOn;" in mock_user_block
-    assert "vtable[0x08 / 4] = QLR_SteamUser_GetSteamID;" in mock_user_block
+    assert "fn = (QL_SteamUser_BLoggedOnFn)vtable[QL_STEAM_USER_BLOGGED_ON_SLOT];" in steamworks
+    assert "vtable[QLR_STEAM_FRIENDS_GET_PERSONA_NAME_SLOT] = QLR_SteamFriends_GetPersonaName;" in mock_friends_block
+    assert "vtable[QLR_STEAM_UTILS_GET_IP_COUNTRY_SLOT] = QLR_SteamUtils_GetIPCountry;" in mock_utils_block
+    assert "vtable[QLR_STEAM_UTILS_GET_APP_ID_SLOT] = QLR_SteamUtils_GetAppID;" in mock_utils_block
+    assert "vtable[0] = QLR_SteamFriends_GetPersonaName;" not in mock_friends_block
+    assert "vtable[0x10 / 4]" not in mock_utils_block
+    assert "vtable[0x24 / 4]" not in mock_utils_block
+    assert "vtable[QLR_STEAM_USER_BLOGGED_ON_SLOT] = QLR_SteamUser_BLoggedOn;" in mock_user_block
+    assert "vtable[QLR_STEAM_USER_GET_STEAM_ID_SLOT] = QLR_SteamUser_GetSteamID;" in mock_user_block
+    assert "vtable[0x" not in mock_user_block
     assert "qlr_mock_state.persona_name_calls++;" in mock_persona_block
     assert "qlr_mock_state.ip_country_calls++;" in mock_country_block
     assert "qlr_mock_state.app_id_calls++;" in mock_app_id_block
@@ -11367,9 +11598,10 @@ def test_steam_clear_stats_round_375_is_pinned() -> None:
     assert "00460531  return (*(*SteamUserStats() + 0x54))(1)" in hlil
     assert "typedef int (__fastcall *QL_SteamUserStats_ResetAllStatsFn)( void *self, void *unused, int achievementsToo );" in clear_stats_block
     assert "if ( !state.initialised || !state.SteamUserStats ) {" in clear_stats_block
-    assert "fn = (QL_SteamUserStats_ResetAllStatsFn)vtable[0x54 / 4];" in clear_stats_block
+    assert "fn = (QL_SteamUserStats_ResetAllStatsFn)vtable[QL_STEAM_USERSTATS_RESET_ALL_STATS_SLOT];" in clear_stats_block
     assert "return fn( userStats, NULL, achievementsToo ? 1 : 0 ) ? qtrue : qfalse;" in clear_stats_block
-    assert "vtable[0x54 / 4] = QLR_SteamUserStats_ResetAllStats;" in mock_user_stats_block
+    assert "vtable[QLR_STEAM_USERSTATS_RESET_ALL_STATS_SLOT] = QLR_SteamUserStats_ResetAllStats;" in mock_user_stats_block
+    assert "vtable[0x" not in mock_user_stats_block
     assert "qlr_mock_state.user_stats_reset_calls++;" in mock_reset_block
     assert "qlr_mock_state.user_stats_last_reset_achievements = achievementsToo;" in mock_reset_block
     assert "return qlr_mock_state.reset_user_stats_result;" in mock_reset_block
@@ -11427,16 +11659,17 @@ def test_steam_user_stats_readback_round_382_is_pinned() -> None:
     assert "`QL_Steamworks_GetUserStatInt(...)`" in round_188
     assert "`QL_Steamworks_GetUserAchievement(...)`" in round_188
     assert "`QL_Steamworks_GetAchievementDisplayAttribute(...)`" in round_188
-    assert "fn = (QL_SteamUserStats_GetUserStatIntFn)vtable[0x48 / 4];" in user_stat_block
+    assert "fn = (QL_SteamUserStats_GetUserStatIntFn)vtable[QL_STEAM_USERSTATS_GET_USER_STAT_INT_SLOT];" in user_stat_block
     assert "return fn( userStats, NULL, idLow, idHigh, name, outValue ) ? qtrue : qfalse;" in user_stat_block
-    assert "fn = (QL_SteamUserStats_GetUserAchievementFn)vtable[0x50 / 4];" in user_achievement_block
+    assert "fn = (QL_SteamUserStats_GetUserAchievementFn)vtable[QL_STEAM_USERSTATS_GET_USER_ACHIEVEMENT_SLOT];" in user_achievement_block
     assert "*outAchieved = achieved ? qtrue : qfalse;" in user_achievement_block
     assert "*outUnlockTime = unlockTime;" in user_achievement_block
-    assert "fn = (QL_SteamUserStats_GetAchievementDisplayAttributeFn)vtable[0x30 / 4];" in display_attribute_block
+    assert "fn = (QL_SteamUserStats_GetAchievementDisplayAttributeFn)vtable[QL_STEAM_USERSTATS_GET_ACHIEVEMENT_DISPLAY_ATTRIBUTE_SLOT];" in display_attribute_block
     assert 'return value ? value : "";' in display_attribute_block
-    assert "vtable[0x30 / 4] = QLR_SteamUserStats_GetAchievementDisplayAttribute;" in mock_user_stats_block
-    assert "vtable[0x48 / 4] = QLR_SteamUserStats_GetUserStatInt;" in mock_user_stats_block
-    assert "vtable[0x50 / 4] = QLR_SteamUserStats_GetUserAchievement;" in mock_user_stats_block
+    assert "vtable[QLR_STEAM_USERSTATS_GET_ACHIEVEMENT_DISPLAY_ATTRIBUTE_SLOT] = QLR_SteamUserStats_GetAchievementDisplayAttribute;" in mock_user_stats_block
+    assert "vtable[QLR_STEAM_USERSTATS_GET_USER_STAT_INT_SLOT] = QLR_SteamUserStats_GetUserStatInt;" in mock_user_stats_block
+    assert "vtable[QLR_STEAM_USERSTATS_GET_USER_ACHIEVEMENT_SLOT] = QLR_SteamUserStats_GetUserAchievement;" in mock_user_stats_block
+    assert "vtable[0x" not in mock_user_stats_block
     assert "qlr_mock_state.user_stats_get_int_calls++;" in mock_stat_block
     assert "QLR_SteamUserStats_CaptureReadback( idLow, idHigh, name );" in mock_stat_block
     assert "qlr_mock_state.user_stats_get_achievement_calls++;" in mock_achievement_block
@@ -11526,7 +11759,7 @@ def test_steam_user_stats_float_descriptor_round_383_is_pinned() -> None:
     assert stat_rows[-1] == ("total_deaths", 0)
     assert all(flag == 0 for _, flag in stat_rows)
     assert "qboolean QL_Steamworks_GetUserStatFloat( uint32_t idLow, uint32_t idHigh, const char *name, float *outValue );" in steamworks_h
-    assert "fn = (QL_SteamUserStats_GetUserStatFloatFn)vtable[0x44 / 4];" in float_block
+    assert "fn = (QL_SteamUserStats_GetUserStatFloatFn)vtable[QL_STEAM_USERSTATS_GET_USER_STAT_FLOAT_SLOT];" in float_block
     assert "return fn( userStats, NULL, idLow, idHigh, name, outValue ) ? qtrue : qfalse;" in float_block
     assert "static const clSteamStatDescriptor_t s_clSteamStatDescriptors[CL_STEAM_STATS_FIELD_COUNT] = {" in cl_main
     assert '{ "medal_accuracy", qfalse },' in cl_main
@@ -11534,7 +11767,8 @@ def test_steam_user_stats_float_descriptor_round_383_is_pinned() -> None:
     assert "QL_Steamworks_GetUserStatFloat( idLow, idHigh, name, &floatValue );" in stats_json_block
     assert '"%s\\"%s\\":%g"' in stats_json_block
     assert "QL_Steamworks_GetUserStatInt( idLow, idHigh, name, &intValue );" in stats_json_block
-    assert "vtable[0x44 / 4] = QLR_SteamUserStats_GetUserStatFloat;" in mock_user_stats_block
+    assert "vtable[QLR_STEAM_USERSTATS_GET_USER_STAT_FLOAT_SLOT] = QLR_SteamUserStats_GetUserStatFloat;" in mock_user_stats_block
+    assert "vtable[0x" not in mock_user_stats_block
     assert "qlr_mock_state.user_stats_get_float_calls++;" in mock_float_block
     assert "*outValue = qlr_mock_state.user_stats_float_value;" in mock_float_block
     assert "QLR_Steamworks_GetUserStatFloat" in harness_py
@@ -11873,8 +12107,8 @@ def test_steam_invite_callback_connect_handoff_tracks_round_614() -> None:
     assert "char server[QL_STEAM_SERVER_LENGTH];\n\tchar password[QL_STEAM_PASSWORD_LENGTH];" in platform_steamworks_h
     assert "char connect[QL_STEAM_COMMAND_LENGTH];" in platform_steamworks_c
     assert "char server[64];\n\tchar password[64];" in platform_steamworks_c
-    assert "QL_STEAMWORKS_STATIC_ASSERT_SIZE( ql_steam_size_game_rich_presence_join_requested_raw, ql_steam_game_rich_presence_join_requested_raw_t, 0x108 );" in platform_steamworks_c
-    assert "QL_STEAMWORKS_STATIC_ASSERT_SIZE( ql_steam_size_game_server_change_requested_raw, ql_steam_game_server_change_requested_raw_t, 0x80 );" in platform_steamworks_c
+    assert "QL_STEAMWORKS_STATIC_ASSERT_SIZE( ql_steam_size_game_rich_presence_join_requested_raw, ql_steam_game_rich_presence_join_requested_raw_t, QL_STEAM_CALLBACK_SIZE_GAME_RICH_PRESENCE_JOIN_REQUESTED );" in platform_steamworks_c
+    assert "QL_STEAMWORKS_STATIC_ASSERT_SIZE( ql_steam_size_game_server_change_requested_raw, ql_steam_game_server_change_requested_raw_t, QL_STEAM_CALLBACK_SIZE_GAME_SERVER_CHANGE_REQUESTED );" in platform_steamworks_c
     assert "#define QL_STEAM_CALLBACK_RICH_PRESENCE_JOIN_REQUESTED 0x151" in platform_steamworks_c
     assert "#define QL_STEAM_CALLBACK_GAME_SERVER_CHANGE_REQUESTED 0x14c" in platform_steamworks_c
 
@@ -11885,8 +12119,8 @@ def test_steam_invite_callback_connect_handoff_tracks_round_614() -> None:
     assert "QL_Steamworks_CopySteamString( event.server, sizeof( event.server ), raw->server );" in platform_server_change_dispatch_block
     assert "QL_Steamworks_CopySteamString( event.password, sizeof( event.password ), raw->password );" in platform_server_change_dispatch_block
     assert "callbackState->bindings.onGameServerChangeRequested( callbackState->bindings.context, &event );" in platform_server_change_dispatch_block
-    assert "QL_Steamworks_PrepareCallbackObject( &callbackState->richPresenceJoinRequested, QL_STEAM_CALLBACK_RICH_PRESENCE_JOIN_REQUESTED, sizeof( ql_steam_game_rich_presence_join_requested_raw_t ), qfalse" in register_client_callbacks_block
-    assert "QL_Steamworks_PrepareCallbackObject( &callbackState->gameServerChangeRequested, QL_STEAM_CALLBACK_GAME_SERVER_CHANGE_REQUESTED, sizeof( ql_steam_game_server_change_requested_raw_t ), qfalse" in register_client_callbacks_block
+    assert "QL_Steamworks_PrepareCallbackObject( &callbackState->richPresenceJoinRequested, QL_STEAM_CALLBACK_RICH_PRESENCE_JOIN_REQUESTED, QL_STEAM_CALLBACK_SIZE_GAME_RICH_PRESENCE_JOIN_REQUESTED, qfalse" in register_client_callbacks_block
+    assert "QL_Steamworks_PrepareCallbackObject( &callbackState->gameServerChangeRequested, QL_STEAM_CALLBACK_GAME_SERVER_CHANGE_REQUESTED, QL_STEAM_CALLBACK_SIZE_GAME_SERVER_CHANGE_REQUESTED, qfalse" in register_client_callbacks_block
     assert register_client_callbacks_block.index("richPresenceJoinRequested") < register_client_callbacks_block.index("gameServerChangeRequested")
 
     assert "clientBindings.onRichPresenceJoinRequested = CL_Steam_Client_OnRichPresenceJoinRequested;" in steam_callbacks_init_block
@@ -11948,8 +12182,8 @@ def test_client_stats_callback_lane_stays_explicit() -> None:
     assert "CL_GetStatsServiceProviderLabel()," in callback_log_block
     assert "CL_GetStatsServicePolicyLabel()" in callback_log_block
     assert "#define CL_STEAM_BROWSER_EVENT_PAYLOAD_LENGTH 65536" in cl_main
-    assert "#define CL_STEAM_STATS_FIELD_COUNT 88" in cl_main
-    assert "#define CL_STEAM_ACHIEVEMENT_COUNT 59" in cl_main
+    assert "#define CL_STEAM_STATS_FIELD_COUNT 0x58" in cl_main
+    assert "#define CL_STEAM_ACHIEVEMENT_COUNT 0x3b" in cl_main
     assert "typedef struct clSteamStatDescriptor_s {" in cl_main
     assert "static const clSteamStatDescriptor_t s_clSteamStatDescriptors[CL_STEAM_STATS_FIELD_COUNT] = {" in cl_main
     assert '{ "medal_accuracy", qfalse },' in cl_main
@@ -12294,7 +12528,7 @@ def test_client_main_menu_presence_seed_reconstructs_retail_bootstrap_status() -
     assert steam_client_init_block.index("if ( CL_Steam_ShouldRegisterStatsClear() ) {") < steam_client_init_block.index("CL_Steam_SetMainMenuRichPresence();")
     assert 'Com_Printf( "Steam API initialized.\\n" );' in steam_client_init_block
     assert steam_client_init_block.index("CL_Steam_SetMainMenuRichPresence();") < steam_client_init_block.index('Com_Printf( "Steam API initialized.\\n" );')
-    assert "vtable[0xac / 4]" in platform_block
+    assert "vtable[QL_STEAM_FRIENDS_SET_RICH_PRESENCE_SLOT]" in platform_block
     assert "return fn( friends, NULL, key, value ) ? qtrue : qfalse;" in platform_block
 
 
@@ -12557,11 +12791,11 @@ def test_steam_identity_bootstrap_persona_country_lifecycle_tracks_round_611() -
 
     assert "if ( buffer && bufferSize > 0 ) {" in platform_persona_block
     assert "if ( !buffer || bufferSize == 0 || !state.initialised || !state.SteamFriends ) {" in platform_persona_block
-    assert "fn = (QL_SteamFriends_GetPersonaNameFn)vtable[0];" in platform_persona_block
+    assert "fn = (QL_SteamFriends_GetPersonaNameFn)vtable[QL_STEAM_FRIENDS_GET_PERSONA_NAME_SLOT];" in platform_persona_block
     assert "personaName = fn( friends, NULL );" in platform_persona_block
     assert "Q_strncpyz( buffer, personaName, bufferSize );" in platform_persona_block
     assert "if ( !buffer || bufferSize == 0 || !state.initialised || !state.SteamUtils ) {" in platform_country_block
-    assert "fn = (QL_SteamUtils_GetIPCountryFn)vtable[0x10 / 4];" in platform_country_block
+    assert "fn = (QL_SteamUtils_GetIPCountryFn)vtable[QL_STEAM_UTILS_GET_IP_COUNTRY_SLOT];" in platform_country_block
     assert "country = fn( utils, NULL );" in platform_country_block
     assert "Q_strncpyz( buffer, country, bufferSize );" in platform_country_block
 
@@ -12878,7 +13112,7 @@ def test_server_game_server_wrappers_reconstruct_mapped_server_slots() -> None:
     assert "00465e18  (*(*SteamGameServer() + 0x64))(&result)" in hlil_part02
     assert 'return "legacy ISteamNetworking";' in steamworks
     assert 'return "missing ISteamNetworkingSockets/ISteamNetworkingMessages adapter";' in steamworks
-    assert 'QL_Steamworks_LoadOptionalSymbol( (void **)&state.SteamGameServerUtils, "SteamGameServerUtils" );' in steamworks
+    assert "QL_Steamworks_LoadOptionalSymbol( (void **)&state.SteamGameServerUtils, QL_STEAMWORKS_EXPORT_STEAM_GAME_SERVER_UTILS );" in steamworks
     assert "QL_Steamworks_UnregisterServerCallbacks();" in platform_shutdown_block
     assert "QL_Steamworks_ServerShutdown();" in platform_shutdown_block
     assert platform_shutdown_block.index("QL_Steamworks_UnregisterServerCallbacks();") < platform_shutdown_block.index(
@@ -12989,63 +13223,63 @@ def test_server_game_server_wrappers_reconstruct_mapped_server_slots() -> None:
     assert "#define QL_STEAMWORKS_FASTCALL" in steamworks
     assert "typedef qboolean (QL_STEAMWORKS_FASTCALL *QL_SteamNetworking_SendP2PPacketFn)( void *, void *, CSteamID, const void *, uint32_t, int, int );" in steamworks
     assert "typedef qboolean (QL_STEAMWORKS_FASTCALL *QL_SteamGameServer_HandleIncomingPacketFn)( void *, void *, const void *, int, uint32_t, uint16_t );" in steamworks
-    assert "vtable[0x24 / 4]" in server_app_id_block
+    assert "vtable[QL_STEAM_GAMESERVER_UTILS_GET_APP_ID_SLOT]" in server_app_id_block
     assert "return fn( gameServerUtils, NULL );" in server_app_id_block
-    assert "vtable[0x10 / 4]" in dedicated_block
+    assert "vtable[QL_STEAM_GAMESERVER_SET_DEDICATED_SLOT]" in dedicated_block
     assert "fn( gameServer, NULL, dedicated ? 1 : 0 );" in dedicated_block
-    assert "vtable[0x14 / 4]" in logon_block
-    assert "vtable[0x18 / 4]" in logon_block
+    assert "vtable[QL_STEAM_GAMESERVER_LOG_ON_SLOT]" in logon_block
+    assert "vtable[QL_STEAM_GAMESERVER_LOG_ON_ANONYMOUS_SLOT]" in logon_block
     assert "if ( account && account[0] ) {" in logon_block
     assert "logOnFn( gameServer, NULL, account );" in logon_block
     assert "anonymousFn( gameServer, NULL );" in logon_block
-    assert "vtable[0x04 / 4]" in product_block
+    assert "vtable[QL_STEAM_GAMESERVER_SET_PRODUCT_SLOT]" in product_block
     assert "fn( gameServer, NULL, product );" in product_block
-    assert "vtable[0x0c / 4]" in game_dir_block
+    assert "vtable[QL_STEAM_GAMESERVER_SET_GAME_DIR_SLOT]" in game_dir_block
     assert "fn( gameServer, NULL, gameDir );" in game_dir_block
-    assert "vtable[0x08 / 4]" in description_block
+    assert "vtable[QL_STEAM_GAMESERVER_SET_GAME_DESCRIPTION_SLOT]" in description_block
     assert "fn( gameServer, NULL, description );" in description_block
-    assert "vtable[0x30 / 4]" in max_players_block
+    assert "vtable[QL_STEAM_GAMESERVER_SET_MAX_PLAYER_COUNT_SLOT]" in max_players_block
     assert "fn( gameServer, NULL, maxPlayers );" in max_players_block
-    assert "vtable[0x34 / 4]" in bot_players_block
+    assert "vtable[QL_STEAM_GAMESERVER_SET_BOT_PLAYER_COUNT_SLOT]" in bot_players_block
     assert "fn( gameServer, NULL, botPlayers );" in bot_players_block
-    assert "vtable[0x38 / 4]" in server_name_block
+    assert "vtable[QL_STEAM_GAMESERVER_SET_SERVER_NAME_SLOT]" in server_name_block
     assert "fn( gameServer, NULL, name );" in server_name_block
-    assert "vtable[0x3c / 4]" in map_name_block
+    assert "vtable[QL_STEAM_GAMESERVER_SET_MAP_NAME_SLOT]" in map_name_block
     assert "fn( gameServer, NULL, mapName );" in map_name_block
-    assert "vtable[0x40 / 4]" in password_block
+    assert "vtable[QL_STEAM_GAMESERVER_SET_PASSWORD_PROTECTED_SLOT]" in password_block
     assert "fn( gameServer, NULL, passwordProtected ? 1 : 0 );" in password_block
-    assert "vtable[0x9c / 4]" in heartbeat_block
+    assert "vtable[QL_STEAM_GAMESERVER_ENABLE_HEARTBEATS_SLOT]" in heartbeat_block
     assert "if ( !state.gameServerInitialised ) {" in heartbeat_block
     assert heartbeat_block.index("if ( !state.gameServerInitialised ) {") < heartbeat_block.index("gameServer = QL_Steamworks_GetGameServer();")
     assert "fn( gameServer, NULL, enable ? 1 : 0 );" in heartbeat_block
     assert "return qtrue;" in heartbeat_block
-    assert "vtable[0x28 / 4]" in steam_id_block
+    assert "vtable[QL_STEAM_GAMESERVER_GET_STEAM_ID_SLOT]" in steam_id_block
     assert "if ( !fn( gameServer, NULL, &steamId ) ) {" in steam_id_block
     assert "*outIdLow = (uint32_t)( steamId.value & 0xffffffffu );" in steam_id_block
     assert "*outIdHigh = (uint32_t)( ( steamId.value >> 32 ) & 0xffffffffu );" in steam_id_block
-    assert "vtable[0x64 / 4]" in unauth_user_block
+    assert "vtable[QL_STEAM_GAMESERVER_CREATE_UNAUTHENTICATED_USER_SLOT]" in unauth_user_block
     assert "if ( !state.gameServerInitialised ) {" in unauth_user_block
     assert unauth_user_block.index("if ( !state.gameServerInitialised ) {") < unauth_user_block.index("gameServer = QL_Steamworks_GetGameServer();")
     assert "if ( !fn( gameServer, NULL, &steamId ) ) {" in unauth_user_block
     assert "return steamId.value != 0ull ? qtrue : qfalse;" in unauth_user_block
-    assert "vtable[0x54 / 4]" in game_tags_block
+    assert "vtable[QL_STEAM_GAMESERVER_SET_GAME_TAGS_SLOT]" in game_tags_block
     assert "fn( gameServer, NULL, tags );" in game_tags_block
-    assert "vtable[0x50 / 4]" in key_value_block
+    assert "vtable[QL_STEAM_GAMESERVER_SET_KEY_VALUE_SLOT]" in key_value_block
     assert "fn( gameServer, NULL, key, value );" in key_value_block
     assert "if ( !state.gameServerInitialised ) {" in key_values_block
     assert key_values_block.index("if ( !state.gameServerInitialised ) {") < key_values_block.index("head = infoString;")
     assert key_values_block.index("if ( !state.gameServerInitialised ) {") < key_values_block.index("Info_NextPair( &head, key, value );")
     assert "Info_NextPair( &head, key, value );" in key_values_block
     assert "QL_Steamworks_ServerSetKeyValue( key, value )" in key_values_block
-    assert "vtable[0x6c / 4]" in user_data_block
+    assert "vtable[QL_STEAM_GAMESERVER_UPDATE_USER_DATA_SLOT]" in user_data_block
     assert "idLow = (uint32_t)( steamId->value & 0xffffffffu );" in user_data_block
     assert "idHigh = (uint32_t)( ( steamId->value >> 32 ) & 0xffffffffu );" in user_data_block
     assert "return fn( gameServer, NULL, idLow, idHigh, playerName, score ) != 0 ? qtrue : qfalse;" in user_data_block
-    assert "vtable[0x90 / 4]" in public_ip_block
+    assert "vtable[QL_STEAM_GAMESERVER_GET_PUBLIC_IP_SLOT]" in public_ip_block
     assert "return fn( gameServer, NULL );" in public_ip_block
-    assert "vtable[0x94 / 4]" in handle_incoming_block
+    assert "vtable[QL_STEAM_GAMESERVER_HANDLE_INCOMING_PACKET_SLOT]" in handle_incoming_block
     assert "return handlePacket( gameServer, NULL, data, dataSize, ip, port ) ? qtrue : qfalse;" in handle_incoming_block
-    assert "vtable[0x98 / 4]" in outgoing_packet_block
+    assert "vtable[QL_STEAM_GAMESERVER_GET_NEXT_OUTGOING_PACKET_SLOT]" in outgoing_packet_block
     assert "return getPacket( gameServer, NULL, data, dataSize, outIp, outPort );" in outgoing_packet_block
     assert "from->type != NA_IP" in sv_incoming_packet_block
     assert "if ( !QL_Steamworks_ServerIsInitialised() ) {" in sv_incoming_packet_block
@@ -13062,12 +13296,12 @@ def test_server_game_server_wrappers_reconstruct_mapped_server_slots() -> None:
     assert sv_packet_event_block.index("SV_SteamServerHandleIncomingPacket( &from, msg );") < sv_packet_event_block.index(
         "SV_ConnectionlessPacket( from, msg );"
     )
-    assert "vtable[0x0c / 4]" in accept_p2p_block
+    assert "vtable[QL_STEAM_NETWORKING_ACCEPT_P2P_SESSION_SLOT]" in accept_p2p_block
     assert "return acceptSession( networking, NULL, *steamId ) ? qtrue : qfalse;" in accept_p2p_block
     assert "QL_Steamworks_HexDecode( ticketHex, ticketData, sizeof( ticketData ), &ticketLength )" in begin_auth_block
-    assert "result = state.BeginAuthSession( gameServer, ticketData, (int)ticketLength, *steamId );" in begin_auth_block
+    assert "result = beginAuthSession( gameServer, NULL, ticketData, (int)ticketLength, *steamId );" in begin_auth_block
     assert "QL_Steamworks_MapAuthResult( result, response );" in begin_auth_block
-    assert "state.EndAuthSession( gameServer, *steamId );" in end_auth_block
+    assert "endAuthSession( gameServer, NULL, *steamId );" in end_auth_block
 
 
 def test_server_frame_reconstructs_retail_steam_server_owner() -> None:
@@ -13130,7 +13364,14 @@ def test_server_frame_reconstructs_retail_steam_server_owner() -> None:
     assert 'SV_LogSteamServerNetworkingLifecycle( &remoteId, "p2p-relay", "sender not found" );' in relay_block
     assert 'SV_LogSteamServerNetworkingLifecycle( &clientId, "p2p-relay", "relay send failed" );' in relay_block
     assert "if ( !QL_Steamworks_ServerIsInitialised() ) {" in helper_block
+    assert "if ( !com_sv_running || !com_sv_running->integer ) {" in helper_block
     assert helper_block.index("if ( !QL_Steamworks_ServerIsInitialised() ) {") < helper_block.index("QL_Steamworks_RunServerCallbacks();")
+    assert helper_block.index("if ( !QL_Steamworks_ServerIsInitialised() ) {") < helper_block.index(
+        "if ( !com_sv_running || !com_sv_running->integer ) {"
+    )
+    assert helper_block.index("if ( !com_sv_running || !com_sv_running->integer ) {") < helper_block.index(
+        "QL_Steamworks_RunServerCallbacks();"
+    )
     assert "QL_Steamworks_RunServerCallbacks();" in helper_block
     assert "SV_SteamServerUpdatePublishedState( qfalse );" in helper_block
     assert "SV_SteamServerSendKeepAlive();" in helper_block
@@ -13230,8 +13471,10 @@ def test_server_published_state_reconstructs_retail_steam_server_owner() -> None
     assert 'Cvar_VariableStringBuffer( "g_blueScore", blueScore, sizeof( blueScore ) );' in publish_block
     assert 'if ( !QL_Steamworks_ServerSetKeyValue( "g_blueScore", blueScore ) ) {' in publish_block
     assert 'SV_LogSteamServerPublishedState( NULL, "key-value", "publish failed for g_blueScore" );' in publish_block
+    assert "if ( svs.clients && sv_maxclients ) {" in publish_block
     assert 'rawName = Info_ValueForKey( cl->userinfo, "name" );' in publish_block
     assert 'Com_sprintf( playerName, sizeof( playerName ), "(Bot) %s", rawName );' in publish_block
+    assert "if ( !sv.gameClients || sv.gameClientSize <= 0 ) {" in publish_block
     assert "playerState = SV_GameClientNum( i );" in publish_block
     assert 'if ( !QL_Steamworks_ServerUpdateUserData( &steamId, playerName, (uint32_t)playerState->persistant[PERS_SCORE] ) ) {' in publish_block
     assert 'Com_sprintf( detail, sizeof( detail ), "publish failed for client %d (%s)", i, playerName );' in publish_block
@@ -13241,6 +13484,51 @@ def test_server_published_state_reconstructs_retail_steam_server_owner() -> None
     assert "SV_SteamServerUpdatePublishedState( qtrue );" in spawn_block
     assert "SV_SteamServerUpdatePublishedState( qfalse );" in helper_block
     assert "SV_SteamServerUpdatePublishedState( qfalse );" not in frame_block
+
+
+def test_steam_gameserver_published_state_launch_callback_is_startup_safe() -> None:
+    sv_main = (REPO_ROOT / "src/code/server/sv_main.c").read_text(encoding="utf-8")
+    sv_client = (REPO_ROOT / "src/code/server/sv_client.c").read_text(encoding="utf-8")
+
+    helper_block = _extract_function_block(sv_main, "void SV_SteamServerNetworkingFrame( void )")
+    publish_block = _extract_function_block(sv_main, "void SV_SteamServerUpdatePublishedState( qboolean fullUpdate )")
+    connected_block = _extract_function_block(
+        sv_client, "static void SV_SteamServerConnectedCallback( void *context, const ql_steam_server_connected_t *event )"
+    )
+
+    assert "SV_SteamServerUpdatePublishedState( qtrue );" in connected_block
+    assert "if ( !QL_Steamworks_ServerIsInitialised() ) {" in helper_block
+    assert "if ( !com_sv_running || !com_sv_running->integer ) {" in helper_block
+    assert "QL_Steamworks_RunServerCallbacks();" in helper_block
+    assert "SV_SteamServerUpdatePublishedState( qfalse );" in helper_block
+    assert 'QL_Steamworks_ServerSetKeyValue( "g_blueScore", blueScore )' in publish_block
+    assert "if ( svs.clients && sv_maxclients ) {" in publish_block
+    assert "for ( i = 0, cl = svs.clients; i < sv_maxclients->integer; i++, cl++ ) {" in publish_block
+    assert "if ( !sv.gameClients || sv.gameClientSize <= 0 ) {" in publish_block
+    assert "playerState = SV_GameClientNum( i );" in publish_block
+    assert "QL_Steamworks_ServerSetBotPlayerCount( botCount )" in publish_block
+
+    assert helper_block.index("if ( !QL_Steamworks_ServerIsInitialised() ) {") < helper_block.index(
+        "if ( !com_sv_running || !com_sv_running->integer ) {"
+    )
+    assert helper_block.index("if ( !com_sv_running || !com_sv_running->integer ) {") < helper_block.index(
+        "QL_Steamworks_RunServerCallbacks();"
+    )
+    assert helper_block.index("QL_Steamworks_RunServerCallbacks();") < helper_block.index(
+        "SV_SteamServerUpdatePublishedState( qfalse );"
+    )
+    assert publish_block.index('QL_Steamworks_ServerSetKeyValue( "g_blueScore", blueScore )') < publish_block.index(
+        "if ( svs.clients && sv_maxclients ) {"
+    )
+    assert publish_block.index("if ( svs.clients && sv_maxclients ) {") < publish_block.index(
+        "for ( i = 0, cl = svs.clients; i < sv_maxclients->integer; i++, cl++ ) {"
+    )
+    assert publish_block.index("if ( !sv.gameClients || sv.gameClientSize <= 0 ) {") < publish_block.index(
+        "playerState = SV_GameClientNum( i );"
+    )
+    assert publish_block.index("if ( svs.clients && sv_maxclients ) {") < publish_block.index(
+        "QL_Steamworks_ServerSetBotPlayerCount( botCount )"
+    )
 
 
 def test_server_init_reconstructs_retail_hostname_and_bootstrap_metadata() -> None:
@@ -13802,12 +14090,16 @@ def test_steam_gameserver_shutdown_restart_lifecycle_tracks_round_612() -> None:
     )
 
     assert "if ( !QL_Steamworks_ServerIsInitialised() ) {" in helper_block
+    assert "if ( !com_sv_running || !com_sv_running->integer ) {" in helper_block
     assert "QL_Steamworks_RunServerCallbacks();" in helper_block
     assert "SV_SteamServerUpdatePublishedState( qfalse );" in helper_block
     assert "SV_SteamServerSendKeepAlive();" in helper_block
     assert "SV_SteamServerRelayP2PPackets();" in helper_block
     assert "SV_SteamServerDrainOutgoingPackets();" in helper_block
     assert helper_block.index("if ( !QL_Steamworks_ServerIsInitialised() ) {") < helper_block.index(
+        "if ( !com_sv_running || !com_sv_running->integer ) {"
+    )
+    assert helper_block.index("if ( !com_sv_running || !com_sv_running->integer ) {") < helper_block.index(
         "QL_Steamworks_RunServerCallbacks();"
     )
     assert helper_block.index("QL_Steamworks_RunServerCallbacks();") < helper_block.index(
@@ -14933,7 +15225,7 @@ def test_server_steam_stats_owner_reconstructs_retail_gameserverstats_bridge() -
     assert "SV_GetServerStatsProviderLabel()" in stats_log_block
     assert "SV_GetServerStatsPolicyLabel()" in stats_log_block
     assert "typedef qboolean (QL_STEAMWORKS_FASTCALL *QL_SteamGameServer_BLoggedOnFn)( void *, void * );" in steamworks
-    assert "vtable[0x20 / 4]" in is_logged_on_block
+    assert "vtable[QL_STEAM_GAMESERVER_BLOGGED_ON_SLOT]" in is_logged_on_block
     assert "return fn( gameServer, NULL ) ? qtrue : qfalse;" in is_logged_on_block
     assert request_block.count("QL_Steamworks_GetGameServerStatsInterface()") == 2
     assert "if ( !QL_Steamworks_ServerIsLoggedOn() ) {" in request_block
@@ -14943,17 +15235,17 @@ def test_server_steam_stats_owner_reconstructs_retail_gameserverstats_bridge() -
     assert request_block.index("QL_Steamworks_ServerIsLoggedOn()") < request_block.rindex(
         "QL_Steamworks_GetGameServerStatsInterface()"
     )
-    assert "vtable[0x00 / 4]" in request_block
+    assert "vtable[QL_STEAM_GAMESERVERSTATS_REQUEST_USER_STATS_SLOT]" in request_block
     assert "return fn( gameServerStats, NULL, idLow, idHigh ) != 0 ? qtrue : qfalse;" in request_block
-    assert "vtable[0x04 / 4]" in get_stat_float_block
-    assert "vtable[0x08 / 4]" in get_stat_block
-    assert "vtable[0x0c / 4]" in get_achievement_block
-    assert "vtable[0x10 / 4]" in set_stat_float_block
-    assert "vtable[0x14 / 4]" in set_stat_block
-    assert "vtable[0x18 / 4]" in update_avg_rate_block
-    assert "vtable[0x1c / 4]" in set_achievement_block
-    assert "vtable[0x24 / 4]" in store_block
-    assert "vtable[0x24 / 4]" in server_app_id_block
+    assert "vtable[QL_STEAM_GAMESERVERSTATS_GET_USER_STAT_FLOAT_SLOT]" in get_stat_float_block
+    assert "vtable[QL_STEAM_GAMESERVERSTATS_GET_USER_STAT_INT_SLOT]" in get_stat_block
+    assert "vtable[QL_STEAM_GAMESERVERSTATS_GET_USER_ACHIEVEMENT_SLOT]" in get_achievement_block
+    assert "vtable[QL_STEAM_GAMESERVERSTATS_SET_USER_STAT_FLOAT_SLOT]" in set_stat_float_block
+    assert "vtable[QL_STEAM_GAMESERVERSTATS_SET_USER_STAT_INT_SLOT]" in set_stat_block
+    assert "vtable[QL_STEAM_GAMESERVERSTATS_UPDATE_AVG_RATE_STAT_SLOT]" in update_avg_rate_block
+    assert "vtable[QL_STEAM_GAMESERVERSTATS_SET_USER_ACHIEVEMENT_SLOT]" in set_achievement_block
+    assert "vtable[QL_STEAM_GAMESERVERSTATS_STORE_USER_STATS_SLOT]" in store_block
+    assert "vtable[QL_STEAM_GAMESERVER_UTILS_GET_APP_ID_SLOT]" in server_app_id_block
     assert '"wins"' in sv_client
     assert '"AW_MIDAIR"' in sv_client
     assert "static void SV_LogSteamStatsStubLifecycle( const char *stage, const char *detail ) {" in stub_section
@@ -15667,17 +15959,25 @@ def test_server_zmq_runtime_reconstructs_retail_publication_and_rcon_owners() ->
     event_block = _extract_function_block(
         sv_game, "static void SV_ReportPlayerEvent( uint32_t steamIdLow, uint32_t steamIdHigh, const void *clientStats, const char *eventName, void *payload )"
     )
-    register_block = _extract_function_block(sv_zmq, "void Zmq_RegisterCvarsAndInitRcon( void )")
-    apply_passwords_block = _extract_function_block(sv_zmq, "static void idZMQ_ApplyPasswords( qboolean rconModeChanged, qboolean statsModeChanged )")
-    update_passwords_block = _extract_function_block(sv_zmq, "void Zmq_UpdatePasswords( void )")
-    init_publisher_block = _extract_function_block(sv_zmq, "void Zmq_InitStatsPublisher( void )")
+    register_block = _extract_function_block(sv_zmq, "static void idZMQ_RegisterCvarsAndInitRcon( void )")
+    apply_passwords_block = _extract_function_block(sv_zmq, "static void idZMQ_ApplyPasswords( void )")
+    update_passwords_block = _extract_function_block(sv_zmq, "static void idZMQ_UpdatePasswords( void ) {")
+    init_publisher_block = _extract_function_block(sv_zmq, "static void idZMQ_InitStatsPublisher( void )")
+    stats_host_block = _extract_function_block(sv_zmq, "static void idZMQ_ResolveStatsHost( char *resolvedAddress, size_t resolvedIpSize )")
+    ensure_rcon_block = _extract_function_block(sv_zmq, "static qboolean idZMQ_EnsureRconSocket( void ) {")
+    ensure_stats_block = _extract_function_block(sv_zmq, "static qboolean idZMQ_EnsureStatsPublisher( void ) {")
+    ensure_auth_block = _extract_function_block(sv_zmq, "static qboolean idZMQ_EnsureAuthSocket( void )")
     shutdown_runtime_block = _extract_function_block(sv_zmq, "void Zmq_ShutdownRuntime( void )")
-    broadcast_block = _extract_function_block(sv_zmq, "void Zmq_BroadcastRconOutput( const char *message )")
-    pump_block = _extract_function_block(sv_zmq, "void Zmq_PumpRcon( void )")
+    broadcast_block = _extract_function_block(sv_zmq, "static void idZMQ_BroadcastRconOutput( const char *message )")
+    pump_block = _extract_function_block(sv_zmq, "static void idZMQ_PumpRcon( void )")
+    pump_auth_block = _extract_function_block(sv_zmq, "static void idZMQ_PumpAuthSocket( void )")
     find_peer_block = _extract_function_block(sv_zmq, "static zmqRconPeer_t *idZMQ_FindRconPeer( const char *identity )")
+    alloc_peer_block = _extract_function_block(sv_zmq, "static zmqRconPeer_t *idZMQ_AllocRconPeer( const char *identity )")
     insert_peer_block = _extract_function_block(sv_zmq, "static zmqRconPeer_t *idZMQ_InsertRconPeer( const char *identity )")
     erase_peer_block = _extract_function_block(sv_zmq, "static void idZMQ_EraseRconPeer( zmqRconPeer_t *peer )")
+    range_erase_block = _extract_function_block(sv_zmq, "static void idZMQ_EraseRconPeerRange( zmqRconPeer_t *first, zmqRconPeer_t *last )")
     clear_peer_block = _extract_function_block(sv_zmq, "static void idZMQ_ClearRconPeers( void )")
+    destroy_block = _extract_function_block(sv_zmq, "static void idZMQ_Destroy( void )")
     printf_block = _extract_function_block(common, "void QDECL Com_Printf( const char *fmt, ... )")
     com_shutdown_block = _extract_function_block(common, "void Com_Shutdown (void)")
     common_frame_block = _extract_function_block(common, "void Com_Frame( void )")
@@ -15692,40 +15992,116 @@ def test_server_zmq_runtime_reconstructs_retail_publication_and_rcon_owners() ->
     assert "void Zmq_SubmitMatchReport( const void *report );" in server_h
     assert "void Zmq_ReportPlayerEvent( uint32_t steamIdLow, uint32_t steamIdHigh, const void *clientStats, const char *eventName, const void *payload );" in server_h
 
-    assert 'Cvar_Get( "zmq_rcon_enable", "0", CVAR_INIT );' in register_block
-    assert 'Cvar_Get( "zmq_stats_enable", "0", CVAR_INIT );' in register_block
-    assert 'Cvar_Get( "zmq_rcon_ip", "0.0.0.0", CVAR_INIT );' in register_block
-    assert 'Cvar_Get( "zmq_rcon_port", "28960", CVAR_INIT );' in register_block
-    assert 'Cvar_Get( "zmq_stats_ip", "", CVAR_INIT );' in register_block
-    assert 'Cvar_Get( "zmq_stats_port", "", CVAR_INIT );' in register_block
-    assert 'Cvar_Get( "zmq_rcon_password", "", CVAR_ARCHIVE );' in register_block
-    assert 'Cvar_Get( "zmq_stats_password", "", CVAR_ARCHIVE );' in register_block
+    assert '#define QL_ZMQ_CVAR_RCON_ENABLE "zmq_rcon_enable"' in sv_zmq
+    assert '#define QL_ZMQ_CVAR_STATS_ENABLE "zmq_stats_enable"' in sv_zmq
+    assert '#define QL_ZMQ_CVAR_RCON_IP "zmq_rcon_ip"' in sv_zmq
+    assert '#define QL_ZMQ_CVAR_RCON_PORT "zmq_rcon_port"' in sv_zmq
+    assert '#define QL_ZMQ_CVAR_STATS_IP "zmq_stats_ip"' in sv_zmq
+    assert '#define QL_ZMQ_CVAR_STATS_PORT "zmq_stats_port"' in sv_zmq
+    assert '#define QL_ZMQ_CVAR_RCON_PASSWORD "zmq_rcon_password"' in sv_zmq
+    assert '#define QL_ZMQ_CVAR_STATS_PASSWORD "zmq_stats_password"' in sv_zmq
+    assert "#define QL_ZMQ_CVAR_INIT_FLAGS CVAR_INIT" in sv_zmq
+    assert "#define QL_ZMQ_CVAR_PASSWORD_FLAGS CVAR_ARCHIVE" in sv_zmq
+    assert "Cvar_Get( QL_ZMQ_CVAR_RCON_ENABLE, QL_ZMQ_DEFAULT_DISABLED, QL_ZMQ_CVAR_INIT_FLAGS );" in register_block
+    assert "Cvar_Get( QL_ZMQ_CVAR_STATS_ENABLE, QL_ZMQ_DEFAULT_DISABLED, QL_ZMQ_CVAR_INIT_FLAGS );" in register_block
+    assert "Cvar_Get( QL_ZMQ_CVAR_RCON_IP, QL_ZMQ_DEFAULT_RCON_IP, QL_ZMQ_CVAR_INIT_FLAGS );" in register_block
+    assert "Cvar_Get( QL_ZMQ_CVAR_RCON_PORT, QL_ZMQ_DEFAULT_RCON_PORT, QL_ZMQ_CVAR_INIT_FLAGS );" in register_block
+    assert "Cvar_Get( QL_ZMQ_CVAR_STATS_IP, QL_ZMQ_DEFAULT_EMPTY, QL_ZMQ_CVAR_INIT_FLAGS );" in register_block
+    assert "Cvar_Get( QL_ZMQ_CVAR_STATS_PORT, QL_ZMQ_DEFAULT_EMPTY, QL_ZMQ_CVAR_INIT_FLAGS );" in register_block
+    assert "Cvar_Get( QL_ZMQ_CVAR_RCON_PASSWORD, QL_ZMQ_DEFAULT_EMPTY, QL_ZMQ_CVAR_PASSWORD_FLAGS );" in register_block
+    assert "Cvar_Get( QL_ZMQ_CVAR_STATS_PASSWORD, QL_ZMQ_DEFAULT_EMPTY, QL_ZMQ_CVAR_PASSWORD_FLAGS );" in register_block
     assert "CVAR_PROTECTED" not in register_block
     assert "idZMQ_EnsureRconSocket();" in register_block
     assert 'FS_FOpenFileWrite( QL_ZMQ_PASSFILE );' in sv_zmq
-    assert 'Com_sprintf( line, sizeof( line ), "stats_stats=%s\\n", s_zmq.statsPassword );' in sv_zmq
-    assert 'Com_sprintf( line, sizeof( line ), "rcon_rcon=%s\\n", s_zmq.rconPassword );' in sv_zmq
-    assert 'Com_Printf( "Failed to open %s\\n", QL_ZMQ_PASSFILE );' in sv_zmq
-    assert "idZMQ_ApplyPasswords( qfalse, qfalse );" in update_passwords_block
-    assert "idZMQ_ApplyPasswords( rconModeChanged, statsModeChanged );" in update_passwords_block
-    assert "idZMQ_CloseSocket( &s_zmq.rconSocket );" in apply_passwords_block
-    assert "idZMQ_CloseSocket( &s_zmq.pubSocket );" in apply_passwords_block
-    assert "idZMQ_CloseAuthSocket();" in apply_passwords_block
-    assert 'Com_Printf( "zmq stats and rcon passwords updated\\n" );' in update_passwords_block
+    assert '#define QL_ZMQ_PASSWORD_STATS_RECORD_FORMAT "stats_stats=%s\\n"' in sv_zmq
+    assert '#define QL_ZMQ_PASSWORD_RCON_RECORD_FORMAT "rcon_rcon=%s\\n"' in sv_zmq
+    assert "Com_sprintf( line, sizeof( line ), QL_ZMQ_PASSWORD_STATS_RECORD_FORMAT, s_zmq.statsPassword );" in sv_zmq
+    assert "Com_sprintf( line, sizeof( line ), QL_ZMQ_PASSWORD_RCON_RECORD_FORMAT, s_zmq.rconPassword );" in sv_zmq
+    assert '#define QL_ZMQ_PASSFILE_OPEN_FAILED_FORMAT "Failed to open %s\\n"' in sv_zmq
+    assert "Com_Printf( QL_ZMQ_PASSFILE_OPEN_FAILED_FORMAT, QL_ZMQ_PASSFILE );" in sv_zmq
+    assert "idZMQ_ApplyPasswords();" in update_passwords_block
+    assert "idZMQ_ApplyPasswords( qfalse, qfalse );" not in update_passwords_block
+    assert "idZMQ_ApplyPasswords( rconModeChanged, statsModeChanged );" not in update_passwords_block
+    assert "rconModeChanged" not in update_passwords_block
+    assert "statsModeChanged" not in update_passwords_block
+    assert "idZMQ_WritePasswordFile();" in apply_passwords_block
+    assert "idZMQ_CloseSocket( &s_zmq.rconSocket );" not in apply_passwords_block
+    assert "idZMQ_CloseSocket( &s_zmq.pubSocket );" not in apply_passwords_block
+    assert "idZMQ_CloseAuthSocket();" not in apply_passwords_block
+    assert "idZMQ_EnsureStatsPublisher();" not in apply_passwords_block
+    assert "idZMQ_EnsureRconSocket();" not in apply_passwords_block
+    assert "if ( !s_zmq.authActorReady ) {" in apply_passwords_block
+    assert apply_passwords_block.index("if ( !s_zmq.authActorReady ) {") < apply_passwords_block.index(
+        "idZMQ_WritePasswordFile();"
+    )
+    assert '#define QL_ZMQ_PASSWORD_UPDATE_MESSAGE "zmq stats and rcon passwords updated\\n"' in sv_zmq
+    assert "Com_Printf( QL_ZMQ_PASSWORD_UPDATE_MESSAGE );" in update_passwords_block
     assert "idZMQ_EnsureStatsPublisher();" in init_publisher_block
-    assert 'idZMQ_Publish( "MATCH_REPORT", (const char *)report );' in sv_zmq
-    assert 'idZMQ_Publish( eventName && eventName[0] ? eventName : "UNKNOWN_EVENT", (const char *)payload );' in sv_zmq
-    assert 'idZMQ_TrySetSocketString( socket, QL_ZMQ_ZAP_DOMAIN, "rcon" );' in sv_zmq
-    assert 'idZMQ_TrySetSocketString( socket, QL_ZMQ_ZAP_DOMAIN, "stats" );' in sv_zmq
-    assert 'idZMQ_TrySetSocketInt( socket, QL_ZMQ_PLAIN_SERVER, s_zmq.rconPassword[0] ? 1 : 0 );' in sv_zmq
-    assert 'idZMQ_TrySetSocketInt( socket, QL_ZMQ_PLAIN_SERVER, s_zmq.statsPassword[0] ? 1 : 0 );' in sv_zmq
-    assert 'Com_Printf( "zmq RCON socket: %s\\n", s_zmq.rconEndpoint );' in sv_zmq
-    assert 'Com_Printf( "zmq PUB socket: %s\\n", s_zmq.statsEndpoint );' in sv_zmq
-    assert 'Com_Printf( "zmq RCON socket error, bind failed: %s\\n", idZMQ_LastErrorString() );' in sv_zmq
-    assert 'Com_Printf( "zmq PUB socket error, bind failed: %s\\n", idZMQ_LastErrorString() );' in sv_zmq
+    assert "idZMQ_CloseStatsTranscript();" not in init_publisher_block
+    assert "idZMQ_CloseSocket( &s_zmq.pubSocket );" not in init_publisher_block
+    assert '#define QL_ZMQ_PUBLICATION_TYPE_KEY "TYPE"' in sv_zmq
+    assert '#define QL_ZMQ_PUBLICATION_DATA_KEY "DATA"' in sv_zmq
+    assert '#define QL_ZMQ_MATCH_REPORT_TYPE "MATCH_REPORT"' in sv_zmq
+    assert "idZMQ_Publish( QL_ZMQ_MATCH_REPORT_TYPE, (const char *)report );" in sv_zmq
+    assert 'idZMQ_Publish( eventName, (const char *)payload );' in sv_zmq
+    assert '"UNKNOWN_EVENT"' not in sv_zmq
+    assert '#define QL_ZMQ_DOMAIN_RCON "rcon"' in sv_zmq
+    assert '#define QL_ZMQ_DOMAIN_STATS "stats"' in sv_zmq
+    assert "idZMQ_TrySetSocketString( socket, QL_ZMQ_ZAP_DOMAIN, QL_ZMQ_DOMAIN_RCON );" in sv_zmq
+    assert "idZMQ_TrySetSocketString( socket, QL_ZMQ_ZAP_DOMAIN, QL_ZMQ_DOMAIN_STATS );" in sv_zmq
+    assert 'idZMQ_TrySetSocketInt( socket, QL_ZMQ_PLAIN_SERVER, s_zmq.rconPassword[0] ? QL_ZMQ_SOCKET_OPTION_ENABLED : QL_ZMQ_SOCKET_OPTION_DISABLED );' in sv_zmq
+    assert 'idZMQ_TrySetSocketInt( socket, QL_ZMQ_PLAIN_SERVER, s_zmq.statsPassword[0] ? QL_ZMQ_SOCKET_OPTION_ENABLED : QL_ZMQ_SOCKET_OPTION_DISABLED );' in sv_zmq
+    assert "qboolean\t\t\t\tauthActorReady;" in sv_zmq
+    assert "s_zmq.authActorReady = qtrue;" in ensure_auth_block
+    assert "idZMQ_ApplyPasswords();" in ensure_auth_block
+    assert ensure_auth_block.index("s_zmq.authSocket = socket;") < ensure_auth_block.index(
+        "s_zmq.authActorReady = qtrue;", ensure_auth_block.index("s_zmq.authSocket = socket;")
+    )
+    assert ensure_auth_block.index(
+        "s_zmq.authActorReady = qtrue;", ensure_auth_block.index("s_zmq.authSocket = socket;")
+    ) < ensure_auth_block.index("idZMQ_ApplyPasswords();")
+    assert "s_zmq.rconSocket = socket;" in ensure_rcon_block
+    assert ensure_rcon_block.index("s_zmq.rconSocket = socket;") < ensure_rcon_block.index(
+        "s_zmq.zmq_bind( socket, s_zmq.rconEndpoint )"
+    )
+    assert "void\t\t\t\t\t*rconPollSocket;" in sv_zmq
+    assert "s_zmq.rconPollSocket = s_zmq.rconSocket;" in ensure_rcon_block
+    assert ensure_rcon_block.index("Com_Printf( QL_ZMQ_RCON_BIND_ERROR_FORMAT, idZMQ_LastErrorString() );") < ensure_rcon_block.index(
+        "s_zmq.rconPollSocket = s_zmq.rconSocket;"
+    )
+    assert ensure_rcon_block.index("Com_Printf( QL_ZMQ_RCON_BIND_SUCCESS_FORMAT, s_zmq.rconEndpoint );") < ensure_rcon_block.index(
+        "s_zmq.rconPollSocket = s_zmq.rconSocket;"
+    )
+    assert "s_zmq.pubSocket = socket;" in ensure_stats_block
+    assert ensure_stats_block.index("s_zmq.pubSocket = socket;") < ensure_stats_block.index(
+        "s_zmq.zmq_bind( socket, s_zmq.statsEndpoint )"
+    )
+    assert "s_zmq.zmq_close( socket );" not in ensure_rcon_block
+    assert "s_zmq.zmq_close( socket );" not in ensure_stats_block
+    assert '#define QL_ZMQ_CVAR_NET_IP "net_ip"' in sv_zmq
+    assert '#define QL_ZMQ_DEFAULT_NET_IP "localhost"' in sv_zmq
+    assert "#define QL_ZMQ_CVAR_NET_FALLBACK_FLAGS CVAR_LATCH" in sv_zmq
+    assert "netIp = Cvar_Get( QL_ZMQ_CVAR_NET_IP, QL_ZMQ_DEFAULT_NET_IP, QL_ZMQ_CVAR_NET_FALLBACK_FLAGS );" in stats_host_block
+    assert 'NET_StringToAdr( netIp->string, &address );' in stats_host_block
+    assert '#define QL_ZMQ_IPV4_FORMAT "%i.%i.%i.%i"' in sv_zmq
+    assert "Com_sprintf( resolvedAddress, resolvedIpSize, QL_ZMQ_IPV4_FORMAT," in stats_host_block
+    assert 'Cvar_VariableStringBuffer( "net_ip"' not in stats_host_block
+    assert '#define QL_ZMQ_RCON_BIND_SUCCESS_FORMAT "zmq RCON socket: %s\\n"' in sv_zmq
+    assert '#define QL_ZMQ_STATS_BIND_SUCCESS_FORMAT "zmq PUB socket: %s\\n"' in sv_zmq
+    assert '#define QL_ZMQ_RCON_BIND_ERROR_FORMAT "zmq RCON socket error, bind failed: %s\\n"' in sv_zmq
+    assert '#define QL_ZMQ_STATS_BIND_ERROR_FORMAT "zmq PUB socket error, bind failed: %s\\n"' in sv_zmq
+    assert "Com_Printf( QL_ZMQ_RCON_BIND_SUCCESS_FORMAT, s_zmq.rconEndpoint );" in sv_zmq
+    assert "Com_Printf( QL_ZMQ_STATS_BIND_SUCCESS_FORMAT, s_zmq.statsEndpoint );" in sv_zmq
+    assert "Com_Printf( QL_ZMQ_RCON_BIND_ERROR_FORMAT, idZMQ_LastErrorString() );" in sv_zmq
+    assert "Com_Printf( QL_ZMQ_STATS_BIND_ERROR_FORMAT, idZMQ_LastErrorString() );" in sv_zmq
     assert "idZMQ_PumpAuthSocket();" in pump_block
-    assert "if ( s_zmq.zmq_poll( &item, 1, 0 ) <= 0 || !( item.revents & QL_ZMQ_POLLIN ) ) {" in pump_block
-    assert "while ( s_zmq.zmq_poll( &item, 1, 0 ) > 0 && ( item.revents & QL_ZMQ_POLLIN ) ) {" not in pump_block
+    assert "idZMQ_EnsureAuthSocket()" not in pump_auth_block
+    assert "if ( !s_zmq.authActorReady || !s_zmq.authSocket || !s_zmq.zmq_poll || !s_zmq.zmq_recv || !s_zmq.zmq_send ) {" in pump_auth_block
+    assert "idZMQ_EnsureRconSocket()" not in pump_block
+    assert "if ( !s_zmq.rconSocket || !s_zmq.rconPollSocket || !s_zmq.zmq_poll || !s_zmq.zmq_recv ) {" in pump_block
+    assert "item.socket = s_zmq.rconPollSocket;" in pump_block
+    assert "if ( s_zmq.zmq_poll( &item, QL_ZMQ_SINGLE_POLL_ITEM, QL_ZMQ_POLL_TIMEOUT_IMMEDIATE ) < QL_ZMQ_POLL_READY_MIN || !( item.revents & QL_ZMQ_POLLIN ) ) {" in pump_block
+    assert "while ( s_zmq.zmq_poll( &item, QL_ZMQ_SINGLE_POLL_ITEM, QL_ZMQ_POLL_TIMEOUT_IMMEDIATE ) > 0 && ( item.revents & QL_ZMQ_POLLIN ) ) {" not in pump_block
     assert "struct zmqRconPeer_s\t*left;" in sv_zmq
     assert "struct zmqRconPeer_s\t*right;" in sv_zmq
     assert "struct zmqRconPeer_s\t*parent;" in sv_zmq
@@ -15735,23 +16111,40 @@ def test_server_zmq_runtime_reconstructs_retail_publication_and_rcon_owners() ->
     assert "for ( peer = s_zmq.rconPeerRoot; peer; ) {" in find_peer_block
     assert "compare = strcmp( identity, peer->identity );" in find_peer_block
     assert "Q_stricmp( peer->identity, identity )" not in find_peer_block
+    assert "peer = Z_Malloc( sizeof( *peer ) );" in alloc_peer_block
+    assert "Com_Memset( peer, 0, sizeof( *peer ) );" in alloc_peer_block
+    assert "peer->identityLength = strlen( peer->identity );" in alloc_peer_block
     assert "parent = NULL;" in insert_peer_block
+    assert "peer = idZMQ_AllocRconPeer( identity );" in insert_peer_block
     assert "parent->left = peer;" in insert_peer_block
     assert "parent->right = peer;" in insert_peer_block
     assert "s_zmq.rconPeerRoot = peer;" in insert_peer_block
     assert "s_zmq.rconPeerCount++;" in insert_peer_block
     assert "idZMQ_TransplantRconPeer( peer, successor );" in erase_peer_block
     assert "s_zmq.rconPeerCount--;" in erase_peer_block
-    assert "idZMQ_FreeRconPeerSubtree( s_zmq.rconPeerRoot );" in clear_peer_block
-    assert "s_zmq.rconPeerRoot = NULL;" in clear_peer_block
-    assert "s_zmq.rconPeerCount = 0;" in clear_peer_block
-    assert 'Com_Printf( "zmq RCON client connected: %s\\n", peer->label );' in pump_block
-    assert 'Com_Printf( "zmq RCON command from %s: %s\\n", peer->label, command );' in pump_block
-    assert 'Com_Printf( "zmq RCON client disconnected: %s\\n", peer->label );' in broadcast_block
-    assert 'Com_sprintf( buffer, bufferSize, "{\\"TYPE\\":\\"%s\\",\\"DATA\\":%s}", type, payload );' in sv_zmq
-    assert 'Com_sprintf( buffer, bufferSize, "{\\"TYPE\\":\\"%s\\",\\"DATA\\":null}", type );' in sv_zmq
+    assert "if ( first == s_zmq.rconPeers && !last ) {" in range_erase_block
+    assert "idZMQ_FreeRconPeerSubtree( s_zmq.rconPeerRoot );" in range_erase_block
+    assert "idZMQ_EraseRconPeer( peer );" in range_erase_block
+    assert "idZMQ_EraseRconPeerRange( s_zmq.rconPeers, NULL );" in clear_peer_block
+    assert "idZMQ_ClearRconPeers();" in destroy_block
+    assert "idZMQ_Destroy();" in ensure_rcon_block
+    assert '#define QL_ZMQ_RCON_CLIENT_CONNECT_FORMAT "zmq RCON client connected: %s\\n"' in sv_zmq
+    assert '#define QL_ZMQ_RCON_COMMAND_FORMAT "zmq RCON command from %s: %s\\n"' in sv_zmq
+    assert '#define QL_ZMQ_RCON_CLIENT_DISCONNECT_FORMAT "zmq RCON client disconnected: %s\\n"' in sv_zmq
+    assert "Com_Printf( QL_ZMQ_RCON_CLIENT_CONNECT_FORMAT, peer->label );" in pump_block
+    assert "Com_Printf( QL_ZMQ_RCON_COMMAND_FORMAT, peer->label, command );" in pump_block
+    assert "Com_Printf( QL_ZMQ_RCON_CLIENT_DISCONNECT_FORMAT, peer->label );" in broadcast_block
+    assert "#define QL_ZMQ_RCON_EMPTY_PAYLOAD QL_ZMQ_DEFAULT_EMPTY" in sv_zmq
+    assert "payload = message ? message : QL_ZMQ_RCON_EMPTY_PAYLOAD;" in broadcast_block
+    assert "!message || !message[0]" not in broadcast_block
+    assert '#define QL_ZMQ_PUBLICATION_PAYLOAD_FORMAT "{\\"" QL_ZMQ_PUBLICATION_TYPE_KEY "\\":\\"%s\\",\\"" QL_ZMQ_PUBLICATION_DATA_KEY "\\":%s}"' in sv_zmq
+    assert '#define QL_ZMQ_PUBLICATION_NULL_PAYLOAD_FORMAT "{\\"" QL_ZMQ_PUBLICATION_TYPE_KEY "\\":\\"%s\\",\\"" QL_ZMQ_PUBLICATION_DATA_KEY "\\":null}"' in sv_zmq
+    assert "Com_sprintf( buffer, bufferSize, QL_ZMQ_PUBLICATION_PAYLOAD_FORMAT, type, payload );" in sv_zmq
+    assert "Com_sprintf( buffer, bufferSize, QL_ZMQ_PUBLICATION_NULL_PAYLOAD_FORMAT, type );" in sv_zmq
     assert 's_zmq.statsTranscript = FS_FOpenFileWrite( QL_ZMQ_STATS_TRANSCRIPT );' in sv_zmq
-    assert 'FS_Write( "\\n", 1, s_zmq.statsTranscript );' in sv_zmq
+    assert '#define QL_ZMQ_STATS_TRANSCRIPT_RECORD_TERMINATOR "\\n"' in sv_zmq
+    assert "#define QL_ZMQ_STATS_TRANSCRIPT_RECORD_TERMINATOR_LENGTH 1" in sv_zmq
+    assert "FS_Write( QL_ZMQ_STATS_TRANSCRIPT_RECORD_TERMINATOR, QL_ZMQ_STATS_TRANSCRIPT_RECORD_TERMINATOR_LENGTH, s_zmq.statsTranscript );" in sv_zmq
     assert "idZMQ_CloseAuthSocket();" in shutdown_runtime_block
     assert "QL_ZMQ_IMMEDIATE" not in sv_zmq
     assert "QL_ZMQ_ROUTER_HANDOVER" not in sv_zmq
@@ -15778,8 +16171,12 @@ def test_server_zmq_runtime_reconstructs_retail_publication_and_rcon_owners() ->
     ) < event_block.index("Zmq_ReportPlayerEvent( steamIdLow, steamIdHigh, clientStats, eventName, payload );")
     assert "Zmq_BroadcastRconOutput( msg );" in printf_block
     assert "Zmq_ShutdownRuntime();" in com_shutdown_block
-    assert "idZMQ_ClearRconPeers();" in shutdown_runtime_block
+    assert "idZMQ_ClearRconPeers();" not in shutdown_runtime_block
+    assert "idZMQ_Destroy();" not in shutdown_runtime_block
     assert "idZMQ_UnloadLibrary();" in shutdown_runtime_block
+    assert shutdown_runtime_block.index("idZMQ_CloseSocket( &s_zmq.rconSocket );") < shutdown_runtime_block.index(
+        "idZMQ_CloseAuthSocket();"
+    )
 
 
 def test_zmq_idzmq_host_round_420_aliases_are_pinned() -> None:
@@ -15896,13 +16293,15 @@ def test_zmq_idzmq_host_round_420_aliases_are_pinned() -> None:
     assert "004f50c9  sub_4f4fe0(&arg1[5], &var_18, *eax_3, eax_3)" in hlil_part05
     assert "004f4e99          sub_4f4980(esi[2])" in hlil_part05
 
-    register_block = _extract_function_block(sv_zmq, "void Zmq_RegisterCvarsAndInitRcon( void )")
-    update_passwords_block = _extract_function_block(sv_zmq, "void Zmq_UpdatePasswords( void )")
-    init_publisher_block = _extract_function_block(sv_zmq, "void Zmq_InitStatsPublisher( void )")
+    register_block = _extract_function_block(sv_zmq, "static void idZMQ_RegisterCvarsAndInitRcon( void )")
+    update_passwords_block = _extract_function_block(sv_zmq, "static void idZMQ_UpdatePasswords( void ) {")
+    init_publisher_block = _extract_function_block(sv_zmq, "static void idZMQ_InitStatsPublisher( void )")
     shutdown_stats_block = _extract_function_block(sv_zmq, "void Zmq_ShutdownStatsPublisher( void )")
     shutdown_runtime_block = _extract_function_block(sv_zmq, "void Zmq_ShutdownRuntime( void )")
-    pump_block = _extract_function_block(sv_zmq, "void Zmq_PumpRcon( void )")
-    broadcast_block = _extract_function_block(sv_zmq, "void Zmq_BroadcastRconOutput( const char *message )")
+    close_socket_block = _extract_function_block(sv_zmq, "static void idZMQ_CloseSocket( void **socketPointer )")
+    destroy_block = _extract_function_block(sv_zmq, "static void idZMQ_Destroy( void )")
+    pump_block = _extract_function_block(sv_zmq, "static void idZMQ_PumpRcon( void )")
+    broadcast_block = _extract_function_block(sv_zmq, "static void idZMQ_BroadcastRconOutput( const char *message )")
     init_block = _extract_function_block(sv_init, "void SV_Init (void)")
     spawn_block = _extract_function_block(sv_init, "void SV_SpawnServer( char *server, qboolean killBots )")
     shutdown_block = _extract_function_block(sv_init, "void SV_Shutdown( char *finalmsg )")
@@ -15914,25 +16313,27 @@ def test_zmq_idzmq_host_round_420_aliases_are_pinned() -> None:
     printf_block = _extract_function_block(common, "void QDECL Com_Printf( const char *fmt, ... )")
     com_shutdown_block = _extract_function_block(common, "void Com_Shutdown (void)")
 
-    assert 'Cvar_Get( "zmq_rcon_enable", "0", CVAR_INIT );' in register_block
-    assert 'Cvar_Get( "zmq_stats_enable", "0", CVAR_INIT );' in register_block
-    assert "Zmq_UpdatePasswords();" in register_block
+    assert "Cvar_Get( QL_ZMQ_CVAR_RCON_ENABLE, QL_ZMQ_DEFAULT_DISABLED, QL_ZMQ_CVAR_INIT_FLAGS );" in register_block
+    assert "Cvar_Get( QL_ZMQ_CVAR_STATS_ENABLE, QL_ZMQ_DEFAULT_DISABLED, QL_ZMQ_CVAR_INIT_FLAGS );" in register_block
+    assert "idZMQ_UpdatePasswords();" in register_block
     assert "idZMQ_EnsureRconSocket();" in register_block
-    assert "idZMQ_ApplyPasswords( rconModeChanged, statsModeChanged );" in update_passwords_block
-    assert 'Com_Printf( "zmq stats and rcon passwords updated\\n" );' in update_passwords_block
-    assert "idZMQ_CloseSocket( &s_zmq.pubSocket );" in init_publisher_block
+    assert "idZMQ_ApplyPasswords();" in update_passwords_block
+    assert "idZMQ_ApplyPasswords( rconModeChanged, statsModeChanged );" not in update_passwords_block
+    assert "Com_Printf( QL_ZMQ_PASSWORD_UPDATE_MESSAGE );" in update_passwords_block
+    assert "idZMQ_CloseSocket( &s_zmq.pubSocket );" not in init_publisher_block
     assert "idZMQ_EnsureStatsPublisher();" in init_publisher_block
     assert "idZMQ_CloseStatsTranscript();" in shutdown_stats_block
     assert "idZMQ_CloseSocket( &s_zmq.pubSocket );" in shutdown_stats_block
-    assert "Zmq_ShutdownStatsPublisher();" in shutdown_runtime_block
-    assert "idZMQ_ClearRconPeers();" in shutdown_runtime_block
+    assert "Zmq_ShutdownStatsPublisher();" not in shutdown_runtime_block
+    assert "idZMQ_ClearRconPeers();" not in shutdown_runtime_block
+    assert "idZMQ_ClearRconPeers();" in destroy_block
     assert "idZMQ_CloseAuthSocket();" in shutdown_runtime_block
     assert "idZMQ_UnloadLibrary();" in shutdown_runtime_block
-    assert 'idZMQ_Publish( "MATCH_REPORT", (const char *)report );' in sv_zmq
-    assert 'idZMQ_Publish( eventName && eventName[0] ? eventName : "UNKNOWN_EVENT", (const char *)payload );' in sv_zmq
-    assert 'Com_Printf( "zmq RCON client disconnected: %s\\n", peer->label );' in broadcast_block
-    assert 'Com_Printf( "zmq RCON client connected: %s\\n", peer->label );' in pump_block
-    assert 'Com_Printf( "zmq RCON command from %s: %s\\n", peer->label, command );' in pump_block
+    assert "idZMQ_Publish( QL_ZMQ_MATCH_REPORT_TYPE, (const char *)report );" in sv_zmq
+    assert 'idZMQ_Publish( eventName, (const char *)payload );' in sv_zmq
+    assert "Com_Printf( QL_ZMQ_RCON_CLIENT_DISCONNECT_FORMAT, peer->label );" in broadcast_block
+    assert "Com_Printf( QL_ZMQ_RCON_CLIENT_CONNECT_FORMAT, peer->label );" in pump_block
+    assert "Com_Printf( QL_ZMQ_RCON_COMMAND_FORMAT, peer->label, command );" in pump_block
     assert "Cmd_ExecuteString( command );" in pump_block
 
     assert "Zmq_RegisterCvarsAndInitRcon();" in init_block
@@ -15959,15 +16360,10818 @@ def test_zmq_idzmq_host_round_420_aliases_are_pinned() -> None:
     assert "before 76% -> after 95%" in mapping_round
 
 
+def test_zmq_peer_table_source_shape_round_638_is_pinned() -> None:
+    aliases = json.loads(
+        (REPO_ROOT / "references/analysis/quakelive_symbol_aliases.json").read_text(encoding="utf-8")
+    )["quakelive_steam_srp"]
+    functions_csv = (
+        REPO_ROOT / "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+    ).read_text(encoding="utf-8").lower()
+    hlil_part05 = (
+        REPO_ROOT
+        / "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part05.txt"
+    ).read_text(encoding="utf-8")
+    sv_zmq = (REPO_ROOT / "src/code/server/sv_zmq.c").read_text(encoding="utf-8")
+    mapping_round = (
+        REPO_ROOT / "docs/reverse-engineering/quakelive_steam_mapping_round_638.md"
+    ).read_text(encoding="utf-8")
+
+    expected_aliases = {
+        "sub_4F4640": "std_tree_create_zmq_rcon_peer_node",
+        "sub_4F46B0": "idZMQ_EraseRconPeer",
+        "sub_4F4910": "idZMQ_FindRconPeer",
+        "sub_4F4980": "idZMQ_FreeRconPeerSubtree",
+        "sub_4F49C0": "idZMQ_InsertRconPeer",
+        "sub_4F4E80": "idZMQ_ClearRconPeers",
+        "sub_4F4FE0": "idZMQ_EraseRconPeerRange",
+    }
+
+    for symbol, alias in expected_aliases.items():
+        address = f"00{symbol.removeprefix('sub_')}".lower()
+        assert aliases[symbol] == alias
+        assert f"fun_{address},{address}" in functions_csv
+        assert f"| `{symbol}` | `{alias}` |" in mapping_round
+
+    assert "004f464b  result, ecx = operator new(0x14)" in hlil_part05
+    assert "004f465c  *result = *(arg1 + 4)" in hlil_part05
+    assert "004f4667  *(result + 8) = *(arg1 + 4)" in hlil_part05
+    assert "004f467b      *(result + 0xc) = *arg_4" in hlil_part05
+    assert "004f4ff6  if (i == *eax && arg4 == eax)" in hlil_part05
+    assert "004f4ffa      sub_4f4e80(arg1)" in hlil_part05
+    assert "004f5012  for (; i != arg4; i = arg3)" in hlil_part05
+    assert "004f5065      sub_4f46b0(arg1, &var_8, i_2)" in hlil_part05
+
+    alloc_peer_block = _extract_function_block(sv_zmq, "static zmqRconPeer_t *idZMQ_AllocRconPeer( const char *identity )")
+    insert_peer_block = _extract_function_block(sv_zmq, "static zmqRconPeer_t *idZMQ_InsertRconPeer( const char *identity )")
+    range_erase_block = _extract_function_block(sv_zmq, "static void idZMQ_EraseRconPeerRange( zmqRconPeer_t *first, zmqRconPeer_t *last )")
+    clear_peer_block = _extract_function_block(sv_zmq, "static void idZMQ_ClearRconPeers( void )")
+
+    assert "peer = Z_Malloc( sizeof( *peer ) );" in alloc_peer_block
+    assert "Com_Memset( peer, 0, sizeof( *peer ) );" in alloc_peer_block
+    assert "Q_strncpyz( peer->identity, identity, sizeof( peer->identity ) );" in alloc_peer_block
+    assert "peer->identityLength = strlen( peer->identity );" in alloc_peer_block
+    assert "peer = idZMQ_AllocRconPeer( identity );" in insert_peer_block
+    assert "peer->parent = parent;" in insert_peer_block
+    assert insert_peer_block.index("peer = idZMQ_AllocRconPeer( identity );") < insert_peer_block.index("idZMQ_LinkRconPeerInOrder")
+
+    assert "if ( first == s_zmq.rconPeers && !last ) {" in range_erase_block
+    assert "idZMQ_FreeRconPeerSubtree( s_zmq.rconPeerRoot );" in range_erase_block
+    assert "for ( peer = first; peer && peer != last; peer = next ) {" in range_erase_block
+    assert "idZMQ_EraseRconPeer( peer );" in range_erase_block
+    assert "idZMQ_EraseRconPeerRange( s_zmq.rconPeers, NULL );" in clear_peer_block
+
+    assert "portable source analogue for `sub_4F4640`" in mapping_round
+    assert "retail full-range fast path" in mapping_round
+    assert "before 95% -> after 97%" in mapping_round
+
+
+def test_zmq_zap_plain_auth_source_shape_round_639_is_pinned() -> None:
+    aliases = json.loads(
+        (REPO_ROOT / "references/analysis/quakelive_symbol_aliases.json").read_text(encoding="utf-8")
+    )["quakelive_steam_srp"]
+    functions_csv = (
+        REPO_ROOT / "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+    ).read_text(encoding="utf-8").lower()
+    hlil_part05 = (
+        REPO_ROOT
+        / "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part05.txt"
+    ).read_text(encoding="utf-8")
+    hlil_part06 = (
+        REPO_ROOT
+        / "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part06.txt"
+    ).read_text(encoding="utf-8")
+    sv_zmq = (REPO_ROOT / "src/code/server/sv_zmq.c").read_text(encoding="utf-8")
+    mapping_round = (
+        REPO_ROOT / "docs/reverse-engineering/quakelive_steam_mapping_round_639.md"
+    ).read_text(encoding="utf-8")
+
+    expected_aliases = {
+        "sub_4F5A30": "zactor_new",
+        "sub_4F5DB0": "zstr_sendx",
+        "sub_4F5630": "zsock_wait",
+        "sub_4F5F10": "zauth_self_new",
+        "sub_4F63D0": "s_zap_request_new",
+        "sub_4F65F0": "s_zap_request_reply",
+        "sub_4F6630": "s_authenticate_plain",
+        "sub_4F67A0": "s_self_authenticate",
+        "sub_4F69F0": "zauth",
+    }
+
+    for symbol, alias in expected_aliases.items():
+        address = f"00{symbol.removeprefix('sub_')}".lower()
+        assert aliases[symbol] == alias
+        assert f"fun_{address},{address}" in functions_csv
+        assert f"| `{symbol}` | `{alias}` |" in mapping_round
+
+    assert "004f4055          eax_8, ecx, edx_1 = sub_4f5a30(sub_4f69f0, 0)" in hlil_part05
+    assert '004f405c          char const* const var_14_1 = "VERBOSE"' in hlil_part05
+    assert "004f4065          eax_9, edx_2 = sub_4f5db0(eax_8, edx_1, ecx, eax_8)" in hlil_part05
+    assert "004f406e          sub_4f5630(eax_9, edx_2, ecx_1, ecx_1)" in hlil_part05
+    assert "004f4078          sub_4f3d70(arg1)" in hlil_part05
+    assert '004f3da9  char const* const var_18_1 = "PLAIN"' in hlil_part05
+    assert '004f3f59      char const* const var_18_1 = "PLAIN"' in hlil_part05
+    assert "004f425f          eax_2, ecx, edx_1 = sub_4f5a30(sub_4f69f0, 0)" in hlil_part05
+    assert '004f4266          char const* const var_40_1 = "VERBOSE"' in hlil_part05
+    assert '004f5f9c  sub_4f5200(eax_9, "inproc://zeromq.zap.01")' in hlil_part05
+    assert '004f64af          char const* const ecx_3 = "PLAIN"' in hlil_part05
+    assert '004f6653  int32_t eax_2 = sub_4f7360("%s_%s")' in hlil_part05
+    assert '004f6894          char const* const ecx_4 = "NULL"' in hlil_part05
+    assert '004f68f3              char const* const ecx_5 = "PLAIN"' in hlil_part05
+
+    assert '0054822c  char const data_54822c[0x8] = "VERBOSE", 0' in hlil_part06
+    assert '00548354  char const data_548354[0x6] = "stats", 0' in hlil_part06
+    assert '005486c4  char const data_5486c4[0x6] = "%s_%s", 0' in hlil_part06
+    assert '005487fc  char const data_5487fc[0xa] = "No access", 0' in hlil_part06
+    assert '00550cd0  char const data_550cd0[0x17] = "inproc://zeromq.zap.01", 0' in hlil_part06
+    assert '0055125c  char const data_55125c[0x5] = "NULL", 0' in hlil_part06
+    assert '00551264  char const data_551264[0x6] = "PLAIN", 0' in hlil_part06
+    assert '00551628                          32 30 30 00' in hlil_part06
+
+    credentials_block = _extract_function_block(
+        sv_zmq,
+        "static qboolean idZMQ_GetPlainCredentials( const char *domain, const char **expectedUsername, const char **expectedPassword )",
+    )
+    validate_block = _extract_function_block(
+        sv_zmq,
+        "static qboolean idZMQ_ValidatePlainCredentials( const char *domain, const char *username, const char *password, const char **userId )",
+    )
+    ensure_auth_block = _extract_function_block(sv_zmq, "static qboolean idZMQ_EnsureAuthSocket( void )")
+    pump_auth_block = _extract_function_block(sv_zmq, "static void idZMQ_PumpAuthSocket( void )")
+    send_response_block = _extract_function_block(
+        sv_zmq,
+        "static void idZMQ_SendAuthResponse( const char *version, const char *requestId, const char *statusCode, const char *statusText, const char *userId )",
+    )
+
+    assert '#define QL_ZMQ_ZAP_ENDPOINT "inproc://zeromq.zap.01"' in sv_zmq
+    assert '#define QL_ZMQ_DOMAIN_RCON "rcon"' in sv_zmq
+    assert '#define QL_ZMQ_DOMAIN_STATS "stats"' in sv_zmq
+    assert '#define QL_ZMQ_ZAP_VERSION "1.0"' in sv_zmq
+    assert '#define QL_ZMQ_ZAP_MECHANISM_NULL "NULL"' in sv_zmq
+    assert '#define QL_ZMQ_ZAP_MECHANISM_PLAIN "PLAIN"' in sv_zmq
+    assert '#define QL_ZMQ_ZAP_STATUS_OK "200"' in sv_zmq
+    assert '#define QL_ZMQ_ZAP_STATUS_NO_ACCESS "400"' in sv_zmq
+    assert '#define QL_ZMQ_ZAP_TEXT_NO_ACCESS "No access"' in sv_zmq
+    assert "if ( !Q_stricmp( domain, QL_ZMQ_DOMAIN_RCON ) ) {" in credentials_block
+    assert "*expectedUsername = QL_ZMQ_DOMAIN_RCON;" in credentials_block
+    assert "*expectedPassword = s_zmq.rconPassword;" in credentials_block
+    assert "if ( !Q_stricmp( domain, QL_ZMQ_DOMAIN_STATS ) ) {" in credentials_block
+    assert "*expectedUsername = QL_ZMQ_DOMAIN_STATS;" in credentials_block
+    assert "*expectedPassword = s_zmq.statsPassword;" in credentials_block
+    assert "idZMQ_GetPlainCredentials( domain, &expectedUsername, &expectedPassword )" in validate_block
+    assert "Q_stricmp( username, expectedUsername ) != 0" in validate_block
+    assert "strcmp( password, expectedPassword ) != 0" in validate_block
+    assert "s_zmq.zmq_bind( socket, QL_ZMQ_ZAP_ENDPOINT )" in ensure_auth_block
+    assert "Q_strncpyz( version, QL_ZMQ_ZAP_VERSION, sizeof( version ) );" in pump_auth_block
+    assert "statusCode = QL_ZMQ_ZAP_STATUS_NO_ACCESS;" in pump_auth_block
+    assert "statusText = QL_ZMQ_ZAP_TEXT_BAD_REQUEST;" in pump_auth_block
+    assert "Q_stricmp( mechanism, QL_ZMQ_ZAP_MECHANISM_NULL )" in pump_auth_block
+    assert "Q_stricmp( mechanism, QL_ZMQ_ZAP_MECHANISM_PLAIN )" in pump_auth_block
+    assert "statusText = QL_ZMQ_ZAP_TEXT_NO_ACCESS;" in pump_auth_block
+    assert "statusCode = QL_ZMQ_ZAP_STATUS_OK;" in pump_auth_block
+    assert "statusText = QL_ZMQ_ZAP_TEXT_OK;" in pump_auth_block
+    assert "idZMQ_SendAuthFrame( s_zmq.authSocket, QL_ZMQ_AUTH_EMPTY_FRAME, qfalse );" in send_response_block
+    assert '#define QL_ZMQ_PASSWORD_STATS_RECORD_FORMAT "stats_stats=%s\\n"' in sv_zmq
+    assert '#define QL_ZMQ_PASSWORD_RCON_RECORD_FORMAT "rcon_rcon=%s\\n"' in sv_zmq
+    assert '#define QL_ZMQ_AUTH_KEY_FORMAT "%s_%s"' in sv_zmq
+    assert "Com_sprintf( line, sizeof( line ), QL_ZMQ_PASSWORD_STATS_RECORD_FORMAT, s_zmq.statsPassword );" in sv_zmq
+    assert "Com_sprintf( line, sizeof( line ), QL_ZMQ_PASSWORD_RCON_RECORD_FORMAT, s_zmq.rconPassword );" in sv_zmq
+
+    assert "manual ZAP REP socket" in mapping_round
+    assert "retail `zauth` actor evidence" in mapping_round
+    assert "before 97% -> after 98%" in mapping_round
+
+
+def test_zmq_rcon_first_message_connection_gate_round_640_is_pinned() -> None:
+    aliases = json.loads(
+        (REPO_ROOT / "references/analysis/quakelive_symbol_aliases.json").read_text(encoding="utf-8")
+    )["quakelive_steam_srp"]
+    functions_csv = (
+        REPO_ROOT / "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+    ).read_text(encoding="utf-8").lower()
+    hlil_part05 = (
+        REPO_ROOT
+        / "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part05.txt"
+    ).read_text(encoding="utf-8")
+    sv_zmq = (REPO_ROOT / "src/code/server/sv_zmq.c").read_text(encoding="utf-8")
+    mapping_round = (
+        REPO_ROOT / "docs/reverse-engineering/quakelive_steam_mapping_round_640.md"
+    ).read_text(encoding="utf-8")
+
+    expected_aliases = {
+        "sub_4F4ED0": "idZMQ_PumpRcon",
+        "sub_4F4910": "idZMQ_FindRconPeer",
+        "sub_4F49C0": "idZMQ_InsertRconPeer",
+        "sub_4F4640": "std_tree_create_zmq_rcon_peer_node",
+        "sub_4F4FD0": "Zmq_PumpRcon",
+    }
+
+    for symbol, alias in expected_aliases.items():
+        address = f"00{symbol.removeprefix('sub_')}".lower()
+        assert aliases[symbol] == alias
+        assert f"fun_{address},{address}" in functions_csv
+        assert f"| `{symbol}` | `{alias}` |" in mapping_round
+
+    assert "004f4efc          int32_t var_18_1 = 0" in hlil_part05
+    assert "004f4f09          var_18_1.w = 1" in hlil_part05
+    assert "004f4f0d          result = sub_401600(xmm0, &var_20, 1)" in hlil_part05
+    assert "004f4f23              int32_t eax_1 = sub_4f5cb0(*(arg1 + 0xc))" in hlil_part05
+    assert "004f4f2f              int32_t eax_2 = sub_4f5cb0(ecx_1)" in hlil_part05
+    assert "004f4f4c              void** ecx_3 = *sub_4f4910(arg1 + 0x14, &var_10, &var_8)" in hlil_part05
+    assert "004f4f5c                  sub_4c9860(arg1, \"zmq RCON client connected: %s\\n\")" in hlil_part05
+    assert "004f4f7a                  sub_4f49c0(arg1 + 0x14, &var_14, sub_4f4640(arg1 + 0x14), nullptr)" in hlil_part05
+    assert "004f4f91                  return sub_4f5e10(&var_c)" in hlil_part05
+    assert "004f4f99              sub_4c9860(arg1, \"zmq RCON command from %s: %s\\n\")" in hlil_part05
+    assert "004f4fa2              sub_4c7cf0(var_c)" in hlil_part05
+
+    pump_block = _extract_function_block(sv_zmq, "static void idZMQ_PumpRcon( void )")
+    connect_index = pump_block.index("Com_Printf( QL_ZMQ_RCON_CLIENT_CONNECT_FORMAT, peer->label );")
+    return_index = pump_block.index("return;", connect_index)
+    command_index = pump_block.index("Com_Printf( QL_ZMQ_RCON_COMMAND_FORMAT, peer->label, command );")
+    execute_index = pump_block.index("Cmd_ExecuteString( command );")
+
+    assert "if ( s_zmq.zmq_poll( &item, QL_ZMQ_SINGLE_POLL_ITEM, QL_ZMQ_POLL_TIMEOUT_IMMEDIATE ) < QL_ZMQ_POLL_READY_MIN || !( item.revents & QL_ZMQ_POLLIN ) ) {" in pump_block
+    assert "peer = idZMQ_FindRconPeer( identity );" in pump_block
+    assert "peer = idZMQ_InsertRconPeer( identity );" in pump_block
+    assert return_index < command_index < execute_index
+    assert "first message from a previously unseen ROUTER identity" in mapping_round
+    assert "before 92% -> after 98%" in mapping_round
+
+
+def test_zmq_player_event_type_forwarding_round_641_is_pinned() -> None:
+    aliases = json.loads(
+        (REPO_ROOT / "references/analysis/quakelive_symbol_aliases.json").read_text(encoding="utf-8")
+    )["quakelive_steam_srp"]
+    functions_csv = (
+        REPO_ROOT / "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+    ).read_text(encoding="utf-8").lower()
+    hlil_part05 = (
+        REPO_ROOT
+        / "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part05.txt"
+    ).read_text(encoding="utf-8")
+    hlil_part06 = (
+        REPO_ROOT
+        / "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part06.txt"
+    ).read_text(encoding="utf-8")
+    sv_zmq = (REPO_ROOT / "src/code/server/sv_zmq.c").read_text(encoding="utf-8")
+    sv_game = (REPO_ROOT / "src/code/server/sv_game.c").read_text(encoding="utf-8")
+    mapping_round = (
+        REPO_ROOT / "docs/reverse-engineering/quakelive_steam_mapping_round_641.md"
+    ).read_text(encoding="utf-8")
+
+    expected_aliases = {
+        "sub_4E2640": "SV_ReportPlayerEvent",
+        "sub_4F4E10": "Zmq_ReportPlayerEvent",
+        "sub_4F4B20": "idZMQ_ReportPlayerEvent",
+        "sub_4F4C30": "idZMQ_SubmitMatchReport",
+        "sub_4F4E40": "Zmq_SubmitMatchReport",
+    }
+
+    for symbol, alias in expected_aliases.items():
+        address = f"00{symbol.removeprefix('sub_')}".lower()
+        assert aliases[symbol] == alias
+        assert f"fun_{address},{address}" in functions_csv
+        assert f"| `{symbol}` | `{alias}` |" in mapping_round
+
+    assert "004e265a  sub_468030(arg1, arg2, arg3)" in hlil_part05
+    assert "004e2676  return sub_4f4e10(arg1, arg2, arg3, arg4, arg5)" in hlil_part05
+    assert "004f4e24  int32_t var_10 = arg3" in hlil_part05
+    assert "004f4e32  return sub_4f4b20(&data_5756fc, arg1, arg2)" in hlil_part05
+    assert "004f4b57  if (*(arg1 + 8) != 0)" in hlil_part05
+    assert "004f4b72      int32_t* eax_3 = sub_429370(&var_50, arg2)" in hlil_part05
+    assert '004f4b8b      sub_4296c0(sub_42a110(&var_40, "TYPE"), eax_3)' in hlil_part05
+    assert '004f4bac      sub_4296c0(sub_42a110(&var_40, "DATA"), arg3)' in hlil_part05
+    assert "004f4bd2      sub_4f5d60(*(arg1 + 8), eax_6)" in hlil_part05
+    assert '00548368  char const data_548368[0x5] = "DATA", 0' in hlil_part06
+    assert '00548370  char const data_548370[0x5] = "TYPE", 0' in hlil_part06
+    assert '00548378  char const data_548378[0xd] = "MATCH_REPORT", 0' in hlil_part06
+
+    publish_block = _extract_function_block(sv_zmq, "static void idZMQ_Publish( const char *type, const char *payload )")
+    report_event_block = _extract_function_block(
+        sv_zmq,
+        "static void idZMQ_ReportPlayerEvent( uint32_t steamIdLow, uint32_t steamIdHigh, const void *clientStats, const char *eventName, const void *payload )",
+    )
+    submit_report_block = _extract_function_block(sv_zmq, "static void idZMQ_SubmitMatchReport( const void *report )")
+    sv_report_bridge_block = _extract_function_block(
+        sv_game,
+        "static void SV_ReportPlayerEvent( uint32_t steamIdLow, uint32_t steamIdHigh, const void *clientStats, const char *eventName, void *payload )",
+    )
+
+    assert "idZMQ_Publish( QL_ZMQ_MATCH_REPORT_TYPE, (const char *)report );" in submit_report_block
+    assert 'idZMQ_Publish( eventName, (const char *)payload );' in report_event_block
+    assert '"UNKNOWN_EVENT"' not in sv_zmq
+    assert "if ( !type || !type[0] ) {" in publish_block
+    assert "idZMQ_BuildPublication( type, payload, message, sizeof( message ) );" in publish_block
+    assert "SV_SteamStats_ProcessEvent( steamIdLow, steamIdHigh, clientStats, eventName, payload );" in sv_report_bridge_block
+    assert "Zmq_ReportPlayerEvent( steamIdLow, steamIdHigh, clientStats, eventName, payload );" in sv_report_bridge_block
+    assert sv_report_bridge_block.index(
+        "SV_SteamStats_ProcessEvent( steamIdLow, steamIdHigh, clientStats, eventName, payload );"
+    ) < sv_report_bridge_block.index("Zmq_ReportPlayerEvent( steamIdLow, steamIdHigh, clientStats, eventName, payload );")
+
+    assert "forwards `arg1` directly as the ZMQ `TYPE`" in mapping_round
+    assert "before 93% -> after 98%" in mapping_round
+
+
+def test_zmq_publication_socket_lifecycle_round_642_is_pinned() -> None:
+    aliases = json.loads(
+        (REPO_ROOT / "references/analysis/quakelive_symbol_aliases.json").read_text(encoding="utf-8")
+    )["quakelive_steam_srp"]
+    functions_csv = (
+        REPO_ROOT / "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+    ).read_text(encoding="utf-8").lower()
+    hlil_part05 = (
+        REPO_ROOT
+        / "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part05.txt"
+    ).read_text(encoding="utf-8")
+    sv_zmq = (REPO_ROOT / "src/code/server/sv_zmq.c").read_text(encoding="utf-8")
+    sv_init = (REPO_ROOT / "src/code/server/sv_init.c").read_text(encoding="utf-8")
+    mapping_round = (
+        REPO_ROOT / "docs/reverse-engineering/quakelive_steam_mapping_round_642.md"
+    ).read_text(encoding="utf-8")
+
+    expected_aliases = {
+        "sub_4F4210": "idZMQ_InitStatsPublisher",
+        "sub_4F43A0": "Zmq_InitStatsPublisher",
+        "sub_4F4B20": "idZMQ_ReportPlayerEvent",
+        "sub_4F4C30": "idZMQ_SubmitMatchReport",
+        "sub_4F4E10": "Zmq_ReportPlayerEvent",
+        "sub_4F4E40": "Zmq_SubmitMatchReport",
+    }
+
+    for symbol, alias in expected_aliases.items():
+        address = f"00{symbol.removeprefix('sub_')}".lower()
+        assert aliases[symbol] == alias
+        assert f"fun_{address},{address}" in functions_csv
+        assert f"| `{symbol}` | `{alias}` |" in mapping_round
+
+    assert "004f4210    int32_t __fastcall sub_4f4210(void* arg1)" in hlil_part05
+    assert "004f424c  if (*(result + 0x30) s> 0 && *(arg1 + 8) == 0)" in hlil_part05
+    assert "004f4327      int32_t eax_11 = sub_4f5100(1, \"zmq\\id_zmq.cpp\", 0x5c)" in hlil_part05
+    assert "004f4332      *(arg1 + 8) = eax_11" in hlil_part05
+    assert "004f4b57  if (*(arg1 + 8) != 0)" in hlil_part05
+    assert "004f4bd2      sub_4f5d60(*(arg1 + 8), eax_6)" in hlil_part05
+    assert "004f4c65  if (*(arg1 + 8) != 0)" in hlil_part05
+    assert "004f4cdf      sub_4f5d60(*(arg1 + 8), eax_6)" in hlil_part05
+
+    publish_block = _extract_function_block(sv_zmq, "static void idZMQ_Publish( const char *type, const char *payload )")
+    init_publisher_block = _extract_function_block(sv_zmq, "static void idZMQ_InitStatsPublisher( void )")
+    spawn_block = _extract_function_block(sv_init, "void SV_SpawnServer( char *server, qboolean killBots )")
+
+    assert "idZMQ_EnsureStatsPublisher();" in init_publisher_block
+    assert "idZMQ_EnsureStatsPublisher();" not in publish_block
+    assert "socket = s_zmq.zmq_socket( s_zmq.context, QL_ZMQ_PUB );" in sv_zmq
+    assert "if ( s_zmq.pubSocket && s_zmq.zmq_send ) {" in publish_block
+    assert "s_zmq.zmq_send( s_zmq.pubSocket, message, strlen( message ), QL_ZMQ_NO_FLAGS );" in publish_block
+    assert "idZMQ_WriteStatsTranscript( message );" in publish_block
+    assert "Zmq_InitStatsPublisher();" in spawn_block
+    assert spawn_block.index("QL_Steamworks_ServerSetKeyValuesFromInfoString( serverInfo );") < spawn_block.index("Zmq_InitStatsPublisher();")
+    assert "publication helpers do not create the PUB socket" in mapping_round
+    assert "before 90% -> after 97%" in mapping_round
+
+
+def test_zmq_password_refresh_actor_source_shape_round_643_is_pinned() -> None:
+    aliases = json.loads(
+        (REPO_ROOT / "references/analysis/quakelive_symbol_aliases.json").read_text(encoding="utf-8")
+    )["quakelive_steam_srp"]
+    functions_csv = (
+        REPO_ROOT / "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+    ).read_text(encoding="utf-8").lower()
+    hlil_part04 = (
+        REPO_ROOT
+        / "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part04.txt"
+    ).read_text(encoding="utf-8")
+    hlil_part05 = (
+        REPO_ROOT
+        / "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part05.txt"
+    ).read_text(encoding="utf-8")
+    sv_zmq = (REPO_ROOT / "src/code/server/sv_zmq.c").read_text(encoding="utf-8")
+    mapping_round = (
+        REPO_ROOT / "docs/reverse-engineering/quakelive_steam_mapping_round_643.md"
+    ).read_text(encoding="utf-8")
+
+    expected_aliases = {
+        "sub_4D2460": "idZMQ_WritePasswordFile",
+        "sub_4F3D70": "idZMQ_ApplyPasswords",
+        "sub_4F3F20": "idZMQ_UpdatePasswords",
+        "sub_4F4130": "Zmq_UpdatePasswords",
+    }
+
+    for symbol, alias in expected_aliases.items():
+        address = f"00{symbol.removeprefix('sub_')}".lower()
+        assert aliases[symbol] == alias
+        assert f"fun_{address},{address}" in functions_csv
+        assert f"| `{symbol}` | `{alias}` |" in mapping_round
+
+    assert "004d2460    int32_t sub_4d2460(char* arg1, char* arg2)" in hlil_part04
+    assert "004d24fc      sub_4c97c0(&var_88, 0x80, \"stats_stats=%s\\n\")" in hlil_part04
+    assert "004d2545      sub_4c97c0(&var_88, 0x80, \"rcon_rcon=%s\\n\")" in hlil_part04
+    assert "004f3d70    uint32_t __fastcall sub_4f3d70(void* arg1)" in hlil_part05
+    assert "004f3d7b  data_5746f4 = *(result + 0x28)" in hlil_part05
+    assert "004f3d8a  data_5756f8 = *(ecx_1 + 0x28)" in hlil_part05
+    assert "004f3d94  if (*(arg1 + 4) == 0)" in hlil_part05
+    assert "004f3d9e  eax, ecx_3, edx_2 = sub_4d2460(*(result + 4), *(ecx_1 + 4))" in hlil_part05
+    assert '004f3da9  char const* const var_18_1 = "PLAIN"' in hlil_part05
+    assert "004f3db8  return sub_4f5630(eax_2, edx_3, ecx_4, ecx_4)" in hlil_part05
+    assert "004f3f20    int32_t __fastcall sub_4f3f20(void* arg1)" in hlil_part05
+    assert "004f3f44  if (*(arg1 + 4) != 0)" in hlil_part05
+    assert "004f3f4e      eax, ecx_3, edx_2 = sub_4d2460(*(eax_4 + 4), *(ecx_1 + 4))" in hlil_part05
+    assert '004f3f59      char const* const var_18_1 = "PLAIN"' in hlil_part05
+    assert '004f3f7e  return sub_4c9860(arg1, "zmq stats and rcon passwords upd…")' in hlil_part05
+
+    write_password_block = _extract_function_block(sv_zmq, "static void idZMQ_WritePasswordFile( void )")
+    apply_passwords_block = _extract_function_block(sv_zmq, "static void idZMQ_ApplyPasswords( void )")
+    update_passwords_block = _extract_function_block(sv_zmq, "static void idZMQ_UpdatePasswords( void ) {")
+    assert '#define QL_ZMQ_PASSWORD_STATS_RECORD_FORMAT "stats_stats=%s\\n"' in sv_zmq
+    assert '#define QL_ZMQ_PASSWORD_RCON_RECORD_FORMAT "rcon_rcon=%s\\n"' in sv_zmq
+    assert "Com_sprintf( line, sizeof( line ), QL_ZMQ_PASSWORD_STATS_RECORD_FORMAT, s_zmq.statsPassword );" in write_password_block
+    assert "Com_sprintf( line, sizeof( line ), QL_ZMQ_PASSWORD_RCON_RECORD_FORMAT, s_zmq.rconPassword );" in write_password_block
+    assert "if ( !s_zmq.authActorReady ) {" in apply_passwords_block
+    assert "idZMQ_WritePasswordFile();" in apply_passwords_block
+    assert apply_passwords_block.index("if ( !s_zmq.authActorReady ) {") < apply_passwords_block.index(
+        "idZMQ_WritePasswordFile();"
+    )
+    assert "idZMQ_CloseSocket" not in apply_passwords_block
+    assert "idZMQ_CloseAuthSocket" not in apply_passwords_block
+    assert "idZMQ_EnsureStatsPublisher" not in apply_passwords_block
+    assert "idZMQ_EnsureRconSocket" not in apply_passwords_block
+    assert "rconModeChanged" not in update_passwords_block
+    assert "statsModeChanged" not in update_passwords_block
+    assert "idZMQ_ApplyPasswords();" in update_passwords_block
+    assert "Com_Printf( QL_ZMQ_PASSWORD_UPDATE_MESSAGE );" in update_passwords_block
+    assert "idZMQ_TrySetSocketInt( socket, QL_ZMQ_PLAIN_SERVER, s_zmq.rconPassword[0] ? QL_ZMQ_SOCKET_OPTION_ENABLED : QL_ZMQ_SOCKET_OPTION_DISABLED );" in sv_zmq
+    assert "idZMQ_TrySetSocketInt( socket, QL_ZMQ_PLAIN_SERVER, s_zmq.statsPassword[0] ? QL_ZMQ_SOCKET_OPTION_ENABLED : QL_ZMQ_SOCKET_OPTION_DISABLED );" in sv_zmq
+    assert "password refresh updates retained cvar snapshots and the password file" in mapping_round
+    assert "does not reconstruct retail libzmq/CZMQ internals" in mapping_round
+    assert "before 91% -> after 98%" in mapping_round
+
+
+def test_zmq_stats_init_idempotent_wrapper_round_644_is_pinned() -> None:
+    aliases = json.loads(
+        (REPO_ROOT / "references/analysis/quakelive_symbol_aliases.json").read_text(encoding="utf-8")
+    )["quakelive_steam_srp"]
+    functions_csv = (
+        REPO_ROOT / "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+    ).read_text(encoding="utf-8").lower()
+    hlil_part05 = (
+        REPO_ROOT
+        / "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part05.txt"
+    ).read_text(encoding="utf-8")
+    sv_zmq = (REPO_ROOT / "src/code/server/sv_zmq.c").read_text(encoding="utf-8")
+    sv_init = (REPO_ROOT / "src/code/server/sv_init.c").read_text(encoding="utf-8")
+    mapping_round = (
+        REPO_ROOT / "docs/reverse-engineering/quakelive_steam_mapping_round_644.md"
+    ).read_text(encoding="utf-8")
+
+    expected_aliases = {
+        "sub_4F3DD0": "Zmq_ShutdownStatsPublisher",
+        "sub_4F4210": "idZMQ_InitStatsPublisher",
+        "sub_4F43A0": "Zmq_InitStatsPublisher",
+    }
+
+    for symbol, alias in expected_aliases.items():
+        address = f"00{symbol.removeprefix('sub_')}".lower()
+        assert aliases[symbol] == alias
+        assert f"fun_{address},{address}" in functions_csv
+        assert f"| `{symbol}` | `{alias}` |" in mapping_round
+
+    assert "004f3dd7  if (data_575704 != 0)" in hlil_part05
+    assert '004f3de5      sub_4f5190(&data_575704, "zmq\\id_zmq.cpp", 0x73)' in hlil_part05
+    assert "004f424c  if (*(result + 0x30) s> 0 && *(arg1 + 8) == 0)" in hlil_part05
+    assert "004f4327      int32_t eax_11 = sub_4f5100(1, \"zmq\\id_zmq.cpp\", 0x5c)" in hlil_part05
+    assert "004f4332      *(arg1 + 8) = eax_11" in hlil_part05
+    assert "004f43a5  return sub_4f4210(&data_5756fc) __tailcall" in hlil_part05
+
+    init_publisher_block = _extract_function_block(sv_zmq, "static void idZMQ_InitStatsPublisher( void )")
+    shutdown_stats_block = _extract_function_block(sv_zmq, "void Zmq_ShutdownStatsPublisher( void )")
+    spawn_block = _extract_function_block(sv_init, "void SV_SpawnServer( char *server, qboolean killBots )")
+
+    assert "idZMQ_EnsureStatsPublisher();" in init_publisher_block
+    assert "idZMQ_CloseStatsTranscript();" not in init_publisher_block
+    assert "idZMQ_CloseSocket( &s_zmq.pubSocket );" not in init_publisher_block
+    assert "if ( s_zmq.pubSocket ) {\n\t\treturn qtrue;\n\t}" in sv_zmq
+    assert "socket = s_zmq.zmq_socket( s_zmq.context, QL_ZMQ_PUB );" in sv_zmq
+    assert "idZMQ_CloseStatsTranscript();" in shutdown_stats_block
+    assert "idZMQ_CloseSocket( &s_zmq.pubSocket );" in shutdown_stats_block
+    assert "s_zmq.statsEndpoint[0] = QL_ZMQ_ENDPOINT_EMPTY;" in shutdown_stats_block
+    assert "Zmq_InitStatsPublisher();" in spawn_block
+    assert spawn_block.index("QL_Steamworks_ServerSetKeyValuesFromInfoString( serverInfo );") < spawn_block.index("Zmq_InitStatsPublisher();")
+    assert "does not close and recreate an existing PUB socket" in mapping_round
+    assert "before 93% -> after 98%" in mapping_round
+
+
+def test_zmq_rcon_frame_pump_is_poll_only_round_645_is_pinned() -> None:
+    aliases = json.loads(
+        (REPO_ROOT / "references/analysis/quakelive_symbol_aliases.json").read_text(encoding="utf-8")
+    )["quakelive_steam_srp"]
+    functions_csv = (
+        REPO_ROOT / "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+    ).read_text(encoding="utf-8").lower()
+    hlil_part05 = (
+        REPO_ROOT
+        / "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part05.txt"
+    ).read_text(encoding="utf-8")
+    sv_zmq = (REPO_ROOT / "src/code/server/sv_zmq.c").read_text(encoding="utf-8")
+    sv_main = (REPO_ROOT / "src/code/server/sv_main.c").read_text(encoding="utf-8")
+    mapping_round = (
+        REPO_ROOT / "docs/reverse-engineering/quakelive_steam_mapping_round_645.md"
+    ).read_text(encoding="utf-8")
+
+    expected_aliases = {
+        "sub_4F3F80": "idZMQ_RegisterCvarsAndInitRcon",
+        "sub_4F4140": "Zmq_RegisterCvarsAndInitRcon",
+        "sub_4F4ED0": "idZMQ_PumpRcon",
+        "sub_4F4FD0": "Zmq_PumpRcon",
+    }
+
+    for symbol, alias in expected_aliases.items():
+        address = f"00{symbol.removeprefix('sub_')}".lower()
+        assert aliases[symbol] == alias
+        assert f"fun_{address},{address}" in functions_csv
+        assert f"| `{symbol}` | `{alias}` |" in mapping_round
+
+    assert "004f4042  if (result[0xc] s> 0)" in hlil_part05
+    assert "004f4078          sub_4f3d70(arg1)" in hlil_part05
+    assert "004f40aa      int32_t eax_12 = sub_4f5100(6, \"zmq\\id_zmq.cpp\", 0xc7)" in hlil_part05
+    assert "004f40b5      *(arg1 + 0xc) = eax_12" in hlil_part05
+    assert "004f4145  return sub_4f3f80(&data_5756fc) __tailcall" in hlil_part05
+    assert "004f4ed0    void* __fastcall sub_4f4ed0(void* arg1)" in hlil_part05
+    assert "004f4efc          int32_t var_18_1 = 0" in hlil_part05
+    assert "004f4f0d          result = sub_401600(xmm0, &var_20, 1)" in hlil_part05
+    assert "004f4f23              int32_t eax_1 = sub_4f5cb0(*(arg1 + 0xc))" in hlil_part05
+    assert "004f4fd5  return sub_4f4ed0(&data_5756fc) __tailcall" in hlil_part05
+
+    register_block = _extract_function_block(sv_zmq, "static void idZMQ_RegisterCvarsAndInitRcon( void )")
+    ensure_auth_block = _extract_function_block(sv_zmq, "static qboolean idZMQ_EnsureAuthSocket( void )")
+    pump_auth_block = _extract_function_block(sv_zmq, "static void idZMQ_PumpAuthSocket( void )")
+    pump_block = _extract_function_block(sv_zmq, "static void idZMQ_PumpRcon( void )")
+    frame_block = _extract_function_block(sv_main, "void SV_Frame( int msec )")
+
+    assert "idZMQ_EnsureRconSocket();" in register_block
+    assert "if ( !idZMQ_EnsureAuthSocket() ) {" in sv_zmq
+    assert "s_zmq.zmq_bind( socket, QL_ZMQ_ZAP_ENDPOINT )" in ensure_auth_block
+    assert "idZMQ_EnsureAuthSocket()" not in pump_auth_block
+    assert "if ( !s_zmq.authActorReady || !s_zmq.authSocket || !s_zmq.zmq_poll || !s_zmq.zmq_recv || !s_zmq.zmq_send ) {" in pump_auth_block
+    assert "idZMQ_PumpAuthSocket();" in pump_block
+    assert "idZMQ_EnsureRconSocket()" not in pump_block
+    assert "if ( !s_zmq.rconSocket || !s_zmq.rconPollSocket || !s_zmq.zmq_poll || !s_zmq.zmq_recv ) {" in pump_block
+    assert "item.socket = s_zmq.rconPollSocket;" in pump_block
+    assert "Zmq_UpdatePasswords();" in frame_block
+    assert "Zmq_PumpRcon();" in frame_block
+    assert frame_block.index("Zmq_UpdatePasswords();") < frame_block.index("Zmq_PumpRcon();")
+    assert "frame pump no longer creates RCON or auth sockets" in mapping_round
+    assert "before 92% -> after 98%" in mapping_round
+
+
+def test_zmq_rcon_broadcast_disconnect_branch_round_646_is_pinned() -> None:
+    aliases = json.loads(
+        (REPO_ROOT / "references/analysis/quakelive_symbol_aliases.json").read_text(encoding="utf-8")
+    )["quakelive_steam_srp"]
+    functions_csv = (
+        REPO_ROOT / "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+    ).read_text(encoding="utf-8").lower()
+    hlil_part05 = (
+        REPO_ROOT
+        / "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part05.txt"
+    ).read_text(encoding="utf-8")
+    sv_zmq = (REPO_ROOT / "src/code/server/sv_zmq.c").read_text(encoding="utf-8")
+    common = (REPO_ROOT / "src/code/qcommon/common.c").read_text(encoding="utf-8")
+    mapping_round = (
+        REPO_ROOT / "docs/reverse-engineering/quakelive_steam_mapping_round_646.md"
+    ).read_text(encoding="utf-8")
+
+    expected_aliases = {
+        "sub_4F4D40": "idZMQ_BroadcastRconOutput",
+        "sub_4F4E60": "Zmq_BroadcastRconOutput",
+        "sub_4F46B0": "idZMQ_EraseRconPeer",
+        "sub_4F5D60": "zstr_send",
+        "sub_4F5D90": "zstr_sendm",
+    }
+
+    for symbol, alias in expected_aliases.items():
+        address = f"00{symbol.removeprefix('sub_')}".lower()
+        assert aliases[symbol] == alias
+        assert f"fun_{address},{address}" in functions_csv
+        assert f"| `{symbol}` | `{alias}` |" in mapping_round
+
+    assert "004f4d40    void __fastcall sub_4f4d40(void* arg1)" in hlil_part05
+    assert "004f4d4b  if (*(arg1 + 0xc) != 0)" in hlil_part05
+    assert "004f4d51      int32_t* i_1 = *(arg1 + 0x18)" in hlil_part05
+    assert "004f4d78              if (sub_4f5d90(*(arg1 + 0xc), eax) s>= 0)" in hlil_part05
+    assert "004f4daa                  sub_4f5d60(*(arg1 + 0xc), ebx_1)" in hlil_part05
+    assert "004f4d8a                  i = *sub_4f46b0(arg1 + 0x14, &var_8, i)" in hlil_part05
+    assert "004f4d92                  sub_4c9860(i, \"zmq RCON client disconnected: %s…\")" in hlil_part05
+    assert "004f4e72  return sub_4f4d40(&data_5756fc)" in hlil_part05
+    assert "004f5d60    int32_t sub_4f5d60(int32_t* arg1, void* arg2)" in hlil_part05
+    assert "004f5d80  return sub_4f5c10(edi, arg1, 0)" in hlil_part05
+    assert "004f5d90    int32_t sub_4f5d90(int32_t* arg1, char* arg2)" in hlil_part05
+    assert "004f5da7  return sub_4f5c10(arg2, arg1, 1)" in hlil_part05
+
+    broadcast_block = _extract_function_block(sv_zmq, "static void idZMQ_BroadcastRconOutput( const char *message )")
+    printf_block = _extract_function_block(common, "void QDECL Com_Printf( const char *fmt, ... )")
+
+    identity_send = "s_zmq.zmq_send( s_zmq.rconSocket, peer->identity, peer->identityLength, QL_ZMQ_SEND_MORE_DONTWAIT ) < QL_ZMQ_SEND_SUCCESS_MIN"
+    message_send = "s_zmq.zmq_send( s_zmq.rconSocket, payload, strlen( payload ), QL_ZMQ_SEND_DONTWAIT );"
+    disconnect_log = "Com_Printf( QL_ZMQ_RCON_CLIENT_DISCONNECT_FORMAT, peer->label );"
+    erase_peer = "idZMQ_EraseRconPeer( peer );"
+
+    assert identity_send in broadcast_block
+    assert message_send in broadcast_block
+    assert disconnect_log in broadcast_block
+    assert erase_peer in broadcast_block
+    assert "||\n\t\t\ts_zmq.zmq_send( s_zmq.rconSocket, payload" not in broadcast_block
+    assert broadcast_block.index(identity_send) < broadcast_block.index(disconnect_log)
+    assert broadcast_block.index(disconnect_log) < broadcast_block.index(erase_peer)
+    assert broadcast_block.index(erase_peer) < broadcast_block.index("continue;")
+    assert broadcast_block.index("continue;") < broadcast_block.index(message_send)
+    assert "Zmq_BroadcastRconOutput( msg );" in printf_block
+    assert "message frame send is not part of the disconnect branch" in mapping_round
+    assert "before 91% -> after 98%" in mapping_round
+
+
+def test_zmq_rcon_broadcast_null_payload_round_647_is_pinned() -> None:
+    aliases = json.loads(
+        (REPO_ROOT / "references/analysis/quakelive_symbol_aliases.json").read_text(encoding="utf-8")
+    )["quakelive_steam_srp"]
+    functions_csv = (
+        REPO_ROOT / "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+    ).read_text(encoding="utf-8").lower()
+    hlil_part05 = (
+        REPO_ROOT
+        / "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part05.txt"
+    ).read_text(encoding="utf-8")
+    sv_zmq = (REPO_ROOT / "src/code/server/sv_zmq.c").read_text(encoding="utf-8")
+    common = (REPO_ROOT / "src/code/qcommon/common.c").read_text(encoding="utf-8")
+    mapping_round = (
+        REPO_ROOT / "docs/reverse-engineering/quakelive_steam_mapping_round_647.md"
+    ).read_text(encoding="utf-8")
+
+    expected_aliases = {
+        "sub_4F4D40": "idZMQ_BroadcastRconOutput",
+        "sub_4F4E60": "Zmq_BroadcastRconOutput",
+        "sub_4F5D60": "zstr_send",
+    }
+
+    for symbol, alias in expected_aliases.items():
+        address = f"00{symbol.removeprefix('sub_')}".lower()
+        assert aliases[symbol] == alias
+        assert f"fun_{address},{address}" in functions_csv
+        assert f"| `{symbol}` | `{alias}` |" in mapping_round
+
+    assert "004f4d60          char* ebx_1 = arg_4" in hlil_part05
+    assert "004f4daa                  sub_4f5d60(*(arg1 + 0xc), ebx_1)" in hlil_part05
+    assert "004f4e66  int32_t var_8 = arg1" in hlil_part05
+    assert "004f4e72  return sub_4f4d40(&data_5756fc)" in hlil_part05
+    assert "004f5d60    int32_t sub_4f5d60(int32_t* arg1, void* arg2)" in hlil_part05
+    assert "004f5d69  if (edi == 0)" in hlil_part05
+    assert "004f5d6b      edi = &data_54f9da" in hlil_part05
+    assert "004f5d80  return sub_4f5c10(edi, arg1, 0)" in hlil_part05
+
+    broadcast_block = _extract_function_block(sv_zmq, "static void idZMQ_BroadcastRconOutput( const char *message )")
+    printf_block = _extract_function_block(common, "void QDECL Com_Printf( const char *fmt, ... )")
+
+    assert "const char *payload;" in broadcast_block
+    assert "if ( !s_zmq.rconSocket || !s_zmq.rconPeers || !s_zmq.zmq_send ) {" in broadcast_block
+    assert "!message || !message[0]" not in broadcast_block
+    assert "#define QL_ZMQ_RCON_EMPTY_PAYLOAD QL_ZMQ_DEFAULT_EMPTY" in sv_zmq
+    assert "payload = message ? message : QL_ZMQ_RCON_EMPTY_PAYLOAD;" in broadcast_block
+    assert 'payload = message ? message : "";' not in broadcast_block
+    assert "s_zmq.zmq_send( s_zmq.rconSocket, payload, strlen( payload ), QL_ZMQ_SEND_DONTWAIT );" in broadcast_block
+    assert "strlen( message )" not in broadcast_block
+    assert "Zmq_BroadcastRconOutput( msg );" in printf_block
+    assert "null broadcast payloads are normalized to an empty string" in mapping_round
+    assert "before 93% -> after 98%" in mapping_round
+
+
+def test_zmq_rcon_broadcast_reentrancy_guard_round_751_is_pinned() -> None:
+    aliases = json.loads(
+        (REPO_ROOT / "references/analysis/quakelive_symbol_aliases.json").read_text(encoding="utf-8")
+    )["quakelive_steam_srp"]
+    functions_csv = (
+        REPO_ROOT / "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+    ).read_text(encoding="utf-8").lower()
+    hlil_part05 = (
+        REPO_ROOT
+        / "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part05.txt"
+    ).read_text(encoding="utf-8")
+    sv_zmq = (REPO_ROOT / "src/code/server/sv_zmq.c").read_text(encoding="utf-8")
+    common = (REPO_ROOT / "src/code/qcommon/common.c").read_text(encoding="utf-8")
+    implementation_plan = (REPO_ROOT / "IMPLEMENTATION_PLAN.md").read_text(encoding="utf-8")
+    mapping_round = (
+        REPO_ROOT / "docs/reverse-engineering/quakelive_steam_mapping_round_751.md"
+    ).read_text(encoding="utf-8")
+
+    expected_aliases = {
+        "sub_4C9860": "Com_Printf",
+        "sub_4F46B0": "idZMQ_EraseRconPeer",
+        "sub_4F4D40": "idZMQ_BroadcastRconOutput",
+        "sub_4F4E60": "Zmq_BroadcastRconOutput",
+        "sub_4F5D60": "zstr_send",
+        "sub_4F5D90": "zstr_sendm",
+    }
+
+    for symbol, alias in expected_aliases.items():
+        address = f"00{symbol.removeprefix('sub_')}".lower()
+        assert aliases[symbol] == alias
+        assert f"fun_{address},{address}" in functions_csv
+        assert f"| `{symbol}` | `{alias}` |" in mapping_round
+
+    assert "004f4d40    void __fastcall sub_4f4d40(void* arg1)" in hlil_part05
+    assert "004f4d4b  if (*(arg1 + 0xc) != 0)" in hlil_part05
+    assert "004f4d78              if (sub_4f5d90(*(arg1 + 0xc), eax) s>= 0)" in hlil_part05
+    assert "004f4daa                  sub_4f5d60(*(arg1 + 0xc), ebx_1)" in hlil_part05
+    assert "004f4d8a                  i = *sub_4f46b0(arg1 + 0x14, &var_8, i)" in hlil_part05
+    assert "004f4d92                  sub_4c9860(i, \"zmq RCON client disconnected: %s…\")" in hlil_part05
+    assert "004f4e72  return sub_4f4d40(&data_5756fc)" in hlil_part05
+
+    broadcast_block = _extract_function_block(sv_zmq, "static void idZMQ_BroadcastRconOutput( const char *message )")
+    printf_block = _extract_function_block(common, "void QDECL Com_Printf( const char *fmt, ... )")
+
+    guard_line = "if ( s_zmq.broadcastingRconOutput ) {"
+    active_line = "s_zmq.broadcastingRconOutput = QL_ZMQ_RCON_BROADCAST_ACTIVE;"
+    idle_line = "s_zmq.broadcastingRconOutput = QL_ZMQ_RCON_BROADCAST_IDLE;"
+    loop_line = "for ( peer = s_zmq.rconPeers; peer; peer = next ) {"
+    disconnect_log = "Com_Printf( QL_ZMQ_RCON_CLIENT_DISCONNECT_FORMAT, peer->label );"
+
+    assert "#define QL_ZMQ_RCON_BROADCAST_ACTIVE qtrue" in sv_zmq
+    assert "#define QL_ZMQ_RCON_BROADCAST_IDLE qfalse" in sv_zmq
+    assert "qboolean\t\t\t\tbroadcastingRconOutput;" in sv_zmq
+    assert guard_line in broadcast_block
+    assert active_line in broadcast_block
+    assert idle_line in broadcast_block
+    assert disconnect_log in broadcast_block
+    assert "Zmq_BroadcastRconOutput( msg );" in printf_block
+    assert "s_zmq.broadcastingRconOutput = qtrue;" not in sv_zmq
+    assert "s_zmq.broadcastingRconOutput = qfalse;" not in sv_zmq
+    assert broadcast_block.index(guard_line) < broadcast_block.index("payload = message ? message : QL_ZMQ_RCON_EMPTY_PAYLOAD;")
+    assert broadcast_block.index(active_line) < broadcast_block.index(loop_line)
+    assert broadcast_block.index(disconnect_log) < broadcast_block.index("idZMQ_EraseRconPeer( peer );")
+    assert broadcast_block.index(loop_line) < broadcast_block.index(idle_line)
+    assert "zstr_send(" not in sv_zmq
+    assert "zstr_sendm(" not in sv_zmq
+
+    assert "ZMQ RCON broadcast reentrancy guard boundary" in mapping_round
+    assert "SRP broadcast recursion guard adaptation" in mapping_round
+    assert "does not reconstruct libzmq/CZMQ internals" in mapping_round
+    assert "before 93% -> after 99%" in mapping_round
+    assert "### Task A653: Pin ZMQ RCON broadcast reentrancy guard boundary [COMPLETED]" in implementation_plan
+
+
+def test_zmq_stats_endpoint_net_ip_round_648_is_pinned() -> None:
+    aliases = json.loads(
+        (REPO_ROOT / "references/analysis/quakelive_symbol_aliases.json").read_text(encoding="utf-8")
+    )["quakelive_steam_srp"]
+    functions_csv = (
+        REPO_ROOT / "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+    ).read_text(encoding="utf-8").lower()
+    hlil_part05 = (
+        REPO_ROOT
+        / "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part05.txt"
+    ).read_text(encoding="utf-8")
+    sv_zmq = (REPO_ROOT / "src/code/server/sv_zmq.c").read_text(encoding="utf-8")
+    mapping_round = (
+        REPO_ROOT / "docs/reverse-engineering/quakelive_steam_mapping_round_648.md"
+    ).read_text(encoding="utf-8")
+
+    expected_aliases = {
+        "sub_4F4210": "idZMQ_InitStatsPublisher",
+        "sub_4F43A0": "Zmq_InitStatsPublisher",
+    }
+
+    for symbol, alias in expected_aliases.items():
+        address = f"00{symbol.removeprefix('sub_')}".lower()
+        assert aliases[symbol] == alias
+        assert f"fun_{address},{address}" in functions_csv
+        assert f"| `{symbol}` | `{alias}` |" in mapping_round
+
+    assert "004f428e      char* edi_1 = *(data_12d3084 + 4)" in hlil_part05
+    assert "004f4294      if (*edi_1 == 0)" in hlil_part05
+    assert '004f42af          sub_4d7250(sub_4ce0d0(x87_r0, "net_ip", "localhost", 0x20)[1], &var_2c)' in hlil_part05
+    assert '004f42d3          sub_4d9160(&var_18, 0x10, "%i.%i.%i.%i")' in hlil_part05
+    assert "004f42db          edi_1 = &var_18" in hlil_part05
+    assert "004f4317      int32_t eax_10 = sub_4d9220(\"tcp://%s:%i\")" in hlil_part05
+
+    stats_host_block = _extract_function_block(sv_zmq, "static void idZMQ_ResolveStatsHost( char *resolvedAddress, size_t resolvedIpSize )")
+    stats_endpoint_block = _extract_function_block(sv_zmq, "static void idZMQ_ResolveStatsEndpoint( char *endpoint, size_t endpointSize )")
+
+    assert 'Q_strncpyz( resolvedAddress, s_zmqStatsIp->string, resolvedIpSize );' in stats_host_block
+    assert "#define QL_ZMQ_CVAR_NET_FALLBACK_FLAGS CVAR_LATCH" in sv_zmq
+    assert "netIp = Cvar_Get( QL_ZMQ_CVAR_NET_IP, QL_ZMQ_DEFAULT_NET_IP, QL_ZMQ_CVAR_NET_FALLBACK_FLAGS );" in stats_host_block
+    assert "Com_Memset( &address, 0, sizeof( address ) );" in stats_host_block
+    assert "if ( netIp ) {" in stats_host_block
+    assert "NET_StringToAdr( netIp->string, &address );" in stats_host_block
+    assert "Com_sprintf( resolvedAddress, resolvedIpSize, QL_ZMQ_IPV4_FORMAT," in stats_host_block
+    assert 'Cvar_VariableStringBuffer( "net_ip"' not in stats_host_block
+    assert 'Q_strncpyz( resolvedIp, "localhost", sizeof( resolvedIp ) );' not in stats_host_block
+    assert "idZMQ_ResolveStatsHost( resolvedIp, sizeof( resolvedIp ) );" in stats_endpoint_block
+    assert '#define QL_ZMQ_ENDPOINT_FORMAT "tcp://%s:%i"' in sv_zmq
+    assert "Com_sprintf( endpoint, endpointSize, QL_ZMQ_ENDPOINT_FORMAT, resolvedIp, resolvedPort );" in stats_endpoint_block
+    assert "empty zmq_stats_ip now follows the retail net_ip parse-and-format path" in mapping_round
+    assert "before 88% -> after 97%" in mapping_round
+
+
+def test_zmq_socket_bind_failure_retention_round_649_is_pinned() -> None:
+    aliases = json.loads(
+        (REPO_ROOT / "references/analysis/quakelive_symbol_aliases.json").read_text(encoding="utf-8")
+    )["quakelive_steam_srp"]
+    functions_csv = (
+        REPO_ROOT / "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+    ).read_text(encoding="utf-8").lower()
+    hlil_part05 = (
+        REPO_ROOT
+        / "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part05.txt"
+    ).read_text(encoding="utf-8")
+    sv_zmq = (REPO_ROOT / "src/code/server/sv_zmq.c").read_text(encoding="utf-8")
+    mapping_round = (
+        REPO_ROOT / "docs/reverse-engineering/quakelive_steam_mapping_round_649.md"
+    ).read_text(encoding="utf-8")
+
+    expected_aliases = {
+        "sub_4F3F80": "idZMQ_RegisterCvarsAndInitRcon",
+        "sub_4F4210": "idZMQ_InitStatsPublisher",
+        "sub_4F5100": "zsock_new_checked",
+        "sub_4F5200": "zsock_bind",
+        "sub_4F56B0": "zsock_resolve",
+    }
+
+    for symbol, alias in expected_aliases.items():
+        address = f"00{symbol.removeprefix('sub_')}".lower()
+        assert aliases[symbol] == alias
+        assert f"fun_{address},{address}" in functions_csv
+        assert f"| `{symbol}` | `{alias}` |" in mapping_round
+
+    assert '004f40aa      int32_t eax_12 = sub_4f5100(6, "zmq\\id_zmq.cpp", 0xc7)' in hlil_part05
+    assert "004f40b5      *(arg1 + 0xc) = eax_12" in hlil_part05
+    assert "004f40ff      if (sub_4f5200(*(arg1 + 0xc), eax_11) == 0xffffffff)" in hlil_part05
+    assert '004f4108          var_10_5 = "zmq RCON socket error, bind fail…"' in hlil_part05
+    assert '004f4101          var_10_5 = "zmq RCON socket: %s\\n"' in hlil_part05
+    assert "004f410d      sub_4c9860(arg1, var_10_5)" in hlil_part05
+    assert "004f4119      result = sub_4f56b0(*(arg1 + 0xc))" in hlil_part05
+    assert "004f4121      *(arg1 + 0x10) = result" in hlil_part05
+    assert '004f4327      int32_t eax_11 = sub_4f5100(1, "zmq\\id_zmq.cpp", 0x5c)' in hlil_part05
+    assert "004f4332      *(arg1 + 8) = eax_11" in hlil_part05
+    assert "004f4371      if (sub_4f5200(*(arg1 + 8), eax_10) == 0xffffffff)" in hlil_part05
+    assert '004f437a          var_3c_7 = "zmq PUB socket error, bind faile…"' in hlil_part05
+    assert '004f4373          var_3c_7 = "zmq PUB socket: %s\\n"' in hlil_part05
+    assert "004f437f      result = sub_4c9860(arg1, var_3c_7)" in hlil_part05
+
+    ensure_rcon_block = _extract_function_block(sv_zmq, "static qboolean idZMQ_EnsureRconSocket( void ) {")
+    ensure_stats_block = _extract_function_block(sv_zmq, "static qboolean idZMQ_EnsureStatsPublisher( void ) {")
+
+    rcon_assign = "s_zmq.rconSocket = socket;"
+    rcon_bind = "if ( s_zmq.zmq_bind( socket, s_zmq.rconEndpoint ) != QL_ZMQ_BIND_SUCCESS ) {"
+    rcon_error = "Com_Printf( QL_ZMQ_RCON_BIND_ERROR_FORMAT, idZMQ_LastErrorString() );"
+    rcon_success = "Com_Printf( QL_ZMQ_RCON_BIND_SUCCESS_FORMAT, s_zmq.rconEndpoint );"
+    stats_assign = "s_zmq.pubSocket = socket;"
+    stats_bind = "if ( s_zmq.zmq_bind( socket, s_zmq.statsEndpoint ) != QL_ZMQ_BIND_SUCCESS ) {"
+    stats_error = "Com_Printf( QL_ZMQ_STATS_BIND_ERROR_FORMAT, idZMQ_LastErrorString() );"
+    stats_success = "Com_Printf( QL_ZMQ_STATS_BIND_SUCCESS_FORMAT, s_zmq.statsEndpoint );"
+
+    assert rcon_assign in ensure_rcon_block
+    assert "#define QL_ZMQ_BIND_SUCCESS 0" in sv_zmq
+    assert rcon_bind in ensure_rcon_block
+    assert rcon_error in ensure_rcon_block
+    assert rcon_success in ensure_rcon_block
+    assert ensure_rcon_block.index(rcon_assign) < ensure_rcon_block.index(rcon_bind)
+    assert ensure_rcon_block.index(rcon_bind) < ensure_rcon_block.index(rcon_error)
+    assert ensure_rcon_block.index(rcon_error) < ensure_rcon_block.index(rcon_success)
+    assert "s_zmq.zmq_close( socket );" not in ensure_rcon_block
+
+    assert stats_assign in ensure_stats_block
+    assert stats_bind in ensure_stats_block
+    assert stats_error in ensure_stats_block
+    assert stats_success in ensure_stats_block
+    assert ensure_stats_block.index(stats_assign) < ensure_stats_block.index(stats_bind)
+    assert ensure_stats_block.index(stats_bind) < ensure_stats_block.index(stats_error)
+    assert ensure_stats_block.index(stats_error) < ensure_stats_block.index(stats_success)
+    assert "s_zmq.zmq_close( socket );" not in ensure_stats_block
+    assert "zmq_bind( socket, s_zmq.rconEndpoint ) != 0" not in sv_zmq
+    assert "zmq_bind( socket, s_zmq.statsEndpoint ) != 0" not in sv_zmq
+    assert "bind failures retain the created socket slot" in mapping_round
+    assert "before 89% -> after 97%" in mapping_round
+
+
+def test_zmq_bind_success_threshold_round_730_is_pinned() -> None:
+    aliases = json.loads(
+        (REPO_ROOT / "references/analysis/quakelive_symbol_aliases.json").read_text(encoding="utf-8")
+    )["quakelive_steam_srp"]
+    functions_csv = (
+        REPO_ROOT / "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+    ).read_text(encoding="utf-8").lower()
+    hlil_part05 = (
+        REPO_ROOT
+        / "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part05.txt"
+    ).read_text(encoding="utf-8")
+    sv_zmq = (REPO_ROOT / "src/code/server/sv_zmq.c").read_text(encoding="utf-8")
+    implementation_plan = (REPO_ROOT / "IMPLEMENTATION_PLAN.md").read_text(encoding="utf-8")
+    mapping_round = (
+        REPO_ROOT / "docs/reverse-engineering/quakelive_steam_mapping_round_730.md"
+    ).read_text(encoding="utf-8")
+
+    expected_aliases = {
+        "sub_401410": "zmq_bind",
+        "sub_4F3F80": "idZMQ_RegisterCvarsAndInitRcon",
+        "sub_4F4210": "idZMQ_InitStatsPublisher",
+        "sub_4F5200": "zsock_bind",
+    }
+
+    for symbol, alias in expected_aliases.items():
+        address = f"00{symbol.removeprefix('sub_')}".lower()
+        assert aliases[symbol] == alias
+        assert f"fun_{address},{address}" in functions_csv
+        assert f"| `{symbol}` | `{alias}` |" in mapping_round
+
+    assert "004f40ff      if (sub_4f5200(*(arg1 + 0xc), eax_11) == 0xffffffff)" in hlil_part05
+    assert '004f4108          var_10_5 = "zmq RCON socket error, bind fail…"' in hlil_part05
+    assert '004f4101          var_10_5 = "zmq RCON socket: %s\\n"' in hlil_part05
+    assert "004f4371      if (sub_4f5200(*(arg1 + 8), eax_10) == 0xffffffff)" in hlil_part05
+    assert '004f437a          var_3c_7 = "zmq PUB socket error, bind faile…"' in hlil_part05
+    assert '004f4373          var_3c_7 = "zmq PUB socket: %s\\n"' in hlil_part05
+
+    ensure_auth_block = _extract_function_block(sv_zmq, "static qboolean idZMQ_EnsureAuthSocket( void ) {")
+    ensure_rcon_block = _extract_function_block(sv_zmq, "static qboolean idZMQ_EnsureRconSocket( void ) {")
+    ensure_stats_block = _extract_function_block(sv_zmq, "static qboolean idZMQ_EnsureStatsPublisher( void ) {")
+
+    assert "#define QL_ZMQ_BIND_SUCCESS 0" in sv_zmq
+    assert "if ( s_zmq.zmq_bind( socket, QL_ZMQ_ZAP_ENDPOINT ) != QL_ZMQ_BIND_SUCCESS ) {" in ensure_auth_block
+    assert "if ( s_zmq.zmq_bind( socket, s_zmq.rconEndpoint ) != QL_ZMQ_BIND_SUCCESS ) {" in ensure_rcon_block
+    assert "if ( s_zmq.zmq_bind( socket, s_zmq.statsEndpoint ) != QL_ZMQ_BIND_SUCCESS ) {" in ensure_stats_block
+    assert "zmq_bind( socket, QL_ZMQ_ZAP_ENDPOINT ) != 0" not in sv_zmq
+    assert "zmq_bind( socket, s_zmq.rconEndpoint ) != 0" not in sv_zmq
+    assert "zmq_bind( socket, s_zmq.statsEndpoint ) != 0" not in sv_zmq
+    assert "zsock_bind(" not in sv_zmq
+    assert "zsock_new_checked(" not in sv_zmq
+
+    assert "ZMQ bind success-threshold boundary" in mapping_round
+    assert "SRP dynamic zmq_bind adaptation" in mapping_round
+    assert "does not reconstruct libzmq/CZMQ internals" in mapping_round
+    assert "before 94% -> after 99%" in mapping_round
+    assert "### Task A632: Pin ZMQ bind success-threshold boundary [COMPLETED]" in implementation_plan
+
+
+def test_zmq_rcon_resolved_poll_slot_round_650_is_pinned() -> None:
+    aliases = json.loads(
+        (REPO_ROOT / "references/analysis/quakelive_symbol_aliases.json").read_text(encoding="utf-8")
+    )["quakelive_steam_srp"]
+    functions_csv = (
+        REPO_ROOT / "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+    ).read_text(encoding="utf-8").lower()
+    hlil_part05 = (
+        REPO_ROOT
+        / "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part05.txt"
+    ).read_text(encoding="utf-8")
+    sv_zmq = (REPO_ROOT / "src/code/server/sv_zmq.c").read_text(encoding="utf-8")
+    mapping_round = (
+        REPO_ROOT / "docs/reverse-engineering/quakelive_steam_mapping_round_650.md"
+    ).read_text(encoding="utf-8")
+
+    expected_aliases = {
+        "sub_401600": "zmq_poll",
+        "sub_4F3F80": "idZMQ_RegisterCvarsAndInitRcon",
+        "sub_4F4ED0": "idZMQ_PumpRcon",
+        "sub_4F4FD0": "Zmq_PumpRcon",
+        "sub_4F56B0": "zsock_resolve",
+    }
+
+    for symbol, alias in expected_aliases.items():
+        address = f"00{symbol.removeprefix('sub_')}".lower()
+        assert aliases[symbol] == alias
+        assert f"fun_{address},{address}" in functions_csv
+        assert f"| `{symbol}` | `{alias}` |" in mapping_round
+
+    assert "004f4119      result = sub_4f56b0(*(arg1 + 0xc))" in hlil_part05
+    assert "004f4121      *(arg1 + 0x10) = result" in hlil_part05
+    assert "004f4ede  if (*(arg1 + 0xc) != 0)" in hlil_part05
+    assert "004f4ee4      int32_t ecx = *(arg1 + 0x10)" in hlil_part05
+    assert "004f4ee9      if (ecx != 0)" in hlil_part05
+    assert "004f4eef          int32_t var_20 = ecx" in hlil_part05
+    assert "004f4f0d          result = sub_401600(xmm0, &var_20, 1)" in hlil_part05
+    assert "004f4f23              int32_t eax_1 = sub_4f5cb0(*(arg1 + 0xc))" in hlil_part05
+    assert "004f4f2f              int32_t eax_2 = sub_4f5cb0(ecx_1)" in hlil_part05
+
+    ensure_rcon_block = _extract_function_block(sv_zmq, "static qboolean idZMQ_EnsureRconSocket( void ) {")
+    pump_block = _extract_function_block(sv_zmq, "static void idZMQ_PumpRcon( void )")
+    shutdown_block = _extract_function_block(sv_zmq, "void Zmq_ShutdownRuntime( void )")
+
+    assert "void\t\t\t\t\t*rconPollSocket;" in sv_zmq
+    assert "s_zmq.rconSocket = socket;" in ensure_rcon_block
+    assert "s_zmq.rconPollSocket = s_zmq.rconSocket;" in ensure_rcon_block
+    assert ensure_rcon_block.index("s_zmq.rconSocket = socket;") < ensure_rcon_block.index(
+        "s_zmq.rconPollSocket = s_zmq.rconSocket;"
+    )
+    assert ensure_rcon_block.index("Com_Printf( QL_ZMQ_RCON_BIND_ERROR_FORMAT, idZMQ_LastErrorString() );") < ensure_rcon_block.index(
+        "s_zmq.rconPollSocket = s_zmq.rconSocket;"
+    )
+    assert ensure_rcon_block.index("Com_Printf( QL_ZMQ_RCON_BIND_SUCCESS_FORMAT, s_zmq.rconEndpoint );") < ensure_rcon_block.index(
+        "s_zmq.rconPollSocket = s_zmq.rconSocket;"
+    )
+    assert "if ( !s_zmq.rconSocket || !s_zmq.rconPollSocket || !s_zmq.zmq_poll || !s_zmq.zmq_recv ) {" in pump_block
+    assert "item.socket = s_zmq.rconPollSocket;" in pump_block
+    assert "identityLength = idZMQ_ReadFrameString( s_zmq.rconSocket, identity, sizeof( identity ), &more );" in pump_block
+    assert "idZMQ_ReadFrameString( s_zmq.rconSocket, command, commandSize, &more );" in sv_zmq
+    assert "s_zmq.rconPollSocket = QL_ZMQ_RCON_POLL_SLOT_EMPTY;" in ensure_rcon_block
+    assert "s_zmq.rconPollSocket = QL_ZMQ_RCON_POLL_SLOT_EMPTY;" in shutdown_block
+    assert "resolved RCON poll slot" in mapping_round
+    assert "before 90% -> after 98%" in mapping_round
+
+
+def test_zmq_auth_actor_ready_shutdown_order_round_651_is_pinned() -> None:
+    aliases = json.loads(
+        (REPO_ROOT / "references/analysis/quakelive_symbol_aliases.json").read_text(encoding="utf-8")
+    )["quakelive_steam_srp"]
+    functions_csv = (
+        REPO_ROOT / "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+    ).read_text(encoding="utf-8").lower()
+    hlil_part05 = (
+        REPO_ROOT
+        / "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part05.txt"
+    ).read_text(encoding="utf-8")
+    sv_zmq = (REPO_ROOT / "src/code/server/sv_zmq.c").read_text(encoding="utf-8")
+    mapping_round = (
+        REPO_ROOT / "docs/reverse-engineering/quakelive_steam_mapping_round_651.md"
+    ).read_text(encoding="utf-8")
+
+    expected_aliases = {
+        "sub_4F3D70": "idZMQ_ApplyPasswords",
+        "sub_4F3DF0": "Zmq_ShutdownRuntime",
+        "sub_4F3F80": "idZMQ_RegisterCvarsAndInitRcon",
+        "sub_4F4210": "idZMQ_InitStatsPublisher",
+        "sub_4F5630": "zsock_wait",
+        "sub_4F5A30": "zactor_new",
+        "sub_4F5B50": "zactor_destroy",
+        "sub_4F5DB0": "zstr_sendx",
+    }
+
+    for symbol, alias in expected_aliases.items():
+        address = f"00{symbol.removeprefix('sub_')}".lower()
+        assert aliases[symbol] == alias
+        assert f"fun_{address},{address}" in functions_csv
+        assert f"| `{symbol}` | `{alias}` |" in mapping_round
+
+    assert "004f404c      if (*(arg1 + 4) == 0)" in hlil_part05
+    assert "004f4055          eax_8, ecx, edx_1 = sub_4f5a30(sub_4f69f0, 0)" in hlil_part05
+    assert '004f405c          char const* const var_14_1 = "VERBOSE"' in hlil_part05
+    assert "004f406e          sub_4f5630(eax_9, edx_2, ecx_1, ecx_1)" in hlil_part05
+    assert "004f4078          sub_4f3d70(arg1)" in hlil_part05
+    assert "004f4256      if (*(arg1 + 4) == 0)" in hlil_part05
+    assert "004f425f          eax_2, ecx, edx_1 = sub_4f5a30(sub_4f69f0, 0)" in hlil_part05
+    assert '004f4266          char const* const var_40_1 = "VERBOSE"' in hlil_part05
+    assert "004f4278          sub_4f5630(eax_3, edx_2, ecx_1, ecx_1)" in hlil_part05
+    assert "004f4282          sub_4f3d70(arg1)" in hlil_part05
+    assert "004f3df7  if (data_575708 != 0)" in hlil_part05
+    assert "004f3e08      data_57570c = 0" in hlil_part05
+    assert '004f3e12      sub_4f5190(&data_575708, "zmq\\id_zmq.cpp", 0xe2)' in hlil_part05
+    assert "004f3e21  if (data_575700 != 0)" in hlil_part05
+    assert "004f3e28      sub_4f5b50(&data_575700)" in hlil_part05
+
+    close_auth_block = _extract_function_block(sv_zmq, "static void idZMQ_CloseAuthSocket( void )")
+    ensure_auth_block = _extract_function_block(sv_zmq, "static qboolean idZMQ_EnsureAuthSocket( void )")
+    pump_auth_block = _extract_function_block(sv_zmq, "static void idZMQ_PumpAuthSocket( void )")
+    shutdown_block = _extract_function_block(sv_zmq, "void Zmq_ShutdownRuntime( void )")
+
+    assert "qboolean\t\t\t\tauthActorReady;" in sv_zmq
+    assert "static void idZMQ_ApplyPasswords( void ) {" in sv_zmq
+    assert "idZMQ_CloseSocket( &s_zmq.authSocket );" in close_auth_block
+    assert "s_zmq.authActorReady = qfalse;" in close_auth_block
+    assert close_auth_block.index("idZMQ_CloseSocket( &s_zmq.authSocket );") < close_auth_block.index(
+        "s_zmq.authActorReady = qfalse;"
+    )
+    assert "if ( s_zmq.authSocket ) {" in ensure_auth_block
+    assert "s_zmq.authActorReady = qtrue;" in ensure_auth_block
+    assert "idZMQ_ApplyPasswords();" in ensure_auth_block
+    assert ensure_auth_block.index("s_zmq.authSocket = socket;") < ensure_auth_block.index(
+        "s_zmq.authActorReady = qtrue;", ensure_auth_block.index("s_zmq.authSocket = socket;")
+    )
+    assert ensure_auth_block.index(
+        "s_zmq.authActorReady = qtrue;", ensure_auth_block.index("s_zmq.authSocket = socket;")
+    ) < ensure_auth_block.index("idZMQ_ApplyPasswords();")
+    assert "if ( !s_zmq.authActorReady || !s_zmq.authSocket || !s_zmq.zmq_poll || !s_zmq.zmq_recv || !s_zmq.zmq_send ) {" in pump_auth_block
+    assert "idZMQ_CloseSocket( &s_zmq.rconSocket );" in shutdown_block
+    assert "s_zmq.rconPollSocket = QL_ZMQ_RCON_POLL_SLOT_EMPTY;" in shutdown_block
+    assert "idZMQ_CloseAuthSocket();" in shutdown_block
+    assert "idZMQ_ClearRconPeers();" not in shutdown_block
+    assert shutdown_block.index("s_zmq.rconPollSocket = QL_ZMQ_RCON_POLL_SLOT_EMPTY;") < shutdown_block.index(
+        "idZMQ_CloseSocket( &s_zmq.rconSocket );"
+    )
+    assert shutdown_block.index("idZMQ_CloseSocket( &s_zmq.rconSocket );") < shutdown_block.index("idZMQ_CloseAuthSocket();")
+    assert "auth actor ready state" in mapping_round
+    assert "RCON socket before the shared auth owner" in mapping_round
+    assert "before 90% -> after 98%" in mapping_round
+
+
+def test_zmq_password_apply_auth_gate_round_652_is_pinned() -> None:
+    aliases = json.loads(
+        (REPO_ROOT / "references/analysis/quakelive_symbol_aliases.json").read_text(encoding="utf-8")
+    )["quakelive_steam_srp"]
+    functions_csv = (
+        REPO_ROOT / "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+    ).read_text(encoding="utf-8").lower()
+    hlil_part05 = (
+        REPO_ROOT
+        / "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part05.txt"
+    ).read_text(encoding="utf-8")
+    sv_zmq = (REPO_ROOT / "src/code/server/sv_zmq.c").read_text(encoding="utf-8")
+    mapping_round = (
+        REPO_ROOT / "docs/reverse-engineering/quakelive_steam_mapping_round_652.md"
+    ).read_text(encoding="utf-8")
+
+    expected_aliases = {
+        "sub_4D2460": "idZMQ_WritePasswordFile",
+        "sub_4F3D70": "idZMQ_ApplyPasswords",
+        "sub_4F3F20": "idZMQ_UpdatePasswords",
+        "sub_4F3F80": "idZMQ_RegisterCvarsAndInitRcon",
+        "sub_4F4210": "idZMQ_InitStatsPublisher",
+    }
+
+    for symbol, alias in expected_aliases.items():
+        address = f"00{symbol.removeprefix('sub_')}".lower()
+        assert aliases[symbol] == alias
+        assert f"fun_{address},{address}" in functions_csv
+        assert f"| `{symbol}` | `{alias}` |" in mapping_round
+
+    assert "004f3d70    uint32_t __fastcall sub_4f3d70(void* arg1)" in hlil_part05
+    assert "004f3d7b  data_5746f4 = *(result + 0x28)" in hlil_part05
+    assert "004f3d8a  data_5756f8 = *(ecx_1 + 0x28)" in hlil_part05
+    assert "004f3d94  if (*(arg1 + 4) == 0)" in hlil_part05
+    assert "004f3dc1      return result" in hlil_part05
+    assert "004f3d9e  eax, ecx_3, edx_2 = sub_4d2460(*(result + 4), *(ecx_1 + 4))" in hlil_part05
+    assert "004f3f20    int32_t __fastcall sub_4f3f20(void* arg1)" in hlil_part05
+    assert "004f3f44  if (*(arg1 + 4) != 0)" in hlil_part05
+    assert "004f3f4e      eax, ecx_3, edx_2 = sub_4d2460(*(eax_4 + 4), *(ecx_1 + 4))" in hlil_part05
+    assert '004f3f7e  return sub_4c9860(arg1, "zmq stats and rcon passwords upd…")' in hlil_part05
+    assert "004f4078          sub_4f3d70(arg1)" in hlil_part05
+    assert "004f4282          sub_4f3d70(arg1)" in hlil_part05
+
+    apply_passwords_block = _extract_function_block(sv_zmq, "static void idZMQ_ApplyPasswords( void )")
+    ensure_auth_block = _extract_function_block(sv_zmq, "static qboolean idZMQ_EnsureAuthSocket( void )")
+    register_block = _extract_function_block(sv_zmq, "static void idZMQ_RegisterCvarsAndInitRcon( void )")
+    update_passwords_block = _extract_function_block(sv_zmq, "static void idZMQ_UpdatePasswords( void ) {")
+
+    assert "if ( !s_zmq.authActorReady ) {" in apply_passwords_block
+    assert "return;" in apply_passwords_block
+    assert "idZMQ_WritePasswordFile();" in apply_passwords_block
+    assert apply_passwords_block.index("if ( !s_zmq.authActorReady ) {") < apply_passwords_block.index(
+        "idZMQ_WritePasswordFile();"
+    )
+    assert "idZMQ_CloseSocket" not in apply_passwords_block
+    assert "idZMQ_CloseAuthSocket" not in apply_passwords_block
+    assert "idZMQ_EnsureRconSocket" not in apply_passwords_block
+    assert "idZMQ_EnsureStatsPublisher" not in apply_passwords_block
+    assert "s_zmq.authSocket = socket;" in ensure_auth_block
+    assert "s_zmq.authActorReady = qtrue;" in ensure_auth_block
+    assert "idZMQ_ApplyPasswords();" in ensure_auth_block
+    assert ensure_auth_block.index("s_zmq.authSocket = socket;") < ensure_auth_block.index(
+        "s_zmq.authActorReady = qtrue;", ensure_auth_block.index("s_zmq.authSocket = socket;")
+    )
+    assert ensure_auth_block.index(
+        "s_zmq.authActorReady = qtrue;", ensure_auth_block.index("s_zmq.authSocket = socket;")
+    ) < ensure_auth_block.index("idZMQ_ApplyPasswords();")
+    assert "idZMQ_UpdatePasswords();" in register_block
+    assert "idZMQ_EnsureRconSocket();" in register_block
+    assert register_block.index("idZMQ_UpdatePasswords();") < register_block.index("idZMQ_EnsureRconSocket();")
+    assert "idZMQ_ApplyPasswords();" in update_passwords_block
+    assert "auth-gated password-file refresh" in mapping_round
+    assert "before 92% -> after 98%" in mapping_round
+
+
+def test_zmq_shutdown_owner_split_round_653_is_pinned() -> None:
+    aliases = json.loads(
+        (REPO_ROOT / "references/analysis/quakelive_symbol_aliases.json").read_text(encoding="utf-8")
+    )["quakelive_steam_srp"]
+    functions_csv = (
+        REPO_ROOT / "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+    ).read_text(encoding="utf-8").lower()
+    hlil_part05 = (
+        REPO_ROOT
+        / "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part05.txt"
+    ).read_text(encoding="utf-8")
+    sv_zmq = (REPO_ROOT / "src/code/server/sv_zmq.c").read_text(encoding="utf-8")
+    sv_init = (REPO_ROOT / "src/code/server/sv_init.c").read_text(encoding="utf-8")
+    common = (REPO_ROOT / "src/code/qcommon/common.c").read_text(encoding="utf-8")
+    mapping_round = (
+        REPO_ROOT / "docs/reverse-engineering/quakelive_steam_mapping_round_653.md"
+    ).read_text(encoding="utf-8")
+
+    expected_aliases = {
+        "sub_4F3DD0": "Zmq_ShutdownStatsPublisher",
+        "sub_4F3DF0": "Zmq_ShutdownRuntime",
+        "sub_4F5190": "zsock_destroy_checked",
+        "sub_4F5B50": "zactor_destroy",
+    }
+
+    for symbol, alias in expected_aliases.items():
+        address = f"00{symbol.removeprefix('sub_')}".lower()
+        assert aliases[symbol] == alias
+        assert f"fun_{address},{address}" in functions_csv
+        assert f"| `{symbol}` | `{alias}` |" in mapping_round
+
+    assert "004f3dd0    void sub_4f3dd0()" in hlil_part05
+    assert "004f3dd7  if (data_575704 != 0)" in hlil_part05
+    assert '004f3de5      sub_4f5190(&data_575704, "zmq\\id_zmq.cpp", 0x73)' in hlil_part05
+    assert "004f3df0    void sub_4f3df0()" in hlil_part05
+    assert "004f3df7  if (data_575708 != 0)" in hlil_part05
+    assert "004f3e08      data_57570c = 0" in hlil_part05
+    assert '004f3e12      sub_4f5190(&data_575708, "zmq\\id_zmq.cpp", 0xe2)' in hlil_part05
+    assert "004f3e21  if (data_575700 != 0)" in hlil_part05
+    assert "004f3e28      sub_4f5b50(&data_575700)" in hlil_part05
+
+    shutdown_stats_block = _extract_function_block(sv_zmq, "void Zmq_ShutdownStatsPublisher( void )")
+    shutdown_runtime_block = _extract_function_block(sv_zmq, "void Zmq_ShutdownRuntime( void )")
+    sv_shutdown_block = _extract_function_block(sv_init, "void SV_Shutdown( char *finalmsg )")
+    com_shutdown_block = _extract_function_block(common, "void Com_Shutdown (void)")
+
+    assert "idZMQ_CloseStatsTranscript();" in shutdown_stats_block
+    assert "idZMQ_CloseSocket( &s_zmq.pubSocket );" in shutdown_stats_block
+    assert "s_zmq.statsEndpoint[0] = QL_ZMQ_ENDPOINT_EMPTY;" in shutdown_stats_block
+    assert "idZMQ_CloseSocket( &s_zmq.pubSocket );" not in shutdown_runtime_block
+    assert "idZMQ_CloseStatsTranscript();" not in shutdown_runtime_block
+    assert "s_zmq.statsEndpoint[0] = QL_ZMQ_ENDPOINT_EMPTY;" not in shutdown_runtime_block
+    assert "Zmq_ShutdownStatsPublisher();" not in shutdown_runtime_block
+    assert "idZMQ_CloseSocket( &s_zmq.rconSocket );" in shutdown_runtime_block
+    assert "s_zmq.rconPollSocket = QL_ZMQ_RCON_POLL_SLOT_EMPTY;" in shutdown_runtime_block
+    assert "idZMQ_CloseAuthSocket();" in shutdown_runtime_block
+    assert "idZMQ_ClearRconPeers();" not in shutdown_runtime_block
+    assert shutdown_runtime_block.index("s_zmq.rconPollSocket = QL_ZMQ_RCON_POLL_SLOT_EMPTY;") < shutdown_runtime_block.index(
+        "idZMQ_CloseSocket( &s_zmq.rconSocket );"
+    )
+    assert shutdown_runtime_block.index("idZMQ_CloseSocket( &s_zmq.rconSocket );") < shutdown_runtime_block.index("idZMQ_CloseAuthSocket();")
+    assert "Zmq_ShutdownStatsPublisher();" in sv_shutdown_block
+    assert sv_shutdown_block.index("SV_ShutdownGameProgs();") < sv_shutdown_block.index("Zmq_ShutdownStatsPublisher();")
+    assert "Zmq_ShutdownRuntime();" in com_shutdown_block
+    assert "stats PUB shutdown remains separate from runtime RCON/auth shutdown" in mapping_round
+    assert "before 91% -> after 98%" in mapping_round
+
+
+def test_zmq_endpoint_empty_clear_boundary_round_691_is_pinned() -> None:
+    aliases = json.loads(
+        (REPO_ROOT / "references/analysis/quakelive_symbol_aliases.json").read_text(encoding="utf-8")
+    )["quakelive_steam_srp"]
+    functions_csv = (
+        REPO_ROOT / "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+    ).read_text(encoding="utf-8").lower()
+    hlil_part05 = (
+        REPO_ROOT
+        / "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part05.txt"
+    ).read_text(encoding="utf-8")
+    sv_zmq = (REPO_ROOT / "src/code/server/sv_zmq.c").read_text(encoding="utf-8")
+    mapping_round = (
+        REPO_ROOT / "docs/reverse-engineering/quakelive_steam_mapping_round_691.md"
+    ).read_text(encoding="utf-8")
+
+    expected_aliases = {
+        "sub_4F3DD0": "Zmq_ShutdownStatsPublisher",
+        "sub_4F3DF0": "Zmq_ShutdownRuntime",
+        "sub_4F5080": "idZMQ_Destroy",
+        "sub_4F5190": "zsock_destroy_checked",
+    }
+
+    for symbol, alias in expected_aliases.items():
+        address = f"00{symbol.removeprefix('sub_')}".lower()
+        assert aliases[symbol] == alias
+        assert f"fun_{address},{address}" in functions_csv
+        assert f"| `{symbol}` | `{alias}` |" in mapping_round
+
+    assert "004f3dd0    void sub_4f3dd0()" in hlil_part05
+    assert "004f3dd7  if (data_575704 != 0)" in hlil_part05
+    assert '004f3de5      sub_4f5190(&data_575704, "zmq\\id_zmq.cpp", 0x73)' in hlil_part05
+    assert "004f3df0    void sub_4f3df0()" in hlil_part05
+    assert "004f3df7  if (data_575708 != 0)" in hlil_part05
+    assert "004f3e08      data_57570c = 0" in hlil_part05
+    assert '004f3e12      sub_4f5190(&data_575708, "zmq\\id_zmq.cpp", 0xe2)' in hlil_part05
+
+    ensure_rcon_block = _extract_function_block(sv_zmq, "static qboolean idZMQ_EnsureRconSocket( void ) {")
+    ensure_stats_block = _extract_function_block(sv_zmq, "static qboolean idZMQ_EnsureStatsPublisher( void ) {")
+    shutdown_stats_block = _extract_function_block(sv_zmq, "void Zmq_ShutdownStatsPublisher( void )")
+    shutdown_runtime_block = _extract_function_block(sv_zmq, "void Zmq_ShutdownRuntime( void )")
+
+    assert "#define QL_ZMQ_ENDPOINT_EMPTY QL_ZMQ_STRING_TERMINATOR" in sv_zmq
+    assert "s_zmq.rconEndpoint[0] = QL_ZMQ_ENDPOINT_EMPTY;" in ensure_rcon_block
+    assert "s_zmq.statsEndpoint[0] = QL_ZMQ_ENDPOINT_EMPTY;" in ensure_stats_block
+    assert "s_zmq.statsEndpoint[0] = QL_ZMQ_ENDPOINT_EMPTY;" in shutdown_stats_block
+    assert "s_zmq.rconEndpoint[0] = QL_ZMQ_ENDPOINT_EMPTY;" in shutdown_runtime_block
+    assert "s_zmq.rconEndpoint[0] = '\\0';" not in sv_zmq
+    assert "s_zmq.statsEndpoint[0] = '\\0';" not in sv_zmq
+    assert "s_zmq.statsEndpoint[0] = QL_ZMQ_ENDPOINT_EMPTY;" not in shutdown_runtime_block
+    assert "idZMQ_Destroy();" in ensure_rcon_block
+    assert "idZMQ_Destroy();" not in shutdown_runtime_block
+    assert "zsock_destroy_checked" not in sv_zmq
+    assert "zsock_destroy(" not in sv_zmq
+
+    assert "ZMQ endpoint empty-clear boundary" in mapping_round
+    assert "retained endpoint buffers" in mapping_round
+    assert "does not reconstruct libzmq/CZMQ internals" in mapping_round
+    assert "before 92% -> after 98%" in mapping_round
+
+
+def test_zmq_runtime_shutdown_skips_peer_clear_round_654_is_pinned() -> None:
+    aliases = json.loads(
+        (REPO_ROOT / "references/analysis/quakelive_symbol_aliases.json").read_text(encoding="utf-8")
+    )["quakelive_steam_srp"]
+    functions_csv = (
+        REPO_ROOT / "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+    ).read_text(encoding="utf-8").lower()
+    hlil_part05 = (
+        REPO_ROOT
+        / "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part05.txt"
+    ).read_text(encoding="utf-8")
+    sv_zmq = (REPO_ROOT / "src/code/server/sv_zmq.c").read_text(encoding="utf-8")
+    mapping_round = (
+        REPO_ROOT / "docs/reverse-engineering/quakelive_steam_mapping_round_654.md"
+    ).read_text(encoding="utf-8")
+
+    expected_aliases = {
+        "sub_4F3DF0": "Zmq_ShutdownRuntime",
+        "sub_4F4E80": "idZMQ_ClearRconPeers",
+        "sub_4F4FE0": "idZMQ_EraseRconPeerRange",
+        "sub_4F5080": "idZMQ_Destroy",
+    }
+
+    for symbol, alias in expected_aliases.items():
+        address = f"00{symbol.removeprefix('sub_')}".lower()
+        assert aliases[symbol] == alias
+        assert f"fun_{address},{address}" in functions_csv
+        assert f"| `{symbol}` | `{alias}` |" in mapping_round
+
+    assert "004f3df7  if (data_575708 != 0)" in hlil_part05
+    assert "004f3e08      data_57570c = 0" in hlil_part05
+    assert '004f3e12      sub_4f5190(&data_575708, "zmq\\id_zmq.cpp", 0xe2)' in hlil_part05
+    assert "004f3e21  if (data_575700 != 0)" in hlil_part05
+    assert "004f3e28      sub_4f5b50(&data_575700)" in hlil_part05
+    assert "004f4e80    void* __fastcall sub_4f4e80(void* arg1)" in hlil_part05
+    assert "004f4ffa      sub_4f4e80(arg1)" in hlil_part05
+    assert "004f5080    struct idZMQ::VTable** __thiscall sub_4f5080" in hlil_part05
+    assert "004f50c9  sub_4f4fe0(&arg1[5], &var_18, *eax_3, eax_3)" in hlil_part05
+
+    shutdown_runtime_block = _extract_function_block(sv_zmq, "void Zmq_ShutdownRuntime( void )")
+    ensure_rcon_block = _extract_function_block(sv_zmq, "static qboolean idZMQ_EnsureRconSocket( void ) {")
+    destroy_block = _extract_function_block(sv_zmq, "static void idZMQ_Destroy( void )")
+    clear_peer_block = _extract_function_block(sv_zmq, "static void idZMQ_ClearRconPeers( void )")
+    range_erase_block = _extract_function_block(sv_zmq, "static void idZMQ_EraseRconPeerRange( zmqRconPeer_t *first, zmqRconPeer_t *last )")
+
+    assert "idZMQ_CloseSocket( &s_zmq.rconSocket );" in shutdown_runtime_block
+    assert "s_zmq.rconPollSocket = QL_ZMQ_RCON_POLL_SLOT_EMPTY;" in shutdown_runtime_block
+    assert "idZMQ_CloseAuthSocket();" in shutdown_runtime_block
+    assert "idZMQ_ClearRconPeers();" not in shutdown_runtime_block
+    assert "idZMQ_Destroy();" not in shutdown_runtime_block
+    assert shutdown_runtime_block.index("s_zmq.rconPollSocket = QL_ZMQ_RCON_POLL_SLOT_EMPTY;") < shutdown_runtime_block.index(
+        "idZMQ_CloseSocket( &s_zmq.rconSocket );"
+    )
+    assert shutdown_runtime_block.index("idZMQ_CloseSocket( &s_zmq.rconSocket );") < shutdown_runtime_block.index("idZMQ_CloseAuthSocket();")
+    assert "idZMQ_Destroy();" in ensure_rcon_block
+    assert "idZMQ_ClearRconPeers();" in destroy_block
+    assert "idZMQ_EraseRconPeerRange( s_zmq.rconPeers, NULL );" in clear_peer_block
+    assert "idZMQ_FreeRconPeerSubtree( s_zmq.rconPeerRoot );" in range_erase_block
+    assert "runtime shutdown no longer clears the RCON peer table" in mapping_round
+    assert "destructor analogue owns the peer-table clear" in mapping_round
+    assert "before 90% -> after 98%" in mapping_round
+
+
+def test_zmq_peer_tree_iterator_boundary_round_655_is_pinned() -> None:
+    aliases = json.loads(
+        (REPO_ROOT / "references/analysis/quakelive_symbol_aliases.json").read_text(encoding="utf-8")
+    )["quakelive_steam_srp"]
+    functions_csv = (
+        REPO_ROOT / "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+    ).read_text(encoding="utf-8").lower()
+    hlil_part05 = (
+        REPO_ROOT
+        / "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part05.txt"
+    ).read_text(encoding="utf-8")
+    sv_zmq = (REPO_ROOT / "src/code/server/sv_zmq.c").read_text(encoding="utf-8")
+    mapping_round = (
+        REPO_ROOT / "docs/reverse-engineering/quakelive_steam_mapping_round_655.md"
+    ).read_text(encoding="utf-8")
+
+    expected_aliases = {
+        "sub_4F3E30": "std_tree_rightmost_zmq_rcon_peer_node",
+        "sub_4F3E50": "std_tree_leftmost_zmq_rcon_peer_node",
+        "sub_4F3E70": "std_tree_next_zmq_rcon_peer_node",
+        "sub_4F3EC0": "std_tree_prev_zmq_rcon_peer_node",
+        "sub_4F4150": "std_tree_rotate_right_zmq_rcon_peer_node",
+        "sub_4F41B0": "std_tree_lower_bound_zmq_rcon_peer_node",
+        "sub_4F43B0": "std_tree_rotate_left_zmq_rcon_peer_node",
+        "sub_4F4410": "std_tree_insert_zmq_rcon_peer_node_rebalance",
+    }
+
+    for symbol, alias in expected_aliases.items():
+        address = f"00{symbol.removeprefix('sub_')}".lower()
+        assert aliases[symbol] == alias
+        assert f"fun_{address},{address}" in functions_csv
+        assert f"| `{symbol}` | `{alias}` |" in mapping_round
+
+    assert "004f3e30    void* sub_4f3e30(void* arg1)" in hlil_part05
+    assert "004f3e3d  while (*(result_1 + 0x11) == 0)" in hlil_part05
+    assert "004f3e50    int32_t* sub_4f3e50(int32_t* arg1)" in hlil_part05
+    assert "004f3e5c  while (*(result_1 + 0x11) == 0)" in hlil_part05
+    assert "004f3e70    int32_t* __fastcall sub_4f3e70(int32_t* arg1)" in hlil_part05
+    assert "004f3e9a          *arg1 = ecx" in hlil_part05
+    assert "004f3ec0    int32_t* __fastcall sub_4f3ec0(int32_t* arg1)" in hlil_part05
+    assert "004f3f0f      if (*(*arg1 + 0x11) == 0)" in hlil_part05
+    assert "004f4150    void* __thiscall sub_4f4150(void* arg1, int32_t* arg2)" in hlil_part05
+    assert "004f41b0    void** __thiscall sub_4f41b0(void* arg1, int32_t* arg2)" in hlil_part05
+    assert "004f41f7          if (ecx_3 s>= 0)" in hlil_part05
+    assert "004f43b0    void** __thiscall sub_4f43b0(void* arg1, void* arg2)" in hlil_part05
+    assert "004f4410    void** __thiscall sub_4f4410(void* arg1, void** arg2, char arg3, void** arg4, void* arg5)" in hlil_part05
+    assert "004f4436  *(arg1 + 8) = eax + 1" in hlil_part05
+    assert "004f462c  *(ecx + 0x10) = 1" in hlil_part05
+    assert "004f4738              eax_5 = sub_4f3e50(edi)" in hlil_part05
+    assert "004f476c              *(ecx_3 + 8) = sub_4f3e30(edi)" in hlil_part05
+    assert "004f4ab2      sub_4f3ec0(&arg4)" in hlil_part05
+
+    leftmost_block = _extract_function_block(sv_zmq, "static zmqRconPeer_t *idZMQ_LeftmostRconPeer( zmqRconPeer_t *peer )")
+    link_block = _extract_function_block(
+        sv_zmq, "static void idZMQ_LinkRconPeerInOrder( zmqRconPeer_t *peer, zmqRconPeer_t *previous, zmqRconPeer_t *next )"
+    )
+    insert_block = _extract_function_block(sv_zmq, "static zmqRconPeer_t *idZMQ_InsertRconPeer( const char *identity )")
+    erase_block = _extract_function_block(sv_zmq, "static void idZMQ_EraseRconPeer( zmqRconPeer_t *peer )")
+    range_erase_block = _extract_function_block(sv_zmq, "static void idZMQ_EraseRconPeerRange( zmqRconPeer_t *first, zmqRconPeer_t *last )")
+
+    assert "while ( peer && peer->left ) {" in leftmost_block
+    assert "peer->prev = previous;" in link_block
+    assert "peer->next = next;" in link_block
+    assert "s_zmq.rconPeers = peer;" in link_block
+    assert "s_zmq.rconPeerLast = peer;" in link_block
+    assert "previousPeer = parent;" in insert_block
+    assert "nextPeer = parent;" in insert_block
+    assert "idZMQ_LinkRconPeerInOrder( peer, previousPeer, nextPeer );" in insert_block
+    assert "successor = idZMQ_LeftmostRconPeer( peer->right );" in erase_block
+    assert "s_zmq.rconPeerLast = peer->prev;" in erase_block
+    assert "next = peer->next;" in range_erase_block
+    assert "std_tree_" not in sv_zmq
+    assert "portable tree/list boundary" in mapping_round
+    assert "does not reconstruct MSVC std::tree internals" in mapping_round
+    assert "before 93% -> after 98%" in mapping_round
+
+
+def test_zmq_rcon_peer_count_floor_round_724_is_pinned() -> None:
+    aliases = json.loads(
+        (REPO_ROOT / "references/analysis/quakelive_symbol_aliases.json").read_text(encoding="utf-8")
+    )["quakelive_steam_srp"]
+    functions_csv = (
+        REPO_ROOT / "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+    ).read_text(encoding="utf-8").lower()
+    hlil_part05 = (
+        REPO_ROOT
+        / "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part05.txt"
+    ).read_text(encoding="utf-8")
+    sv_zmq = (REPO_ROOT / "src/code/server/sv_zmq.c").read_text(encoding="utf-8")
+    implementation_plan = (REPO_ROOT / "IMPLEMENTATION_PLAN.md").read_text(encoding="utf-8")
+    mapping_round = (
+        REPO_ROOT / "docs/reverse-engineering/quakelive_steam_mapping_round_724.md"
+    ).read_text(encoding="utf-8")
+
+    expected_aliases = {
+        "sub_4F46B0": "idZMQ_EraseRconPeer",
+        "sub_4F49C0": "idZMQ_InsertRconPeer",
+        "sub_4F4E80": "idZMQ_ClearRconPeers",
+        "sub_4F4FE0": "idZMQ_EraseRconPeerRange",
+    }
+
+    for symbol, alias in expected_aliases.items():
+        address = f"00{symbol.removeprefix('sub_')}".lower()
+        assert aliases[symbol] == alias
+        assert f"fun_{address},{address}" in functions_csv
+        assert f"| `{symbol}` | `{alias}` |" in mapping_round
+
+    assert "004f46b0    int32_t* __thiscall sub_4f46b0(void* arg1, int32_t* arg2, int32_t* arg3)" in hlil_part05
+    assert "004f48e7  int32_t eax_13 = *(arg1 + 8)" in hlil_part05
+    assert "004f48f2  if (eax_13 != 0)" in hlil_part05
+    assert "004f48f5      *(arg1 + 8) = eax_13 - 1" in hlil_part05
+    assert "004f4e80    void* __fastcall sub_4f4e80(void* arg1)" in hlil_part05
+    assert "004f4ec2  *(arg1 + 8) = 0" in hlil_part05
+    assert "004f4fe0    int32_t* __thiscall sub_4f4fe0(void* arg1, int32_t* arg2, int32_t* arg3, int32_t arg4)" in hlil_part05
+    assert "004f4ff6  if (i == *eax && arg4 == eax)" in hlil_part05
+    assert "004f4ffa      sub_4f4e80(arg1)" in hlil_part05
+
+    insert_block = _extract_function_block(sv_zmq, "static zmqRconPeer_t *idZMQ_InsertRconPeer( const char *identity )")
+    erase_block = _extract_function_block(sv_zmq, "static void idZMQ_EraseRconPeer( zmqRconPeer_t *peer )")
+    range_erase_block = _extract_function_block(sv_zmq, "static void idZMQ_EraseRconPeerRange( zmqRconPeer_t *first, zmqRconPeer_t *last )")
+    clear_peer_block = _extract_function_block(sv_zmq, "static void idZMQ_ClearRconPeers( void )")
+
+    assert "#define QL_ZMQ_RCON_PEER_COUNT_EMPTY 0" in sv_zmq
+    assert "s_zmq.rconPeerCount++;" in insert_block
+    assert "if ( s_zmq.rconPeerCount > QL_ZMQ_RCON_PEER_COUNT_EMPTY ) {" in erase_block
+    assert "s_zmq.rconPeerCount--;" in erase_block
+    assert "s_zmq.rconPeerCount > 0" not in sv_zmq
+    assert "s_zmq.rconPeerCount = QL_ZMQ_RCON_PEER_COUNT_EMPTY;" in range_erase_block
+    assert "s_zmq.rconPeerCount = 0;" not in sv_zmq
+    assert "idZMQ_EraseRconPeerRange( s_zmq.rconPeers, NULL );" in clear_peer_block
+    assert "std_tree_" not in sv_zmq
+
+    assert "ZMQ RCON peer-count floor boundary" in mapping_round
+    assert "SRP portable peer-table count floor" in mapping_round
+    assert "does not reconstruct libzmq/CZMQ internals" in mapping_round
+    assert "does not reconstruct MSVC std::tree internals" in mapping_round
+    assert "before 94% -> after 99%" in mapping_round
+    assert "Task A626: Pin ZMQ RCON peer-count floor boundary [COMPLETED]" in implementation_plan
+
+
+def test_zmq_public_wrapper_tailcalls_round_656_are_pinned() -> None:
+    aliases = json.loads(
+        (REPO_ROOT / "references/analysis/quakelive_symbol_aliases.json").read_text(encoding="utf-8")
+    )["quakelive_steam_srp"]
+    functions_csv = (
+        REPO_ROOT / "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+    ).read_text(encoding="utf-8").lower()
+    hlil_part05 = (
+        REPO_ROOT
+        / "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part05.txt"
+    ).read_text(encoding="utf-8")
+    sv_zmq = (REPO_ROOT / "src/code/server/sv_zmq.c").read_text(encoding="utf-8")
+    mapping_round = (
+        REPO_ROOT / "docs/reverse-engineering/quakelive_steam_mapping_round_656.md"
+    ).read_text(encoding="utf-8")
+
+    expected_aliases = {
+        "sub_4F3F20": "idZMQ_UpdatePasswords",
+        "sub_4F3F80": "idZMQ_RegisterCvarsAndInitRcon",
+        "sub_4F4130": "Zmq_UpdatePasswords",
+        "sub_4F4140": "Zmq_RegisterCvarsAndInitRcon",
+        "sub_4F4210": "idZMQ_InitStatsPublisher",
+        "sub_4F43A0": "Zmq_InitStatsPublisher",
+        "sub_4F4B20": "idZMQ_ReportPlayerEvent",
+        "sub_4F4C30": "idZMQ_SubmitMatchReport",
+        "sub_4F4D40": "idZMQ_BroadcastRconOutput",
+        "sub_4F4E10": "Zmq_ReportPlayerEvent",
+        "sub_4F4E40": "Zmq_SubmitMatchReport",
+        "sub_4F4E60": "Zmq_BroadcastRconOutput",
+        "sub_4F4ED0": "idZMQ_PumpRcon",
+        "sub_4F4FD0": "Zmq_PumpRcon",
+    }
+
+    for symbol, alias in expected_aliases.items():
+        address = f"00{symbol.removeprefix('sub_')}".lower()
+        assert aliases[symbol] == alias
+        assert f"fun_{address},{address}" in functions_csv
+        assert f"| `{symbol}` | `{alias}` |" in mapping_round
+
+    assert "004f4135  return sub_4f3f20(&data_5756fc) __tailcall" in hlil_part05
+    assert "004f4145  return sub_4f3f80(&data_5756fc) __tailcall" in hlil_part05
+    assert "004f43a5  return sub_4f4210(&data_5756fc) __tailcall" in hlil_part05
+    assert "004f4e10    struct _EXCEPTION_REGISTRATION_RECORD** sub_4f4e10" in hlil_part05
+    assert "004f4e32  return sub_4f4b20(&data_5756fc, arg1, arg2)" in hlil_part05
+    assert "004f4e40    struct _EXCEPTION_REGISTRATION_RECORD** sub_4f4e40(int32_t* arg1)" in hlil_part05
+    assert "004f4e52  return sub_4f4c30(&data_5756fc, arg1)" in hlil_part05
+    assert "004f4e60    int32_t sub_4f4e60(int32_t arg1)" in hlil_part05
+    assert "004f4e72  return sub_4f4d40(&data_5756fc)" in hlil_part05
+    assert "004f4fd5  return sub_4f4ed0(&data_5756fc) __tailcall" in hlil_part05
+
+    register_public_block = _extract_function_block(sv_zmq, "void Zmq_RegisterCvarsAndInitRcon( void )")
+    update_public_block = _extract_function_block(sv_zmq, "void Zmq_UpdatePasswords( void )")
+    init_public_block = _extract_function_block(sv_zmq, "void Zmq_InitStatsPublisher( void )")
+    report_public_block = _extract_function_block(
+        sv_zmq,
+        "void Zmq_ReportPlayerEvent( uint32_t steamIdLow, uint32_t steamIdHigh, const void *clientStats, const char *eventName, const void *payload )",
+    )
+    submit_public_block = _extract_function_block(sv_zmq, "void Zmq_SubmitMatchReport( const void *report )")
+    broadcast_public_block = _extract_function_block(sv_zmq, "void Zmq_BroadcastRconOutput( const char *message )")
+    pump_public_block = _extract_function_block(sv_zmq, "void Zmq_PumpRcon( void )")
+
+    assert "idZMQ_RegisterCvarsAndInitRcon();" in register_public_block
+    assert 'Cvar_Get( "zmq_rcon_enable", "0", CVAR_INIT );' not in register_public_block
+    assert "idZMQ_UpdatePasswords();" in update_public_block
+    assert "idZMQ_ApplyPasswords();" not in update_public_block
+    assert "idZMQ_InitStatsPublisher();" in init_public_block
+    assert "idZMQ_EnsureStatsPublisher();" not in init_public_block
+    assert "idZMQ_ReportPlayerEvent( steamIdLow, steamIdHigh, clientStats, eventName, payload );" in report_public_block
+    assert 'idZMQ_Publish( eventName, (const char *)payload );' not in report_public_block
+    assert "idZMQ_SubmitMatchReport( report );" in submit_public_block
+    assert "idZMQ_Publish( QL_ZMQ_MATCH_REPORT_TYPE, (const char *)report );" not in submit_public_block
+    assert "idZMQ_BroadcastRconOutput( message );" in broadcast_public_block
+    assert "s_zmq.zmq_send" not in broadcast_public_block
+    assert "idZMQ_PumpRcon();" in pump_public_block
+    assert "s_zmq.zmq_poll" not in pump_public_block
+
+    assert "static void idZMQ_RegisterCvarsAndInitRcon( void )" in sv_zmq
+    assert "static void idZMQ_UpdatePasswords( void )" in sv_zmq
+    assert "static void idZMQ_InitStatsPublisher( void )" in sv_zmq
+    assert "static void idZMQ_ReportPlayerEvent(" in sv_zmq
+    assert "static void idZMQ_SubmitMatchReport( const void *report )" in sv_zmq
+    assert "static void idZMQ_BroadcastRconOutput( const char *message )" in sv_zmq
+    assert "static void idZMQ_PumpRcon( void )" in sv_zmq
+    assert "public wrapper tailcalls the retained idZMQ method owner" in mapping_round
+    assert "does not reconstruct libzmq/CZMQ internals" in mapping_round
+    assert "before 88% -> after 97%" in mapping_round
+
+
+def test_zmq_retained_idzmq_layout_boundary_round_657_is_pinned() -> None:
+    aliases = json.loads(
+        (REPO_ROOT / "references/analysis/quakelive_symbol_aliases.json").read_text(encoding="utf-8")
+    )["quakelive_steam_srp"]
+    functions_csv = (
+        REPO_ROOT / "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+    ).read_text(encoding="utf-8").lower()
+    analysis_symbols = (
+        REPO_ROOT / "references/reverse-engineering/ghidra/quakelive_steam/analysis_symbols.txt"
+    ).read_text(encoding="utf-8")
+    hlil_part05 = (
+        REPO_ROOT
+        / "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part05.txt"
+    ).read_text(encoding="utf-8")
+    hlil_part06 = (
+        REPO_ROOT
+        / "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part06.txt"
+    ).read_text(encoding="utf-8")
+    hlil_part07 = (
+        REPO_ROOT
+        / "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part07.txt"
+    ).read_text(encoding="utf-8")
+    sv_zmq = (REPO_ROOT / "src/code/server/sv_zmq.c").read_text(encoding="utf-8")
+    mapping_round = (
+        REPO_ROOT / "docs/reverse-engineering/quakelive_steam_mapping_round_657.md"
+    ).read_text(encoding="utf-8")
+
+    expected_aliases = {
+        "sub_4F3D70": "idZMQ_ApplyPasswords",
+        "sub_4F3DD0": "Zmq_ShutdownStatsPublisher",
+        "sub_4F3DF0": "Zmq_ShutdownRuntime",
+        "sub_4F4E80": "idZMQ_ClearRconPeers",
+        "sub_4F4FE0": "idZMQ_EraseRconPeerRange",
+        "sub_4F5080": "idZMQ_Destroy",
+    }
+
+    for symbol, alias in expected_aliases.items():
+        address = f"00{symbol.removeprefix('sub_')}".lower()
+        assert aliases[symbol] == alias
+        assert f"fun_{address},{address}" in functions_csv
+        assert f"| `{symbol}`" in mapping_round
+
+    assert "005483f0 IMPORTED idZMQ::vftable" in analysis_symbols
+    assert "005483f0      void*** (__thiscall* const vFunc_0)(void*** arg1, char arg2) = sub_4f5080" in hlil_part06
+    assert "005756fc  void* data_5756fc = idZMQ::`vftable'" in hlil_part07
+    assert "00575700  int32_t data_575700 = 0x0" in hlil_part07
+    assert "00575704  int32_t data_575704 = 0x0" in hlil_part07
+    assert "00575708  int32_t data_575708 = 0x0" in hlil_part07
+    assert "0057570c  int32_t data_57570c = 0x0" in hlil_part07
+    assert "00575710  data_575710:" in hlil_part07
+    assert "00575714  int32_t data_575714 = 0x0" in hlil_part07
+    assert "00575720  struct class idZMQ `RTTI Type Descriptor'" in hlil_part07
+    assert '00575728      char name[0xb] = ".?AVidZMQ@@"' in hlil_part07
+
+    assert "004f3d94  if (*(arg1 + 4) == 0)" in hlil_part05
+    assert "004f3dd7  if (data_575704 != 0)" in hlil_part05
+    assert "004f3df7  if (data_575708 != 0)" in hlil_part05
+    assert "004f3e08      data_57570c = 0" in hlil_part05
+    assert "004f4d51      int32_t* i_1 = *(arg1 + 0x18)" in hlil_part05
+    assert "004f4d8a                  i = *sub_4f46b0(arg1 + 0x14, &var_8, i)" in hlil_part05
+    assert "004f4f4c              void** ecx_3 = *sub_4f4910(arg1 + 0x14, &var_10, &var_8)" in hlil_part05
+    assert "004f4f54              if (ecx_3 == *(arg1 + 0x18))" in hlil_part05
+    assert "004f4f7a                  sub_4f49c0(arg1 + 0x14, &var_14, sub_4f4640(arg1 + 0x14), nullptr)" in hlil_part05
+    assert "004f50b2  void* var_14 = &arg1[5]" in hlil_part05
+    assert "004f50b5  int32_t* eax_3 = arg1[6]" in hlil_part05
+    assert "004f50c9  sub_4f4fe0(&arg1[5], &var_18, *eax_3, eax_3)" in hlil_part05
+    assert "004f50d2  operator delete(arg1[6])" in hlil_part05
+
+    assert "Retail idZMQ slots represented here: +4 auth actor, +8 stats PUB, +0xc RCON, +0x10 resolved RCON poll socket, +0x14 peer table." in sv_zmq
+    assert "Portable decomposition of the retail std::tree header/sentinel peer table." in sv_zmq
+    assert "void\t\t\t\t\t*authSocket;" in sv_zmq
+    assert "void\t\t\t\t\t*pubSocket;" in sv_zmq
+    assert "void\t\t\t\t\t*rconSocket;" in sv_zmq
+    assert "void\t\t\t\t\t*rconPollSocket;" in sv_zmq
+    assert "zmqRconPeer_t\t\t\t*rconPeers;" in sv_zmq
+    assert "zmqRconPeer_t\t\t\t*rconPeerRoot;" in sv_zmq
+    assert "zmqRconPeer_t\t\t\t*rconPeerLast;" in sv_zmq
+    assert "int\t\t\t\t\t\trconPeerCount;" in sv_zmq
+    assert "static void idZMQ_Destroy( void )" in sv_zmq
+    assert "idZMQ_ClearRconPeers();" in _extract_function_block(sv_zmq, "static void idZMQ_Destroy( void )")
+    assert "operator delete" not in sv_zmq
+    assert "idZMQ::`vftable" not in sv_zmq
+    assert "portable retained idZMQ layout boundary" in mapping_round
+    assert "does not reconstruct libzmq/CZMQ internals" in mapping_round
+    assert "before 90% -> after 98%" in mapping_round
+
+
+def test_zmq_checked_zsock_lifecycle_provenance_round_658_is_pinned() -> None:
+    aliases = json.loads(
+        (REPO_ROOT / "references/analysis/quakelive_symbol_aliases.json").read_text(encoding="utf-8")
+    )["quakelive_steam_srp"]
+    functions_csv = (
+        REPO_ROOT / "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+    ).read_text(encoding="utf-8").lower()
+    hlil_part05 = (
+        REPO_ROOT
+        / "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part05.txt"
+    ).read_text(encoding="utf-8")
+    sv_zmq = (REPO_ROOT / "src/code/server/sv_zmq.c").read_text(encoding="utf-8")
+    mapping_round = (
+        REPO_ROOT / "docs/reverse-engineering/quakelive_steam_mapping_round_658.md"
+    ).read_text(encoding="utf-8")
+
+    expected_aliases = {
+        "sub_4F5100": "zsock_new_checked",
+        "sub_4F5190": "zsock_destroy_checked",
+        "sub_4F5200": "zsock_bind",
+        "sub_4F5750": "zsock_set_zap_domain",
+        "sub_4F5790": "zsock_set_plain_server",
+        "sub_4F5980": "zsock_set_router_mandatory",
+    }
+
+    for symbol, alias in expected_aliases.items():
+        address = f"00{symbol.removeprefix('sub_')}".lower()
+        assert aliases[symbol] == alias
+        assert f"fun_{address},{address}" in functions_csv
+        assert f"| `{symbol}` | `{alias}` |" in mapping_round
+
+    assert '004f3de5      sub_4f5190(&data_575704, "zmq\\id_zmq.cpp", 0x73)' in hlil_part05
+    assert "004f3e08      data_57570c = 0" in hlil_part05
+    assert '004f3e12      sub_4f5190(&data_575708, "zmq\\id_zmq.cpp", 0xe2)' in hlil_part05
+    assert '004f40aa      int32_t eax_12 = sub_4f5100(6, "zmq\\id_zmq.cpp", 0xc7)' in hlil_part05
+    assert '004f40b8      sub_4f5750(eax_12, "rcon")' in hlil_part05
+    assert "004f40db      sub_4f5790(var_10_3)" in hlil_part05
+    assert "004f40e9      sub_4f5980(*(arg1 + 0xc))" in hlil_part05
+    assert "004f40ff      if (sub_4f5200(*(arg1 + 0xc), eax_11) == 0xffffffff)" in hlil_part05
+    assert '004f4327      int32_t eax_11 = sub_4f5100(1, "zmq\\id_zmq.cpp", 0x5c)' in hlil_part05
+    assert '004f4335      sub_4f5750(eax_11, "stats")' in hlil_part05
+    assert "004f4358      sub_4f5790(var_3c_5)" in hlil_part05
+    assert "004f4371      if (sub_4f5200(*(arg1 + 8), eax_10) == 0xffffffff)" in hlil_part05
+
+    ensure_rcon_block = _extract_function_block(sv_zmq, "static qboolean idZMQ_EnsureRconSocket( void ) {")
+    ensure_stats_block = _extract_function_block(sv_zmq, "static qboolean idZMQ_EnsureStatsPublisher( void ) {")
+    shutdown_stats_block = _extract_function_block(sv_zmq, "void Zmq_ShutdownStatsPublisher( void )")
+    shutdown_runtime_block = _extract_function_block(sv_zmq, "void Zmq_ShutdownRuntime( void )")
+    close_socket_block = _extract_function_block(sv_zmq, "static void idZMQ_CloseSocket( void **socketPointer )")
+
+    assert '#define QL_ZMQ_RETAIL_SOURCE_FILE "zmq\\\\id_zmq.cpp"' in sv_zmq
+    assert "#define QL_ZMQ_RETAIL_STATS_PUB_CREATE_LINE 0x5c" in sv_zmq
+    assert "#define QL_ZMQ_RETAIL_STATS_PUB_DESTROY_LINE 0x73" in sv_zmq
+    assert "#define QL_ZMQ_RETAIL_RCON_CREATE_LINE 0xc7" in sv_zmq
+    assert "#define QL_ZMQ_RETAIL_RCON_DESTROY_LINE 0xe2" in sv_zmq
+    assert "s_zmq.zmq_socket( s_zmq.context, QL_ZMQ_ROUTER );" in ensure_rcon_block
+    assert "idZMQ_TrySetSocketString( socket, QL_ZMQ_ZAP_DOMAIN, QL_ZMQ_DOMAIN_RCON );" in ensure_rcon_block
+    assert "idZMQ_TrySetSocketInt( socket, QL_ZMQ_PLAIN_SERVER, s_zmq.rconPassword[0] ? QL_ZMQ_SOCKET_OPTION_ENABLED : QL_ZMQ_SOCKET_OPTION_DISABLED );" in ensure_rcon_block
+    assert "idZMQ_TrySetSocketInt( socket, QL_ZMQ_ROUTER_MANDATORY, QL_ZMQ_SOCKET_OPTION_ENABLED );" in ensure_rcon_block
+    assert "s_zmq.zmq_bind( socket, s_zmq.rconEndpoint )" in ensure_rcon_block
+    assert "s_zmq.zmq_socket( s_zmq.context, QL_ZMQ_PUB );" in ensure_stats_block
+    assert "idZMQ_TrySetSocketString( socket, QL_ZMQ_ZAP_DOMAIN, QL_ZMQ_DOMAIN_STATS );" in ensure_stats_block
+    assert "idZMQ_TrySetSocketInt( socket, QL_ZMQ_PLAIN_SERVER, s_zmq.statsPassword[0] ? QL_ZMQ_SOCKET_OPTION_ENABLED : QL_ZMQ_SOCKET_OPTION_DISABLED );" in ensure_stats_block
+    assert "s_zmq.zmq_bind( socket, s_zmq.statsEndpoint )" in ensure_stats_block
+    assert "idZMQ_CloseSocket( &s_zmq.pubSocket );" in shutdown_stats_block
+    assert "idZMQ_CloseSocket( &s_zmq.rconSocket );" in shutdown_runtime_block
+    assert "#define QL_ZMQ_SOCKET_SLOT_EMPTY NULL" in sv_zmq
+    assert "*socketPointer = QL_ZMQ_SOCKET_SLOT_EMPTY;" in close_socket_block
+    assert "*socketPointer = NULL;" not in close_socket_block
+    assert "s_zmq.rconPollSocket = QL_ZMQ_RCON_POLL_SLOT_EMPTY;" in shutdown_runtime_block
+    assert "zsock_new_checked" not in sv_zmq
+    assert "zsock_destroy_checked" not in sv_zmq
+    assert "checked zsock lifecycle provenance" in mapping_round
+    assert "does not reconstruct libzmq/CZMQ internals" in mapping_round
+    assert "before 91% -> after 98%" in mapping_round
+
+
+def test_zmq_socket_close_slot_clear_round_736_is_pinned() -> None:
+    aliases = json.loads(
+        (REPO_ROOT / "references/analysis/quakelive_symbol_aliases.json").read_text(encoding="utf-8")
+    )["quakelive_steam_srp"]
+    functions_csv = (
+        REPO_ROOT / "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+    ).read_text(encoding="utf-8").lower()
+    hlil_part05 = (
+        REPO_ROOT
+        / "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part05.txt"
+    ).read_text(encoding="utf-8")
+    sv_zmq = (REPO_ROOT / "src/code/server/sv_zmq.c").read_text(encoding="utf-8")
+    implementation_plan = (REPO_ROOT / "IMPLEMENTATION_PLAN.md").read_text(encoding="utf-8")
+    mapping_round = (
+        REPO_ROOT / "docs/reverse-engineering/quakelive_steam_mapping_round_736.md"
+    ).read_text(encoding="utf-8")
+
+    expected_aliases = {
+        "sub_4012F0": "zmq_close",
+        "sub_4F5190": "zsock_destroy_checked",
+        "sub_4F6AA0": "zsys_close",
+    }
+
+    for symbol, alias in expected_aliases.items():
+        address = f"00{symbol.removeprefix('sub_')}".lower()
+        assert aliases[symbol] == alias
+        assert f"fun_{address},{address}" in functions_csv
+        assert f"| `{symbol}` | `{alias}` |" in mapping_round
+
+    assert "004f5190    void sub_4f5190(int32_t* arg1, int32_t arg2, int32_t arg3)" in hlil_part05
+    assert "004f5198  int32_t* esi = *arg1" in hlil_part05
+    assert "004f519c  if (esi != 0)" in hlil_part05
+    assert "004f51ab      *esi = 0xdeadbeef" in hlil_part05
+    assert "004f51b1      sub_4f6aa0(edx_1)" in hlil_part05
+    assert "004f51ce      *arg1 = 0" in hlil_part05
+    assert "004f6aa0    int32_t sub_4f6aa0(void* arg1)" in hlil_part05
+    assert "004f6b09  sub_4012f0(arg1)" in hlil_part05
+
+    close_socket_block = _extract_function_block(sv_zmq, "static void idZMQ_CloseSocket( void **socketPointer )")
+    shutdown_stats_block = _extract_function_block(sv_zmq, "void Zmq_ShutdownStatsPublisher( void )")
+    shutdown_runtime_block = _extract_function_block(sv_zmq, "void Zmq_ShutdownRuntime( void )")
+    close_auth_block = _extract_function_block(sv_zmq, "static void idZMQ_CloseAuthSocket( void )")
+
+    assert "#define QL_ZMQ_SOCKET_SLOT_EMPTY NULL" in sv_zmq
+    assert "if ( *socketPointer && s_zmq.zmq_close ) {" in close_socket_block
+    assert "s_zmq.zmq_close( *socketPointer );" in close_socket_block
+    assert "*socketPointer = QL_ZMQ_SOCKET_SLOT_EMPTY;" in close_socket_block
+    assert "*socketPointer = NULL;" not in close_socket_block
+    assert close_socket_block.index("s_zmq.zmq_close( *socketPointer );") < close_socket_block.index(
+        "*socketPointer = QL_ZMQ_SOCKET_SLOT_EMPTY;"
+    )
+    assert "idZMQ_CloseSocket( &s_zmq.pubSocket );" in shutdown_stats_block
+    assert "idZMQ_CloseSocket( &s_zmq.rconSocket );" in shutdown_runtime_block
+    assert "idZMQ_CloseSocket( &s_zmq.authSocket );" in close_auth_block
+    assert "zsock_destroy_checked" not in sv_zmq
+    assert "zsys_close(" not in sv_zmq
+    assert "ZMQ socket close-slot clear boundary" in mapping_round
+    assert "SRP dynamic zmq_close adaptation" in mapping_round
+    assert "does not reconstruct libzmq/CZMQ internals" in mapping_round
+    assert "before 94% -> after 99%" in mapping_round
+    assert "### Task A638: Pin ZMQ socket close-slot clear boundary [COMPLETED]" in implementation_plan
+
+
+def test_zmq_auth_bind_failure_close_slot_round_738_is_pinned() -> None:
+    aliases = json.loads(
+        (REPO_ROOT / "references/analysis/quakelive_symbol_aliases.json").read_text(encoding="utf-8")
+    )["quakelive_steam_srp"]
+    functions_csv = (
+        REPO_ROOT / "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+    ).read_text(encoding="utf-8").lower()
+    hlil_part05 = (
+        REPO_ROOT
+        / "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part05.txt"
+    ).read_text(encoding="utf-8")
+    sv_zmq = (REPO_ROOT / "src/code/server/sv_zmq.c").read_text(encoding="utf-8")
+    implementation_plan = (REPO_ROOT / "IMPLEMENTATION_PLAN.md").read_text(encoding="utf-8")
+    mapping_round = (
+        REPO_ROOT / "docs/reverse-engineering/quakelive_steam_mapping_round_738.md"
+    ).read_text(encoding="utf-8")
+
+    expected_aliases = {
+        "sub_4012F0": "zmq_close",
+        "sub_4F5190": "zsock_destroy_checked",
+        "sub_4F5200": "zsock_bind",
+        "sub_4F5EA0": "zauth_self_destroy",
+        "sub_4F5F10": "zauth_self_new",
+        "sub_4F6AA0": "zsys_close",
+    }
+
+    for symbol, alias in expected_aliases.items():
+        address = f"00{symbol.removeprefix('sub_')}".lower()
+        assert aliases[symbol] == alias
+        assert f"fun_{address},{address}" in functions_csv
+        assert f"| `{symbol}` | `{alias}` |" in mapping_round
+
+    assert "004f5190    void sub_4f5190(int32_t* arg1, int32_t arg2, int32_t arg3)" in hlil_part05
+    assert "004f51b1      sub_4f6aa0(edx_1)" in hlil_part05
+    assert "004f51ce      *arg1 = 0" in hlil_part05
+    assert "004f5200    int32_t sub_4f5200(void* arg1, int32_t arg2)" in hlil_part05
+    assert "004f5270      if (sub_401410(*(arg1 + 4), var_8) != 0)" in hlil_part05
+    assert "004f5ea0    void sub_4f5ea0()" in hlil_part05
+    assert '004f5ee8          sub_4f5410(eax_3, edx_2, ecx_3, eax_3, "inproc://zeromq.zap.01")' in hlil_part05
+    assert '004f5ef5          sub_4f5190(esi + 4, "..\\..\\..\\..\\src\\zauth.c", 0x39)' in hlil_part05
+    assert "004f5f10    int32_t sub_4f5f10(int32_t arg1)" in hlil_part05
+    assert '004f5f8e  int32_t eax_9 = sub_4f5100(4, "..\\..\\..\\..\\src\\zauth.c", 0x4c)' in hlil_part05
+    assert '004f5f9c  sub_4f5200(eax_9, "inproc://zeromq.zap.01")' in hlil_part05
+    assert "004f6aa0    int32_t sub_4f6aa0(void* arg1)" in hlil_part05
+    assert "004f6b09  sub_4012f0(arg1)" in hlil_part05
+
+    ensure_auth_block = _extract_function_block(sv_zmq, "static qboolean idZMQ_EnsureAuthSocket( void )")
+    close_socket_block = _extract_function_block(sv_zmq, "static void idZMQ_CloseSocket( void **socketPointer )")
+
+    assert '#define QL_ZMQ_ZAP_ENDPOINT "inproc://zeromq.zap.01"' in sv_zmq
+    assert '#define QL_ZMQ_AUTH_SOCKET_BIND_FAILED_FORMAT "failed to bind auth socket: %s"' in sv_zmq
+    assert "#define QL_ZMQ_SOCKET_SLOT_EMPTY NULL" in sv_zmq
+    assert "if ( s_zmq.zmq_bind( socket, QL_ZMQ_ZAP_ENDPOINT ) != QL_ZMQ_BIND_SUCCESS ) {" in ensure_auth_block
+    assert "idZMQ_LogRuntimeUnavailable( va( QL_ZMQ_AUTH_SOCKET_BIND_FAILED_FORMAT, idZMQ_LastErrorString() ) );" in ensure_auth_block
+    assert "idZMQ_CloseSocket( &socket );" in ensure_auth_block
+    assert "s_zmq.zmq_close( socket );" not in ensure_auth_block
+    assert ensure_auth_block.index("idZMQ_LogRuntimeUnavailable") < ensure_auth_block.index("idZMQ_CloseSocket( &socket );")
+    cleanup_position = ensure_auth_block.index("idZMQ_CloseSocket( &socket );")
+    assert "return qfalse;" in ensure_auth_block[cleanup_position:]
+    assert "s_zmq.zmq_close( *socketPointer );" in close_socket_block
+    assert "*socketPointer = QL_ZMQ_SOCKET_SLOT_EMPTY;" in close_socket_block
+    assert sv_zmq.count("s_zmq.zmq_close(") == 1
+    assert "zsock_bind(" not in sv_zmq
+    assert "zsock_destroy_checked" not in sv_zmq
+    assert "zauth_self_new" not in sv_zmq
+    assert "zauth_self_destroy" not in sv_zmq
+    assert "ZMQ auth bind failure close-slot boundary" in mapping_round
+    assert "SRP manual ZAP bind failure cleanup" in mapping_round
+    assert "does not reconstruct libzmq/CZMQ internals" in mapping_round
+    assert "before 94% -> after 99%" in mapping_round
+    assert "### Task A640: Pin ZMQ auth bind failure close-slot boundary [COMPLETED]" in implementation_plan
+
+
+def test_zmq_context_shutdown_slot_clear_round_740_is_pinned() -> None:
+    aliases = json.loads(
+        (REPO_ROOT / "references/analysis/quakelive_symbol_aliases.json").read_text(encoding="utf-8")
+    )["quakelive_steam_srp"]
+    functions_csv = (
+        REPO_ROOT / "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+    ).read_text(encoding="utf-8").lower()
+    hlil_part01 = (
+        REPO_ROOT
+        / "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part01.txt"
+    ).read_text(encoding="utf-8")
+    hlil_part05 = (
+        REPO_ROOT
+        / "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part05.txt"
+    ).read_text(encoding="utf-8")
+    sv_zmq = (REPO_ROOT / "src/code/server/sv_zmq.c").read_text(encoding="utf-8")
+    implementation_plan = (REPO_ROOT / "IMPLEMENTATION_PLAN.md").read_text(encoding="utf-8")
+    mapping_round = (
+        REPO_ROOT / "docs/reverse-engineering/quakelive_steam_mapping_round_740.md"
+    ).read_text(encoding="utf-8")
+
+    expected_aliases = {
+        "sub_401140": "zmq_ctx_term",
+        "sub_4012B0": "zmq_term",
+        "sub_402790": "zmq_ctx_t_term",
+        "sub_4F3DD0": "Zmq_ShutdownStatsPublisher",
+        "sub_4F3DF0": "Zmq_ShutdownRuntime",
+        "sub_4F5190": "zsock_destroy_checked",
+        "sub_4F5B50": "zactor_destroy",
+    }
+
+    for symbol, alias in expected_aliases.items():
+        address = f"00{symbol.removeprefix('sub_')}".lower()
+        assert aliases[symbol] == alias
+        assert f"fun_{address},{address}" in functions_csv
+        assert f"| `{symbol}` | `{alias}` |" in mapping_round
+
+    assert "00401140    int32_t sub_401140(int32_t* arg1)" in hlil_part01
+    assert "00401162  int32_t result = sub_402790(eax)" in hlil_part01
+    assert "004012b0    int32_t sub_4012b0()" in hlil_part01
+    assert "004012b4  return sub_401140() __tailcall" in hlil_part01
+    assert "00402790    int32_t __stdcall sub_402790(void* arg1)" in hlil_part01
+    assert "004f3dd0    void sub_4f3dd0()" in hlil_part05
+    assert '004f3de5      sub_4f5190(&data_575704, "zmq\\id_zmq.cpp", 0x73)' in hlil_part05
+    assert "004f3df0    void sub_4f3df0()" in hlil_part05
+    assert "004f3e08      data_57570c = 0" in hlil_part05
+    assert '004f3e12      sub_4f5190(&data_575708, "zmq\\id_zmq.cpp", 0xe2)' in hlil_part05
+    assert "004f3e21  if (data_575700 != 0)" in hlil_part05
+    assert "004f3e28      sub_4f5b50(&data_575700)" in hlil_part05
+
+    shutdown_runtime_block = _extract_function_block(sv_zmq, "void Zmq_ShutdownRuntime( void )")
+    ensure_runtime_block = _extract_function_block(sv_zmq, "static qboolean idZMQ_EnsureRuntime( void )")
+    load_library_block = _extract_function_block(sv_zmq, "static qboolean idZMQ_LoadLibrary( void )")
+
+    assert "#define QL_ZMQ_CONTEXT_SLOT_EMPTY NULL" in sv_zmq
+    assert '#define QL_ZMQ_EXPORT_CTX_TERM "zmq_ctx_term"' in sv_zmq
+    assert "idZMQ_LoadSymbol( (void **)&s_zmq.zmq_ctx_term, QL_ZMQ_EXPORT_CTX_TERM )" in load_library_block
+    assert "s_zmq.context = s_zmq.zmq_ctx_new();" in ensure_runtime_block
+    assert "if ( s_zmq.context && s_zmq.zmq_ctx_term ) {" in shutdown_runtime_block
+    assert "s_zmq.zmq_ctx_term( s_zmq.context );" in shutdown_runtime_block
+    assert "s_zmq.context = QL_ZMQ_CONTEXT_SLOT_EMPTY;" in shutdown_runtime_block
+    assert "s_zmq.context = NULL;" not in shutdown_runtime_block
+    assert shutdown_runtime_block.index("s_zmq.zmq_ctx_term( s_zmq.context );") < shutdown_runtime_block.index(
+        "s_zmq.context = QL_ZMQ_CONTEXT_SLOT_EMPTY;"
+    )
+    assert shutdown_runtime_block.index("s_zmq.context = QL_ZMQ_CONTEXT_SLOT_EMPTY;") < shutdown_runtime_block.index(
+        "idZMQ_UnloadLibrary();"
+    )
+    assert "#include <zmq.h>" not in sv_zmq
+    assert "zmq_ctx_t_term(" not in sv_zmq
+    assert "zmq_term(" not in sv_zmq
+    assert "zactor_destroy(" not in sv_zmq
+    assert "ZMQ context shutdown slot-clear boundary" in mapping_round
+    assert "SRP dynamic zmq_ctx_term adaptation" in mapping_round
+    assert "does not reconstruct libzmq/CZMQ internals" in mapping_round
+    assert "before 94% -> after 99%" in mapping_round
+    assert "### Task A642: Pin ZMQ context shutdown slot-clear boundary [COMPLETED]" in implementation_plan
+
+
+def test_zmq_external_runtime_library_slot_clear_round_742_is_pinned() -> None:
+    aliases = json.loads(
+        (REPO_ROOT / "references/analysis/quakelive_symbol_aliases.json").read_text(encoding="utf-8")
+    )["quakelive_steam_srp"]
+    functions_csv = (
+        REPO_ROOT / "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+    ).read_text(encoding="utf-8").lower()
+    hlil_part01 = (
+        REPO_ROOT
+        / "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part01.txt"
+    ).read_text(encoding="utf-8")
+    hlil_part05 = (
+        REPO_ROOT
+        / "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part05.txt"
+    ).read_text(encoding="utf-8")
+    sv_zmq = (REPO_ROOT / "src/code/server/sv_zmq.c").read_text(encoding="utf-8")
+    implementation_plan = (REPO_ROOT / "IMPLEMENTATION_PLAN.md").read_text(encoding="utf-8")
+    mapping_round = (
+        REPO_ROOT / "docs/reverse-engineering/quakelive_steam_mapping_round_742.md"
+    ).read_text(encoding="utf-8")
+
+    expected_aliases = {
+        "sub_401140": "zmq_ctx_term",
+        "sub_4012B0": "zmq_term",
+        "sub_4F3DF0": "Zmq_ShutdownRuntime",
+        "sub_4F5190": "zsock_destroy_checked",
+        "sub_4F5B50": "zactor_destroy",
+        "sub_4F7070": "zsys_shutdown",
+    }
+
+    for symbol, alias in expected_aliases.items():
+        address = f"00{symbol.removeprefix('sub_')}".lower()
+        assert aliases[symbol] == alias
+        assert f"fun_{address},{address}" in functions_csv
+        assert f"| `{symbol}` | `{alias}` |" in mapping_round
+
+    assert "00401140    int32_t sub_401140(int32_t* arg1)" in hlil_part01
+    assert "004012b0    int32_t sub_4012b0()" in hlil_part01
+    assert "004012b4  return sub_401140() __tailcall" in hlil_part01
+    assert "004f3df0    void sub_4f3df0()" in hlil_part05
+    assert "004f3e08      data_57570c = 0" in hlil_part05
+    assert '004f3e12      sub_4f5190(&data_575708, "zmq\\id_zmq.cpp", 0xe2)' in hlil_part05
+    assert "004f3e21  if (data_575700 != 0)" in hlil_part05
+    assert "004f3e28      sub_4f5b50(&data_575700)" in hlil_part05
+    assert "004f7070    void sub_4f7070()" in hlil_part05
+    assert "004f70bf      if (data_12d30e8 != 0)" in hlil_part05
+    assert '004f70d0          sub_4f5190(&data_12d30e8, "..\\..\\..\\..\\src\\zsys.c", 0xe9)' in hlil_part05
+    assert "004f7122          sub_4012f0(*i)" in hlil_part05
+    assert "004f7162          sub_4012b0()" in hlil_part05
+    assert "004f717b      DeleteCriticalSection(lpCriticalSection: &data_12d309c)" in hlil_part05
+
+    load_library_block = _extract_function_block(sv_zmq, "static qboolean idZMQ_LoadLibrary( void )")
+    unload_library_block = _extract_function_block(sv_zmq, "static void idZMQ_UnloadLibrary( void )")
+    shutdown_runtime_block = _extract_function_block(sv_zmq, "void Zmq_ShutdownRuntime( void )")
+
+    assert "#define QL_ZMQ_LIBRARY_SLOT_EMPTY NULL" in sv_zmq
+    assert "#define QL_ZMQ_CONTEXT_SLOT_EMPTY NULL" in sv_zmq
+    assert "QL_ZMQ_CLOSE();" in load_library_block
+    assert "s_zmq.library = QL_ZMQ_LIBRARY_SLOT_EMPTY;" in load_library_block
+    assert "s_zmq.library = NULL;" not in load_library_block
+    assert load_library_block.index("QL_ZMQ_CLOSE();") < load_library_block.index(
+        "s_zmq.library = QL_ZMQ_LIBRARY_SLOT_EMPTY;"
+    )
+    assert load_library_block.index("s_zmq.library = QL_ZMQ_LIBRARY_SLOT_EMPTY;") < load_library_block.index(
+        "idZMQ_ResetResolvedSymbols();"
+    )
+    assert "QL_ZMQ_CLOSE();" in unload_library_block
+    assert "s_zmq.library = QL_ZMQ_LIBRARY_SLOT_EMPTY;" in unload_library_block
+    assert "s_zmq.library = NULL;" not in unload_library_block
+    assert unload_library_block.index("QL_ZMQ_CLOSE();") < unload_library_block.index(
+        "s_zmq.library = QL_ZMQ_LIBRARY_SLOT_EMPTY;"
+    )
+    assert sv_zmq.count("s_zmq.library = QL_ZMQ_LIBRARY_SLOT_EMPTY;") == 2
+    assert "s_zmq.library = NULL;" not in sv_zmq
+    assert shutdown_runtime_block.index("s_zmq.context = QL_ZMQ_CONTEXT_SLOT_EMPTY;") < shutdown_runtime_block.index(
+        "idZMQ_UnloadLibrary();"
+    )
+    assert "#include <zmq.h>" not in sv_zmq
+    assert "zmq_term(" not in sv_zmq
+    assert "zactor_destroy(" not in sv_zmq
+    assert "zsys_shutdown(" not in sv_zmq
+    assert "ZMQ external runtime library slot-clear boundary" in mapping_round
+    assert "SRP dynamic library handle adaptation" in mapping_round
+    assert "does not reconstruct libzmq/CZMQ internals" in mapping_round
+    assert "before 94% -> after 99%" in mapping_round
+    assert "### Task A644: Pin ZMQ external runtime library slot-clear boundary [COMPLETED]" in implementation_plan
+
+
+def test_zmq_external_runtime_resolved_symbol_slot_clear_round_743_is_pinned() -> None:
+    aliases = json.loads(
+        (REPO_ROOT / "references/analysis/quakelive_symbol_aliases.json").read_text(encoding="utf-8")
+    )["quakelive_steam_srp"]
+    functions_csv = (
+        REPO_ROOT / "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+    ).read_text(encoding="utf-8").lower()
+    hlil_part01 = (
+        REPO_ROOT
+        / "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part01.txt"
+    ).read_text(encoding="utf-8")
+    sv_zmq = (REPO_ROOT / "src/code/server/sv_zmq.c").read_text(encoding="utf-8")
+    implementation_plan = (REPO_ROOT / "IMPLEMENTATION_PLAN.md").read_text(encoding="utf-8")
+    ownership_note = (
+        REPO_ROOT / "docs/reverse-engineering/zmq-dependency-ownership-2026-06-06.md"
+    ).read_text(encoding="utf-8")
+    mapping_round = (
+        REPO_ROOT / "docs/reverse-engineering/quakelive_steam_mapping_round_743.md"
+    ).read_text(encoding="utf-8")
+
+    expected_embedded_exports = {
+        "sub_401000": "zmq_ctx_new",
+        "sub_401140": "zmq_ctx_term",
+        "sub_4012C0": "zmq_socket",
+        "sub_4012F0": "zmq_close",
+        "sub_401390": "zmq_setsockopt",
+        "sub_4013D0": "zmq_getsockopt",
+        "sub_401410": "zmq_bind",
+        "sub_4014D0": "zmq_msg_send",
+        "sub_401520": "zmq_msg_recv",
+        "sub_401600": "zmq_poll",
+    }
+
+    for symbol, alias in expected_embedded_exports.items():
+        address = f"00{symbol.removeprefix('sub_')}".lower()
+        assert aliases[symbol] == alias
+        assert f"fun_{address},{address}" in functions_csv
+        assert f"| `{symbol}` | `{alias}` |" in mapping_round
+
+    assert "00401000    uint32_t sub_401000()" in hlil_part01
+    assert "00401140    int32_t sub_401140(int32_t* arg1)" in hlil_part01
+    assert "004012c0    void* sub_4012c0(int32_t* arg1, int32_t arg2)" in hlil_part01
+    assert "004012f0    int32_t sub_4012f0(void* arg1)" in hlil_part01
+    assert "00401390    int32_t sub_401390(int32_t* arg1, int32_t arg2, int32_t* arg3, void* arg4)" in hlil_part01
+    assert "004013d0    int32_t sub_4013d0(int32_t* arg1, int32_t arg2, uint32_t arg3, int32_t* arg4)" in hlil_part01
+    assert "00401410    int32_t sub_401410(int32_t* arg1, char* arg2)" in hlil_part01
+    assert "004014d0    uint32_t sub_4014d0(int32_t* arg1, void* arg2, char arg3)" in hlil_part01
+    assert "00401520    uint32_t sub_401520(int32_t* arg1, void* arg2, char arg3)" in hlil_part01
+    assert "00401600    void* const sub_401600(uint64_t arg1[0x2] @ xmm0, uint32_t arg2, int64_t arg3)" in hlil_part01
+
+    reset_symbols_block = _extract_function_block(sv_zmq, "static void idZMQ_ResetResolvedSymbols( void )")
+    load_library_block = _extract_function_block(sv_zmq, "static qboolean idZMQ_LoadLibrary( void )")
+    unload_library_block = _extract_function_block(sv_zmq, "static void idZMQ_UnloadLibrary( void )")
+    resolved_symbol_fields = (
+        "zmq_ctx_new",
+        "zmq_ctx_term",
+        "zmq_socket",
+        "zmq_close",
+        "zmq_bind",
+        "zmq_setsockopt",
+        "zmq_getsockopt",
+        "zmq_send",
+        "zmq_recv",
+        "zmq_poll",
+        "zmq_errno",
+        "zmq_strerror",
+    )
+
+    assert "#define QL_ZMQ_SYMBOL_SLOT_EMPTY NULL" in sv_zmq
+    assert reset_symbols_block.count("= QL_ZMQ_SYMBOL_SLOT_EMPTY;") == len(resolved_symbol_fields)
+
+    previous_position = -1
+    for field in resolved_symbol_fields:
+        clear_line = f"s_zmq.{field} = QL_ZMQ_SYMBOL_SLOT_EMPTY;"
+        raw_clear_line = f"s_zmq.{field} = NULL;"
+        assert clear_line in reset_symbols_block
+        assert raw_clear_line not in reset_symbols_block
+        position = reset_symbols_block.index(clear_line)
+        assert position > previous_position
+        previous_position = position
+
+    assert "s_zmq.library = QL_ZMQ_LIBRARY_SLOT_EMPTY;" in load_library_block
+    assert "idZMQ_ResetResolvedSymbols();" in load_library_block
+    assert load_library_block.index("s_zmq.library = QL_ZMQ_LIBRARY_SLOT_EMPTY;") < load_library_block.index(
+        "idZMQ_ResetResolvedSymbols();"
+    )
+    assert "s_zmq.library = QL_ZMQ_LIBRARY_SLOT_EMPTY;" in unload_library_block
+    assert "idZMQ_ResetResolvedSymbols();" in unload_library_block
+    assert unload_library_block.index("s_zmq.library = QL_ZMQ_LIBRARY_SLOT_EMPTY;") < unload_library_block.index(
+        "idZMQ_ResetResolvedSymbols();"
+    )
+
+    source_suffixes = {".c", ".cc", ".cpp", ".cxx", ".h", ".hh", ".hpp", ".hxx"}
+    libzmq_source_files = sorted(
+        source.relative_to(REPO_ROOT).as_posix()
+        for source in (REPO_ROOT / "src/libs/libzmq").rglob("*")
+        if source.is_file() and source.suffix.lower() in source_suffixes
+    )
+
+    assert "#include <zmq.h>" not in sv_zmq
+    assert "zsys_shutdown(" not in sv_zmq
+    assert "zsock_destroy_checked" not in sv_zmq
+    assert libzmq_source_files == []
+    assert "runtime-only" in ownership_note
+    assert "ZMQ external runtime resolved-symbol slot-clear boundary" in mapping_round
+    assert "SRP dynamic export-table adaptation" in mapping_round
+    assert "does not reconstruct libzmq/CZMQ internals" in mapping_round
+    assert "before 94% -> after 99%" in mapping_round
+    assert "### Task A645: Pin ZMQ external runtime resolved-symbol slot-clear boundary [COMPLETED]" in implementation_plan
+
+
+def test_zmq_rcon_poll_slot_clear_order_round_746_is_pinned() -> None:
+    aliases = json.loads(
+        (REPO_ROOT / "references/analysis/quakelive_symbol_aliases.json").read_text(encoding="utf-8")
+    )["quakelive_steam_srp"]
+    functions_csv = (
+        REPO_ROOT / "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+    ).read_text(encoding="utf-8").lower()
+    hlil_part01 = (
+        REPO_ROOT
+        / "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part01.txt"
+    ).read_text(encoding="utf-8")
+    hlil_part05 = (
+        REPO_ROOT
+        / "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part05.txt"
+    ).read_text(encoding="utf-8")
+    sv_zmq = (REPO_ROOT / "src/code/server/sv_zmq.c").read_text(encoding="utf-8")
+    implementation_plan = (REPO_ROOT / "IMPLEMENTATION_PLAN.md").read_text(encoding="utf-8")
+    mapping_round = (
+        REPO_ROOT / "docs/reverse-engineering/quakelive_steam_mapping_round_746.md"
+    ).read_text(encoding="utf-8")
+
+    expected_aliases = {
+        "sub_401600": "zmq_poll",
+        "sub_4F3DF0": "Zmq_ShutdownRuntime",
+        "sub_4F4ED0": "idZMQ_PumpRcon",
+        "sub_4F5190": "zsock_destroy_checked",
+        "sub_4F56B0": "zsock_resolve",
+    }
+
+    for symbol, alias in expected_aliases.items():
+        address = f"00{symbol.removeprefix('sub_')}".lower()
+        assert aliases[symbol] == alias
+        assert f"fun_{address},{address}" in functions_csv
+        assert f"| `{symbol}` | `{alias}` |" in mapping_round
+
+    assert "00401600    void* const sub_401600(uint64_t arg1[0x2] @ xmm0, uint32_t arg2, int64_t arg3)" in hlil_part01
+    assert "004f3df0    void sub_4f3df0()" in hlil_part05
+    assert "004f3df7  if (data_575708 != 0)" in hlil_part05
+    assert "004f3e08      data_57570c = 0" in hlil_part05
+    assert '004f3e12      sub_4f5190(&data_575708, "zmq\\id_zmq.cpp", 0xe2)' in hlil_part05
+    assert "004f4119      result = sub_4f56b0(*(arg1 + 0xc))" in hlil_part05
+    assert "004f4121      *(arg1 + 0x10) = result" in hlil_part05
+    assert "004f4ed0    void* __fastcall sub_4f4ed0(void* arg1)" in hlil_part05
+    assert "004f4ede  if (*(arg1 + 0xc) != 0)" in hlil_part05
+    assert "004f4ee4      int32_t ecx = *(arg1 + 0x10)" in hlil_part05
+    assert "004f4ee9      if (ecx != 0)" in hlil_part05
+    assert "004f4f0d          result = sub_401600(xmm0, &var_20, 1)" in hlil_part05
+
+    ensure_rcon_block = _extract_function_block(sv_zmq, "static qboolean idZMQ_EnsureRconSocket( void ) {")
+    pump_rcon_block = _extract_function_block(sv_zmq, "static void idZMQ_PumpRcon( void )")
+    shutdown_runtime_block = _extract_function_block(sv_zmq, "void Zmq_ShutdownRuntime( void )")
+
+    assert "#define QL_ZMQ_RCON_POLL_SLOT_EMPTY NULL" in sv_zmq
+    assert "s_zmq.rconPollSocket = QL_ZMQ_RCON_POLL_SLOT_EMPTY;" in ensure_rcon_block
+    assert "s_zmq.rconPollSocket = QL_ZMQ_RCON_POLL_SLOT_EMPTY;" in shutdown_runtime_block
+    assert "s_zmq.rconPollSocket = NULL;" not in sv_zmq
+    assert sv_zmq.count("s_zmq.rconPollSocket = QL_ZMQ_RCON_POLL_SLOT_EMPTY;") == 2
+    assert ensure_rcon_block.index("idZMQ_Destroy();") < ensure_rcon_block.index(
+        "s_zmq.rconPollSocket = QL_ZMQ_RCON_POLL_SLOT_EMPTY;"
+    )
+    assert ensure_rcon_block.index("s_zmq.rconPollSocket = QL_ZMQ_RCON_POLL_SLOT_EMPTY;") < ensure_rcon_block.index(
+        "idZMQ_CloseSocket( &s_zmq.rconSocket );"
+    )
+    assert shutdown_runtime_block.index("s_zmq.rconPollSocket = QL_ZMQ_RCON_POLL_SLOT_EMPTY;") < shutdown_runtime_block.index(
+        "idZMQ_CloseSocket( &s_zmq.rconSocket );"
+    )
+    assert shutdown_runtime_block.index("idZMQ_CloseSocket( &s_zmq.rconSocket );") < shutdown_runtime_block.index(
+        "idZMQ_CloseAuthSocket();"
+    )
+    assert "s_zmq.rconPollSocket = s_zmq.rconSocket;" in ensure_rcon_block
+    assert "if ( !s_zmq.rconSocket || !s_zmq.rconPollSocket || !s_zmq.zmq_poll || !s_zmq.zmq_recv ) {" in pump_rcon_block
+    assert "item.socket = s_zmq.rconPollSocket;" in pump_rcon_block
+    assert "identityLength = idZMQ_ReadFrameString( s_zmq.rconSocket, identity, sizeof( identity ), &more );" in pump_rcon_block
+    assert "zsock_resolve(" not in sv_zmq
+    assert "zsock_destroy_checked" not in sv_zmq
+    assert "ZMQ resolved RCON poll slot-clear boundary" in mapping_round
+    assert "SRP retained RCON poll slot adaptation" in mapping_round
+    assert "does not reconstruct libzmq/CZMQ internals" in mapping_round
+    assert "before 94% -> after 99%" in mapping_round
+    assert "### Task A648: Pin ZMQ resolved RCON poll slot-clear boundary [COMPLETED]" in implementation_plan
+
+
+def test_zmq_rcon_peer_table_slot_clear_round_747_is_pinned() -> None:
+    aliases = json.loads(
+        (REPO_ROOT / "references/analysis/quakelive_symbol_aliases.json").read_text(encoding="utf-8")
+    )["quakelive_steam_srp"]
+    functions_csv = (
+        REPO_ROOT / "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+    ).read_text(encoding="utf-8").lower()
+    hlil_part05 = (
+        REPO_ROOT
+        / "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part05.txt"
+    ).read_text(encoding="utf-8")
+    sv_zmq = (REPO_ROOT / "src/code/server/sv_zmq.c").read_text(encoding="utf-8")
+    implementation_plan = (REPO_ROOT / "IMPLEMENTATION_PLAN.md").read_text(encoding="utf-8")
+    mapping_round = (
+        REPO_ROOT / "docs/reverse-engineering/quakelive_steam_mapping_round_747.md"
+    ).read_text(encoding="utf-8")
+
+    expected_aliases = {
+        "sub_4F46B0": "idZMQ_EraseRconPeer",
+        "sub_4F49C0": "idZMQ_InsertRconPeer",
+        "sub_4F4E80": "idZMQ_ClearRconPeers",
+        "sub_4F4FE0": "idZMQ_EraseRconPeerRange",
+        "sub_4F5080": "idZMQ_Destroy",
+    }
+
+    for symbol, alias in expected_aliases.items():
+        address = f"00{symbol.removeprefix('sub_')}".lower()
+        assert aliases[symbol] == alias
+        assert f"fun_{address},{address}" in functions_csv
+        assert f"| `{symbol}` | `{alias}` |" in mapping_round
+
+    assert "004f46b0    int32_t* __thiscall sub_4f46b0(void* arg1, int32_t* arg2, int32_t* arg3)" in hlil_part05
+    assert "004f48e7  int32_t eax_13 = *(arg1 + 8)" in hlil_part05
+    assert "004f48f2  if (eax_13 != 0)" in hlil_part05
+    assert "004f48f5      *(arg1 + 8) = eax_13 - 1" in hlil_part05
+    assert "004f4e80    void* __fastcall sub_4f4e80(void* arg1)" in hlil_part05
+    assert "004f4ec2  *(arg1 + 8) = 0" in hlil_part05
+    assert "004f4fe0    int32_t* __thiscall sub_4f4fe0(void* arg1, int32_t* arg2, int32_t* arg3, int32_t arg4)" in hlil_part05
+    assert "004f4ff6  if (i == *eax && arg4 == eax)" in hlil_part05
+    assert "004f4ffa      sub_4f4e80(arg1)" in hlil_part05
+    assert "004f5080    struct idZMQ::VTable** __thiscall sub_4f5080" in hlil_part05
+    assert "004f50c9  sub_4f4fe0(&arg1[5], &var_18, *eax_3, eax_3)" in hlil_part05
+
+    insert_block = _extract_function_block(sv_zmq, "static zmqRconPeer_t *idZMQ_InsertRconPeer( const char *identity )")
+    erase_peer_block = _extract_function_block(sv_zmq, "static void idZMQ_EraseRconPeer( zmqRconPeer_t *peer )")
+    range_erase_block = _extract_function_block(sv_zmq, "static void idZMQ_EraseRconPeerRange( zmqRconPeer_t *first, zmqRconPeer_t *last )")
+    clear_peer_block = _extract_function_block(sv_zmq, "static void idZMQ_ClearRconPeers( void )")
+    destroy_block = _extract_function_block(sv_zmq, "static void idZMQ_Destroy( void )")
+    shutdown_runtime_block = _extract_function_block(sv_zmq, "void Zmq_ShutdownRuntime( void )")
+
+    assert "#define QL_ZMQ_RCON_PEER_SLOT_EMPTY NULL" in sv_zmq
+    assert "#define QL_ZMQ_RCON_PEER_COUNT_EMPTY 0" in sv_zmq
+    assert "idZMQ_FreeRconPeerSubtree( s_zmq.rconPeerRoot );" in range_erase_block
+    assert "s_zmq.rconPeers = QL_ZMQ_RCON_PEER_SLOT_EMPTY;" in range_erase_block
+    assert "s_zmq.rconPeerRoot = QL_ZMQ_RCON_PEER_SLOT_EMPTY;" in range_erase_block
+    assert "s_zmq.rconPeerLast = QL_ZMQ_RCON_PEER_SLOT_EMPTY;" in range_erase_block
+    assert "s_zmq.rconPeerCount = QL_ZMQ_RCON_PEER_COUNT_EMPTY;" in range_erase_block
+    assert "s_zmq.rconPeers = NULL;" not in range_erase_block
+    assert "s_zmq.rconPeerRoot = NULL;" not in range_erase_block
+    assert "s_zmq.rconPeerLast = NULL;" not in range_erase_block
+    assert range_erase_block.index("idZMQ_FreeRconPeerSubtree( s_zmq.rconPeerRoot );") < range_erase_block.index(
+        "s_zmq.rconPeers = QL_ZMQ_RCON_PEER_SLOT_EMPTY;"
+    )
+    assert range_erase_block.index("s_zmq.rconPeerLast = QL_ZMQ_RCON_PEER_SLOT_EMPTY;") < range_erase_block.index(
+        "s_zmq.rconPeerCount = QL_ZMQ_RCON_PEER_COUNT_EMPTY;"
+    )
+    assert "idZMQ_EraseRconPeerRange( s_zmq.rconPeers, NULL );" in clear_peer_block
+    assert "idZMQ_ClearRconPeers();" in destroy_block
+    assert "idZMQ_ClearRconPeers();" not in shutdown_runtime_block
+    assert "s_zmq.rconPeerCount++;" in insert_block
+    assert "if ( s_zmq.rconPeerCount > QL_ZMQ_RCON_PEER_COUNT_EMPTY ) {" in erase_peer_block
+    assert "s_zmq.rconPeerCount--;" in erase_peer_block
+    assert "std_tree_" not in sv_zmq
+    assert "ZMQ RCON peer-table slot-clear boundary" in mapping_round
+    assert "SRP portable peer-table slot adaptation" in mapping_round
+    assert "does not reconstruct libzmq/CZMQ internals" in mapping_round
+    assert "does not reconstruct MSVC std::tree internals" in mapping_round
+    assert "before 94% -> after 99%" in mapping_round
+    assert "### Task A649: Pin ZMQ RCON peer-table slot-clear boundary [COMPLETED]" in implementation_plan
+
+
+def test_zmq_auth_actor_verbose_handshake_boundary_round_659_is_pinned() -> None:
+    aliases = json.loads(
+        (REPO_ROOT / "references/analysis/quakelive_symbol_aliases.json").read_text(encoding="utf-8")
+    )["quakelive_steam_srp"]
+    functions_csv = (
+        REPO_ROOT / "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+    ).read_text(encoding="utf-8").lower()
+    hlil_part05 = (
+        REPO_ROOT
+        / "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part05.txt"
+    ).read_text(encoding="utf-8")
+    sv_zmq = (REPO_ROOT / "src/code/server/sv_zmq.c").read_text(encoding="utf-8")
+    mapping_round = (
+        REPO_ROOT / "docs/reverse-engineering/quakelive_steam_mapping_round_659.md"
+    ).read_text(encoding="utf-8")
+
+    expected_aliases = {
+        "sub_4F3F80": "idZMQ_RegisterCvarsAndInitRcon",
+        "sub_4F4210": "idZMQ_InitStatsPublisher",
+        "sub_4F5630": "zsock_wait",
+        "sub_4F5A30": "zactor_new",
+        "sub_4F5B50": "zactor_destroy",
+        "sub_4F5DB0": "zstr_sendx",
+        "sub_4F69F0": "zauth",
+    }
+
+    for symbol, alias in expected_aliases.items():
+        address = f"00{symbol.removeprefix('sub_')}".lower()
+        assert aliases[symbol] == alias
+        assert f"fun_{address},{address}" in functions_csv
+        assert f"| `{symbol}` | `{alias}` |" in mapping_round
+
+    assert "004f4055          eax_8, ecx, edx_1 = sub_4f5a30(sub_4f69f0, 0)" in hlil_part05
+    assert '004f405c          char const* const var_14_1 = "VERBOSE"' in hlil_part05
+    assert "004f4065          eax_9, edx_2 = sub_4f5db0(eax_8, edx_1, ecx, eax_8)" in hlil_part05
+    assert "004f406e          sub_4f5630(eax_9, edx_2, ecx_1, ecx_1)" in hlil_part05
+    assert "004f4078          sub_4f3d70(arg1)" in hlil_part05
+    assert "004f425f          eax_2, ecx, edx_1 = sub_4f5a30(sub_4f69f0, 0)" in hlil_part05
+    assert '004f4266          char const* const var_40_1 = "VERBOSE"' in hlil_part05
+    assert "004f426f          eax_3, edx_2 = sub_4f5db0(eax_2, edx_1, ecx, eax_2)" in hlil_part05
+    assert "004f4278          sub_4f5630(eax_3, edx_2, ecx_1, ecx_1)" in hlil_part05
+    assert "004f4282          sub_4f3d70(arg1)" in hlil_part05
+    assert "004f59d0    int32_t __stdcall sub_4f59d0(int32_t* arg1)" in hlil_part05
+    assert '004f5a03  sub_4f5190(&arg1[1], "..\\..\\..\\..\\src\\zactor.c", 0x58)' in hlil_part05
+    assert "004f5a30    int32_t sub_4f5a30(int32_t arg1, int32_t arg2)" in hlil_part05
+    assert "004f5a96  *result = 0x5cafe" in hlil_part05
+    assert '004f5a63      fprintf(__iob_func("FATAL ERROR at %s:%u\\n", "..\\..\\..\\..\\src\\zactor.c", 0x66) + 0x40)' in hlil_part05
+    assert '004f5ab9      fprintf(__iob_func("FATAL ERROR at %s:%u\\n", "..\\..\\..\\..\\src\\zactor.c", 0x6a) + 0x40)' in hlil_part05
+    assert "004f5b0d  int32_t eax_15 = _beginthreadex(0, 0, sub_4f59d0, eax_6, 4, 0)" in hlil_part05
+    assert "004f5b3e  sub_4f5630(eax_18, edx, ecx_1, edx)" in hlil_part05
+    assert "004f69f0    int32_t sub_4f69f0(int32_t* arg1)" in hlil_part05
+    assert "004f69fb  eax, ecx_1, edx = sub_4f5f10(arg1)" in hlil_part05
+    assert "004f6a28          sub_4f5fc0(eax)" in hlil_part05
+    assert "004f6a61  return sub_4f5ea0()" in hlil_part05
+
+    ensure_auth_block = _extract_function_block(sv_zmq, "static qboolean idZMQ_EnsureAuthSocket( void )")
+    pump_auth_block = _extract_function_block(sv_zmq, "static void idZMQ_PumpAuthSocket( void )")
+
+    assert '#define QL_ZMQ_AUTH_ACTOR_COMMAND_VERBOSE "VERBOSE"' in sv_zmq
+    assert '#define QL_ZMQ_AUTH_ACTOR_COMMAND_PLAIN "PLAIN"' in sv_zmq
+    assert '#define QL_ZMQ_RETAIL_ZACTOR_SOURCE_FILE "..\\\\..\\\\..\\\\..\\\\src\\\\zactor.c"' in sv_zmq
+    assert "#define QL_ZMQ_RETAIL_ZACTOR_MAGIC 0x5cafe" in sv_zmq
+    assert "#define QL_ZMQ_RETAIL_ZACTOR_THREAD_DESTROY_LINE 0x58" in sv_zmq
+    assert "#define QL_ZMQ_RETAIL_ZACTOR_ALLOC_LINE 0x66" in sv_zmq
+    assert "#define QL_ZMQ_RETAIL_ZACTOR_ARGS_ALLOC_LINE 0x6a" in sv_zmq
+    assert "SRP keeps CZMQ outside the repo" in ensure_auth_block
+    assert "socket = s_zmq.zmq_socket( s_zmq.context, QL_ZMQ_REP );" in ensure_auth_block
+    assert "s_zmq.zmq_bind( socket, QL_ZMQ_ZAP_ENDPOINT )" in ensure_auth_block
+    assert "s_zmq.authSocket = socket;" in ensure_auth_block
+    assert "s_zmq.authActorReady = qtrue;" in ensure_auth_block
+    assert "idZMQ_ApplyPasswords();" in ensure_auth_block
+    assert "if ( !s_zmq.authActorReady || !s_zmq.authSocket || !s_zmq.zmq_poll || !s_zmq.zmq_recv || !s_zmq.zmq_send )" in pump_auth_block
+    assert "Q_stricmp( mechanism, QL_ZMQ_ZAP_MECHANISM_PLAIN )" in pump_auth_block
+    assert "QL_ZMQ_AUTH_ACTOR_COMMAND_VERBOSE" not in pump_auth_block
+    assert "QL_ZMQ_AUTH_ACTOR_COMMAND_PLAIN" not in pump_auth_block
+    assert "zactor_new(" not in sv_zmq
+    assert "zactor_destroy(" not in sv_zmq
+    assert "zstr_sendx(" not in sv_zmq
+    assert "zsock_wait(" not in sv_zmq
+    assert "zauth(" not in sv_zmq
+    assert "manual ZAP REP socket remains the portable stand-in" in mapping_round
+    assert "does not reconstruct libzmq/CZMQ internals" in mapping_round
+    assert "before 92% -> after 98%" in mapping_round
+
+
+def test_zmq_password_plain_notification_boundary_round_660_is_pinned() -> None:
+    aliases = json.loads(
+        (REPO_ROOT / "references/analysis/quakelive_symbol_aliases.json").read_text(encoding="utf-8")
+    )["quakelive_steam_srp"]
+    functions_csv = (
+        REPO_ROOT / "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+    ).read_text(encoding="utf-8").lower()
+    hlil_part04 = (
+        REPO_ROOT
+        / "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part04.txt"
+    ).read_text(encoding="utf-8")
+    hlil_part05 = (
+        REPO_ROOT
+        / "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part05.txt"
+    ).read_text(encoding="utf-8")
+    hlil_part06 = (
+        REPO_ROOT
+        / "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part06.txt"
+    ).read_text(encoding="utf-8")
+    sv_zmq = (REPO_ROOT / "src/code/server/sv_zmq.c").read_text(encoding="utf-8")
+    mapping_round = (
+        REPO_ROOT / "docs/reverse-engineering/quakelive_steam_mapping_round_660.md"
+    ).read_text(encoding="utf-8")
+
+    expected_aliases = {
+        "sub_4D2460": "idZMQ_WritePasswordFile",
+        "sub_4F3D70": "idZMQ_ApplyPasswords",
+        "sub_4F3F20": "idZMQ_UpdatePasswords",
+        "sub_4F5630": "zsock_wait",
+        "sub_4F5DB0": "zstr_sendx",
+        "sub_4F6630": "s_authenticate_plain",
+        "sub_4F7360": "zsys_sprintf",
+    }
+
+    for symbol, alias in expected_aliases.items():
+        address = f"00{symbol.removeprefix('sub_')}".lower()
+        assert aliases[symbol] == alias
+        assert f"fun_{address},{address}" in functions_csv
+        assert f"| `{symbol}` | `{alias}` |" in mapping_round
+
+    assert "004d2460    int32_t sub_4d2460(char* arg1, char* arg2)" in hlil_part04
+    assert "004d2482  if (data_1239bd4 == 0)" in hlil_part04
+    assert "004d24ac  int32_t eax_3 = sub_4cf3e0(data_5686b4)" in hlil_part04
+    assert '004d24c6      sub_4c9860(arg1, "Failed to open %s\\n")' in hlil_part04
+    assert "004d24e8  if (arg1 != 0 && *arg1 != 0)" in hlil_part04
+    assert '004d24fc      sub_4c97c0(&var_88, 0x80, "stats_stats=%s\\n")' in hlil_part04
+    assert "004d2522      sub_4d00f0(&var_88, eax_5 - &var_87, eax_3)" in hlil_part04
+    assert "004d2531  if (arg2 != 0 && *arg2 != 0)" in hlil_part04
+    assert '004d2545      sub_4c97c0(&var_88, 0x80, "rcon_rcon=%s\\n")' in hlil_part04
+    assert "004d2568      sub_4d00f0(&var_88, eax_7 - &var_87, eax_3)" in hlil_part04
+    assert "004d2571  sub_4cf320(eax_3)" in hlil_part04
+
+    assert "004f3d94  if (*(arg1 + 4) == 0)" in hlil_part05
+    assert "004f3d9e  eax, ecx_3, edx_2 = sub_4d2460(*(result + 4), *(ecx_1 + 4))" in hlil_part05
+    assert '004f3da9  char const* const var_18_1 = "PLAIN"' in hlil_part05
+    assert "004f3daf  eax_2, edx_3 = sub_4f5db0(eax_1, edx_2, ecx_3, eax_1)" in hlil_part05
+    assert "004f3db8  return sub_4f5630(eax_2, edx_3, ecx_4, ecx_4)" in hlil_part05
+    assert "004f3f44  if (*(arg1 + 4) != 0)" in hlil_part05
+    assert "004f3f4e      eax, ecx_3, edx_2 = sub_4d2460(*(eax_4 + 4), *(ecx_1 + 4))" in hlil_part05
+    assert '004f3f59      char const* const var_18_1 = "PLAIN"' in hlil_part05
+    assert "004f3f5f      eax_2, edx_3 = sub_4f5db0(eax_1, edx_2, ecx_3, eax_1)" in hlil_part05
+    assert "004f3f68      sub_4f5630(eax_2, edx_3, ecx_4, ecx_4)" in hlil_part05
+    assert "004f6630    int32_t __fastcall sub_4f6630(int32_t arg1, void* arg2 @ esi, void* arg3 @ edi)" in hlil_part05
+    assert '004f6653  int32_t eax_2 = sub_4f7360("%s_%s")' in hlil_part05
+    assert "004f6660  eax_3, ecx_1, edx_2 = sub_4f9320(edx_1, eax_2)" in hlil_part05
+    assert "004f66a9              sub_4f7030(eax_6, edx_2, ecx_1, \"zauth: - allowed (PLAIN) usernam…\")" in hlil_part05
+    assert "004f66d7      sub_4f7030(eax_8, edx_3, ecx_1, \"zauth: - denied (PLAIN) username…\")" in hlil_part05
+    assert "004f66fd          sub_4f7030(eax, edx, arg1, \"zauth: - denied (PLAIN) no passw…\")" in hlil_part05
+
+    assert '005413dc  char const data_5413dc[0xc] = "zmqpass.txt", 0' in hlil_part06
+    assert '00541ac4  char const data_541ac4[0xe] = "rcon_rcon=%s\\n", 0' in hlil_part06
+    assert '00541ad4  char const data_541ad4[0x10] = "stats_stats=%s\\n", 0' in hlil_part06
+    assert '005486c4  char const data_5486c4[0x6] = "%s_%s", 0' in hlil_part06
+    assert '00551264  char const data_551264[0x6] = "PLAIN", 0' in hlil_part06
+
+    write_password_block = _extract_function_block(sv_zmq, "static void idZMQ_WritePasswordFile( void )")
+    apply_passwords_block = _extract_function_block(sv_zmq, "static void idZMQ_ApplyPasswords( void )")
+    validate_block = _extract_function_block(
+        sv_zmq,
+        "static qboolean idZMQ_ValidatePlainCredentials( const char *domain, const char *username, const char *password, const char **userId )",
+    )
+
+    assert '#define QL_ZMQ_PASSFILE "zmqpass.txt"' in sv_zmq
+    assert '#define QL_ZMQ_PASSWORD_STATS_RECORD_FORMAT "stats_stats=%s\\n"' in sv_zmq
+    assert '#define QL_ZMQ_PASSWORD_RCON_RECORD_FORMAT "rcon_rcon=%s\\n"' in sv_zmq
+    assert '#define QL_ZMQ_AUTH_KEY_FORMAT "%s_%s"' in sv_zmq
+    assert '#define QL_ZMQ_AUTH_ACTOR_COMMAND_PLAIN "PLAIN"' in sv_zmq
+    assert "Com_sprintf( line, sizeof( line ), QL_ZMQ_PASSWORD_STATS_RECORD_FORMAT, s_zmq.statsPassword );" in write_password_block
+    assert "Com_sprintf( line, sizeof( line ), QL_ZMQ_PASSWORD_RCON_RECORD_FORMAT, s_zmq.rconPassword );" in write_password_block
+    assert '"stats_stats=%s\\n", s_zmq.statsPassword' not in write_password_block
+    assert '"rcon_rcon=%s\\n", s_zmq.rconPassword' not in write_password_block
+    assert "Retail sends QL_ZMQ_AUTH_ACTOR_COMMAND_PLAIN" in apply_passwords_block
+    assert "manual ZAP path reads" in apply_passwords_block
+    assert "these retained buffers directly" in apply_passwords_block
+    assert "idZMQ_WritePasswordFile();" in apply_passwords_block
+    assert "Q_stricmp( username, expectedUsername ) != 0 || strcmp( password, expectedPassword ) != 0" in validate_block
+    assert "zstr_sendx(" not in sv_zmq
+    assert "zsock_wait(" not in sv_zmq
+    assert "s_authenticate_plain" not in sv_zmq
+    assert "actor `PLAIN` notification boundary" in mapping_round
+    assert "manual ZAP path reads retained password buffers directly" in mapping_round
+    assert "does not reconstruct libzmq/CZMQ internals" in mapping_round
+    assert "before 93% -> after 98%" in mapping_round
+
+
+def test_zmq_endpoint_cvar_literal_boundary_round_661_is_pinned() -> None:
+    aliases = json.loads(
+        (REPO_ROOT / "references/analysis/quakelive_symbol_aliases.json").read_text(encoding="utf-8")
+    )["quakelive_steam_srp"]
+    functions_csv = (
+        REPO_ROOT / "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+    ).read_text(encoding="utf-8").lower()
+    hlil_part05 = (
+        REPO_ROOT
+        / "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part05.txt"
+    ).read_text(encoding="utf-8")
+    hlil_part06 = (
+        REPO_ROOT
+        / "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part06.txt"
+    ).read_text(encoding="utf-8")
+    sv_zmq = (REPO_ROOT / "src/code/server/sv_zmq.c").read_text(encoding="utf-8")
+    mapping_round = (
+        REPO_ROOT / "docs/reverse-engineering/quakelive_steam_mapping_round_661.md"
+    ).read_text(encoding="utf-8")
+
+    expected_aliases = {
+        "sub_4C9860": "Com_Printf",
+        "sub_4CE0D0": "Cvar_Get",
+        "sub_4D7250": "NET_StringToAdr",
+        "sub_4D9160": "Com_sprintf",
+        "sub_4D9220": "va",
+        "sub_4F3F80": "idZMQ_RegisterCvarsAndInitRcon",
+        "sub_4F4210": "idZMQ_InitStatsPublisher",
+    }
+
+    for symbol, alias in expected_aliases.items():
+        address = f"00{symbol.removeprefix('sub_')}".lower()
+        assert aliases[symbol] == alias
+        assert f"fun_{address},{address}" in functions_csv
+        assert f"| `{symbol}` | `{alias}` |" in mapping_round
+
+    assert '004f3fa0  data_12d3090 = sub_4ce0d0(x87_r0, "zmq_rcon_enable", U"0", 0x10)' in hlil_part05
+    assert '004f3fb6  data_12d308c = sub_4ce0d0(x87_r2, "zmq_stats_enable", U"0", 0x10)' in hlil_part05
+    assert '004f3fcc  data_12d3094 = sub_4ce0d0(x87_r4, "zmq_rcon_ip", "0.0.0.0", 0x10)' in hlil_part05
+    assert '004f3fe2  data_12d3098 = sub_4ce0d0(x87_r6, "zmq_rcon_port", "28960", 0x10)' in hlil_part05
+    assert '004f3ff8  data_12d3084 = sub_4ce0d0(x87_r0, "zmq_stats_ip", &data_54f9da, 0x10)' in hlil_part05
+    assert '004f4011  data_12d3088 = sub_4ce0d0(x87_r2, "zmq_stats_port", &data_54f9da, 0x10)' in hlil_part05
+    assert '004f4027  data_12d307c = sub_4ce0d0(x87_r4, "zmq_stats_password", &data_54f9da, 1)' in hlil_part05
+    assert '004f4031  data_12d3080 = sub_4ce0d0(x87_r6, "zmq_rcon_password", &data_54f9da, 1)' in hlil_part05
+    assert '004f4097      int32_t eax_11 = sub_4d9220("tcp://%s:%i")' in hlil_part05
+    assert '004f4108          var_10_5 = "zmq RCON socket error, bind fail…"' in hlil_part05
+    assert '004f4101          var_10_5 = "zmq RCON socket: %s\\n"' in hlil_part05
+    assert '004f42af          sub_4d7250(sub_4ce0d0(x87_r0, "net_ip", "localhost", 0x20)[1], &var_2c)' in hlil_part05
+    assert '004f42d3          sub_4d9160(&var_18, 0x10, "%i.%i.%i.%i")' in hlil_part05
+    assert '004f430a          eax_7 = sub_4ce0d0("net_port", sub_4d9220(&data_52e930), 0x20)[0xc]' in hlil_part05
+    assert '004f4317      int32_t eax_10 = sub_4d9220("tcp://%s:%i")' in hlil_part05
+    assert '004f437a          var_3c_7 = "zmq PUB socket error, bind faile…"' in hlil_part05
+    assert '004f4373          var_3c_7 = "zmq PUB socket: %s\\n"' in hlil_part05
+
+    assert '00548234  char const data_548234[0x28] = "zmq RCON socket error, bind failed: %s\\n", 0' in hlil_part06
+    assert '0054825c  char const data_54825c[0x15] = "zmq RCON socket: %s\\n", 0' in hlil_part06
+    assert '00548274  char const data_548274[0xc] = "tcp://%s:%i", 0' in hlil_part06
+    assert '00548280  char const data_548280[0x12] = "zmq_rcon_password", 0' in hlil_part06
+    assert '00548294  char const data_548294[0x13] = "zmq_stats_password", 0' in hlil_part06
+    assert '005482a8  char const data_5482a8[0xf] = "zmq_stats_port", 0' in hlil_part06
+    assert '005482b8  char const data_5482b8[0xd] = "zmq_stats_ip", 0' in hlil_part06
+    assert '005482c8  char const data_5482c8[0xe] = "zmq_rcon_port", 0' in hlil_part06
+    assert '005482e0  char const data_5482e0[0xc] = "zmq_rcon_ip", 0' in hlil_part06
+    assert '005482f4  char const data_5482f4[0x11] = "zmq_stats_enable", 0' in hlil_part06
+    assert '00548308  char const data_548308[0x10] = "zmq_rcon_enable", 0' in hlil_part06
+    assert '00548318  char const data_548318[0x27] = "zmq PUB socket error, bind failed: %s\\n", 0' in hlil_part06
+    assert '00548340  char const data_548340[0x14] = "zmq PUB socket: %s\\n", 0' in hlil_part06
+
+    register_block = _extract_function_block(sv_zmq, "static void idZMQ_RegisterCvarsAndInitRcon( void )")
+    stats_host_block = _extract_function_block(sv_zmq, "static void idZMQ_ResolveStatsHost( char *resolvedAddress, size_t resolvedIpSize )")
+    rcon_endpoint_block = _extract_function_block(sv_zmq, "static void idZMQ_ResolveRconEndpoint( char *endpoint, size_t endpointSize )")
+    stats_endpoint_block = _extract_function_block(sv_zmq, "static void idZMQ_ResolveStatsEndpoint( char *endpoint, size_t endpointSize )")
+    ensure_rcon_block = _extract_function_block(sv_zmq, "static qboolean idZMQ_EnsureRconSocket( void ) {")
+    ensure_stats_block = _extract_function_block(sv_zmq, "static qboolean idZMQ_EnsureStatsPublisher( void ) {")
+
+    assert '#define QL_ZMQ_CVAR_RCON_ENABLE "zmq_rcon_enable"' in sv_zmq
+    assert '#define QL_ZMQ_CVAR_STATS_ENABLE "zmq_stats_enable"' in sv_zmq
+    assert '#define QL_ZMQ_CVAR_RCON_IP "zmq_rcon_ip"' in sv_zmq
+    assert '#define QL_ZMQ_CVAR_RCON_PORT "zmq_rcon_port"' in sv_zmq
+    assert '#define QL_ZMQ_CVAR_STATS_IP "zmq_stats_ip"' in sv_zmq
+    assert '#define QL_ZMQ_CVAR_STATS_PORT "zmq_stats_port"' in sv_zmq
+    assert '#define QL_ZMQ_CVAR_RCON_PASSWORD "zmq_rcon_password"' in sv_zmq
+    assert '#define QL_ZMQ_CVAR_STATS_PASSWORD "zmq_stats_password"' in sv_zmq
+    assert '#define QL_ZMQ_CVAR_NET_IP "net_ip"' in sv_zmq
+    assert '#define QL_ZMQ_CVAR_NET_PORT "net_port"' in sv_zmq
+    assert '#define QL_ZMQ_DEFAULT_RCON_IP "0.0.0.0"' in sv_zmq
+    assert '#define QL_ZMQ_DEFAULT_RCON_PORT "28960"' in sv_zmq
+    assert "#define QL_ZMQ_DEFAULT_RCON_PORT_VALUE 28960" in sv_zmq
+    assert '#define QL_ZMQ_DEFAULT_NET_IP "localhost"' in sv_zmq
+    assert '#define QL_ZMQ_DEFAULT_NET_PORT_FORMAT "%i"' in sv_zmq
+    assert '#define QL_ZMQ_ENDPOINT_FORMAT "tcp://%s:%i"' in sv_zmq
+    assert '#define QL_ZMQ_IPV4_FORMAT "%i.%i.%i.%i"' in sv_zmq
+    assert '#define QL_ZMQ_RCON_BIND_ERROR_FORMAT "zmq RCON socket error, bind failed: %s\\n"' in sv_zmq
+    assert '#define QL_ZMQ_RCON_BIND_SUCCESS_FORMAT "zmq RCON socket: %s\\n"' in sv_zmq
+    assert '#define QL_ZMQ_STATS_BIND_ERROR_FORMAT "zmq PUB socket error, bind failed: %s\\n"' in sv_zmq
+    assert '#define QL_ZMQ_STATS_BIND_SUCCESS_FORMAT "zmq PUB socket: %s\\n"' in sv_zmq
+    assert "#define QL_ZMQ_CVAR_INIT_FLAGS CVAR_INIT" in sv_zmq
+    assert "#define QL_ZMQ_CVAR_PASSWORD_FLAGS CVAR_ARCHIVE" in sv_zmq
+    assert "#define QL_ZMQ_CVAR_NET_FALLBACK_FLAGS CVAR_LATCH" in sv_zmq
+
+    assert "Cvar_Get( QL_ZMQ_CVAR_RCON_ENABLE, QL_ZMQ_DEFAULT_DISABLED, QL_ZMQ_CVAR_INIT_FLAGS );" in register_block
+    assert "Cvar_Get( QL_ZMQ_CVAR_STATS_ENABLE, QL_ZMQ_DEFAULT_DISABLED, QL_ZMQ_CVAR_INIT_FLAGS );" in register_block
+    assert "Cvar_Get( QL_ZMQ_CVAR_RCON_IP, QL_ZMQ_DEFAULT_RCON_IP, QL_ZMQ_CVAR_INIT_FLAGS );" in register_block
+    assert "Cvar_Get( QL_ZMQ_CVAR_RCON_PORT, QL_ZMQ_DEFAULT_RCON_PORT, QL_ZMQ_CVAR_INIT_FLAGS );" in register_block
+    assert "Cvar_Get( QL_ZMQ_CVAR_STATS_IP, QL_ZMQ_DEFAULT_EMPTY, QL_ZMQ_CVAR_INIT_FLAGS );" in register_block
+    assert "Cvar_Get( QL_ZMQ_CVAR_STATS_PORT, QL_ZMQ_DEFAULT_EMPTY, QL_ZMQ_CVAR_INIT_FLAGS );" in register_block
+    assert "Cvar_Get( QL_ZMQ_CVAR_STATS_PASSWORD, QL_ZMQ_DEFAULT_EMPTY, QL_ZMQ_CVAR_PASSWORD_FLAGS );" in register_block
+    assert "Cvar_Get( QL_ZMQ_CVAR_RCON_PASSWORD, QL_ZMQ_DEFAULT_EMPTY, QL_ZMQ_CVAR_PASSWORD_FLAGS );" in register_block
+    assert '"zmq_rcon_enable"' not in register_block
+
+    assert "Cvar_Get( QL_ZMQ_CVAR_NET_IP, QL_ZMQ_DEFAULT_NET_IP, QL_ZMQ_CVAR_NET_FALLBACK_FLAGS );" in stats_host_block
+    assert "Com_sprintf( resolvedAddress, resolvedIpSize, QL_ZMQ_IPV4_FORMAT," in stats_host_block
+    assert "Q_strncpyz( resolvedIp, QL_ZMQ_DEFAULT_RCON_IP, sizeof( resolvedIp ) );" in rcon_endpoint_block
+    assert "QL_ZMQ_DEFAULT_RCON_PORT_VALUE" in rcon_endpoint_block
+    assert "Com_sprintf( endpoint, endpointSize, QL_ZMQ_ENDPOINT_FORMAT, resolvedIp, resolvedPort );" in rcon_endpoint_block
+    assert "Cvar_Get( QL_ZMQ_CVAR_NET_PORT, va( QL_ZMQ_DEFAULT_NET_PORT_FORMAT, PORT_SERVER ), QL_ZMQ_CVAR_NET_FALLBACK_FLAGS );" in stats_endpoint_block
+    assert "Com_sprintf( endpoint, endpointSize, QL_ZMQ_ENDPOINT_FORMAT, resolvedIp, resolvedPort );" in stats_endpoint_block
+    assert "Com_Printf( QL_ZMQ_RCON_BIND_ERROR_FORMAT, idZMQ_LastErrorString() );" in ensure_rcon_block
+    assert "Com_Printf( QL_ZMQ_RCON_BIND_SUCCESS_FORMAT, s_zmq.rconEndpoint );" in ensure_rcon_block
+    assert "Com_Printf( QL_ZMQ_STATS_BIND_ERROR_FORMAT, idZMQ_LastErrorString() );" in ensure_stats_block
+    assert "Com_Printf( QL_ZMQ_STATS_BIND_SUCCESS_FORMAT, s_zmq.statsEndpoint );" in ensure_stats_block
+    assert "retail ZMQ cvar and endpoint literal boundary" in mapping_round
+    assert "does not reconstruct libzmq/CZMQ internals" in mapping_round
+    assert "before 94% -> after 98%" in mapping_round
+
+
+def test_zmq_cvar_flag_boundary_round_697_is_pinned() -> None:
+    aliases = json.loads(
+        (REPO_ROOT / "references/analysis/quakelive_symbol_aliases.json").read_text(encoding="utf-8")
+    )["quakelive_steam_srp"]
+    functions_csv = (
+        REPO_ROOT / "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+    ).read_text(encoding="utf-8").lower()
+    hlil_part05 = (
+        REPO_ROOT
+        / "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part05.txt"
+    ).read_text(encoding="utf-8")
+    sv_zmq = (REPO_ROOT / "src/code/server/sv_zmq.c").read_text(encoding="utf-8")
+    implementation_plan = (REPO_ROOT / "IMPLEMENTATION_PLAN.md").read_text(encoding="utf-8")
+    mapping_round = (
+        REPO_ROOT / "docs/reverse-engineering/quakelive_steam_mapping_round_697.md"
+    ).read_text(encoding="utf-8")
+
+    expected_aliases = {
+        "sub_4CE0D0": "Cvar_Get",
+        "sub_4F3F80": "idZMQ_RegisterCvarsAndInitRcon",
+        "sub_4F4210": "idZMQ_InitStatsPublisher",
+    }
+
+    for symbol, alias in expected_aliases.items():
+        address = f"00{symbol.removeprefix('sub_')}".lower()
+        assert aliases[symbol] == alias
+        assert f"fun_{address},{address}" in functions_csv
+        assert f"| `{symbol}` | `{alias}` |" in mapping_round
+
+    assert '004f3fa0  data_12d3090 = sub_4ce0d0(x87_r0, "zmq_rcon_enable", U"0", 0x10)' in hlil_part05
+    assert '004f3fb6  data_12d308c = sub_4ce0d0(x87_r2, "zmq_stats_enable", U"0", 0x10)' in hlil_part05
+    assert '004f3fcc  data_12d3094 = sub_4ce0d0(x87_r4, "zmq_rcon_ip", "0.0.0.0", 0x10)' in hlil_part05
+    assert '004f3fe2  data_12d3098 = sub_4ce0d0(x87_r6, "zmq_rcon_port", "28960", 0x10)' in hlil_part05
+    assert '004f3ff8  data_12d3084 = sub_4ce0d0(x87_r0, "zmq_stats_ip", &data_54f9da, 0x10)' in hlil_part05
+    assert '004f4011  data_12d3088 = sub_4ce0d0(x87_r2, "zmq_stats_port", &data_54f9da, 0x10)' in hlil_part05
+    assert '004f4027  data_12d307c = sub_4ce0d0(x87_r4, "zmq_stats_password", &data_54f9da, 1)' in hlil_part05
+    assert '004f4031  data_12d3080 = sub_4ce0d0(x87_r6, "zmq_rcon_password", &data_54f9da, 1)' in hlil_part05
+    assert '004f42af          sub_4d7250(sub_4ce0d0(x87_r0, "net_ip", "localhost", 0x20)[1], &var_2c)' in hlil_part05
+    assert '004f430a          eax_7 = sub_4ce0d0("net_port", sub_4d9220(&data_52e930), 0x20)[0xc]' in hlil_part05
+
+    register_block = _extract_function_block(sv_zmq, "static void idZMQ_RegisterCvarsAndInitRcon( void )")
+    stats_host_block = _extract_function_block(sv_zmq, "static void idZMQ_ResolveStatsHost( char *resolvedAddress, size_t resolvedIpSize )")
+    stats_endpoint_block = _extract_function_block(sv_zmq, "static void idZMQ_ResolveStatsEndpoint( char *endpoint, size_t endpointSize )")
+
+    assert "#define QL_ZMQ_CVAR_INIT_FLAGS CVAR_INIT" in sv_zmq
+    assert "#define QL_ZMQ_CVAR_PASSWORD_FLAGS CVAR_ARCHIVE" in sv_zmq
+    assert "#define QL_ZMQ_CVAR_NET_FALLBACK_FLAGS CVAR_LATCH" in sv_zmq
+    assert "Cvar_Get( QL_ZMQ_CVAR_RCON_ENABLE, QL_ZMQ_DEFAULT_DISABLED, QL_ZMQ_CVAR_INIT_FLAGS );" in register_block
+    assert "Cvar_Get( QL_ZMQ_CVAR_STATS_ENABLE, QL_ZMQ_DEFAULT_DISABLED, QL_ZMQ_CVAR_INIT_FLAGS );" in register_block
+    assert "Cvar_Get( QL_ZMQ_CVAR_RCON_IP, QL_ZMQ_DEFAULT_RCON_IP, QL_ZMQ_CVAR_INIT_FLAGS );" in register_block
+    assert "Cvar_Get( QL_ZMQ_CVAR_RCON_PORT, QL_ZMQ_DEFAULT_RCON_PORT, QL_ZMQ_CVAR_INIT_FLAGS );" in register_block
+    assert "Cvar_Get( QL_ZMQ_CVAR_STATS_IP, QL_ZMQ_DEFAULT_EMPTY, QL_ZMQ_CVAR_INIT_FLAGS );" in register_block
+    assert "Cvar_Get( QL_ZMQ_CVAR_STATS_PORT, QL_ZMQ_DEFAULT_EMPTY, QL_ZMQ_CVAR_INIT_FLAGS );" in register_block
+    assert "Cvar_Get( QL_ZMQ_CVAR_STATS_PASSWORD, QL_ZMQ_DEFAULT_EMPTY, QL_ZMQ_CVAR_PASSWORD_FLAGS );" in register_block
+    assert "Cvar_Get( QL_ZMQ_CVAR_RCON_PASSWORD, QL_ZMQ_DEFAULT_EMPTY, QL_ZMQ_CVAR_PASSWORD_FLAGS );" in register_block
+    assert "CVAR_INIT );" not in register_block
+    assert "CVAR_ARCHIVE );" not in register_block
+
+    assert "Cvar_Get( QL_ZMQ_CVAR_NET_IP, QL_ZMQ_DEFAULT_NET_IP, QL_ZMQ_CVAR_NET_FALLBACK_FLAGS );" in stats_host_block
+    assert "Cvar_Get( QL_ZMQ_CVAR_NET_IP, QL_ZMQ_DEFAULT_NET_IP, CVAR_LATCH );" not in stats_host_block
+    assert "Cvar_Get( QL_ZMQ_CVAR_NET_PORT, va( QL_ZMQ_DEFAULT_NET_PORT_FORMAT, PORT_SERVER ), QL_ZMQ_CVAR_NET_FALLBACK_FLAGS );" in stats_endpoint_block
+    assert "Cvar_Get( QL_ZMQ_CVAR_NET_PORT, va( QL_ZMQ_DEFAULT_NET_PORT_FORMAT, PORT_SERVER ), CVAR_LATCH );" not in stats_endpoint_block
+    assert "zsock_new_checked" not in sv_zmq
+    assert "zsock_bind(" not in sv_zmq
+
+    assert "ZMQ cvar flag boundary" in mapping_round
+    assert "0x10" in mapping_round
+    assert "does not reconstruct libzmq/CZMQ internals" in mapping_round
+    assert "before 94% -> after 99%" in mapping_round
+    assert "Task A599: Pin ZMQ cvar flag boundary [COMPLETED]" in implementation_plan
+
+
+def test_zmq_rcon_positive_frame_gate_round_698_is_pinned() -> None:
+    aliases = json.loads(
+        (REPO_ROOT / "references/analysis/quakelive_symbol_aliases.json").read_text(encoding="utf-8")
+    )["quakelive_steam_srp"]
+    functions_csv = (
+        REPO_ROOT / "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+    ).read_text(encoding="utf-8").lower()
+    hlil_part05 = (
+        REPO_ROOT
+        / "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part05.txt"
+    ).read_text(encoding="utf-8")
+    sv_zmq = (REPO_ROOT / "src/code/server/sv_zmq.c").read_text(encoding="utf-8")
+    implementation_plan = (REPO_ROOT / "IMPLEMENTATION_PLAN.md").read_text(encoding="utf-8")
+    mapping_round = (
+        REPO_ROOT / "docs/reverse-engineering/quakelive_steam_mapping_round_698.md"
+    ).read_text(encoding="utf-8")
+
+    expected_aliases = {
+        "sub_4F4ED0": "idZMQ_PumpRcon",
+        "sub_4F4910": "idZMQ_FindRconPeer",
+        "sub_4F49C0": "idZMQ_InsertRconPeer",
+        "sub_4F5CB0": "zstr_recv",
+        "sub_4F5E10": "zstr_free",
+        "sub_401600": "zmq_poll",
+    }
+
+    for symbol, alias in expected_aliases.items():
+        address = f"00{symbol.removeprefix('sub_')}".lower()
+        assert aliases[symbol] == alias
+        assert f"fun_{address},{address}" in functions_csv
+        assert f"| `{symbol}` | `{alias}` |" in mapping_round
+
+    assert "004f4ed0    void* __fastcall sub_4f4ed0(void* arg1)" in hlil_part05
+    assert "004f4f0d          result = sub_401600(xmm0, &var_20, 1)" in hlil_part05
+    assert "004f4f23              int32_t eax_1 = sub_4f5cb0(*(arg1 + 0xc))" in hlil_part05
+    assert "004f4f2f              int32_t eax_2 = sub_4f5cb0(ecx_1)" in hlil_part05
+    assert "004f4f4c              void** ecx_3 = *sub_4f4910(arg1 + 0x14, &var_10, &var_8)" in hlil_part05
+    assert "004f4f7a                  sub_4f49c0(arg1 + 0x14, &var_14, sub_4f4640(arg1 + 0x14), nullptr)" in hlil_part05
+    assert "004f4f91                  return sub_4f5e10(&var_c)" in hlil_part05
+    assert "004f4fa2              sub_4c7cf0(var_c)" in hlil_part05
+    assert "004f4fab              sub_4f5e10(&var_8)" in hlil_part05
+    assert "004f4fb7              return sub_4f5e10(&var_c)" in hlil_part05
+
+    read_command_block = _extract_function_block(
+        sv_zmq,
+        "static int idZMQ_ReadRconCommand( char *command, size_t commandSize )",
+    )
+    pump_block = _extract_function_block(sv_zmq, "static void idZMQ_PumpRcon( void )")
+
+    assert "#define QL_ZMQ_FRAME_READ_SUCCESS_MIN 0" in sv_zmq
+    assert "#define QL_ZMQ_RCON_MIN_IDENTITY_LENGTH 1" in sv_zmq
+    assert "#define QL_ZMQ_RCON_MIN_COMMAND_LENGTH 1" in sv_zmq
+    assert "commandLength >= QL_ZMQ_FRAME_READ_SUCCESS_MIN" in read_command_block
+    assert "identityLength < QL_ZMQ_RCON_MIN_IDENTITY_LENGTH" in pump_block
+    assert "commandLength < QL_ZMQ_RCON_MIN_COMMAND_LENGTH" in pump_block
+    assert "idZMQ_DrainRemainingFrames( s_zmq.rconSocket, more );" in read_command_block
+    assert "idZMQ_DrainRemainingFrames( s_zmq.rconSocket, more );" in pump_block
+    assert "peer = idZMQ_FindRconPeer( identity );" in pump_block
+    assert "peer = idZMQ_InsertRconPeer( identity );" in pump_block
+    assert "Cmd_ExecuteString( command );" in pump_block
+    assert "commandLength >= 0" not in read_command_block
+    assert "identityLength <= 0" not in pump_block
+    assert "commandLength <= 0" not in pump_block
+    assert "zstr_recv(" not in sv_zmq
+    assert "zstr_free(" not in sv_zmq
+
+    assert "ZMQ RCON positive-frame gate" in mapping_round
+    assert "SRP stack-buffer adaptation" in mapping_round
+    assert "does not reconstruct libzmq/CZMQ internals" in mapping_round
+    assert "before 94% -> after 99%" in mapping_round
+    assert "Task A600: Pin ZMQ RCON positive-frame gate [COMPLETED]" in implementation_plan
+
+
+def test_zmq_endpoint_ip_scratch_buffer_round_721_is_pinned() -> None:
+    aliases = json.loads(
+        (REPO_ROOT / "references/analysis/quakelive_symbol_aliases.json").read_text(encoding="utf-8")
+    )["quakelive_steam_srp"]
+    functions_csv = (
+        REPO_ROOT / "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+    ).read_text(encoding="utf-8").lower()
+    hlil_part05 = (
+        REPO_ROOT
+        / "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part05.txt"
+    ).read_text(encoding="utf-8")
+    sv_zmq = (REPO_ROOT / "src/code/server/sv_zmq.c").read_text(encoding="utf-8")
+    implementation_plan = (REPO_ROOT / "IMPLEMENTATION_PLAN.md").read_text(encoding="utf-8")
+    mapping_round = (
+        REPO_ROOT / "docs/reverse-engineering/quakelive_steam_mapping_round_721.md"
+    ).read_text(encoding="utf-8")
+
+    expected_aliases = {
+        "sub_4D9160": "Com_sprintf",
+        "sub_4D9220": "va",
+        "sub_4F3F80": "idZMQ_RegisterCvarsAndInitRcon",
+        "sub_4F4210": "idZMQ_InitStatsPublisher",
+    }
+
+    for symbol, alias in expected_aliases.items():
+        address = f"00{symbol.removeprefix('sub_')}".lower()
+        assert aliases[symbol] == alias
+        assert f"fun_{address},{address}" in functions_csv
+        assert f"| `{symbol}` | `{alias}` |" in mapping_round
+
+    assert "004f4090      int32_t var_c_1 = *(data_12d3098 + 0x30)" in hlil_part05
+    assert "004f4091      int32_t var_10_2 = *(data_12d3094 + 4)" in hlil_part05
+    assert '004f4097      int32_t eax_11 = sub_4d9220("tcp://%s:%i")' in hlil_part05
+    assert '004f42af          sub_4d7250(sub_4ce0d0(x87_r0, "net_ip", "localhost", 0x20)[1], &var_2c)' in hlil_part05
+    assert '004f42d3          sub_4d9160(&var_18, 0x10, "%i.%i.%i.%i")' in hlil_part05
+    assert '004f4317      int32_t eax_10 = sub_4d9220("tcp://%s:%i")' in hlil_part05
+
+    stats_host_block = _extract_function_block(
+        sv_zmq,
+        "static void idZMQ_ResolveStatsHost( char *resolvedAddress, size_t resolvedIpSize )",
+    )
+    rcon_endpoint_block = _extract_function_block(
+        sv_zmq,
+        "static void idZMQ_ResolveRconEndpoint( char *endpoint, size_t endpointSize )",
+    )
+    stats_endpoint_block = _extract_function_block(
+        sv_zmq,
+        "static void idZMQ_ResolveStatsEndpoint( char *endpoint, size_t endpointSize )",
+    )
+
+    assert "#define QL_ZMQ_ENDPOINT_IP_BUFFER_SIZE 64" in sv_zmq
+    assert sv_zmq.count("char resolvedIp[QL_ZMQ_ENDPOINT_IP_BUFFER_SIZE];") == 2
+    assert "char resolvedIp[64];" not in sv_zmq
+    assert "Q_strncpyz( resolvedIp, s_zmqRconIp->string, sizeof( resolvedIp ) );" in rcon_endpoint_block
+    assert "Q_strncpyz( resolvedIp, QL_ZMQ_DEFAULT_RCON_IP, sizeof( resolvedIp ) );" in rcon_endpoint_block
+    assert "idZMQ_ResolveStatsHost( resolvedIp, sizeof( resolvedIp ) );" in stats_endpoint_block
+    assert "Com_sprintf( resolvedAddress, resolvedIpSize, QL_ZMQ_IPV4_FORMAT," in stats_host_block
+    assert "Com_sprintf( endpoint, endpointSize, QL_ZMQ_ENDPOINT_FORMAT, resolvedIp, resolvedPort );" in rcon_endpoint_block
+    assert "Com_sprintf( endpoint, endpointSize, QL_ZMQ_ENDPOINT_FORMAT, resolvedIp, resolvedPort );" in stats_endpoint_block
+    assert "zsock_new_checked" not in sv_zmq
+    assert "zsock_bind(" not in sv_zmq
+
+    assert "ZMQ endpoint IP scratch-buffer boundary" in mapping_round
+    assert "SRP portable endpoint buffer" in mapping_round
+    assert "does not reconstruct libzmq/CZMQ internals" in mapping_round
+    assert "before 94% -> after 99%" in mapping_round
+    assert "Task A623: Pin ZMQ endpoint IP scratch-buffer boundary [COMPLETED]" in implementation_plan
+
+
+def test_zmq_zap_domain_constant_boundary_round_662_is_pinned() -> None:
+    aliases = json.loads(
+        (REPO_ROOT / "references/analysis/quakelive_symbol_aliases.json").read_text(encoding="utf-8")
+    )["quakelive_steam_srp"]
+    functions_csv = (
+        REPO_ROOT / "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+    ).read_text(encoding="utf-8").lower()
+    hlil_part05 = (
+        REPO_ROOT
+        / "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part05.txt"
+    ).read_text(encoding="utf-8")
+    hlil_part06 = (
+        REPO_ROOT
+        / "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part06.txt"
+    ).read_text(encoding="utf-8")
+    sv_zmq = (REPO_ROOT / "src/code/server/sv_zmq.c").read_text(encoding="utf-8")
+    mapping_round = (
+        REPO_ROOT / "docs/reverse-engineering/quakelive_steam_mapping_round_662.md"
+    ).read_text(encoding="utf-8")
+
+    expected_aliases = {
+        "sub_4F3F80": "idZMQ_RegisterCvarsAndInitRcon",
+        "sub_4F4210": "idZMQ_InitStatsPublisher",
+        "sub_4F5750": "zsock_set_zap_domain",
+        "sub_4F6630": "s_authenticate_plain",
+        "sub_4F7360": "zsys_sprintf",
+    }
+
+    for symbol, alias in expected_aliases.items():
+        address = f"00{symbol.removeprefix('sub_')}".lower()
+        assert aliases[symbol] == alias
+        assert f"fun_{address},{address}" in functions_csv
+        assert f"| `{symbol}` | `{alias}` |" in mapping_round
+
+    assert '004f40b8      sub_4f5750(eax_12, "rcon")' in hlil_part05
+    assert '004f4335      sub_4f5750(eax_11, "stats")' in hlil_part05
+    assert "004f6630    int32_t __fastcall sub_4f6630(int32_t arg1, void* arg2 @ esi, void* arg3 @ edi)" in hlil_part05
+    assert '004f6653  int32_t eax_2 = sub_4f7360("%s_%s")' in hlil_part05
+    assert "004f6660  eax_3, ecx_1, edx_2 = sub_4f9320(edx_1, eax_2)" in hlil_part05
+    assert "004f66a9              sub_4f7030(eax_6, edx_2, ecx_1, \"zauth: - allowed (PLAIN) usernam…\")" in hlil_part05
+    assert "004f66d7      sub_4f7030(eax_8, edx_3, ecx_1, \"zauth: - denied (PLAIN) username…\")" in hlil_part05
+    assert '005451ac  char const data_5451ac[0x5] = "rcon", 0' in hlil_part06
+    assert '00548354  char const data_548354[0x6] = "stats", 0' in hlil_part06
+    assert '005486c4  char const data_5486c4[0x6] = "%s_%s", 0' in hlil_part06
+
+    ensure_rcon_block = _extract_function_block(sv_zmq, "static qboolean idZMQ_EnsureRconSocket( void ) {")
+    ensure_stats_block = _extract_function_block(sv_zmq, "static qboolean idZMQ_EnsureStatsPublisher( void ) {")
+    set_string_block = _extract_function_block(sv_zmq, "static void idZMQ_TrySetSocketString( void *socket, int option, const char *value )")
+    credentials_block = _extract_function_block(
+        sv_zmq,
+        "static qboolean idZMQ_GetPlainCredentials( const char *domain, const char **expectedUsername, const char **expectedPassword )",
+    )
+    validate_block = _extract_function_block(
+        sv_zmq,
+        "static qboolean idZMQ_ValidatePlainCredentials( const char *domain, const char *username, const char *password, const char **userId )",
+    )
+    pump_auth_block = _extract_function_block(sv_zmq, "static void idZMQ_PumpAuthSocket( void )")
+
+    assert '#define QL_ZMQ_DOMAIN_RCON "rcon"' in sv_zmq
+    assert '#define QL_ZMQ_DOMAIN_STATS "stats"' in sv_zmq
+    assert '#define QL_ZMQ_AUTH_KEY_FORMAT "%s_%s"' in sv_zmq
+    assert "#define QL_ZMQ_SOCKET_OPTION_STRING_SIZE( value ) strlen( value )" in sv_zmq
+    assert "s_zmq.zmq_setsockopt( socket, option, value, QL_ZMQ_SOCKET_OPTION_STRING_SIZE( value ) );" in set_string_block
+    assert "s_zmq.zmq_setsockopt( socket, option, value, strlen( value ) );" not in set_string_block
+    assert "idZMQ_TrySetSocketString( socket, QL_ZMQ_ZAP_DOMAIN, QL_ZMQ_DOMAIN_RCON );" in ensure_rcon_block
+    assert "idZMQ_TrySetSocketString( socket, QL_ZMQ_ZAP_DOMAIN, QL_ZMQ_DOMAIN_STATS );" in ensure_stats_block
+    assert 'idZMQ_TrySetSocketString( socket, QL_ZMQ_ZAP_DOMAIN, "rcon" );' not in ensure_rcon_block
+    assert 'idZMQ_TrySetSocketString( socket, QL_ZMQ_ZAP_DOMAIN, "stats" );' not in ensure_stats_block
+    assert "if ( !Q_stricmp( domain, QL_ZMQ_DOMAIN_RCON ) ) {" in credentials_block
+    assert "*expectedUsername = QL_ZMQ_DOMAIN_RCON;" in credentials_block
+    assert "*expectedPassword = s_zmq.rconPassword;" in credentials_block
+    assert "if ( !Q_stricmp( domain, QL_ZMQ_DOMAIN_STATS ) ) {" in credentials_block
+    assert "*expectedUsername = QL_ZMQ_DOMAIN_STATS;" in credentials_block
+    assert "*expectedPassword = s_zmq.statsPassword;" in credentials_block
+    assert "idZMQ_GetPlainCredentials( domain, &expectedUsername, &expectedPassword )" in validate_block
+    assert "Q_stricmp( username, expectedUsername ) != 0 || strcmp( password, expectedPassword ) != 0" in validate_block
+    assert "length = idZMQ_ReadFrameString( s_zmq.authSocket, domain, sizeof( domain ), &more );" in pump_auth_block
+    assert "length = idZMQ_ReadFrameString( s_zmq.authSocket, username, sizeof( username ), &more );" in pump_auth_block
+    assert "idZMQ_ValidatePlainCredentials( domain, username, password, &userId )" in pump_auth_block
+    assert "zsock_set_zap_domain" not in sv_zmq
+    assert "s_authenticate_plain" not in sv_zmq
+    assert "retail ZAP domain constant boundary" in mapping_round
+    assert "manual ZAP credential lookup uses the same domain constants" in mapping_round
+    assert "does not reconstruct libzmq/CZMQ internals" in mapping_round
+    assert "before 94% -> after 98%" in mapping_round
+
+
+def test_zmq_rcon_peer_log_format_boundary_round_663_is_pinned() -> None:
+    aliases = json.loads(
+        (REPO_ROOT / "references/analysis/quakelive_symbol_aliases.json").read_text(encoding="utf-8")
+    )["quakelive_steam_srp"]
+    functions_csv = (
+        REPO_ROOT / "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+    ).read_text(encoding="utf-8").lower()
+    hlil_part05 = (
+        REPO_ROOT
+        / "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part05.txt"
+    ).read_text(encoding="utf-8")
+    hlil_part06 = (
+        REPO_ROOT
+        / "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part06.txt"
+    ).read_text(encoding="utf-8")
+    sv_zmq = (REPO_ROOT / "src/code/server/sv_zmq.c").read_text(encoding="utf-8")
+    mapping_round = (
+        REPO_ROOT / "docs/reverse-engineering/quakelive_steam_mapping_round_663.md"
+    ).read_text(encoding="utf-8")
+
+    expected_aliases = {
+        "sub_4F4D40": "idZMQ_BroadcastRconOutput",
+        "sub_4F4E60": "Zmq_BroadcastRconOutput",
+        "sub_4F4ED0": "idZMQ_PumpRcon",
+        "sub_4F4910": "idZMQ_FindRconPeer",
+        "sub_4F49C0": "idZMQ_InsertRconPeer",
+        "sub_4F5CB0": "zstr_recv",
+        "sub_4F5D60": "zstr_send",
+        "sub_4F5D90": "zstr_sendm",
+        "sub_4F5E10": "zstr_free",
+    }
+
+    for symbol, alias in expected_aliases.items():
+        address = f"00{symbol.removeprefix('sub_')}".lower()
+        assert aliases[symbol] == alias
+        assert f"fun_{address},{address}" in functions_csv
+        assert f"| `{symbol}` | `{alias}` |" in mapping_round
+
+    assert "004f4d40    void __fastcall sub_4f4d40(void* arg1)" in hlil_part05
+    assert "004f4d78              if (sub_4f5d90(*(arg1 + 0xc), eax) s>= 0)" in hlil_part05
+    assert "004f4daa                  sub_4f5d60(*(arg1 + 0xc), ebx_1)" in hlil_part05
+    assert "004f4d92                  sub_4c9860(i, \"zmq RCON client disconnected: %s…\")" in hlil_part05
+    assert "004f4f23              int32_t eax_1 = sub_4f5cb0(*(arg1 + 0xc))" in hlil_part05
+    assert "004f4f2f              int32_t eax_2 = sub_4f5cb0(ecx_1)" in hlil_part05
+    assert "004f4f5c                  sub_4c9860(arg1, \"zmq RCON client connected: %s\\n\")" in hlil_part05
+    assert "004f4f91                  return sub_4f5e10(&var_c)" in hlil_part05
+    assert "004f4f99              sub_4c9860(arg1, \"zmq RCON command from %s: %s\\n\")" in hlil_part05
+    assert "004f4fa2              sub_4c7cf0(var_c)" in hlil_part05
+    assert "00548388  char const data_548388[0x22] = \"zmq RCON client disconnected: %s\\n\", 0" in hlil_part06
+    assert "005483ac  char const data_5483ac[0x1e] = \"zmq RCON command from %s: %s\\n\", 0" in hlil_part06
+    assert "005483cc  char const data_5483cc[0x1f] = \"zmq RCON client connected: %s\\n\", 0" in hlil_part06
+
+    broadcast_block = _extract_function_block(sv_zmq, "static void idZMQ_BroadcastRconOutput( const char *message )")
+    read_command_block = _extract_function_block(sv_zmq, "static int idZMQ_ReadRconCommand( char *command, size_t commandSize )")
+    pump_block = _extract_function_block(sv_zmq, "static void idZMQ_PumpRcon( void )")
+
+    disconnect_format = "Com_Printf( QL_ZMQ_RCON_CLIENT_DISCONNECT_FORMAT, peer->label );"
+    connect_format = "Com_Printf( QL_ZMQ_RCON_CLIENT_CONNECT_FORMAT, peer->label );"
+    command_format = "Com_Printf( QL_ZMQ_RCON_COMMAND_FORMAT, peer->label, command );"
+
+    assert '#define QL_ZMQ_RCON_CLIENT_DISCONNECT_FORMAT "zmq RCON client disconnected: %s\\n"' in sv_zmq
+    assert '#define QL_ZMQ_RCON_CLIENT_CONNECT_FORMAT "zmq RCON client connected: %s\\n"' in sv_zmq
+    assert '#define QL_ZMQ_RCON_COMMAND_FORMAT "zmq RCON command from %s: %s\\n"' in sv_zmq
+    assert "s_zmq.zmq_send( s_zmq.rconSocket, peer->identity, peer->identityLength, QL_ZMQ_SEND_MORE_DONTWAIT ) < QL_ZMQ_SEND_SUCCESS_MIN" in broadcast_block
+    assert "s_zmq.zmq_send( s_zmq.rconSocket, payload, strlen( payload ), QL_ZMQ_SEND_DONTWAIT );" in broadcast_block
+    assert "idZMQ_ReadFrameString( s_zmq.rconSocket, identity, sizeof( identity ), &more );" in pump_block
+    assert "idZMQ_ReadFrameString( s_zmq.rconSocket, command, commandSize, &more );" in read_command_block
+    assert disconnect_format in broadcast_block
+    assert connect_format in pump_block
+    assert command_format in pump_block
+    assert broadcast_block.index(disconnect_format) < broadcast_block.index("idZMQ_EraseRconPeer( peer );")
+    assert pump_block.index(connect_format) < pump_block.index("return;", pump_block.index(connect_format))
+    assert pump_block.index("peer = idZMQ_FindRconPeer( identity );") < pump_block.index(connect_format)
+    assert pump_block.index(command_format) < pump_block.index("Cmd_ExecuteString( command );")
+    assert "zstr_send(" not in sv_zmq
+    assert "zstr_sendm(" not in sv_zmq
+    assert "zstr_recv(" not in sv_zmq
+    assert "zstr_free(" not in sv_zmq
+    assert "retail RCON peer log-format boundary" in mapping_round
+    assert "manual ROUTER send/recv path keeps CZMQ helpers out of source" in mapping_round
+    assert "does not reconstruct libzmq/CZMQ internals" in mapping_round
+    assert "before 94% -> after 98%" in mapping_round
+
+
+def test_zmq_stats_publication_envelope_boundary_round_664_is_pinned() -> None:
+    aliases = json.loads(
+        (REPO_ROOT / "references/analysis/quakelive_symbol_aliases.json").read_text(encoding="utf-8")
+    )["quakelive_steam_srp"]
+    functions_csv = (
+        REPO_ROOT / "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+    ).read_text(encoding="utf-8").lower()
+    hlil_part05 = (
+        REPO_ROOT
+        / "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part05.txt"
+    ).read_text(encoding="utf-8")
+    hlil_part06 = (
+        REPO_ROOT
+        / "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part06.txt"
+    ).read_text(encoding="utf-8")
+    sv_zmq = (REPO_ROOT / "src/code/server/sv_zmq.c").read_text(encoding="utf-8")
+    mapping_round = (
+        REPO_ROOT / "docs/reverse-engineering/quakelive_steam_mapping_round_664.md"
+    ).read_text(encoding="utf-8")
+
+    expected_aliases = {
+        "sub_4F4B20": "idZMQ_ReportPlayerEvent",
+        "sub_4F4C30": "idZMQ_SubmitMatchReport",
+        "sub_4F4E10": "Zmq_ReportPlayerEvent",
+        "sub_4F4E40": "Zmq_SubmitMatchReport",
+        "sub_4F5D60": "zstr_send",
+    }
+
+    for symbol, alias in expected_aliases.items():
+        address = f"00{symbol.removeprefix('sub_')}".lower()
+        assert aliases[symbol] == alias
+        assert f"fun_{address},{address}" in functions_csv
+        assert f"| `{symbol}` | `{alias}` |" in mapping_round
+
+    assert "004f4b57  if (*(arg1 + 8) != 0)" in hlil_part05
+    assert "004f4b72      int32_t* eax_3 = sub_429370(&var_50, arg2)" in hlil_part05
+    assert '004f4b8b      sub_4296c0(sub_42a110(&var_40, "TYPE"), eax_3)' in hlil_part05
+    assert '004f4bac      sub_4296c0(sub_42a110(&var_40, "DATA"), arg3)' in hlil_part05
+    assert "004f4bd2      sub_4f5d60(*(arg1 + 8), eax_6)" in hlil_part05
+    assert "004f4c65  if (*(arg1 + 8) != 0)" in hlil_part05
+    assert '004f4c80      int32_t* eax_3 = sub_429370(&var_50, "MATCH_REPORT")' in hlil_part05
+    assert '004f4c99      sub_4296c0(sub_42a110(&var_40, "TYPE"), eax_3)' in hlil_part05
+    assert '004f4cb9      sub_4296c0(sub_42a110(&var_40, "DATA"), arg2)' in hlil_part05
+    assert "004f4cdf      sub_4f5d60(*(arg1 + 8), eax_6)" in hlil_part05
+    assert "004f4e32  return sub_4f4b20(&data_5756fc, arg1, arg2)" in hlil_part05
+    assert "004f4e52  return sub_4f4c30(&data_5756fc, arg1)" in hlil_part05
+    assert '00548368  char const data_548368[0x5] = "DATA", 0' in hlil_part06
+    assert '00548370  char const data_548370[0x5] = "TYPE", 0' in hlil_part06
+    assert '00548378  char const data_548378[0xd] = "MATCH_REPORT", 0' in hlil_part06
+
+    build_block = _extract_function_block(sv_zmq, "static void idZMQ_BuildPublication( const char *type, const char *payload, char *buffer, size_t bufferSize )")
+    publish_block = _extract_function_block(sv_zmq, "static void idZMQ_Publish( const char *type, const char *payload )")
+    report_event_block = _extract_function_block(
+        sv_zmq,
+        "static void idZMQ_ReportPlayerEvent( uint32_t steamIdLow, uint32_t steamIdHigh, const void *clientStats, const char *eventName, const void *payload )",
+    )
+    submit_report_block = _extract_function_block(sv_zmq, "static void idZMQ_SubmitMatchReport( const void *report )")
+
+    assert '#define QL_ZMQ_PUBLICATION_TYPE_KEY "TYPE"' in sv_zmq
+    assert '#define QL_ZMQ_PUBLICATION_DATA_KEY "DATA"' in sv_zmq
+    assert '#define QL_ZMQ_MATCH_REPORT_TYPE "MATCH_REPORT"' in sv_zmq
+    assert '#define QL_ZMQ_PUBLICATION_PAYLOAD_FORMAT "{\\"" QL_ZMQ_PUBLICATION_TYPE_KEY "\\":\\"%s\\",\\"" QL_ZMQ_PUBLICATION_DATA_KEY "\\":%s}"' in sv_zmq
+    assert '#define QL_ZMQ_PUBLICATION_NULL_PAYLOAD_FORMAT "{\\"" QL_ZMQ_PUBLICATION_TYPE_KEY "\\":\\"%s\\",\\"" QL_ZMQ_PUBLICATION_DATA_KEY "\\":null}"' in sv_zmq
+    assert "Com_sprintf( buffer, bufferSize, QL_ZMQ_PUBLICATION_PAYLOAD_FORMAT, type, payload );" in build_block
+    assert "Com_sprintf( buffer, bufferSize, QL_ZMQ_PUBLICATION_NULL_PAYLOAD_FORMAT, type );" in build_block
+    assert "idZMQ_BuildPublication( type, payload, message, sizeof( message ) );" in publish_block
+    assert "idZMQ_WriteStatsTranscript( message );" in publish_block
+    assert "if ( s_zmq.pubSocket && s_zmq.zmq_send ) {" in publish_block
+    assert "s_zmq.zmq_send( s_zmq.pubSocket, message, strlen( message ), QL_ZMQ_NO_FLAGS );" in publish_block
+    assert "idZMQ_Publish( eventName, (const char *)payload );" in report_event_block
+    assert "idZMQ_Publish( QL_ZMQ_MATCH_REPORT_TYPE, (const char *)report );" in submit_report_block
+    assert '"UNKNOWN_EVENT"' not in sv_zmq
+    assert "zstr_send(" not in sv_zmq
+    assert "retail stats publication envelope boundary" in mapping_round
+    assert "TYPE/DATA/MATCH_REPORT constants define the Quake Live-owned envelope" in mapping_round
+    assert "does not reconstruct libzmq/CZMQ internals" in mapping_round
+    assert "before 94% -> after 98%" in mapping_round
+
+
+def test_zmq_passfile_failed_open_boundary_round_665_is_pinned() -> None:
+    aliases = json.loads(
+        (REPO_ROOT / "references/analysis/quakelive_symbol_aliases.json").read_text(encoding="utf-8")
+    )["quakelive_steam_srp"]
+    functions_csv = (
+        REPO_ROOT / "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+    ).read_text(encoding="utf-8").lower()
+    hlil_part04 = (
+        REPO_ROOT
+        / "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part04.txt"
+    ).read_text(encoding="utf-8")
+    hlil_part05 = (
+        REPO_ROOT
+        / "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part05.txt"
+    ).read_text(encoding="utf-8")
+    hlil_part06 = (
+        REPO_ROOT
+        / "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part06.txt"
+    ).read_text(encoding="utf-8")
+    hlil_part07 = (
+        REPO_ROOT
+        / "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part07.txt"
+    ).read_text(encoding="utf-8")
+    sv_zmq = (REPO_ROOT / "src/code/server/sv_zmq.c").read_text(encoding="utf-8")
+    mapping_round = (
+        REPO_ROOT / "docs/reverse-engineering/quakelive_steam_mapping_round_665.md"
+    ).read_text(encoding="utf-8")
+
+    expected_aliases = {
+        "sub_4D2460": "idZMQ_WritePasswordFile",
+        "sub_4F3D70": "idZMQ_ApplyPasswords",
+        "sub_4F3F20": "idZMQ_UpdatePasswords",
+        "sub_4F5630": "zsock_wait",
+        "sub_4F5DB0": "zstr_sendx",
+    }
+
+    for symbol, alias in expected_aliases.items():
+        address = f"00{symbol.removeprefix('sub_')}".lower()
+        assert aliases[symbol] == alias
+        assert f"fun_{address},{address}" in functions_csv
+        assert f"| `{symbol}` | `{alias}` |" in mapping_round
+
+    assert "004d2460    int32_t sub_4d2460(char* arg1, char* arg2)" in hlil_part04
+    assert "004d2482  if (data_1239bd4 == 0)" in hlil_part04
+    assert "004d24ac  int32_t eax_3 = sub_4cf3e0(data_5686b4)" in hlil_part04
+    assert "004d24b8  if (eax_3 == 0)" in hlil_part04
+    assert "004d24c0      char const (* var_98_1)[0xc] = data_5686b4" in hlil_part04
+    assert '004d24c6      sub_4c9860(arg1, "Failed to open %s\\n")' in hlil_part04
+    assert "004d24e0      return 0" in hlil_part04
+    assert "004d24e8  if (arg1 != 0 && *arg1 != 0)" in hlil_part04
+    assert '004d24fc      sub_4c97c0(&var_88, 0x80, "stats_stats=%s\\n")' in hlil_part04
+    assert "004d2531  if (arg2 != 0 && *arg2 != 0)" in hlil_part04
+    assert '004d2545      sub_4c97c0(&var_88, 0x80, "rcon_rcon=%s\\n")' in hlil_part04
+    assert "004d2571  sub_4cf320(eax_3)" in hlil_part04
+    assert "004f3d9e  eax, ecx_3, edx_2 = sub_4d2460(*(result + 4), *(ecx_1 + 4))" in hlil_part05
+    assert "004f3f4e      eax, ecx_3, edx_2 = sub_4d2460(*(eax_4 + 4), *(ecx_1 + 4))" in hlil_part05
+    assert '005413dc  char const data_5413dc[0xc] = "zmqpass.txt", 0' in hlil_part06
+    assert '00541870  char const data_541870[0x13] = "Failed to open %s\\n", 0' in hlil_part06
+    assert '00541ac4  char const data_541ac4[0xe] = "rcon_rcon=%s\\n", 0' in hlil_part06
+    assert '00541ad4  char const data_541ad4[0x10] = "stats_stats=%s\\n", 0' in hlil_part06
+    assert '005686b4  char const (* data_5686b4)[0xc] = data_5413dc {"zmqpass.txt"}' in hlil_part07
+
+    write_password_block = _extract_function_block(sv_zmq, "static void idZMQ_WritePasswordFile( void )")
+    apply_passwords_block = _extract_function_block(sv_zmq, "static void idZMQ_ApplyPasswords( void )")
+    update_passwords_block = _extract_function_block(sv_zmq, "static void idZMQ_UpdatePasswords( void ) {")
+
+    assert '#define QL_ZMQ_PASSFILE "zmqpass.txt"' in sv_zmq
+    assert '#define QL_ZMQ_PASSFILE_OPEN_FAILED_FORMAT "Failed to open %s\\n"' in sv_zmq
+    assert '#define QL_ZMQ_PASSWORD_STATS_RECORD_FORMAT "stats_stats=%s\\n"' in sv_zmq
+    assert '#define QL_ZMQ_PASSWORD_RCON_RECORD_FORMAT "rcon_rcon=%s\\n"' in sv_zmq
+    assert "passFile = FS_FOpenFileWrite( QL_ZMQ_PASSFILE );" in write_password_block
+    assert "if ( !passFile ) {" in write_password_block
+    assert "Com_Printf( QL_ZMQ_PASSFILE_OPEN_FAILED_FORMAT, QL_ZMQ_PASSFILE );" in write_password_block
+    assert "Com_sprintf( line, sizeof( line ), QL_ZMQ_PASSWORD_STATS_RECORD_FORMAT, s_zmq.statsPassword );" in write_password_block
+    assert "Com_sprintf( line, sizeof( line ), QL_ZMQ_PASSWORD_RCON_RECORD_FORMAT, s_zmq.rconPassword );" in write_password_block
+    assert write_password_block.index("passFile = FS_FOpenFileWrite( QL_ZMQ_PASSFILE );") < write_password_block.index(
+        "Com_Printf( QL_ZMQ_PASSFILE_OPEN_FAILED_FORMAT, QL_ZMQ_PASSFILE );"
+    )
+    assert write_password_block.index("Com_Printf( QL_ZMQ_PASSFILE_OPEN_FAILED_FORMAT, QL_ZMQ_PASSFILE );") < write_password_block.index(
+        "return;", write_password_block.index("Com_Printf( QL_ZMQ_PASSFILE_OPEN_FAILED_FORMAT, QL_ZMQ_PASSFILE );")
+    )
+    assert write_password_block.index("Com_sprintf( line, sizeof( line ), QL_ZMQ_PASSWORD_STATS_RECORD_FORMAT, s_zmq.statsPassword );") < write_password_block.index(
+        "Com_sprintf( line, sizeof( line ), QL_ZMQ_PASSWORD_RCON_RECORD_FORMAT, s_zmq.rconPassword );"
+    )
+    assert '"Failed to open %s\\n", QL_ZMQ_PASSFILE' not in write_password_block
+    assert "idZMQ_WritePasswordFile();" in apply_passwords_block
+    assert "idZMQ_ApplyPasswords();" in update_passwords_block
+    assert "zstr_sendx(" not in sv_zmq
+    assert "zsock_wait(" not in sv_zmq
+    assert "retail password-file failed-open boundary" in mapping_round
+    assert "failed-open log and password-record formats are Quake Live-owned" in mapping_round
+    assert "does not reconstruct libzmq/CZMQ internals" in mapping_round
+    assert "before 94% -> after 98%" in mapping_round
+
+
+def test_zmq_passfile_record_buffer_round_722_is_pinned() -> None:
+    aliases = json.loads(
+        (REPO_ROOT / "references/analysis/quakelive_symbol_aliases.json").read_text(encoding="utf-8")
+    )["quakelive_steam_srp"]
+    functions_csv = (
+        REPO_ROOT / "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+    ).read_text(encoding="utf-8").lower()
+    hlil_part04 = (
+        REPO_ROOT
+        / "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part04.txt"
+    ).read_text(encoding="utf-8")
+    hlil_part05 = (
+        REPO_ROOT
+        / "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part05.txt"
+    ).read_text(encoding="utf-8")
+    sv_zmq = (REPO_ROOT / "src/code/server/sv_zmq.c").read_text(encoding="utf-8")
+    implementation_plan = (REPO_ROOT / "IMPLEMENTATION_PLAN.md").read_text(encoding="utf-8")
+    mapping_round = (
+        REPO_ROOT / "docs/reverse-engineering/quakelive_steam_mapping_round_722.md"
+    ).read_text(encoding="utf-8")
+
+    expected_aliases = {
+        "sub_4D2460": "idZMQ_WritePasswordFile",
+        "sub_4CF3E0": "FS_FOpenFileWrite",
+        "sub_4D00F0": "FS_Write",
+        "sub_4CF320": "FS_FCloseFile",
+    }
+
+    for symbol, alias in expected_aliases.items():
+        address = f"00{symbol.removeprefix('sub_')}".lower()
+        assert aliases[symbol] == alias
+        assert f"fun_{address},{address}" in functions_csv
+        assert f"| `{symbol}` | `{alias}` |" in mapping_round
+
+    assert "004d2460    int32_t sub_4d2460(char* arg1, char* arg2)" in hlil_part04
+    assert "004d24ac  int32_t eax_3 = sub_4cf3e0(data_5686b4)" in hlil_part04
+    assert '004d24fc      sub_4c97c0(&var_88, 0x80, "stats_stats=%s\\n")' in hlil_part04
+    assert "004d2522      sub_4d00f0(&var_88, eax_5 - &var_87, eax_3)" in hlil_part04
+    assert '004d2545      sub_4c97c0(&var_88, 0x80, "rcon_rcon=%s\\n")' in hlil_part04
+    assert "004d2568      sub_4d00f0(&var_88, eax_7 - &var_87, eax_3)" in hlil_part04
+    assert "004d2571  sub_4cf320(eax_3)" in hlil_part04
+    assert "004f3d9e  eax, ecx_3, edx_2 = sub_4d2460(*(result + 4), *(ecx_1 + 4))" in hlil_part05
+    assert "004f3f4e      eax, ecx_3, edx_2 = sub_4d2460(*(eax_4 + 4), *(ecx_1 + 4))" in hlil_part05
+
+    write_password_block = _extract_function_block(sv_zmq, "static void idZMQ_WritePasswordFile( void )")
+
+    assert "#define QL_ZMQ_PASSFILE_RECORD_SLACK 32" in sv_zmq
+    assert "#define QL_ZMQ_PASSFILE_RECORD_BUFFER_SIZE ( MAX_STRING_CHARS + QL_ZMQ_PASSFILE_RECORD_SLACK )" in sv_zmq
+    assert "char line[QL_ZMQ_PASSFILE_RECORD_BUFFER_SIZE];" in write_password_block
+    assert "char line[MAX_STRING_CHARS + 32];" not in sv_zmq
+    assert "Com_sprintf( line, sizeof( line ), QL_ZMQ_PASSWORD_STATS_RECORD_FORMAT, s_zmq.statsPassword );" in write_password_block
+    assert "Com_sprintf( line, sizeof( line ), QL_ZMQ_PASSWORD_RCON_RECORD_FORMAT, s_zmq.rconPassword );" in write_password_block
+    assert write_password_block.count("lineLength = strlen( line );") == 2
+    assert write_password_block.count("FS_Write( line, lineLength, passFile );") == 2
+    assert "zstr_sendx(" not in sv_zmq
+    assert "zsock_wait(" not in sv_zmq
+
+    assert "ZMQ passfile record-buffer boundary" in mapping_round
+    assert "SRP passfile record line buffer" in mapping_round
+    assert "does not reconstruct libzmq/CZMQ internals" in mapping_round
+    assert "before 94% -> after 99%" in mapping_round
+    assert "Task A624: Pin ZMQ passfile record-buffer boundary [COMPLETED]" in implementation_plan
+
+
+def test_zmq_external_runtime_loader_boundary_round_666_is_pinned() -> None:
+    sv_zmq = (REPO_ROOT / "src/code/server/sv_zmq.c").read_text(encoding="utf-8")
+    vcxproj = (REPO_ROOT / "src/code/quakelive_steam.vcxproj").read_text(encoding="utf-8")
+    gitignore = (REPO_ROOT / ".gitignore").read_text(encoding="utf-8")
+    readme = (REPO_ROOT / "README.md").read_text(encoding="utf-8")
+    build_guide = (REPO_ROOT / "BUILD.md").read_text(encoding="utf-8")
+    libzmq_readme = (REPO_ROOT / "src/libs/libzmq/README.md").read_text(encoding="utf-8")
+    ownership_note = (
+        REPO_ROOT / "docs/reverse-engineering/zmq-dependency-ownership-2026-06-06.md"
+    ).read_text(encoding="utf-8")
+    mapping_round = (
+        REPO_ROOT / "docs/reverse-engineering/quakelive_steam_mapping_round_666.md"
+    ).read_text(encoding="utf-8")
+
+    last_error_block = _extract_function_block(sv_zmq, "static const char *idZMQ_LastErrorString( void )")
+    unavailable_block = _extract_function_block(sv_zmq, "static void idZMQ_LogRuntimeUnavailable( const char *reason )")
+    load_library_block = _extract_function_block(sv_zmq, "static qboolean idZMQ_LoadLibrary( void )")
+    ensure_runtime_block = _extract_function_block(sv_zmq, "static qboolean idZMQ_EnsureRuntime( void )")
+    ensure_auth_block = _extract_function_block(sv_zmq, "static qboolean idZMQ_EnsureAuthSocket( void ) {")
+    ensure_rcon_block = _extract_function_block(sv_zmq, "static qboolean idZMQ_EnsureRconSocket( void ) {")
+    ensure_stats_block = _extract_function_block(sv_zmq, "static qboolean idZMQ_EnsureStatsPublisher( void ) {")
+
+    source_suffixes = {".c", ".cc", ".cpp", ".cxx", ".h", ".hh", ".hpp", ".hxx"}
+    libzmq_source_files = sorted(
+        source.relative_to(REPO_ROOT).as_posix()
+        for source in (REPO_ROOT / "src/libs/libzmq").rglob("*")
+        if source.is_file() and source.suffix.lower() in source_suffixes
+    )
+
+    assert '#define QL_ZMQ_LIB_PRIMARY "libzmq.dll"' in sv_zmq
+    assert '#define QL_ZMQ_LIB_SECONDARY "zmq.dll"' in sv_zmq
+    assert '#define QL_ZMQ_LIB_PRIMARY "libzmq.so.5"' in sv_zmq
+    assert '#define QL_ZMQ_LIB_SECONDARY "libzmq.so"' in sv_zmq
+    assert "#define QL_ZMQ_OPEN( name ) LoadLibraryA( name )" in sv_zmq
+    assert "#define QL_ZMQ_OPEN( name ) dlopen( name, RTLD_LAZY | RTLD_LOCAL )" in sv_zmq
+    assert "#define QL_ZMQ_SYM( name ) GetProcAddress( (HMODULE)s_zmq.library, name )" in sv_zmq
+    assert "#define QL_ZMQ_SYM( name ) dlsym( s_zmq.library, name )" in sv_zmq
+    assert "#define QL_ZMQ_CLOSE() FreeLibrary( (HMODULE)s_zmq.library )" in sv_zmq
+    assert "#define QL_ZMQ_CLOSE() dlclose( s_zmq.library )" in sv_zmq
+
+    assert '#define QL_ZMQ_LAST_ERROR_UNKNOWN "unknown"' in sv_zmq
+    assert '#define QL_ZMQ_RUNTIME_UNAVAILABLE_FORMAT "ZMQ runtime unavailable: %s\\n"' in sv_zmq
+    assert '#define QL_ZMQ_RUNTIME_DISABLED_MESSAGE "ZMQ runtime disabled by build policy (QL_BUILD_ONLINE_SERVICES=0); keeping retained fallback paths.\\n"' in sv_zmq
+    assert '#define QL_ZMQ_RUNTIME_LOAD_FAILED_REASON "unable to load libzmq"' in sv_zmq
+    assert '#define QL_ZMQ_RUNTIME_EXPORTS_MISSING_REASON "libzmq is missing required exports"' in sv_zmq
+    assert '#define QL_ZMQ_CONTEXT_CREATE_FAILED_FORMAT "failed to create context: %s"' in sv_zmq
+    assert '#define QL_ZMQ_AUTH_SOCKET_CREATE_FAILED_FORMAT "failed to create auth socket: %s"' in sv_zmq
+    assert '#define QL_ZMQ_AUTH_SOCKET_BIND_FAILED_FORMAT "failed to bind auth socket: %s"' in sv_zmq
+    assert '#define QL_ZMQ_RCON_SOCKET_CREATE_FAILED_FORMAT "failed to create RCON socket: %s"' in sv_zmq
+    assert '#define QL_ZMQ_STATS_SOCKET_CREATE_FAILED_FORMAT "failed to create stats publisher socket: %s"' in sv_zmq
+
+    assert "return QL_ZMQ_LAST_ERROR_UNKNOWN;" in last_error_block
+    assert "Com_Printf( QL_ZMQ_RUNTIME_UNAVAILABLE_FORMAT, reason );" in unavailable_block
+    assert "#if !QL_PLATFORM_HAS_ONLINE_SERVICES" in load_library_block
+    assert "Com_Printf( QL_ZMQ_RUNTIME_DISABLED_MESSAGE );" in load_library_block
+    assert "idZMQ_LogRuntimeUnavailable( QL_ZMQ_RUNTIME_LOAD_FAILED_REASON );" in load_library_block
+    assert "idZMQ_LogRuntimeUnavailable( QL_ZMQ_RUNTIME_EXPORTS_MISSING_REASON );" in load_library_block
+    assert "idZMQ_LogRuntimeUnavailable( va( QL_ZMQ_CONTEXT_CREATE_FAILED_FORMAT, idZMQ_LastErrorString() ) );" in ensure_runtime_block
+    assert "idZMQ_LogRuntimeUnavailable( va( QL_ZMQ_AUTH_SOCKET_CREATE_FAILED_FORMAT, idZMQ_LastErrorString() ) );" in ensure_auth_block
+    assert "idZMQ_LogRuntimeUnavailable( va( QL_ZMQ_AUTH_SOCKET_BIND_FAILED_FORMAT, idZMQ_LastErrorString() ) );" in ensure_auth_block
+    assert "idZMQ_LogRuntimeUnavailable( va( QL_ZMQ_RCON_SOCKET_CREATE_FAILED_FORMAT, idZMQ_LastErrorString() ) );" in ensure_rcon_block
+    assert "idZMQ_LogRuntimeUnavailable( va( QL_ZMQ_STATS_SOCKET_CREATE_FAILED_FORMAT, idZMQ_LastErrorString() ) );" in ensure_stats_block
+
+    required_exports = (
+        ("zmq_ctx_new", "QL_ZMQ_EXPORT_CTX_NEW", "zmq_ctx_new"),
+        ("zmq_ctx_term", "QL_ZMQ_EXPORT_CTX_TERM", "zmq_ctx_term"),
+        ("zmq_socket", "QL_ZMQ_EXPORT_SOCKET", "zmq_socket"),
+        ("zmq_close", "QL_ZMQ_EXPORT_CLOSE", "zmq_close"),
+        ("zmq_bind", "QL_ZMQ_EXPORT_BIND", "zmq_bind"),
+        ("zmq_send", "QL_ZMQ_EXPORT_SEND", "zmq_send"),
+        ("zmq_recv", "QL_ZMQ_EXPORT_RECV", "zmq_recv"),
+        ("zmq_poll", "QL_ZMQ_EXPORT_POLL", "zmq_poll"),
+        ("zmq_errno", "QL_ZMQ_EXPORT_ERRNO", "zmq_errno"),
+        ("zmq_strerror", "QL_ZMQ_EXPORT_STRERROR", "zmq_strerror"),
+    )
+
+    for field, macro, symbol in required_exports:
+        assert f'#define {macro} "{symbol}"' in sv_zmq
+        assert f"idZMQ_LoadSymbol( (void **)&s_zmq.{field}, {macro} )" in load_library_block
+        assert f'idZMQ_LoadSymbol( (void **)&s_zmq.{field}, "{symbol}" )' not in load_library_block
+
+    optional_exports = (
+        ("zmq_setsockopt", "QL_ZMQ_EXPORT_SETSOCKOPT", "zmq_setsockopt"),
+        ("zmq_getsockopt", "QL_ZMQ_EXPORT_GETSOCKOPT", "zmq_getsockopt"),
+    )
+
+    for field, macro, symbol in optional_exports:
+        assert f'#define {macro} "{symbol}"' in sv_zmq
+        assert f"idZMQ_LoadOptionalSymbol( (void **)&s_zmq.{field}, {macro} );" in load_library_block
+        assert f'idZMQ_LoadOptionalSymbol( (void **)&s_zmq.{field}, "{symbol}" );' not in load_library_block
+
+    assert "QL_ZMQ_CLOSE();" in load_library_block
+    assert "idZMQ_ResetResolvedSymbols();" in load_library_block
+    assert "QL_ZMQ_LIB_PRIMARY," in load_library_block
+    assert "QL_ZMQ_LIB_SECONDARY" in load_library_block
+
+    assert libzmq_source_files == []
+    assert "#include <zmq.h>" not in sv_zmq
+    assert "#include <zmq.h>" not in vcxproj
+    assert "libzmq.lib" not in vcxproj
+    assert '<ClCompile Include="server\\sv_zmq.c">' in vcxproj
+    assert "src\\libs\\libzmq\\bin\\Win32\\libzmq.dll" in vcxproj
+    assert "src/libs/libzmq/*" in gitignore
+    assert "!src/libs/libzmq/README.md" in gitignore
+    assert "It is not a source reconstruction area" in libzmq_readme
+    assert "Do not commit libzmq/CZMQ source files under this directory" in libzmq_readme
+    assert "The repo does not vendor libzmq source" in readme
+    assert "ZMQ is a runtime-only online-service dependency" in build_guide
+    assert "Do not install or vendor libzmq implementation source under `src/libs/`" in ownership_note
+    assert "hand-rolling that library under `src/code`" in ownership_note
+
+    assert "external runtime loader boundary" in mapping_round
+    assert "SRP external-libzmq accommodation" in mapping_round
+    assert "does not reconstruct libzmq/CZMQ internals" in mapping_round
+    assert "before 93% -> after 98%" in mapping_round
+
+
+def test_zmq_external_runtime_export_names_round_692_is_pinned() -> None:
+    aliases = json.loads(
+        (REPO_ROOT / "references/analysis/quakelive_symbol_aliases.json").read_text(encoding="utf-8")
+    )["quakelive_steam_srp"]
+    functions_csv = (
+        REPO_ROOT / "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+    ).read_text(encoding="utf-8").lower()
+    sv_zmq = (REPO_ROOT / "src/code/server/sv_zmq.c").read_text(encoding="utf-8")
+    ownership_note = (
+        REPO_ROOT / "docs/reverse-engineering/zmq-dependency-ownership-2026-06-06.md"
+    ).read_text(encoding="utf-8")
+    mapping_round = (
+        REPO_ROOT / "docs/reverse-engineering/quakelive_steam_mapping_round_692.md"
+    ).read_text(encoding="utf-8")
+
+    expected_embedded_exports = {
+        "sub_401000": "zmq_ctx_new",
+        "sub_401140": "zmq_ctx_term",
+        "sub_4012C0": "zmq_socket",
+        "sub_4012F0": "zmq_close",
+        "sub_401390": "zmq_setsockopt",
+        "sub_4013D0": "zmq_getsockopt",
+        "sub_401410": "zmq_bind",
+        "sub_4014D0": "zmq_msg_send",
+        "sub_401520": "zmq_msg_recv",
+        "sub_401600": "zmq_poll",
+    }
+
+    for symbol, alias in expected_embedded_exports.items():
+        address = f"00{symbol.removeprefix('sub_')}".lower()
+        assert aliases[symbol] == alias
+        assert f"fun_{address},{address}" in functions_csv
+        assert f"| `{symbol}` | `{alias}` |" in mapping_round
+
+    load_library_block = _extract_function_block(sv_zmq, "static qboolean idZMQ_LoadLibrary( void )")
+    required_exports = (
+        ("zmq_ctx_new", "QL_ZMQ_EXPORT_CTX_NEW", "zmq_ctx_new"),
+        ("zmq_ctx_term", "QL_ZMQ_EXPORT_CTX_TERM", "zmq_ctx_term"),
+        ("zmq_socket", "QL_ZMQ_EXPORT_SOCKET", "zmq_socket"),
+        ("zmq_close", "QL_ZMQ_EXPORT_CLOSE", "zmq_close"),
+        ("zmq_bind", "QL_ZMQ_EXPORT_BIND", "zmq_bind"),
+        ("zmq_send", "QL_ZMQ_EXPORT_SEND", "zmq_send"),
+        ("zmq_recv", "QL_ZMQ_EXPORT_RECV", "zmq_recv"),
+        ("zmq_poll", "QL_ZMQ_EXPORT_POLL", "zmq_poll"),
+        ("zmq_errno", "QL_ZMQ_EXPORT_ERRNO", "zmq_errno"),
+        ("zmq_strerror", "QL_ZMQ_EXPORT_STRERROR", "zmq_strerror"),
+    )
+    previous_position = -1
+
+    for field, macro, export_name in required_exports:
+        define = f'#define {macro} "{export_name}"'
+        load_call = f"idZMQ_LoadSymbol( (void **)&s_zmq.{field}, {macro} )"
+        raw_load_call = f'idZMQ_LoadSymbol( (void **)&s_zmq.{field}, "{export_name}" )'
+        assert define in sv_zmq
+        assert load_call in load_library_block
+        assert raw_load_call not in load_library_block
+        position = load_library_block.index(load_call)
+        assert position > previous_position
+        previous_position = position
+
+    optional_exports = (
+        ("zmq_setsockopt", "QL_ZMQ_EXPORT_SETSOCKOPT", "zmq_setsockopt"),
+        ("zmq_getsockopt", "QL_ZMQ_EXPORT_GETSOCKOPT", "zmq_getsockopt"),
+    )
+
+    for field, macro, export_name in optional_exports:
+        define = f'#define {macro} "{export_name}"'
+        load_call = f"idZMQ_LoadOptionalSymbol( (void **)&s_zmq.{field}, {macro} );"
+        raw_load_call = f'idZMQ_LoadOptionalSymbol( (void **)&s_zmq.{field}, "{export_name}" );'
+        assert define in sv_zmq
+        assert load_call in load_library_block
+        assert raw_load_call not in load_library_block
+        assert load_library_block.index(load_call) > previous_position
+
+    source_suffixes = {".c", ".cc", ".cpp", ".cxx", ".h", ".hh", ".hpp", ".hxx"}
+    libzmq_source_files = sorted(
+        source.relative_to(REPO_ROOT).as_posix()
+        for source in (REPO_ROOT / "src/libs/libzmq").rglob("*")
+        if source.is_file() and source.suffix.lower() in source_suffixes
+    )
+
+    assert "idZMQ_LoadSymbol( (void **)&s_zmq.zmq_setsockopt" not in load_library_block
+    assert "idZMQ_LoadSymbol( (void **)&s_zmq.zmq_getsockopt" not in load_library_block
+    assert "#include <zmq.h>" not in sv_zmq
+    assert libzmq_source_files == []
+    assert "runtime-only" in ownership_note
+    assert "ZMQ external runtime export-name boundary" in mapping_round
+    assert "retail embedded libzmq/CZMQ remains evidence only" in mapping_round
+    assert "does not reconstruct libzmq/CZMQ internals" in mapping_round
+    assert "before 94% -> after 99%" in mapping_round
+
+
+def test_zmq_manual_zap_auth_response_boundary_round_667_is_pinned() -> None:
+    aliases = json.loads(
+        (REPO_ROOT / "references/analysis/quakelive_symbol_aliases.json").read_text(encoding="utf-8")
+    )["quakelive_steam_srp"]
+    functions_csv = (
+        REPO_ROOT / "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+    ).read_text(encoding="utf-8").lower()
+    hlil_part05 = (
+        REPO_ROOT
+        / "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part05.txt"
+    ).read_text(encoding="utf-8")
+    hlil_part06 = (
+        REPO_ROOT
+        / "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part06.txt"
+    ).read_text(encoding="utf-8")
+    sv_zmq = (REPO_ROOT / "src/code/server/sv_zmq.c").read_text(encoding="utf-8")
+    mapping_round = (
+        REPO_ROOT / "docs/reverse-engineering/quakelive_steam_mapping_round_667.md"
+    ).read_text(encoding="utf-8")
+
+    expected_aliases = {
+        "sub_4F5F10": "zauth_self_new",
+        "sub_4F5FC0": "zauth_self_handle_pipe",
+        "sub_4F6630": "s_authenticate_plain",
+        "sub_4F69F0": "zauth",
+    }
+
+    for symbol, alias in expected_aliases.items():
+        address = f"00{symbol.removeprefix('sub_')}".lower()
+        assert aliases[symbol] == alias
+        assert f"fun_{address},{address}" in functions_csv
+        assert f"| `{symbol}` | `{alias}` |" in mapping_round
+
+    assert '004f5f9c  sub_4f5200(eax_9, "inproc://zeromq.zap.01")' in hlil_part05
+    assert '004f65fd      edx = sub_4f7030(eax, edx, ecx, "zauth: - ZAP reply status_code=%…")' in hlil_part05
+    assert '004f6653  int32_t eax_2 = sub_4f7360("%s_%s")' in hlil_part05
+    assert '004f66a9              sub_4f7030(eax_6, edx_2, ecx_1, "zauth: - allowed (PLAIN) usernam…")' in hlil_part05
+    assert '004f66fd          sub_4f7030(eax, edx, arg1, "zauth: - denied (PLAIN) no passw…")' in hlil_part05
+    assert '004f68dc              sub_4f7030(eax_10, edx, ecx_4, "zauth: - allowed (NULL)")' in hlil_part05
+    assert "004f69fb  eax, ecx_1, edx = sub_4f5f10(arg1)" in hlil_part05
+    assert "004f6a28          sub_4f5fc0(eax)" in hlil_part05
+    assert '005485f8  char const data_5485f8[0x31] = "zauth: - ZAP reply status_code=%s status_text=%s", 0' in hlil_part06
+    assert '00548660  char const data_548660[0x30] = "zauth: - denied (PLAIN) username=%s password=%s", 0' in hlil_part06
+    assert '00548690  char const data_548690[0x31] = "zauth: - allowed (PLAIN) username=%s password=%s", 0' in hlil_part06
+    assert '005486c4  char const data_5486c4[0x6] = "%s_%s", 0' in hlil_part06
+    assert '0054878c  char const data_54878c[0x18] = "zauth: - allowed (NULL)", 0' in hlil_part06
+    assert '005487fc  char const data_5487fc[0xa] = "No access", 0' in hlil_part06
+    assert '00550cd0  char const data_550cd0[0x17] = "inproc://zeromq.zap.01", 0' in hlil_part06
+
+    send_frame_block = _extract_function_block(sv_zmq, "static int idZMQ_SendAuthFrame( void *socket, const char *value, qboolean more )")
+    send_response_block = _extract_function_block(
+        sv_zmq,
+        "static void idZMQ_SendAuthResponse( const char *version, const char *requestId, const char *statusCode, const char *statusText, const char *userId )",
+    )
+    get_credentials_block = _extract_function_block(
+        sv_zmq,
+        "static qboolean idZMQ_GetPlainCredentials( const char *domain, const char **expectedUsername, const char **expectedPassword )",
+    )
+    validate_credentials_block = _extract_function_block(
+        sv_zmq,
+        "static qboolean idZMQ_ValidatePlainCredentials( const char *domain, const char *username, const char *password, const char **userId )",
+    )
+    pump_auth_block = _extract_function_block(sv_zmq, "static void idZMQ_PumpAuthSocket( void )")
+
+    assert '#define QL_ZMQ_AUTH_EMPTY_FRAME ""' in sv_zmq
+    assert "#define QL_ZMQ_AUTH_EMPTY_USER_ID QL_ZMQ_AUTH_EMPTY_FRAME" in sv_zmq
+    assert "#define QL_ZMQ_AUTH_EMPTY_CREDENTIAL QL_ZMQ_AUTH_EMPTY_FRAME" in sv_zmq
+    assert '#define QL_ZMQ_ZAP_ENDPOINT "inproc://zeromq.zap.01"' in sv_zmq
+    assert '#define QL_ZMQ_ZAP_VERSION "1.0"' in sv_zmq
+    assert '#define QL_ZMQ_ZAP_MECHANISM_NULL "NULL"' in sv_zmq
+    assert '#define QL_ZMQ_ZAP_MECHANISM_PLAIN "PLAIN"' in sv_zmq
+    assert '#define QL_ZMQ_ZAP_STATUS_OK "200"' in sv_zmq
+    assert '#define QL_ZMQ_ZAP_STATUS_NO_ACCESS "400"' in sv_zmq
+    assert '#define QL_ZMQ_ZAP_TEXT_OK "OK"' in sv_zmq
+    assert '#define QL_ZMQ_ZAP_TEXT_BAD_REQUEST "BAD REQUEST"' in sv_zmq
+    assert '#define QL_ZMQ_ZAP_TEXT_NO_ACCESS "No access"' in sv_zmq
+
+    assert "frame = value ? value : QL_ZMQ_AUTH_EMPTY_FRAME;" in send_frame_block
+    assert "flags = more ? QL_ZMQ_SNDMORE : QL_ZMQ_NO_FLAGS;" in send_frame_block
+    assert "idZMQ_SendAuthFrame( s_zmq.authSocket, version, qtrue )" in send_response_block
+    assert "idZMQ_SendAuthFrame( s_zmq.authSocket, requestId, qtrue )" in send_response_block
+    assert "idZMQ_SendAuthFrame( s_zmq.authSocket, statusCode, qtrue )" in send_response_block
+    assert "idZMQ_SendAuthFrame( s_zmq.authSocket, statusText, qtrue )" in send_response_block
+    assert "idZMQ_SendAuthFrame( s_zmq.authSocket, userId, qtrue )" in send_response_block
+    assert "idZMQ_SendAuthFrame( s_zmq.authSocket, QL_ZMQ_AUTH_EMPTY_FRAME, qfalse );" in send_response_block
+    assert send_response_block.index("version, qtrue") < send_response_block.index("requestId, qtrue")
+    assert send_response_block.index("requestId, qtrue") < send_response_block.index("statusCode, qtrue")
+    assert send_response_block.index("statusCode, qtrue") < send_response_block.index("statusText, qtrue")
+    assert send_response_block.index("statusText, qtrue") < send_response_block.index("userId, qtrue")
+    assert send_response_block.index("userId, qtrue") < send_response_block.index("QL_ZMQ_AUTH_EMPTY_FRAME, qfalse")
+
+    assert "*expectedUsername = QL_ZMQ_AUTH_EMPTY_CREDENTIAL;" in get_credentials_block
+    assert "*expectedPassword = QL_ZMQ_AUTH_EMPTY_CREDENTIAL;" in get_credentials_block
+    assert "expectedPassword = QL_ZMQ_AUTH_EMPTY_CREDENTIAL;" in validate_credentials_block
+    assert "expectedUsername = QL_ZMQ_AUTH_EMPTY_CREDENTIAL;" in validate_credentials_block
+    assert "*userId = QL_ZMQ_AUTH_EMPTY_USER_ID;" in validate_credentials_block
+    assert "userId = QL_ZMQ_AUTH_EMPTY_USER_ID;" in pump_auth_block
+    assert "statusCode = QL_ZMQ_ZAP_STATUS_NO_ACCESS;" in pump_auth_block
+    assert "statusText = QL_ZMQ_ZAP_TEXT_BAD_REQUEST;" in pump_auth_block
+    assert "Q_strncpyz( version, QL_ZMQ_ZAP_VERSION, sizeof( version ) );" in pump_auth_block
+    assert "if ( !Q_stricmp( mechanism, QL_ZMQ_ZAP_MECHANISM_NULL ) ) {" in pump_auth_block
+    assert "statusCode = QL_ZMQ_ZAP_STATUS_OK;" in pump_auth_block
+    assert "statusText = QL_ZMQ_ZAP_TEXT_OK;" in pump_auth_block
+    assert "if ( !Q_stricmp( mechanism, QL_ZMQ_ZAP_MECHANISM_PLAIN ) ) {" in pump_auth_block
+    assert "statusText = QL_ZMQ_ZAP_TEXT_NO_ACCESS;" in pump_auth_block
+    assert "if ( idZMQ_ValidatePlainCredentials( domain, username, password, &userId ) ) {" in pump_auth_block
+    assert "idZMQ_SendAuthResponse( version, requestId, statusCode, QL_ZMQ_ZAP_TEXT_NO_ACCESS, userId );" in pump_auth_block
+    assert 'idZMQ_SendAuthFrame( s_zmq.authSocket, "", qfalse );' not in sv_zmq
+    assert 'userId = "";' not in pump_auth_block
+    assert 'zstr_sendx(' not in sv_zmq
+    assert 'zauth(' not in sv_zmq
+    assert "manual ZAP auth response frame boundary" in mapping_round
+    assert "SRP-owned manual ZAP responder" in mapping_round
+    assert "does not reconstruct libzmq/CZMQ internals" in mapping_round
+    assert "before 92% -> after 98%" in mapping_round
+
+
+def test_zmq_zap_request_buffer_boundary_round_689_is_pinned() -> None:
+    aliases = json.loads(
+        (REPO_ROOT / "references/analysis/quakelive_symbol_aliases.json").read_text(encoding="utf-8")
+    )["quakelive_steam_srp"]
+    functions_csv = (
+        REPO_ROOT / "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+    ).read_text(encoding="utf-8").lower()
+    hlil_part05 = (
+        REPO_ROOT
+        / "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part05.txt"
+    ).read_text(encoding="utf-8")
+    hlil_part06 = (
+        REPO_ROOT
+        / "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part06.txt"
+    ).read_text(encoding="utf-8")
+    sv_zmq = (REPO_ROOT / "src/code/server/sv_zmq.c").read_text(encoding="utf-8")
+    mapping_round = (
+        REPO_ROOT / "docs/reverse-engineering/quakelive_steam_mapping_round_689.md"
+    ).read_text(encoding="utf-8")
+
+    expected_aliases = {
+        "sub_4F63D0": "s_zap_request_new",
+        "sub_4F65F0": "s_zap_request_reply",
+        "sub_4F6630": "s_authenticate_plain",
+        "sub_4F67A0": "s_self_authenticate",
+        "sub_4F69F0": "zauth",
+    }
+
+    for symbol, alias in expected_aliases.items():
+        address = f"00{symbol.removeprefix('sub_')}".lower()
+        assert aliases[symbol] == alias
+        assert f"fun_{address},{address}" in functions_csv
+        assert f"| `{symbol}` | `{alias}` |" in mapping_round
+
+    assert "004f63d0    int32_t sub_4f63d0(int32_t* arg1, char arg2)" in hlil_part05
+    assert '004f65ce              sub_4f7030(eax_31, edx_6, ecx_5, "zauth: ZAP request mechanism=%s …")' in hlil_part05
+    assert "004f65f0    int32_t sub_4f65f0(int32_t* arg1 @ esi)" in hlil_part05
+    assert "004f6630    int32_t __fastcall sub_4f6630(int32_t arg1, void* arg2 @ esi, void* arg3 @ edi)" in hlil_part05
+    assert '004f6894          char const* const ecx_4 = "NULL"' in hlil_part05
+    assert '004f68f3              char const* const ecx_5 = "PLAIN"' in hlil_part05
+    assert "004f69f0    int32_t sub_4f69f0(int32_t* arg1)" in hlil_part05
+    assert '005485c8  char const data_5485c8[0x2d] = "zauth: ZAP request mechanism=%s ipaddress=%s", 0' in hlil_part06
+    assert '005485f8  char const data_5485f8[0x31] = "zauth: - ZAP reply status_code=%s status_text=%s", 0' in hlil_part06
+    assert '005487fc  char const data_5487fc[0xa] = "No access", 0' in hlil_part06
+    assert '00550cd0  char const data_550cd0[0x17] = "inproc://zeromq.zap.01", 0' in hlil_part06
+
+    pump_auth_block = _extract_function_block(sv_zmq, "static void idZMQ_PumpAuthSocket( void )")
+
+    assert "#define QL_ZMQ_ZAP_VERSION_BUFFER_SIZE 16" in sv_zmq
+    assert "#define QL_ZMQ_ZAP_REQUEST_ID_BUFFER_SIZE 64" in sv_zmq
+    assert "#define QL_ZMQ_ZAP_DOMAIN_BUFFER_SIZE 64" in sv_zmq
+    assert "#define QL_ZMQ_ZAP_ADDRESS_BUFFER_SIZE 128" in sv_zmq
+    assert "#define QL_ZMQ_ZAP_IDENTITY_BUFFER_SIZE QL_ZMQ_MAX_IDENTITY" in sv_zmq
+    assert "#define QL_ZMQ_ZAP_MECHANISM_BUFFER_SIZE 16" in sv_zmq
+    assert "#define QL_ZMQ_ZAP_USERNAME_BUFFER_SIZE QL_ZMQ_MAX_IDENTITY" in sv_zmq
+    assert "#define QL_ZMQ_ZAP_PASSWORD_BUFFER_SIZE MAX_STRING_CHARS" in sv_zmq
+    assert "#define QL_ZMQ_ZAP_EMPTY_FIELD QL_ZMQ_STRING_TERMINATOR" in sv_zmq
+    assert "char version[QL_ZMQ_ZAP_VERSION_BUFFER_SIZE];" in pump_auth_block
+    assert "char requestId[QL_ZMQ_ZAP_REQUEST_ID_BUFFER_SIZE];" in pump_auth_block
+    assert "char domain[QL_ZMQ_ZAP_DOMAIN_BUFFER_SIZE];" in pump_auth_block
+    assert "char address[QL_ZMQ_ZAP_ADDRESS_BUFFER_SIZE];" in pump_auth_block
+    assert "char identity[QL_ZMQ_ZAP_IDENTITY_BUFFER_SIZE];" in pump_auth_block
+    assert "char mechanism[QL_ZMQ_ZAP_MECHANISM_BUFFER_SIZE];" in pump_auth_block
+    assert "char username[QL_ZMQ_ZAP_USERNAME_BUFFER_SIZE];" in pump_auth_block
+    assert "char password[QL_ZMQ_ZAP_PASSWORD_BUFFER_SIZE];" in pump_auth_block
+    assert "Q_strncpyz( version, QL_ZMQ_ZAP_VERSION, sizeof( version ) );" in pump_auth_block
+    assert "requestId[0] = QL_ZMQ_ZAP_EMPTY_FIELD;" in pump_auth_block
+    assert "domain[0] = QL_ZMQ_ZAP_EMPTY_FIELD;" in pump_auth_block
+    assert "address[0] = QL_ZMQ_ZAP_EMPTY_FIELD;" in pump_auth_block
+    assert "identity[0] = QL_ZMQ_ZAP_EMPTY_FIELD;" in pump_auth_block
+    assert "mechanism[0] = QL_ZMQ_ZAP_EMPTY_FIELD;" in pump_auth_block
+    assert "username[0] = QL_ZMQ_ZAP_EMPTY_FIELD;" in pump_auth_block
+    assert "password[0] = QL_ZMQ_ZAP_EMPTY_FIELD;" in pump_auth_block
+    assert "char version[16];" not in pump_auth_block
+    assert "char requestId[64];" not in pump_auth_block
+    assert "char domain[64];" not in pump_auth_block
+    assert "char address[128];" not in pump_auth_block
+    assert "char mechanism[16];" not in pump_auth_block
+    assert "requestId[0] = '\\0';" not in pump_auth_block
+    assert "zauth(" not in sv_zmq
+    assert "s_zap_request_new(" not in sv_zmq
+    assert "s_authenticate_plain(" not in sv_zmq
+
+    assert "ZAP request frame-buffer boundary" in mapping_round
+    assert "caller-owned frame buffers" in mapping_round
+    assert "does not reconstruct libzmq/CZMQ internals" in mapping_round
+    assert "before 92% -> after 98%" in mapping_round
+
+
+def test_zmq_receive_frame_drain_boundary_round_668_is_pinned() -> None:
+    aliases = json.loads(
+        (REPO_ROOT / "references/analysis/quakelive_symbol_aliases.json").read_text(encoding="utf-8")
+    )["quakelive_steam_srp"]
+    functions_csv = (
+        REPO_ROOT / "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+    ).read_text(encoding="utf-8").lower()
+    hlil_part05 = (
+        REPO_ROOT
+        / "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part05.txt"
+    ).read_text(encoding="utf-8")
+    sv_zmq = (REPO_ROOT / "src/code/server/sv_zmq.c").read_text(encoding="utf-8")
+    mapping_round = (
+        REPO_ROOT / "docs/reverse-engineering/quakelive_steam_mapping_round_668.md"
+    ).read_text(encoding="utf-8")
+
+    expected_aliases = {
+        "sub_4F5CB0": "zstr_recv",
+        "sub_4F5E10": "zstr_free",
+        "sub_401520": "zmq_msg_recv",
+        "sub_401570": "zmq_msg_init",
+        "sub_4015B0": "zmq_msg_close",
+        "sub_4015E0": "zmq_msg_data",
+        "sub_4015F0": "zmq_msg_size",
+    }
+
+    for symbol, alias in expected_aliases.items():
+        address = f"00{symbol.removeprefix('sub_')}".lower()
+        assert aliases[symbol] == alias
+        assert f"fun_{address},{address}" in functions_csv
+        assert f"| `{symbol}` | `{alias}` |" in mapping_round
+
+    assert "004f5cb0    int32_t sub_4f5cb0(int32_t* arg1)" in hlil_part05
+    assert "004f5cd0  sub_401570(&var_28)" in hlil_part05
+    assert "004f5ce6  if (sub_401520(eax_3, &var_28, 0) s< 0)" in hlil_part05
+    assert "004f5cfe  uint32_t eax_6 = sub_4015f0(&var_28)" in hlil_part05
+    assert "004f5d09  int32_t result = malloc(eax_6 + 1)" in hlil_part05
+    assert "004f5d27      memcpy(result, sub_4015e0(&var_28), eax_6)" in hlil_part05
+    assert "004f5d2f      *(result + eax_6) = 0" in hlil_part05
+    assert "004f5d37  sub_4015b0(&var_28)" in hlil_part05
+
+    read_frame_block = _extract_function_block(
+        sv_zmq,
+        "static int idZMQ_ReadFrameString( void *socket, char *buffer, size_t bufferSize, qboolean *more )",
+    )
+    drain_block = _extract_function_block(sv_zmq, "static void idZMQ_DrainRemainingFrames( void *socket, qboolean more )")
+    read_rcon_block = _extract_function_block(sv_zmq, "static int idZMQ_ReadRconCommand( char *command, size_t commandSize )")
+    pump_rcon_block = _extract_function_block(sv_zmq, "static void idZMQ_PumpRcon( void )")
+    pump_auth_block = _extract_function_block(sv_zmq, "static void idZMQ_PumpAuthSocket( void )")
+
+    assert "#define QL_ZMQ_DONTWAIT 1" in sv_zmq
+    assert "#define QL_ZMQ_RCVMORE 13" in sv_zmq
+    assert "#define QL_ZMQ_DRAIN_SCRATCH_SIZE MAX_STRING_CHARS" in sv_zmq
+    assert "#define QL_ZMQ_STRING_TERMINATOR_LENGTH 1" in sv_zmq
+    assert "#define QL_ZMQ_STRING_TERMINATOR '\\0'" in sv_zmq
+    assert "#define QL_ZMQ_RCVMORE_NONE 0" in sv_zmq
+    assert "#define QL_ZMQ_GETSOCKOPT_SUCCESS 0" in sv_zmq
+    assert "#define QL_ZMQ_FRAME_MORE qtrue" in sv_zmq
+    assert "#define QL_ZMQ_FRAME_NO_MORE qfalse" in sv_zmq
+    assert '#define QL_ZMQ_EXPORT_RECV "zmq_recv"' in sv_zmq
+    assert '#define QL_ZMQ_EXPORT_GETSOCKOPT "zmq_getsockopt"' in sv_zmq
+    assert "idZMQ_LoadSymbol( (void **)&s_zmq.zmq_recv, QL_ZMQ_EXPORT_RECV )" in sv_zmq
+    assert "idZMQ_LoadOptionalSymbol( (void **)&s_zmq.zmq_getsockopt, QL_ZMQ_EXPORT_GETSOCKOPT );" in sv_zmq
+
+    assert "if ( bufferSize > 0 ) {" in read_frame_block
+    assert "buffer[0] = QL_ZMQ_STRING_TERMINATOR;" in read_frame_block
+    assert "if ( more ) {" in read_frame_block
+    assert "*more = QL_ZMQ_FRAME_NO_MORE;" in read_frame_block
+    assert "length = s_zmq.zmq_recv( socket, buffer, bufferSize > 0 ? bufferSize - QL_ZMQ_STRING_TERMINATOR_LENGTH : 0, QL_ZMQ_DONTWAIT );" in read_frame_block
+    assert "if ( length < QL_ZMQ_FRAME_READ_SUCCESS_MIN ) {" in read_frame_block
+    assert "return length;" in read_frame_block
+    assert "if ( length >= (int)bufferSize ) {" in read_frame_block
+    assert "length = (int)bufferSize - QL_ZMQ_STRING_TERMINATOR_LENGTH;" in read_frame_block
+    assert "buffer[length] = QL_ZMQ_STRING_TERMINATOR;" in read_frame_block
+    assert "if ( !more || !s_zmq.zmq_getsockopt ) {" in read_frame_block
+    assert "moreValue = QL_ZMQ_RCVMORE_NONE;" in read_frame_block
+    assert "moreSize = sizeof( moreValue );" in read_frame_block
+    assert "s_zmq.zmq_getsockopt( socket, QL_ZMQ_RCVMORE, &moreValue, &moreSize ) == QL_ZMQ_GETSOCKOPT_SUCCESS && moreValue != QL_ZMQ_RCVMORE_NONE" in read_frame_block
+    assert "s_zmq.zmq_getsockopt( socket, QL_ZMQ_RCVMORE, &moreValue, &moreSize ) == 0 && moreValue" not in read_frame_block
+    assert "*more = QL_ZMQ_FRAME_MORE;" in read_frame_block
+    assert "*more = qfalse;" not in read_frame_block
+    assert "*more = qtrue;" not in read_frame_block
+
+    assert "char scratch[QL_ZMQ_DRAIN_SCRATCH_SIZE];" in drain_block
+    assert "while ( more ) {" in drain_block
+    assert "idZMQ_ReadFrameString( socket, scratch, sizeof( scratch ), &more ) < QL_ZMQ_FRAME_READ_SUCCESS_MIN" in drain_block
+    assert "break;" in drain_block
+    assert "idZMQ_DrainRemainingFrames( s_zmq.authSocket, more );" in pump_auth_block
+    assert "idZMQ_DrainRemainingFrames( s_zmq.rconSocket, more );" in read_rcon_block
+    assert "idZMQ_DrainRemainingFrames( s_zmq.rconSocket, more );" in pump_rcon_block
+    assert 'zstr_recv(' not in sv_zmq
+    assert 'zstr_free(' not in sv_zmq
+    assert "receive frame drain boundary" in mapping_round
+    assert "SRP stack-buffer receive/drain equivalent" in mapping_round
+    assert "does not reconstruct libzmq/CZMQ internals" in mapping_round
+    assert "before 91% -> after 98%" in mapping_round
+
+
+def test_zmq_rcvmore_getsockopt_success_round_732_is_pinned() -> None:
+    aliases = json.loads(
+        (REPO_ROOT / "references/analysis/quakelive_symbol_aliases.json").read_text(encoding="utf-8")
+    )["quakelive_steam_srp"]
+    functions_csv = (
+        REPO_ROOT / "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+    ).read_text(encoding="utf-8").lower()
+    hlil_part05 = (
+        REPO_ROOT
+        / "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part05.txt"
+    ).read_text(encoding="utf-8")
+    sv_zmq = (REPO_ROOT / "src/code/server/sv_zmq.c").read_text(encoding="utf-8")
+    implementation_plan = (REPO_ROOT / "IMPLEMENTATION_PLAN.md").read_text(encoding="utf-8")
+    mapping_round = (
+        REPO_ROOT / "docs/reverse-engineering/quakelive_steam_mapping_round_732.md"
+    ).read_text(encoding="utf-8")
+
+    expected_aliases = {
+        "sub_4013D0": "zmq_getsockopt",
+        "sub_4F58F0": "zsock_rcvmore",
+        "sub_4F5CB0": "zstr_recv",
+    }
+
+    for symbol, alias in expected_aliases.items():
+        address = f"00{symbol.removeprefix('sub_')}".lower()
+        assert aliases[symbol] == alias
+        assert f"fun_{address},{address}" in functions_csv
+        assert f"| `{symbol}` | `{alias}` |" in mapping_round
+
+    assert "004f58f0    int32_t sub_4f58f0(int32_t* arg1)" in hlil_part05
+    assert "004f5904  int32_t var_8 = 4" in hlil_part05
+    assert "004f5914  sub_4013d0(sub_4f56b0(arg1), 0xd, &result, &var_8)" in hlil_part05
+    assert "004f5922  return result" in hlil_part05
+    assert "004f5cb0    int32_t sub_4f5cb0(int32_t* arg1)" in hlil_part05
+
+    read_frame_block = _extract_function_block(
+        sv_zmq,
+        "static int idZMQ_ReadFrameString( void *socket, char *buffer, size_t bufferSize, qboolean *more )",
+    )
+
+    assert "#define QL_ZMQ_RCVMORE 13" in sv_zmq
+    assert "#define QL_ZMQ_GETSOCKOPT_SUCCESS 0" in sv_zmq
+    assert "#define QL_ZMQ_RCVMORE_NONE 0" in sv_zmq
+    assert "if ( !more || !s_zmq.zmq_getsockopt ) {" in read_frame_block
+    assert "moreValue = QL_ZMQ_RCVMORE_NONE;" in read_frame_block
+    assert "moreSize = sizeof( moreValue );" in read_frame_block
+    assert "s_zmq.zmq_getsockopt( socket, QL_ZMQ_RCVMORE, &moreValue, &moreSize ) == QL_ZMQ_GETSOCKOPT_SUCCESS && moreValue != QL_ZMQ_RCVMORE_NONE" in read_frame_block
+    assert "s_zmq.zmq_getsockopt( socket, QL_ZMQ_RCVMORE, &moreValue, &moreSize ) == 0 && moreValue" not in read_frame_block
+    assert "zsock_rcvmore(" not in sv_zmq
+    assert "zstr_recv(" not in sv_zmq
+    assert "ZMQ RCVMORE getsockopt success boundary" in mapping_round
+    assert "SRP dynamic zmq_getsockopt adaptation" in mapping_round
+    assert "does not reconstruct libzmq/CZMQ internals" in mapping_round
+    assert "before 94% -> after 99%" in mapping_round
+    assert "### Task A634: Pin ZMQ RCVMORE getsockopt success boundary [COMPLETED]" in implementation_plan
+
+
+def test_zmq_receive_frame_more_flag_round_752_is_pinned() -> None:
+    aliases = json.loads(
+        (REPO_ROOT / "references/analysis/quakelive_symbol_aliases.json").read_text(encoding="utf-8")
+    )["quakelive_steam_srp"]
+    functions_csv = (
+        REPO_ROOT / "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+    ).read_text(encoding="utf-8").lower()
+    hlil_part05 = (
+        REPO_ROOT
+        / "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part05.txt"
+    ).read_text(encoding="utf-8")
+    sv_zmq = (REPO_ROOT / "src/code/server/sv_zmq.c").read_text(encoding="utf-8")
+    implementation_plan = (REPO_ROOT / "IMPLEMENTATION_PLAN.md").read_text(encoding="utf-8")
+    mapping_round = (
+        REPO_ROOT / "docs/reverse-engineering/quakelive_steam_mapping_round_752.md"
+    ).read_text(encoding="utf-8")
+
+    expected_aliases = {
+        "sub_4013D0": "zmq_getsockopt",
+        "sub_401520": "zmq_msg_recv",
+        "sub_4015E0": "zmq_msg_data",
+        "sub_4015F0": "zmq_msg_size",
+        "sub_4F58F0": "zsock_rcvmore",
+        "sub_4F5CB0": "zstr_recv",
+    }
+
+    for symbol, alias in expected_aliases.items():
+        address = f"00{symbol.removeprefix('sub_')}".lower()
+        assert aliases[symbol] == alias
+        assert f"fun_{address},{address}" in functions_csv
+        assert f"| `{symbol}` | `{alias}` |" in mapping_round
+
+    assert "004f58f0    int32_t sub_4f58f0(int32_t* arg1)" in hlil_part05
+    assert "004f5914  sub_4013d0(sub_4f56b0(arg1), 0xd, &result, &var_8)" in hlil_part05
+    assert "004f5922  return result" in hlil_part05
+    assert "004f5cb0    int32_t sub_4f5cb0(int32_t* arg1)" in hlil_part05
+    assert "004f5ce6  if (sub_401520(eax_3, &var_28, 0) s< 0)" in hlil_part05
+    assert "004f5cfe  uint32_t eax_6 = sub_4015f0(&var_28)" in hlil_part05
+    assert "004f5d27      memcpy(result, sub_4015e0(&var_28), eax_6)" in hlil_part05
+    assert "004f5d2f      *(result + eax_6) = 0" in hlil_part05
+
+    read_frame_block = _extract_function_block(
+        sv_zmq,
+        "static int idZMQ_ReadFrameString( void *socket, char *buffer, size_t bufferSize, qboolean *more )",
+    )
+    pump_auth_block = _extract_function_block(sv_zmq, "static void idZMQ_PumpAuthSocket( void )")
+
+    assert "#define QL_ZMQ_FRAME_MORE qtrue" in sv_zmq
+    assert "#define QL_ZMQ_FRAME_NO_MORE qfalse" in sv_zmq
+    assert "#define QL_ZMQ_RCVMORE_NONE 0" in sv_zmq
+    assert "#define QL_ZMQ_GETSOCKOPT_SUCCESS 0" in sv_zmq
+    assert "*more = QL_ZMQ_FRAME_NO_MORE;" in read_frame_block
+    assert "*more = QL_ZMQ_FRAME_MORE;" in read_frame_block
+    assert "more = QL_ZMQ_FRAME_NO_MORE;" in pump_auth_block
+    assert "*more = qfalse;" not in read_frame_block
+    assert "*more = qtrue;" not in read_frame_block
+    assert "more = qfalse;" not in pump_auth_block
+    assert "moreValue = QL_ZMQ_RCVMORE_NONE;" in read_frame_block
+    assert "s_zmq.zmq_getsockopt( socket, QL_ZMQ_RCVMORE, &moreValue, &moreSize ) == QL_ZMQ_GETSOCKOPT_SUCCESS && moreValue != QL_ZMQ_RCVMORE_NONE" in read_frame_block
+    assert read_frame_block.index("*more = QL_ZMQ_FRAME_NO_MORE;") < read_frame_block.index(
+        "length = s_zmq.zmq_recv("
+    )
+    assert read_frame_block.index("moreValue = QL_ZMQ_RCVMORE_NONE;") < read_frame_block.index(
+        "*more = QL_ZMQ_FRAME_MORE;"
+    )
+    assert "zstr_recv(" not in sv_zmq
+    assert "zsock_rcvmore(" not in sv_zmq
+
+    assert "ZMQ receive frame-more flag boundary" in mapping_round
+    assert "SRP caller-visible frame-more adaptation" in mapping_round
+    assert "does not reconstruct libzmq/CZMQ internals" in mapping_round
+    assert "before 93% -> after 99%" in mapping_round
+    assert "### Task A654: Pin ZMQ receive frame-more flag boundary [COMPLETED]" in implementation_plan
+
+
+def test_zmq_frame_read_failure_threshold_round_728_is_pinned() -> None:
+    aliases = json.loads(
+        (REPO_ROOT / "references/analysis/quakelive_symbol_aliases.json").read_text(encoding="utf-8")
+    )["quakelive_steam_srp"]
+    functions_csv = (
+        REPO_ROOT / "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+    ).read_text(encoding="utf-8").lower()
+    hlil_part05 = (
+        REPO_ROOT
+        / "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part05.txt"
+    ).read_text(encoding="utf-8")
+    sv_zmq = (REPO_ROOT / "src/code/server/sv_zmq.c").read_text(encoding="utf-8")
+    implementation_plan = (REPO_ROOT / "IMPLEMENTATION_PLAN.md").read_text(encoding="utf-8")
+    mapping_round = (
+        REPO_ROOT / "docs/reverse-engineering/quakelive_steam_mapping_round_728.md"
+    ).read_text(encoding="utf-8")
+
+    expected_aliases = {
+        "sub_4F4ED0": "idZMQ_PumpRcon",
+        "sub_4F5CB0": "zstr_recv",
+        "sub_4F5E10": "zstr_free",
+        "sub_401520": "zmq_msg_recv",
+    }
+
+    for symbol, alias in expected_aliases.items():
+        address = f"00{symbol.removeprefix('sub_')}".lower()
+        assert aliases[symbol] == alias
+        assert f"fun_{address},{address}" in functions_csv
+        assert f"| `{symbol}` | `{alias}` |" in mapping_round
+
+    assert "004f4f23              int32_t eax_1 = sub_4f5cb0(*(arg1 + 0xc))" in hlil_part05
+    assert "004f4f2f              int32_t eax_2 = sub_4f5cb0(ecx_1)" in hlil_part05
+    assert "004f4f91                  return sub_4f5e10(&var_c)" in hlil_part05
+    assert "004f4fab              sub_4f5e10(&var_8)" in hlil_part05
+    assert "004f5ce6  if (sub_401520(eax_3, &var_28, 0) s< 0)" in hlil_part05
+
+    read_frame_block = _extract_function_block(
+        sv_zmq,
+        "static int idZMQ_ReadFrameString( void *socket, char *buffer, size_t bufferSize, qboolean *more )",
+    )
+    drain_block = _extract_function_block(sv_zmq, "static void idZMQ_DrainRemainingFrames( void *socket, qboolean more )")
+    read_command_block = _extract_function_block(
+        sv_zmq,
+        "static int idZMQ_ReadRconCommand( char *command, size_t commandSize )",
+    )
+    pump_auth_block = _extract_function_block(sv_zmq, "static void idZMQ_PumpAuthSocket( void )")
+
+    assert "#define QL_ZMQ_FRAME_READ_SUCCESS_MIN 0" in sv_zmq
+    assert "length = s_zmq.zmq_recv( socket, buffer, bufferSize > 0 ? bufferSize - QL_ZMQ_STRING_TERMINATOR_LENGTH : 0, QL_ZMQ_DONTWAIT );" in read_frame_block
+    assert "if ( length < QL_ZMQ_FRAME_READ_SUCCESS_MIN ) {" in read_frame_block
+    assert "idZMQ_ReadFrameString( socket, scratch, sizeof( scratch ), &more ) < QL_ZMQ_FRAME_READ_SUCCESS_MIN" in drain_block
+    assert "commandLength >= QL_ZMQ_FRAME_READ_SUCCESS_MIN" in read_command_block
+    assert pump_auth_block.count("if ( length < QL_ZMQ_FRAME_READ_SUCCESS_MIN ) {") == 8
+    assert "if ( length < 0 ) {" not in sv_zmq
+    assert "idZMQ_ReadFrameString( socket, scratch, sizeof( scratch ), &more ) < 0" not in sv_zmq
+    assert "zstr_recv(" not in sv_zmq
+    assert "zstr_free(" not in sv_zmq
+    assert "zmq_msg_recv(" not in sv_zmq
+
+    assert "ZMQ frame-read failure threshold boundary" in mapping_round
+    assert "SRP dynamic zmq_recv adaptation" in mapping_round
+    assert "does not reconstruct libzmq/CZMQ internals" in mapping_round
+    assert "before 94% -> after 99%" in mapping_round
+    assert "### Task A630: Pin ZMQ frame-read failure threshold boundary [COMPLETED]" in implementation_plan
+
+
+def test_zmq_receive_string_terminator_boundary_round_684_is_pinned() -> None:
+    aliases = json.loads(
+        (REPO_ROOT / "references/analysis/quakelive_symbol_aliases.json").read_text(encoding="utf-8")
+    )["quakelive_steam_srp"]
+    functions_csv = (
+        REPO_ROOT / "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+    ).read_text(encoding="utf-8").lower()
+    hlil_part05 = (
+        REPO_ROOT
+        / "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part05.txt"
+    ).read_text(encoding="utf-8")
+    sv_zmq = (REPO_ROOT / "src/code/server/sv_zmq.c").read_text(encoding="utf-8")
+    mapping_round = (
+        REPO_ROOT / "docs/reverse-engineering/quakelive_steam_mapping_round_684.md"
+    ).read_text(encoding="utf-8")
+
+    expected_aliases = {
+        "sub_4F5CB0": "zstr_recv",
+        "sub_401520": "zmq_msg_recv",
+        "sub_4015E0": "zmq_msg_data",
+        "sub_4015F0": "zmq_msg_size",
+    }
+
+    for symbol, alias in expected_aliases.items():
+        address = f"00{symbol.removeprefix('sub_')}".lower()
+        assert aliases[symbol] == alias
+        assert f"fun_{address},{address}" in functions_csv
+        assert f"| `{symbol}` | `{alias}` |" in mapping_round
+
+    assert "004f5cfe  uint32_t eax_6 = sub_4015f0(&var_28)" in hlil_part05
+    assert "004f5d09  int32_t result = malloc(eax_6 + 1)" in hlil_part05
+    assert "004f5d27      memcpy(result, sub_4015e0(&var_28), eax_6)" in hlil_part05
+    assert "004f5d2f      *(result + eax_6) = 0" in hlil_part05
+
+    read_frame_block = _extract_function_block(
+        sv_zmq,
+        "static int idZMQ_ReadFrameString( void *socket, char *buffer, size_t bufferSize, qboolean *more )",
+    )
+
+    assert "#define QL_ZMQ_STRING_TERMINATOR_LENGTH 1" in sv_zmq
+    assert "#define QL_ZMQ_STRING_TERMINATOR '\\0'" in sv_zmq
+    assert "#define QL_ZMQ_RCVMORE_NONE 0" in sv_zmq
+    assert "buffer[0] = QL_ZMQ_STRING_TERMINATOR;" in read_frame_block
+    assert "bufferSize > 0 ? bufferSize - QL_ZMQ_STRING_TERMINATOR_LENGTH : 0" in read_frame_block
+    assert "length = (int)bufferSize - QL_ZMQ_STRING_TERMINATOR_LENGTH;" in read_frame_block
+    assert "buffer[length] = QL_ZMQ_STRING_TERMINATOR;" in read_frame_block
+    assert "moreValue = QL_ZMQ_RCVMORE_NONE;" in read_frame_block
+    assert "buffer[0] = '\\0';" not in read_frame_block
+    assert "buffer[length] = '\\0';" not in read_frame_block
+    assert "bufferSize - 1" not in read_frame_block
+    assert "zstr_recv(" not in sv_zmq
+
+    assert "receive string-terminator boundary" in mapping_round
+    assert "malloc(size + 1)" in mapping_round
+    assert "does not reconstruct libzmq/CZMQ internals" in mapping_round
+    assert "before 92% -> after 98%" in mapping_round
+
+
+def test_zmq_stats_transcript_line_boundary_round_669_is_pinned() -> None:
+    aliases = json.loads(
+        (REPO_ROOT / "references/analysis/quakelive_symbol_aliases.json").read_text(encoding="utf-8")
+    )["quakelive_steam_srp"]
+    functions_csv = (
+        REPO_ROOT / "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+    ).read_text(encoding="utf-8").lower()
+    hlil_part05 = (
+        REPO_ROOT
+        / "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part05.txt"
+    ).read_text(encoding="utf-8")
+    sv_zmq = (REPO_ROOT / "src/code/server/sv_zmq.c").read_text(encoding="utf-8")
+    mapping_round = (
+        REPO_ROOT / "docs/reverse-engineering/quakelive_steam_mapping_round_669.md"
+    ).read_text(encoding="utf-8")
+
+    expected_aliases = {
+        "sub_4F4B20": "idZMQ_ReportPlayerEvent",
+        "sub_4F4C30": "idZMQ_SubmitMatchReport",
+        "sub_4F4E10": "Zmq_ReportPlayerEvent",
+        "sub_4F4E40": "Zmq_SubmitMatchReport",
+        "sub_4F5D60": "zstr_send",
+    }
+
+    for symbol, alias in expected_aliases.items():
+        address = f"00{symbol.removeprefix('sub_')}".lower()
+        assert aliases[symbol] == alias
+        assert f"fun_{address},{address}" in functions_csv
+        assert f"| `{symbol}` | `{alias}` |" in mapping_round
+
+    assert "004f4b57  if (*(arg1 + 8) != 0)" in hlil_part05
+    assert "004f4bd2      sub_4f5d60(*(arg1 + 8), eax_6)" in hlil_part05
+    assert "004f4c65  if (*(arg1 + 8) != 0)" in hlil_part05
+    assert "004f4cdf      sub_4f5d60(*(arg1 + 8), eax_6)" in hlil_part05
+    assert "004f4e32  return sub_4f4b20(&data_5756fc, arg1, arg2)" in hlil_part05
+    assert "004f4e52  return sub_4f4c30(&data_5756fc, arg1)" in hlil_part05
+
+    open_transcript_block = _extract_function_block(sv_zmq, "static void idZMQ_OpenStatsTranscript( void )")
+    write_transcript_block = _extract_function_block(sv_zmq, "static void idZMQ_WriteStatsTranscript( const char *message )")
+    publish_block = _extract_function_block(sv_zmq, "static void idZMQ_Publish( const char *type, const char *payload )")
+
+    build_call = "idZMQ_BuildPublication( type, payload, message, sizeof( message ) );"
+    transcript_call = "idZMQ_WriteStatsTranscript( message );"
+    live_send_call = "s_zmq.zmq_send( s_zmq.pubSocket, message, strlen( message ), QL_ZMQ_NO_FLAGS );"
+
+    assert '#define QL_ZMQ_STATS_TRANSCRIPT "zmq_stats.ndjson"' in sv_zmq
+    assert '#define QL_ZMQ_STATS_TRANSCRIPT_RECORD_TERMINATOR "\\n"' in sv_zmq
+    assert "#define QL_ZMQ_STATS_TRANSCRIPT_RECORD_TERMINATOR_LENGTH 1" in sv_zmq
+    assert "s_zmq.statsTranscript = FS_FOpenFileWrite( QL_ZMQ_STATS_TRANSCRIPT );" in open_transcript_block
+
+    assert "if ( !s_zmqStatsEnable || !s_zmqStatsEnable->integer || !message || !message[0] ) {" in write_transcript_block
+    assert "idZMQ_OpenStatsTranscript();" in write_transcript_block
+    assert "if ( !s_zmq.statsTranscript ) {" in write_transcript_block
+    assert "length = (int)strlen( message );" in write_transcript_block
+    assert "FS_Write( message, length, s_zmq.statsTranscript );" in write_transcript_block
+    assert "FS_Write( QL_ZMQ_STATS_TRANSCRIPT_RECORD_TERMINATOR, QL_ZMQ_STATS_TRANSCRIPT_RECORD_TERMINATOR_LENGTH, s_zmq.statsTranscript );" in write_transcript_block
+    assert 'FS_Write( "\\n", 1, s_zmq.statsTranscript );' not in sv_zmq
+
+    assert build_call in publish_block
+    assert transcript_call in publish_block
+    assert live_send_call in publish_block
+    assert publish_block.index(build_call) < publish_block.index(transcript_call)
+    assert publish_block.index(transcript_call) < publish_block.index(live_send_call)
+    assert "zstr_send(" not in sv_zmq
+
+    assert "stats transcript line boundary" in mapping_round
+    assert "SRP fallback transcript" in mapping_round
+    assert "does not reconstruct libzmq/CZMQ internals" in mapping_round
+    assert "before 90% -> after 98%" in mapping_round
+
+
+def test_zmq_stats_transcript_handle_clear_round_749_is_pinned() -> None:
+    aliases = json.loads(
+        (REPO_ROOT / "references/analysis/quakelive_symbol_aliases.json").read_text(encoding="utf-8")
+    )["quakelive_steam_srp"]
+    functions_csv = (
+        REPO_ROOT / "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+    ).read_text(encoding="utf-8").lower()
+    hlil_part05 = (
+        REPO_ROOT
+        / "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part05.txt"
+    ).read_text(encoding="utf-8")
+    sv_zmq = (REPO_ROOT / "src/code/server/sv_zmq.c").read_text(encoding="utf-8")
+    implementation_plan = (REPO_ROOT / "IMPLEMENTATION_PLAN.md").read_text(encoding="utf-8")
+    mapping_round = (
+        REPO_ROOT / "docs/reverse-engineering/quakelive_steam_mapping_round_749.md"
+    ).read_text(encoding="utf-8")
+
+    expected_aliases = {
+        "sub_4F3DD0": "Zmq_ShutdownStatsPublisher",
+        "sub_4F4210": "idZMQ_InitStatsPublisher",
+        "sub_4F4B20": "idZMQ_ReportPlayerEvent",
+        "sub_4F4C30": "idZMQ_SubmitMatchReport",
+        "sub_4F5190": "zsock_destroy_checked",
+        "sub_4F5D60": "zstr_send",
+    }
+
+    for symbol, alias in expected_aliases.items():
+        address = f"00{symbol.removeprefix('sub_')}".lower()
+        assert aliases[symbol] == alias
+        assert f"fun_{address},{address}" in functions_csv
+        assert f"| `{symbol}` | `{alias}` |" in mapping_round
+
+    assert "004f3dd0    void sub_4f3dd0()" in hlil_part05
+    assert "004f3dd7  if (data_575704 != 0)" in hlil_part05
+    assert '004f3de5      sub_4f5190(&data_575704, "zmq\\id_zmq.cpp", 0x73)' in hlil_part05
+    assert "004f4210    int32_t __fastcall sub_4f4210(void* arg1)" in hlil_part05
+    assert "004f424c  if (*(result + 0x30) s> 0 && *(arg1 + 8) == 0)" in hlil_part05
+    assert '004f4327      int32_t eax_11 = sub_4f5100(1, "zmq\\id_zmq.cpp", 0x5c)' in hlil_part05
+    assert "004f4332      *(arg1 + 8) = eax_11" in hlil_part05
+    assert "004f4b57  if (*(arg1 + 8) != 0)" in hlil_part05
+    assert "004f4bd2      sub_4f5d60(*(arg1 + 8), eax_6)" in hlil_part05
+    assert "004f4c65  if (*(arg1 + 8) != 0)" in hlil_part05
+    assert "004f4cdf      sub_4f5d60(*(arg1 + 8), eax_6)" in hlil_part05
+
+    close_transcript_block = _extract_function_block(sv_zmq, "static void idZMQ_CloseStatsTranscript( void )")
+    open_transcript_block = _extract_function_block(sv_zmq, "static void idZMQ_OpenStatsTranscript( void )")
+    shutdown_stats_block = _extract_function_block(sv_zmq, "void Zmq_ShutdownStatsPublisher( void )")
+    shutdown_runtime_block = _extract_function_block(sv_zmq, "void Zmq_ShutdownRuntime( void )")
+    publish_block = _extract_function_block(sv_zmq, "static void idZMQ_Publish( const char *type, const char *payload )")
+
+    assert "#define QL_ZMQ_STATS_TRANSCRIPT_HANDLE_EMPTY 0" in sv_zmq
+    assert "if ( s_zmq.statsTranscript ) {" in close_transcript_block
+    assert "FS_FCloseFile( s_zmq.statsTranscript );" in close_transcript_block
+    assert "s_zmq.statsTranscript = QL_ZMQ_STATS_TRANSCRIPT_HANDLE_EMPTY;" in close_transcript_block
+    assert "s_zmq.statsTranscript = 0;" not in sv_zmq
+    assert "s_zmq.statsTranscript = FS_FOpenFileWrite( QL_ZMQ_STATS_TRANSCRIPT );" in open_transcript_block
+    assert "idZMQ_CloseStatsTranscript();" in shutdown_stats_block
+    assert "idZMQ_CloseSocket( &s_zmq.pubSocket );" in shutdown_stats_block
+    assert shutdown_stats_block.index("idZMQ_CloseStatsTranscript();") < shutdown_stats_block.index("idZMQ_CloseSocket( &s_zmq.pubSocket );")
+    assert "idZMQ_CloseStatsTranscript();" not in shutdown_runtime_block
+    assert "idZMQ_WriteStatsTranscript( message );" in publish_block
+    assert "zstr_send(" not in sv_zmq
+
+    assert "ZMQ stats transcript handle-clear boundary" in mapping_round
+    assert "SRP fallback transcript handle adaptation" in mapping_round
+    assert "does not reconstruct libzmq/CZMQ internals" in mapping_round
+    assert "before 92% -> after 99%" in mapping_round
+    assert "### Task A651: Pin ZMQ stats transcript handle-clear boundary [COMPLETED]" in implementation_plan
+
+
+def test_zmq_stats_default_port_format_boundary_round_671_is_pinned() -> None:
+    aliases = json.loads(
+        (REPO_ROOT / "references/analysis/quakelive_symbol_aliases.json").read_text(encoding="utf-8")
+    )["quakelive_steam_srp"]
+    functions_csv = (
+        REPO_ROOT / "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+    ).read_text(encoding="utf-8").lower()
+    hlil_part05 = (
+        REPO_ROOT
+        / "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part05.txt"
+    ).read_text(encoding="utf-8")
+    hlil_part06 = (
+        REPO_ROOT
+        / "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part06.txt"
+    ).read_text(encoding="utf-8")
+    sv_zmq = (REPO_ROOT / "src/code/server/sv_zmq.c").read_text(encoding="utf-8")
+    qcommon = (REPO_ROOT / "src/code/qcommon/qcommon.h").read_text(encoding="utf-8")
+    mapping_round = (
+        REPO_ROOT / "docs/reverse-engineering/quakelive_steam_mapping_round_671.md"
+    ).read_text(encoding="utf-8")
+
+    expected_aliases = {
+        "sub_4CE0D0": "Cvar_Get",
+        "sub_4D9160": "Com_sprintf",
+        "sub_4D9220": "va",
+        "sub_4F4210": "idZMQ_InitStatsPublisher",
+        "sub_4F43A0": "Zmq_InitStatsPublisher",
+    }
+
+    for symbol, alias in expected_aliases.items():
+        address = f"00{symbol.removeprefix('sub_')}".lower()
+        assert aliases[symbol] == alias
+        assert f"fun_{address},{address}" in functions_csv
+        assert f"| `{symbol}` | `{alias}` |" in mapping_round
+
+    assert '004f4210    int32_t __fastcall sub_4f4210(void* arg1)' in hlil_part05
+    assert '004f42e4      int32_t eax_7 = *(data_12d3088 + 0x30)' in hlil_part05
+    assert '004f42e9      if (eax_7 == 0)' in hlil_part05
+    assert '004f42ed          int32_t var_3c_2 = 0x6d38' in hlil_part05
+    assert '004f430a          eax_7 = sub_4ce0d0("net_port", sub_4d9220(&data_52e930), 0x20)[0xc]' in hlil_part05
+    assert '004f4317      int32_t eax_10 = sub_4d9220("tcp://%s:%i")' in hlil_part05
+    assert '004f43a0    int32_t sub_4f43a0()' in hlil_part05
+    assert '0052ca8c  char const data_52ca8c[0x9] = "net_port", 0' in hlil_part06
+    assert "0052e930  data_52e930:" in hlil_part06
+    assert "25 69 00 00" in hlil_part06
+    assert '005482a8  char const data_5482a8[0xf] = "zmq_stats_port", 0' in hlil_part06
+    assert '00548274  char const data_548274[0xc] = "tcp://%s:%i", 0' in hlil_part06
+
+    stats_endpoint_block = _extract_function_block(sv_zmq, "static void idZMQ_ResolveStatsEndpoint( char *endpoint, size_t endpointSize )")
+
+    assert "#define\tPORT_SERVER\t\t\t27960" in qcommon
+    assert '#define QL_ZMQ_CVAR_STATS_PORT "zmq_stats_port"' in sv_zmq
+    assert '#define QL_ZMQ_CVAR_NET_PORT "net_port"' in sv_zmq
+    assert '#define QL_ZMQ_DEFAULT_NET_PORT_FORMAT "%i"' in sv_zmq
+    assert '#define QL_ZMQ_ENDPOINT_FORMAT "tcp://%s:%i"' in sv_zmq
+    assert "#define QL_ZMQ_CVAR_NET_FALLBACK_FLAGS CVAR_LATCH" in sv_zmq
+    assert "if ( s_zmqStatsPort && s_zmqStatsPort->string[0] ) {" in stats_endpoint_block
+    assert "resolvedPort = s_zmqStatsPort->integer;" in stats_endpoint_block
+    assert "netPort = Cvar_Get( QL_ZMQ_CVAR_NET_PORT, va( QL_ZMQ_DEFAULT_NET_PORT_FORMAT, PORT_SERVER ), QL_ZMQ_CVAR_NET_FALLBACK_FLAGS );" in stats_endpoint_block
+    assert "resolvedPort = netPort->integer;" in stats_endpoint_block
+    assert "Com_sprintf( endpoint, endpointSize, QL_ZMQ_ENDPOINT_FORMAT, resolvedIp, resolvedPort );" in stats_endpoint_block
+    assert 'va( "%i", PORT_SERVER )' not in stats_endpoint_block
+
+    assert "stats default port format boundary" in mapping_round
+    assert "PORT_SERVER" in mapping_round
+    assert "does not reconstruct libzmq/CZMQ internals" in mapping_round
+    assert "before 91% -> after 98%" in mapping_round
+
+
+def test_zmq_rcon_empty_payload_constant_boundary_round_672_is_pinned() -> None:
+    aliases = json.loads(
+        (REPO_ROOT / "references/analysis/quakelive_symbol_aliases.json").read_text(encoding="utf-8")
+    )["quakelive_steam_srp"]
+    functions_csv = (
+        REPO_ROOT / "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+    ).read_text(encoding="utf-8").lower()
+    hlil_part05 = (
+        REPO_ROOT
+        / "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part05.txt"
+    ).read_text(encoding="utf-8")
+    hlil_part06 = (
+        REPO_ROOT
+        / "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part06.txt"
+    ).read_text(encoding="utf-8")
+    sv_zmq = (REPO_ROOT / "src/code/server/sv_zmq.c").read_text(encoding="utf-8")
+    mapping_round = (
+        REPO_ROOT / "docs/reverse-engineering/quakelive_steam_mapping_round_672.md"
+    ).read_text(encoding="utf-8")
+
+    expected_aliases = {
+        "sub_4F4D40": "idZMQ_BroadcastRconOutput",
+        "sub_4F4E60": "Zmq_BroadcastRconOutput",
+        "sub_4F5C10": "s_send_string",
+        "sub_4F5D60": "zstr_send",
+    }
+
+    for symbol, alias in expected_aliases.items():
+        address = f"00{symbol.removeprefix('sub_')}".lower()
+        assert aliases[symbol] == alias
+        assert f"fun_{address},{address}" in functions_csv
+        assert f"| `{symbol}` | `{alias}` |" in mapping_round
+
+    assert "004f4d40    void __fastcall sub_4f4d40(void* arg1)" in hlil_part05
+    assert "004f4d78              if (sub_4f5d90(*(arg1 + 0xc), eax) s>= 0)" in hlil_part05
+    assert "004f4daa                  sub_4f5d60(*(arg1 + 0xc), ebx_1)" in hlil_part05
+    assert "004f4e60    int32_t sub_4f4e60(int32_t arg1)" in hlil_part05
+    assert "004f4e72  return sub_4f4d40(&data_5756fc)" in hlil_part05
+    assert "004f5d60    int32_t sub_4f5d60(int32_t* arg1, void* arg2)" in hlil_part05
+    assert "004f5d69  if (edi == 0)" in hlil_part05
+    assert "004f5d6b      edi = &data_54f9da" in hlil_part05
+    assert "004f5d80  return sub_4f5c10(edi, arg1, 0)" in hlil_part05
+    assert "0054f9da  data_54f9da:" in hlil_part06
+    assert "00 00" in hlil_part06
+
+    broadcast_block = _extract_function_block(sv_zmq, "static void idZMQ_BroadcastRconOutput( const char *message )")
+
+    assert '#define QL_ZMQ_DEFAULT_EMPTY ""' in sv_zmq
+    assert "#define QL_ZMQ_RCON_EMPTY_PAYLOAD QL_ZMQ_DEFAULT_EMPTY" in sv_zmq
+    assert "payload = message ? message : QL_ZMQ_RCON_EMPTY_PAYLOAD;" in broadcast_block
+    assert "s_zmq.zmq_send( s_zmq.rconSocket, payload, strlen( payload ), QL_ZMQ_SEND_DONTWAIT );" in broadcast_block
+    assert 'payload = message ? message : "";' not in broadcast_block
+    assert "strlen( message )" not in broadcast_block
+    assert "zstr_send(" not in sv_zmq
+
+    assert "RCON empty payload constant boundary" in mapping_round
+    assert "shared empty-string storage" in mapping_round
+    assert "does not reconstruct libzmq/CZMQ internals" in mapping_round
+    assert "before 92% -> after 98%" in mapping_round
+
+
+def test_zmq_rcon_broadcast_send_flag_boundary_round_686_is_pinned() -> None:
+    aliases = json.loads(
+        (REPO_ROOT / "references/analysis/quakelive_symbol_aliases.json").read_text(encoding="utf-8")
+    )["quakelive_steam_srp"]
+    functions_csv = (
+        REPO_ROOT / "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+    ).read_text(encoding="utf-8").lower()
+    hlil_part05 = (
+        REPO_ROOT
+        / "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part05.txt"
+    ).read_text(encoding="utf-8")
+    sv_zmq = (REPO_ROOT / "src/code/server/sv_zmq.c").read_text(encoding="utf-8")
+    mapping_round = (
+        REPO_ROOT / "docs/reverse-engineering/quakelive_steam_mapping_round_686.md"
+    ).read_text(encoding="utf-8")
+
+    expected_aliases = {
+        "sub_4F4D40": "idZMQ_BroadcastRconOutput",
+        "sub_4F5C10": "s_send_string",
+        "sub_4F5D60": "zstr_send",
+        "sub_4F5D90": "zstr_sendm",
+    }
+
+    for symbol, alias in expected_aliases.items():
+        address = f"00{symbol.removeprefix('sub_')}".lower()
+        assert aliases[symbol] == alias
+        assert f"fun_{address},{address}" in functions_csv
+        assert f"| `{symbol}` | `{alias}` |" in mapping_round
+
+    assert "004f4d78              if (sub_4f5d90(*(arg1 + 0xc), eax) s>= 0)" in hlil_part05
+    assert "004f4daa                  sub_4f5d60(*(arg1 + 0xc), ebx_1)" in hlil_part05
+    assert "004f5d80  return sub_4f5c10(edi, arg1, 0)" in hlil_part05
+    assert "004f5da7  return sub_4f5c10(arg2, arg1, 1)" in hlil_part05
+
+    broadcast_block = _extract_function_block(sv_zmq, "static void idZMQ_BroadcastRconOutput( const char *message )")
+
+    identity_send = "s_zmq.zmq_send( s_zmq.rconSocket, peer->identity, peer->identityLength, QL_ZMQ_SEND_MORE_DONTWAIT ) < QL_ZMQ_SEND_SUCCESS_MIN"
+    payload_send = "s_zmq.zmq_send( s_zmq.rconSocket, payload, strlen( payload ), QL_ZMQ_SEND_DONTWAIT );"
+
+    assert "#define QL_ZMQ_SEND_DONTWAIT QL_ZMQ_DONTWAIT" in sv_zmq
+    assert "#define QL_ZMQ_SEND_MORE_DONTWAIT ( QL_ZMQ_SNDMORE | QL_ZMQ_DONTWAIT )" in sv_zmq
+    assert identity_send in broadcast_block
+    assert payload_send in broadcast_block
+    assert broadcast_block.index(identity_send) < broadcast_block.index(payload_send)
+    assert "peer->identity, peer->identityLength, QL_ZMQ_SNDMORE | QL_ZMQ_DONTWAIT" not in broadcast_block
+    assert "payload, strlen( payload ), QL_ZMQ_DONTWAIT );" not in broadcast_block
+    assert "zstr_send(" not in sv_zmq
+    assert "zstr_sendm(" not in sv_zmq
+    assert "s_send_string(" not in sv_zmq
+
+    assert "RCON broadcast send-flag boundary" in mapping_round
+    assert "multipart identity-frame send" in mapping_round
+    assert "does not reconstruct libzmq/CZMQ internals" in mapping_round
+    assert "before 92% -> after 98%" in mapping_round
+
+
+def test_zmq_send_success_threshold_round_726_is_pinned() -> None:
+    aliases = json.loads(
+        (REPO_ROOT / "references/analysis/quakelive_symbol_aliases.json").read_text(encoding="utf-8")
+    )["quakelive_steam_srp"]
+    functions_csv = (
+        REPO_ROOT / "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+    ).read_text(encoding="utf-8").lower()
+    hlil_part05 = (
+        REPO_ROOT
+        / "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part05.txt"
+    ).read_text(encoding="utf-8")
+    sv_zmq = (REPO_ROOT / "src/code/server/sv_zmq.c").read_text(encoding="utf-8")
+    implementation_plan = (REPO_ROOT / "IMPLEMENTATION_PLAN.md").read_text(encoding="utf-8")
+    mapping_round = (
+        REPO_ROOT / "docs/reverse-engineering/quakelive_steam_mapping_round_726.md"
+    ).read_text(encoding="utf-8")
+
+    expected_aliases = {
+        "sub_4F4D40": "idZMQ_BroadcastRconOutput",
+        "sub_4F5C10": "s_send_string",
+        "sub_4F5D60": "zstr_send",
+        "sub_4F5D90": "zstr_sendm",
+    }
+
+    for symbol, alias in expected_aliases.items():
+        address = f"00{symbol.removeprefix('sub_')}".lower()
+        assert aliases[symbol] == alias
+        assert f"fun_{address},{address}" in functions_csv
+        assert f"| `{symbol}` | `{alias}` |" in mapping_round
+
+    assert "004f4d40    void __fastcall sub_4f4d40(void* arg1)" in hlil_part05
+    assert "004f4d78              if (sub_4f5d90(*(arg1 + 0xc), eax) s>= 0)" in hlil_part05
+    assert "004f4daa                  sub_4f5d60(*(arg1 + 0xc), ebx_1)" in hlil_part05
+    assert "004f5d80  return sub_4f5c10(edi, arg1, 0)" in hlil_part05
+    assert "004f5da7  return sub_4f5c10(arg2, arg1, 1)" in hlil_part05
+
+    send_response_block = _extract_function_block(
+        sv_zmq,
+        "static void idZMQ_SendAuthResponse( const char *version, const char *requestId, const char *statusCode, const char *statusText, const char *userId )",
+    )
+    broadcast_block = _extract_function_block(sv_zmq, "static void idZMQ_BroadcastRconOutput( const char *message )")
+
+    identity_send = "s_zmq.zmq_send( s_zmq.rconSocket, peer->identity, peer->identityLength, QL_ZMQ_SEND_MORE_DONTWAIT ) < QL_ZMQ_SEND_SUCCESS_MIN"
+    payload_send = "s_zmq.zmq_send( s_zmq.rconSocket, payload, strlen( payload ), QL_ZMQ_SEND_DONTWAIT );"
+
+    assert "#define QL_ZMQ_SEND_SUCCESS_MIN 0" in sv_zmq
+    assert "idZMQ_SendAuthFrame( s_zmq.authSocket, version, qtrue ) < QL_ZMQ_SEND_SUCCESS_MIN" in send_response_block
+    assert "idZMQ_SendAuthFrame( s_zmq.authSocket, requestId, qtrue ) < QL_ZMQ_SEND_SUCCESS_MIN" in send_response_block
+    assert "idZMQ_SendAuthFrame( s_zmq.authSocket, statusCode, qtrue ) < QL_ZMQ_SEND_SUCCESS_MIN" in send_response_block
+    assert "idZMQ_SendAuthFrame( s_zmq.authSocket, statusText, qtrue ) < QL_ZMQ_SEND_SUCCESS_MIN" in send_response_block
+    assert "idZMQ_SendAuthFrame( s_zmq.authSocket, userId, qtrue ) < QL_ZMQ_SEND_SUCCESS_MIN" in send_response_block
+    assert "idZMQ_SendAuthFrame( s_zmq.authSocket, version, qtrue ) < 0" not in send_response_block
+    assert identity_send in broadcast_block
+    assert payload_send in broadcast_block
+    assert broadcast_block.index(identity_send) < broadcast_block.index(payload_send)
+    assert "QL_ZMQ_SEND_MORE_DONTWAIT ) < 0" not in sv_zmq
+    assert "zstr_send(" not in sv_zmq
+    assert "zstr_sendm(" not in sv_zmq
+    assert "s_send_string(" not in sv_zmq
+
+    assert "ZMQ send success-threshold boundary" in mapping_round
+    assert "SRP dynamic zmq_send adaptation" in mapping_round
+    assert "does not reconstruct libzmq/CZMQ internals" in mapping_round
+    assert "before 94% -> after 99%" in mapping_round
+    assert "### Task A628: Pin ZMQ send success-threshold boundary [COMPLETED]" in implementation_plan
+
+
+def test_zmq_socket_option_boolean_boundary_round_674_is_pinned() -> None:
+    aliases = json.loads(
+        (REPO_ROOT / "references/analysis/quakelive_symbol_aliases.json").read_text(encoding="utf-8")
+    )["quakelive_steam_srp"]
+    functions_csv = (
+        REPO_ROOT / "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+    ).read_text(encoding="utf-8").lower()
+    hlil_part05 = (
+        REPO_ROOT
+        / "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part05.txt"
+    ).read_text(encoding="utf-8")
+    sv_zmq = (REPO_ROOT / "src/code/server/sv_zmq.c").read_text(encoding="utf-8")
+    mapping_round = (
+        REPO_ROOT / "docs/reverse-engineering/quakelive_steam_mapping_round_674.md"
+    ).read_text(encoding="utf-8")
+
+    expected_aliases = {
+        "sub_401390": "zmq_setsockopt",
+        "sub_4F5750": "zsock_set_zap_domain",
+        "sub_4F5790": "zsock_set_plain_server",
+        "sub_4F5980": "zsock_set_router_mandatory",
+    }
+
+    for symbol, alias in expected_aliases.items():
+        address = f"00{symbol.removeprefix('sub_')}".lower()
+        assert aliases[symbol] == alias
+        assert f"fun_{address},{address}" in functions_csv
+        assert f"| `{symbol}` | `{alias}` |" in mapping_round
+
+    assert '004f40b8      sub_4f5750(eax_12, "rcon")' in hlil_part05
+    assert "004f40cb      if (**(data_12d3080 + 4) == 0)" in hlil_part05
+    assert "004f40d8          int32_t var_c_3 = 0" in hlil_part05
+    assert "004f40d0          int32_t var_c_2 = 1" in hlil_part05
+    assert "004f40db      sub_4f5790(var_10_3)" in hlil_part05
+    assert "004f40e6      int32_t var_c_4 = 1" in hlil_part05
+    assert "004f40e9      sub_4f5980(*(arg1 + 0xc))" in hlil_part05
+    assert '004f4335      sub_4f5750(eax_11, "stats")' in hlil_part05
+    assert "004f4348      if (**(data_12d307c + 4) == 0)" in hlil_part05
+    assert "004f4355          int32_t var_38_3 = 0" in hlil_part05
+    assert "004f434d          int32_t var_38_2 = 1" in hlil_part05
+    assert "004f4358      sub_4f5790(var_3c_5)" in hlil_part05
+    assert "004f57b1  return sub_401390(sub_4f56b0(arg1), 0x2c, &arg_8, 4)" in hlil_part05
+    assert "004f59cc  return sub_401390(sub_4f56b0(arg1), 0x21, &arg_8, 4)" in hlil_part05
+
+    ensure_rcon_block = _extract_function_block(sv_zmq, "static qboolean idZMQ_EnsureRconSocket( void ) {")
+    ensure_stats_block = _extract_function_block(sv_zmq, "static qboolean idZMQ_EnsureStatsPublisher( void ) {")
+    set_int_block = _extract_function_block(sv_zmq, "static void idZMQ_TrySetSocketInt( void *socket, int option, int value )")
+
+    assert "#define QL_ZMQ_ROUTER_MANDATORY 33" in sv_zmq
+    assert "#define QL_ZMQ_PLAIN_SERVER 44" in sv_zmq
+    assert "#define QL_ZMQ_SOCKET_OPTION_DISABLED 0" in sv_zmq
+    assert "#define QL_ZMQ_SOCKET_OPTION_ENABLED 1" in sv_zmq
+    assert "#define QL_ZMQ_SOCKET_OPTION_INT_SIZE sizeof( int )" in sv_zmq
+    assert "s_zmq.zmq_setsockopt( socket, option, &value, QL_ZMQ_SOCKET_OPTION_INT_SIZE );" in set_int_block
+    assert "s_zmq.zmq_setsockopt( socket, option, &value, sizeof( value ) );" not in set_int_block
+    assert "idZMQ_TrySetSocketInt( socket, QL_ZMQ_ROUTER_MANDATORY, QL_ZMQ_SOCKET_OPTION_ENABLED );" in ensure_rcon_block
+    assert "idZMQ_TrySetSocketInt( socket, QL_ZMQ_PLAIN_SERVER, s_zmq.rconPassword[0] ? QL_ZMQ_SOCKET_OPTION_ENABLED : QL_ZMQ_SOCKET_OPTION_DISABLED );" in ensure_rcon_block
+    assert "idZMQ_TrySetSocketInt( socket, QL_ZMQ_PLAIN_SERVER, s_zmq.statsPassword[0] ? QL_ZMQ_SOCKET_OPTION_ENABLED : QL_ZMQ_SOCKET_OPTION_DISABLED );" in ensure_stats_block
+    assert "idZMQ_TrySetSocketInt( socket, QL_ZMQ_ROUTER_MANDATORY, 1 );" not in sv_zmq
+    assert "s_zmq.rconPassword[0] ? 1 : 0" not in sv_zmq
+    assert "s_zmq.statsPassword[0] ? 1 : 0" not in sv_zmq
+    assert "zsock_set_plain_server" not in sv_zmq
+    assert "zsock_set_router_mandatory" not in sv_zmq
+
+    assert "socket option boolean boundary" in mapping_round
+    assert "ROUTER mandatory" in mapping_round
+    assert "does not reconstruct libzmq/CZMQ internals" in mapping_round
+    assert "before 91% -> after 98%" in mapping_round
+
+
+def test_zmq_socket_option_int_size_round_733_is_pinned() -> None:
+    aliases = json.loads(
+        (REPO_ROOT / "references/analysis/quakelive_symbol_aliases.json").read_text(encoding="utf-8")
+    )["quakelive_steam_srp"]
+    functions_csv = (
+        REPO_ROOT / "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+    ).read_text(encoding="utf-8").lower()
+    hlil_part05 = (
+        REPO_ROOT
+        / "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part05.txt"
+    ).read_text(encoding="utf-8")
+    sv_zmq = (REPO_ROOT / "src/code/server/sv_zmq.c").read_text(encoding="utf-8")
+    implementation_plan = (REPO_ROOT / "IMPLEMENTATION_PLAN.md").read_text(encoding="utf-8")
+    mapping_round = (
+        REPO_ROOT / "docs/reverse-engineering/quakelive_steam_mapping_round_733.md"
+    ).read_text(encoding="utf-8")
+
+    expected_aliases = {
+        "sub_401390": "zmq_setsockopt",
+        "sub_4F5790": "zsock_set_plain_server",
+        "sub_4F5980": "zsock_set_router_mandatory",
+    }
+
+    for symbol, alias in expected_aliases.items():
+        address = f"00{symbol.removeprefix('sub_')}".lower()
+        assert aliases[symbol] == alias
+        assert f"fun_{address},{address}" in functions_csv
+        assert f"| `{symbol}` | `{alias}` |" in mapping_round
+
+    assert "004f40db      sub_4f5790(var_10_3)" in hlil_part05
+    assert "004f40e9      sub_4f5980(*(arg1 + 0xc))" in hlil_part05
+    assert "004f4358      sub_4f5790(var_3c_5)" in hlil_part05
+    assert "004f57b1  return sub_401390(sub_4f56b0(arg1), 0x2c, &arg_8, 4)" in hlil_part05
+    assert "004f59cc  return sub_401390(sub_4f56b0(arg1), 0x21, &arg_8, 4)" in hlil_part05
+
+    set_int_block = _extract_function_block(sv_zmq, "static void idZMQ_TrySetSocketInt( void *socket, int option, int value )")
+    ensure_rcon_block = _extract_function_block(sv_zmq, "static qboolean idZMQ_EnsureRconSocket( void ) {")
+    ensure_stats_block = _extract_function_block(sv_zmq, "static qboolean idZMQ_EnsureStatsPublisher( void ) {")
+
+    assert "#define QL_ZMQ_SOCKET_OPTION_INT_SIZE sizeof( int )" in sv_zmq
+    assert "s_zmq.zmq_setsockopt( socket, option, &value, QL_ZMQ_SOCKET_OPTION_INT_SIZE );" in set_int_block
+    assert "s_zmq.zmq_setsockopt( socket, option, &value, sizeof( value ) );" not in set_int_block
+    assert "idZMQ_TrySetSocketInt( socket, QL_ZMQ_ROUTER_MANDATORY, QL_ZMQ_SOCKET_OPTION_ENABLED );" in ensure_rcon_block
+    assert "idZMQ_TrySetSocketInt( socket, QL_ZMQ_PLAIN_SERVER, s_zmq.rconPassword[0] ? QL_ZMQ_SOCKET_OPTION_ENABLED : QL_ZMQ_SOCKET_OPTION_DISABLED );" in ensure_rcon_block
+    assert "idZMQ_TrySetSocketInt( socket, QL_ZMQ_PLAIN_SERVER, s_zmq.statsPassword[0] ? QL_ZMQ_SOCKET_OPTION_ENABLED : QL_ZMQ_SOCKET_OPTION_DISABLED );" in ensure_stats_block
+    assert "zsock_set_plain_server" not in sv_zmq
+    assert "zsock_set_router_mandatory" not in sv_zmq
+    assert "ZMQ socket-option int-size boundary" in mapping_round
+    assert "SRP dynamic zmq_setsockopt adaptation" in mapping_round
+    assert "does not reconstruct libzmq/CZMQ internals" in mapping_round
+    assert "before 94% -> after 99%" in mapping_round
+    assert "### Task A635: Pin ZMQ socket-option int-size boundary [COMPLETED]" in implementation_plan
+
+
+def test_zmq_socket_option_string_size_round_734_is_pinned() -> None:
+    aliases = json.loads(
+        (REPO_ROOT / "references/analysis/quakelive_symbol_aliases.json").read_text(encoding="utf-8")
+    )["quakelive_steam_srp"]
+    functions_csv = (
+        REPO_ROOT / "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+    ).read_text(encoding="utf-8").lower()
+    hlil_part05 = (
+        REPO_ROOT
+        / "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part05.txt"
+    ).read_text(encoding="utf-8")
+    sv_zmq = (REPO_ROOT / "src/code/server/sv_zmq.c").read_text(encoding="utf-8")
+    implementation_plan = (REPO_ROOT / "IMPLEMENTATION_PLAN.md").read_text(encoding="utf-8")
+    mapping_round = (
+        REPO_ROOT / "docs/reverse-engineering/quakelive_steam_mapping_round_734.md"
+    ).read_text(encoding="utf-8")
+
+    expected_aliases = {
+        "sub_401390": "zmq_setsockopt",
+        "sub_4F5750": "zsock_set_zap_domain",
+    }
+
+    for symbol, alias in expected_aliases.items():
+        address = f"00{symbol.removeprefix('sub_')}".lower()
+        assert aliases[symbol] == alias
+        assert f"fun_{address},{address}" in functions_csv
+        assert f"| `{symbol}` | `{alias}` |" in mapping_round
+
+    assert '004f40b8      sub_4f5750(eax_12, "rcon")' in hlil_part05
+    assert '004f4335      sub_4f5750(eax_11, "stats")' in hlil_part05
+    assert "004f5750    int32_t sub_4f5750(int32_t* arg1, int32_t* arg2)" in hlil_part05
+    assert "004f5756  char* eax = arg2" in hlil_part05
+    assert "004f5765  while (i != 0)" in hlil_part05
+    assert "004f5784  return sub_401390(sub_4f56b0(arg1), 0x37, arg2, eax - &eax[1])" in hlil_part05
+
+    set_string_block = _extract_function_block(sv_zmq, "static void idZMQ_TrySetSocketString( void *socket, int option, const char *value )")
+    ensure_rcon_block = _extract_function_block(sv_zmq, "static qboolean idZMQ_EnsureRconSocket( void ) {")
+    ensure_stats_block = _extract_function_block(sv_zmq, "static qboolean idZMQ_EnsureStatsPublisher( void ) {")
+
+    assert "#define QL_ZMQ_SOCKET_OPTION_STRING_SIZE( value ) strlen( value )" in sv_zmq
+    assert "s_zmq.zmq_setsockopt( socket, option, value, QL_ZMQ_SOCKET_OPTION_STRING_SIZE( value ) );" in set_string_block
+    assert "s_zmq.zmq_setsockopt( socket, option, value, strlen( value ) );" not in set_string_block
+    assert "idZMQ_TrySetSocketString( socket, QL_ZMQ_ZAP_DOMAIN, QL_ZMQ_DOMAIN_RCON );" in ensure_rcon_block
+    assert "idZMQ_TrySetSocketString( socket, QL_ZMQ_ZAP_DOMAIN, QL_ZMQ_DOMAIN_STATS );" in ensure_stats_block
+    assert "zsock_set_zap_domain" not in sv_zmq
+    assert "ZMQ socket-option string-size boundary" in mapping_round
+    assert "SRP dynamic zmq_setsockopt adaptation" in mapping_round
+    assert "does not reconstruct libzmq/CZMQ internals" in mapping_round
+    assert "before 94% -> after 99%" in mapping_round
+    assert "### Task A636: Pin ZMQ socket-option string-size boundary [COMPLETED]" in implementation_plan
+
+
+def test_zmq_no_flags_and_immediate_poll_boundary_round_676_is_pinned() -> None:
+    aliases = json.loads(
+        (REPO_ROOT / "references/analysis/quakelive_symbol_aliases.json").read_text(encoding="utf-8")
+    )["quakelive_steam_srp"]
+    functions_csv = (
+        REPO_ROOT / "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+    ).read_text(encoding="utf-8").lower()
+    hlil_part05 = (
+        REPO_ROOT
+        / "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part05.txt"
+    ).read_text(encoding="utf-8")
+    sv_zmq = (REPO_ROOT / "src/code/server/sv_zmq.c").read_text(encoding="utf-8")
+    mapping_round = (
+        REPO_ROOT / "docs/reverse-engineering/quakelive_steam_mapping_round_676.md"
+    ).read_text(encoding="utf-8")
+
+    expected_aliases = {
+        "sub_401600": "zmq_poll",
+        "sub_4F4B20": "idZMQ_ReportPlayerEvent",
+        "sub_4F4C30": "idZMQ_SubmitMatchReport",
+        "sub_4F4D40": "idZMQ_BroadcastRconOutput",
+        "sub_4F4ED0": "idZMQ_PumpRcon",
+        "sub_4F5D60": "zstr_send",
+        "sub_4F5D90": "zstr_sendm",
+    }
+
+    for symbol, alias in expected_aliases.items():
+        address = f"00{symbol.removeprefix('sub_')}".lower()
+        assert aliases[symbol] == alias
+        assert f"fun_{address},{address}" in functions_csv
+        assert f"| `{symbol}` | `{alias}` |" in mapping_round
+
+    assert "004f4bd2      sub_4f5d60(*(arg1 + 8), eax_6)" in hlil_part05
+    assert "004f4cdf      sub_4f5d60(*(arg1 + 8), eax_6)" in hlil_part05
+    assert "004f4d78              if (sub_4f5d90(*(arg1 + 0xc), eax) s>= 0)" in hlil_part05
+    assert "004f4daa                  sub_4f5d60(*(arg1 + 0xc), ebx_1)" in hlil_part05
+    assert "004f4ed0    void* __fastcall sub_4f4ed0(void* arg1)" in hlil_part05
+    assert "004f4f09          var_18_1.w = 1" in hlil_part05
+    assert "004f4f0d          result = sub_401600(xmm0, &var_20, 1)" in hlil_part05
+    assert "004f5d80  return sub_4f5c10(edi, arg1, 0)" in hlil_part05
+    assert "004f5da7  return sub_4f5c10(arg2, arg1, 1)" in hlil_part05
+
+    send_frame_block = _extract_function_block(sv_zmq, "static int idZMQ_SendAuthFrame( void *socket, const char *value, qboolean more )")
+    publish_block = _extract_function_block(sv_zmq, "static void idZMQ_Publish( const char *type, const char *payload )")
+    pump_auth_block = _extract_function_block(sv_zmq, "static void idZMQ_PumpAuthSocket( void )")
+    pump_rcon_block = _extract_function_block(sv_zmq, "static void idZMQ_PumpRcon( void )")
+
+    assert "#define QL_ZMQ_NO_FLAGS 0" in sv_zmq
+    assert "#define QL_ZMQ_DONTWAIT 1" in sv_zmq
+    assert "#define QL_ZMQ_SNDMORE 2" in sv_zmq
+    assert "#define QL_ZMQ_POLL_TIMEOUT_IMMEDIATE 0" in sv_zmq
+    assert "#define QL_ZMQ_POLLIN 1" in sv_zmq
+    assert "#define QL_ZMQ_SINGLE_POLL_ITEM 1" in sv_zmq
+    assert "#define QL_ZMQ_POLL_READY_MIN 1" in sv_zmq
+
+    assert "flags = more ? QL_ZMQ_SNDMORE : QL_ZMQ_NO_FLAGS;" in send_frame_block
+    assert "return s_zmq.zmq_send( socket, frame, strlen( frame ), flags );" in send_frame_block
+    assert "s_zmq.zmq_send( s_zmq.pubSocket, message, strlen( message ), QL_ZMQ_NO_FLAGS );" in publish_block
+    assert "while ( s_zmq.zmq_poll( &item, QL_ZMQ_SINGLE_POLL_ITEM, QL_ZMQ_POLL_TIMEOUT_IMMEDIATE ) >= QL_ZMQ_POLL_READY_MIN && ( item.revents & QL_ZMQ_POLLIN ) ) {" in pump_auth_block
+    assert "if ( s_zmq.zmq_poll( &item, QL_ZMQ_SINGLE_POLL_ITEM, QL_ZMQ_POLL_TIMEOUT_IMMEDIATE ) < QL_ZMQ_POLL_READY_MIN || !( item.revents & QL_ZMQ_POLLIN ) ) {" in pump_rcon_block
+    assert "flags = more ? QL_ZMQ_SNDMORE : 0;" not in sv_zmq
+    assert "s_zmq.zmq_send( s_zmq.pubSocket, message, strlen( message ), 0 );" not in sv_zmq
+    assert "s_zmq.zmq_poll( &item, 1, 0 )" not in sv_zmq
+    assert "s_zmq.zmq_poll( &item, 1, QL_ZMQ_POLL_TIMEOUT_IMMEDIATE )" not in sv_zmq
+    assert "QL_ZMQ_POLL_TIMEOUT_IMMEDIATE ) > 0" not in sv_zmq
+    assert "QL_ZMQ_POLL_TIMEOUT_IMMEDIATE ) <= 0" not in sv_zmq
+    assert "zstr_send(" not in sv_zmq
+    assert "zstr_sendm(" not in sv_zmq
+
+    assert "no-flags and immediate-poll boundary" in mapping_round
+    assert "final send" in mapping_round
+    assert "does not reconstruct libzmq/CZMQ internals" in mapping_round
+    assert "before 90% -> after 98%" in mapping_round
+
+
+def test_zmq_single_poll_item_boundary_round_679_is_pinned() -> None:
+    aliases = json.loads(
+        (REPO_ROOT / "references/analysis/quakelive_symbol_aliases.json").read_text(encoding="utf-8")
+    )["quakelive_steam_srp"]
+    functions_csv = (
+        REPO_ROOT / "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+    ).read_text(encoding="utf-8").lower()
+    hlil_part05 = (
+        REPO_ROOT
+        / "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part05.txt"
+    ).read_text(encoding="utf-8")
+    sv_zmq = (REPO_ROOT / "src/code/server/sv_zmq.c").read_text(encoding="utf-8")
+    mapping_round = (
+        REPO_ROOT / "docs/reverse-engineering/quakelive_steam_mapping_round_679.md"
+    ).read_text(encoding="utf-8")
+
+    expected_aliases = {
+        "sub_401600": "zmq_poll",
+        "sub_4F4ED0": "idZMQ_PumpRcon",
+    }
+
+    for symbol, alias in expected_aliases.items():
+        address = f"00{symbol.removeprefix('sub_')}".lower()
+        assert aliases[symbol] == alias
+        assert f"fun_{address},{address}" in functions_csv
+        assert f"| `{symbol}` | `{alias}` |" in mapping_round
+
+    assert "004f4ed0    void* __fastcall sub_4f4ed0(void* arg1)" in hlil_part05
+    assert "004f4f09          var_18_1.w = 1" in hlil_part05
+    assert "004f4f0d          result = sub_401600(xmm0, &var_20, 1)" in hlil_part05
+
+    pump_auth_block = _extract_function_block(sv_zmq, "static void idZMQ_PumpAuthSocket( void )")
+    pump_rcon_block = _extract_function_block(sv_zmq, "static void idZMQ_PumpRcon( void )")
+
+    assert "#define QL_ZMQ_SINGLE_POLL_ITEM 1" in sv_zmq
+    assert "#define QL_ZMQ_POLL_TIMEOUT_IMMEDIATE 0" in sv_zmq
+    assert "#define QL_ZMQ_POLLIN 1" in sv_zmq
+    assert "#define QL_ZMQ_POLL_READY_MIN 1" in sv_zmq
+    assert "while ( s_zmq.zmq_poll( &item, QL_ZMQ_SINGLE_POLL_ITEM, QL_ZMQ_POLL_TIMEOUT_IMMEDIATE ) >= QL_ZMQ_POLL_READY_MIN && ( item.revents & QL_ZMQ_POLLIN ) ) {" in pump_auth_block
+    assert "if ( s_zmq.zmq_poll( &item, QL_ZMQ_SINGLE_POLL_ITEM, QL_ZMQ_POLL_TIMEOUT_IMMEDIATE ) < QL_ZMQ_POLL_READY_MIN || !( item.revents & QL_ZMQ_POLLIN ) ) {" in pump_rcon_block
+    assert "s_zmq.zmq_poll( &item, 1, QL_ZMQ_POLL_TIMEOUT_IMMEDIATE )" not in sv_zmq
+    assert "zmq_poll(" not in sv_zmq.replace("s_zmq.zmq_poll(", "")
+
+    assert "single-poll-item boundary" in mapping_round
+    assert "does not reconstruct libzmq/CZMQ internals" in mapping_round
+    assert "before 92% -> after 98%" in mapping_round
+
+
+def test_zmq_poll_item_zero_state_boundary_round_680_is_pinned() -> None:
+    aliases = json.loads(
+        (REPO_ROOT / "references/analysis/quakelive_symbol_aliases.json").read_text(encoding="utf-8")
+    )["quakelive_steam_srp"]
+    functions_csv = (
+        REPO_ROOT / "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+    ).read_text(encoding="utf-8").lower()
+    hlil_part05 = (
+        REPO_ROOT
+        / "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part05.txt"
+    ).read_text(encoding="utf-8")
+    sv_zmq = (REPO_ROOT / "src/code/server/sv_zmq.c").read_text(encoding="utf-8")
+    mapping_round = (
+        REPO_ROOT / "docs/reverse-engineering/quakelive_steam_mapping_round_680.md"
+    ).read_text(encoding="utf-8")
+
+    expected_aliases = {
+        "sub_401600": "zmq_poll",
+        "sub_4F4ED0": "idZMQ_PumpRcon",
+    }
+
+    for symbol, alias in expected_aliases.items():
+        address = f"00{symbol.removeprefix('sub_')}".lower()
+        assert aliases[symbol] == alias
+        assert f"fun_{address},{address}" in functions_csv
+        assert f"| `{symbol}` | `{alias}` |" in mapping_round
+
+    assert "004f4ed0    void* __fastcall sub_4f4ed0(void* arg1)" in hlil_part05
+    assert "004f4ef7          int32_t __saved_ebx_1 = 0" in hlil_part05
+    assert "004f4efc          int32_t var_18_1 = 0" in hlil_part05
+    assert "004f4f00          int32_t var_1c_1 = 0" in hlil_part05
+    assert "004f4f09          var_18_1.w = 1" in hlil_part05
+    assert "004f4f0d          result = sub_401600(xmm0, &var_20, 1)" in hlil_part05
+
+    pump_auth_block = _extract_function_block(sv_zmq, "static void idZMQ_PumpAuthSocket( void )")
+    pump_rcon_block = _extract_function_block(sv_zmq, "static void idZMQ_PumpRcon( void )")
+
+    assert "#define QL_ZMQ_POLL_FD_NONE 0" in sv_zmq
+    assert "#define QL_ZMQ_POLL_REVENTS_NONE 0" in sv_zmq
+    assert "item.fd = QL_ZMQ_POLL_FD_NONE;" in pump_auth_block
+    assert "item.fd = QL_ZMQ_POLL_FD_NONE;" in pump_rcon_block
+    assert "item.revents = QL_ZMQ_POLL_REVENTS_NONE;" in pump_auth_block
+    assert "item.revents = QL_ZMQ_POLL_REVENTS_NONE;" in pump_rcon_block
+    assert pump_auth_block.count("item.revents = QL_ZMQ_POLL_REVENTS_NONE;") >= 10
+    assert "item.fd = 0;" not in sv_zmq
+    assert "item.revents = 0;" not in sv_zmq
+    assert "zmq_poll(" not in sv_zmq.replace("s_zmq.zmq_poll(", "")
+
+    assert "poll-item zero-state boundary" in mapping_round
+    assert "does not reconstruct libzmq/CZMQ internals" in mapping_round
+    assert "before 93% -> after 98%" in mapping_round
+
+
+def test_zmq_poll_ready_threshold_round_727_is_pinned() -> None:
+    aliases = json.loads(
+        (REPO_ROOT / "references/analysis/quakelive_symbol_aliases.json").read_text(encoding="utf-8")
+    )["quakelive_steam_srp"]
+    functions_csv = (
+        REPO_ROOT / "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+    ).read_text(encoding="utf-8").lower()
+    hlil_part05 = (
+        REPO_ROOT
+        / "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part05.txt"
+    ).read_text(encoding="utf-8")
+    sv_zmq = (REPO_ROOT / "src/code/server/sv_zmq.c").read_text(encoding="utf-8")
+    implementation_plan = (REPO_ROOT / "IMPLEMENTATION_PLAN.md").read_text(encoding="utf-8")
+    mapping_round = (
+        REPO_ROOT / "docs/reverse-engineering/quakelive_steam_mapping_round_727.md"
+    ).read_text(encoding="utf-8")
+
+    expected_aliases = {
+        "sub_401600": "zmq_poll",
+        "sub_4F4ED0": "idZMQ_PumpRcon",
+        "sub_4F5CB0": "zstr_recv",
+    }
+
+    for symbol, alias in expected_aliases.items():
+        address = f"00{symbol.removeprefix('sub_')}".lower()
+        assert aliases[symbol] == alias
+        assert f"fun_{address},{address}" in functions_csv
+        assert f"| `{symbol}` | `{alias}` |" in mapping_round
+
+    assert "004f4ed0    void* __fastcall sub_4f4ed0(void* arg1)" in hlil_part05
+    assert "004f4f0d          result = sub_401600(xmm0, &var_20, 1)" in hlil_part05
+    assert "004f4f17          if (result s> 0)" in hlil_part05
+    assert "004f4f23              int32_t eax_1 = sub_4f5cb0(*(arg1 + 0xc))" in hlil_part05
+    assert "004f4f2f              int32_t eax_2 = sub_4f5cb0(ecx_1)" in hlil_part05
+
+    pump_auth_block = _extract_function_block(sv_zmq, "static void idZMQ_PumpAuthSocket( void )")
+    pump_rcon_block = _extract_function_block(sv_zmq, "static void idZMQ_PumpRcon( void )")
+
+    assert "#define QL_ZMQ_POLL_READY_MIN 1" in sv_zmq
+    assert "while ( s_zmq.zmq_poll( &item, QL_ZMQ_SINGLE_POLL_ITEM, QL_ZMQ_POLL_TIMEOUT_IMMEDIATE ) >= QL_ZMQ_POLL_READY_MIN && ( item.revents & QL_ZMQ_POLLIN ) ) {" in pump_auth_block
+    assert "if ( s_zmq.zmq_poll( &item, QL_ZMQ_SINGLE_POLL_ITEM, QL_ZMQ_POLL_TIMEOUT_IMMEDIATE ) < QL_ZMQ_POLL_READY_MIN || !( item.revents & QL_ZMQ_POLLIN ) ) {" in pump_rcon_block
+    assert "QL_ZMQ_POLL_TIMEOUT_IMMEDIATE ) > 0" not in sv_zmq
+    assert "QL_ZMQ_POLL_TIMEOUT_IMMEDIATE ) <= 0" not in sv_zmq
+    assert "zmq_poll(" not in sv_zmq.replace("s_zmq.zmq_poll(", "")
+    assert "zstr_recv(" not in sv_zmq
+
+    assert "ZMQ poll ready-threshold boundary" in mapping_round
+    assert "SRP dynamic zmq_poll adaptation" in mapping_round
+    assert "does not reconstruct libzmq/CZMQ internals" in mapping_round
+    assert "before 94% -> after 99%" in mapping_round
+    assert "### Task A629: Pin ZMQ poll ready-threshold boundary [COMPLETED]" in implementation_plan
+
+
+def test_zmq_rcon_receive_buffer_boundary_round_682_is_pinned() -> None:
+    aliases = json.loads(
+        (REPO_ROOT / "references/analysis/quakelive_symbol_aliases.json").read_text(encoding="utf-8")
+    )["quakelive_steam_srp"]
+    functions_csv = (
+        REPO_ROOT / "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+    ).read_text(encoding="utf-8").lower()
+    hlil_part05 = (
+        REPO_ROOT
+        / "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part05.txt"
+    ).read_text(encoding="utf-8")
+    sv_zmq = (REPO_ROOT / "src/code/server/sv_zmq.c").read_text(encoding="utf-8")
+    mapping_round = (
+        REPO_ROOT / "docs/reverse-engineering/quakelive_steam_mapping_round_682.md"
+    ).read_text(encoding="utf-8")
+
+    expected_aliases = {
+        "sub_4F4ED0": "idZMQ_PumpRcon",
+        "sub_4F5CB0": "zstr_recv",
+        "sub_4F5E10": "zstr_free",
+    }
+
+    for symbol, alias in expected_aliases.items():
+        address = f"00{symbol.removeprefix('sub_')}".lower()
+        assert aliases[symbol] == alias
+        assert f"fun_{address},{address}" in functions_csv
+        assert f"| `{symbol}` | `{alias}` |" in mapping_round
+
+    assert "004f4f23              int32_t eax_1 = sub_4f5cb0(*(arg1 + 0xc))" in hlil_part05
+    assert "004f4f2f              int32_t eax_2 = sub_4f5cb0(ecx_1)" in hlil_part05
+    assert "004f4f91                  return sub_4f5e10(&var_c)" in hlil_part05
+    assert "004f4fab              sub_4f5e10(&var_8)" in hlil_part05
+    assert "004f4fb7              return sub_4f5e10(&var_c)" in hlil_part05
+
+    pump_rcon_block = _extract_function_block(sv_zmq, "static void idZMQ_PumpRcon( void )")
+    read_command_block = _extract_function_block(sv_zmq, "static int idZMQ_ReadRconCommand( char *command, size_t commandSize )")
+
+    assert "#define QL_ZMQ_RCON_IDENTITY_BUFFER_SIZE QL_ZMQ_MAX_IDENTITY" in sv_zmq
+    assert "#define QL_ZMQ_RCON_COMMAND_BUFFER_SIZE MAX_STRING_CHARS" in sv_zmq
+    assert "char identity[QL_ZMQ_RCON_IDENTITY_BUFFER_SIZE];" in pump_rcon_block
+    assert "char command[QL_ZMQ_RCON_COMMAND_BUFFER_SIZE];" in pump_rcon_block
+    assert "identityLength = idZMQ_ReadFrameString( s_zmq.rconSocket, identity, sizeof( identity ), &more );" in pump_rcon_block
+    assert "commandLength = idZMQ_ReadRconCommand( command, sizeof( command ) );" in pump_rcon_block
+    assert "idZMQ_ReadFrameString( s_zmq.rconSocket, command, commandSize, &more );" in read_command_block
+    assert "char command[MAX_STRING_CHARS];" not in pump_rcon_block
+    assert "char identity[QL_ZMQ_MAX_IDENTITY];" not in pump_rcon_block
+    assert "zstr_recv(" not in sv_zmq
+    assert "zstr_free(" not in sv_zmq
+
+    assert "RCON receive-buffer boundary" in mapping_round
+    assert "two retail `zstr_recv` calls" in mapping_round
+    assert "does not reconstruct libzmq/CZMQ internals" in mapping_round
+    assert "before 92% -> after 98%" in mapping_round
+
+
+def test_steam_gameserver_auth_session_vtable_slots_round_675_is_pinned() -> None:
+    aliases = json.loads(
+        (REPO_ROOT / "references/analysis/quakelive_symbol_aliases.json").read_text(encoding="utf-8")
+    )["quakelive_steam_srp"]
+    functions_csv = (
+        REPO_ROOT / "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+    ).read_text(encoding="utf-8")
+    imports_txt = (
+        REPO_ROOT / "references/reverse-engineering/ghidra/quakelive_steam/imports.txt"
+    ).read_text(encoding="utf-8")
+    hlil_part02 = (
+        REPO_ROOT
+        / "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part02.txt"
+    ).read_text(encoding="utf-8")
+    steamworks = (REPO_ROOT / "src/common/platform/platform_steamworks.c").read_text(encoding="utf-8")
+    harness_c = (REPO_ROOT / "tests/steamworks_harness.c").read_text(encoding="utf-8")
+    mapping_round = (
+        REPO_ROOT / "docs/reverse-engineering/quakelive_steam_mapping_round_675.md"
+    ).read_text(encoding="utf-8")
+    implementation_plan = (REPO_ROOT / "IMPLEMENTATION_PLAN.md").read_text(encoding="utf-8")
+
+    expected_aliases = {
+        "FUN_00465fd0": "SteamServer_BeginAuthSession",
+        "sub_465fd0": "SteamServer_BeginAuthSession",
+        "FUN_004661e0": "SteamServer_EndAuthSession",
+        "sub_4661e0": "SteamServer_EndAuthSession",
+        "FUN_00466b90": "SteamServer_EndOrphanedAuthSessions",
+        "sub_466b90": "SteamServer_EndOrphanedAuthSessions",
+    }
+    for symbol, alias in expected_aliases.items():
+        assert aliases[symbol] == alias
+
+    for row in (
+        "FUN_00465fd0,00465fd0,230,0,unknown",
+        "FUN_004661e0,004661e0,126,0,unknown",
+        "FUN_00466b90,00466b90,535,0,unknown",
+    ):
+        assert row in functions_csv
+
+    assert "STEAM_API.DLL!SteamGameServer @ 0015918a" in imports_txt
+
+    for retail_anchor in (
+        "00465fd0    int32_t sub_465fd0(int32_t arg1, int32_t arg2, int32_t arg3, int32_t arg4)",
+        "00465fdd  if (data_e30358 == 0)",
+        "0046603b  if (*eax_2 != edx)",
+        "00466042      sub_4c9ab0(\"Refusing to re-auth a client tha…\")",
+        "0046606d  int32_t eax_5 = (*(*SteamGameServer() + 0x74))(arg1, arg2, ebx, arg4)",
+        "004661e0    void* sub_4661e0(int32_t arg1, int32_t arg2)",
+        "004661ed  if (data_e30358 == 0)",
+        "00466213  void* edx = *SteamGameServer()",
+        "0046621f  (*(edx + 0x78))(edi, arg2)",
+        "00466cdd              (*(*SteamGameServer() + 0x78))(edi_4, ebx_2)",
+    ):
+        assert retail_anchor in hlil_part02
+
+    assert hlil_part02.index("00465fdd  if (data_e30358 == 0)") < hlil_part02.index(
+        "0046606d  int32_t eax_5 = (*(*SteamGameServer() + 0x74))(arg1, arg2, ebx, arg4)"
+    )
+    assert hlil_part02.index("004661ed  if (data_e30358 == 0)") < hlil_part02.index(
+        "0046621f  (*(edx + 0x78))(edi, arg2)"
+    )
+
+    begin_auth_block = _extract_function_block(
+        steamworks, "qboolean QL_Steamworks_ServerBeginAuthSession( const CSteamID *steamId, const char *ticketHex, ql_auth_response_t *response )"
+    )
+    end_auth_block = _extract_function_block(steamworks, "void QL_Steamworks_ServerEndAuthSession( const CSteamID *steamId )")
+    validate_ticket_block = _extract_function_block(
+        steamworks, "qboolean QL_Steamworks_ValidateTicket( const char *ticketHex, ql_auth_response_t *response )"
+    )
+    mock_gameserver_block = _extract_function_block(harness_c, "void *QLR_SteamAPI_SteamGameServer( void ) {")
+    mock_begin_block = _extract_function_block(
+        harness_c,
+        "static EBeginAuthSessionResult QLR_FASTCALL QLR_SteamGameServer_BeginAuthSession( void *self, void *unused, const void *ticket, int length, CSteamID steamId ) {",
+    )
+    mock_end_block = _extract_function_block(
+        harness_c, "static void QLR_FASTCALL QLR_SteamGameServer_EndAuthSession( void *self, void *unused, CSteamID steamId ) {"
+    )
+
+    assert "typedef EBeginAuthSessionResult (QL_STEAMWORKS_FASTCALL *QL_SteamGameServer_BeginAuthSessionFn)( void *, void *, const void *, int, CSteamID );" in steamworks
+    assert "typedef void (QL_STEAMWORKS_FASTCALL *QL_SteamGameServer_EndAuthSessionFn)( void *, void *, CSteamID );" in steamworks
+    assert "#define QL_STEAM_GAMESERVER_BEGIN_AUTH_SESSION_SLOT (0x74 / 4)" in steamworks
+    assert "#define QL_STEAM_GAMESERVER_END_AUTH_SESSION_SLOT (0x78 / 4)" in steamworks
+
+    assert "gameServer = QL_Steamworks_GetGameServer();" in begin_auth_block
+    assert "vtable = *(void ***)gameServer;" in begin_auth_block
+    assert "beginAuthSession = (QL_SteamGameServer_BeginAuthSessionFn)vtable[QL_STEAM_GAMESERVER_BEGIN_AUTH_SESSION_SLOT];" in begin_auth_block
+    assert "QL_Steamworks_HexDecode( ticketHex, ticketData, sizeof( ticketData ), &ticketLength )" in begin_auth_block
+    assert "result = beginAuthSession( gameServer, NULL, ticketData, (int)ticketLength, *steamId );" in begin_auth_block
+    assert begin_auth_block.index("gameServer = QL_Steamworks_GetGameServer();") < begin_auth_block.index(
+        "beginAuthSession = (QL_SteamGameServer_BeginAuthSessionFn)vtable[QL_STEAM_GAMESERVER_BEGIN_AUTH_SESSION_SLOT];"
+    )
+    assert begin_auth_block.index(
+        "beginAuthSession = (QL_SteamGameServer_BeginAuthSessionFn)vtable[QL_STEAM_GAMESERVER_BEGIN_AUTH_SESSION_SLOT];"
+    ) < begin_auth_block.index(
+        "QL_Steamworks_HexDecode( ticketHex, ticketData, sizeof( ticketData ), &ticketLength )"
+    )
+    assert begin_auth_block.index(
+        "QL_Steamworks_HexDecode( ticketHex, ticketData, sizeof( ticketData ), &ticketLength )"
+    ) < begin_auth_block.index(
+        "result = beginAuthSession( gameServer, NULL, ticketData, (int)ticketLength, *steamId );"
+    )
+
+    assert "endAuthSession = (QL_SteamGameServer_EndAuthSessionFn)vtable[QL_STEAM_GAMESERVER_END_AUTH_SESSION_SLOT];" in end_auth_block
+    assert "endAuthSession( gameServer, NULL, *steamId );" in end_auth_block
+    assert end_auth_block.index("gameServer = QL_Steamworks_GetGameServer();") < end_auth_block.index(
+        "endAuthSession = (QL_SteamGameServer_EndAuthSessionFn)vtable[QL_STEAM_GAMESERVER_END_AUTH_SESSION_SLOT];"
+    )
+
+    assert "state.BeginAuthSession( user, ticketData, (int)ticketLength, steamId );" in validate_ticket_block
+    assert "state.EndAuthSession( user, steamId );" in validate_ticket_block
+
+    assert "vtable[QLR_STEAM_GAMESERVER_BEGIN_AUTH_SESSION_SLOT] = QLR_SteamGameServer_BeginAuthSession;" in mock_gameserver_block
+    assert "vtable[QLR_STEAM_GAMESERVER_END_AUTH_SESSION_SLOT] = QLR_SteamGameServer_EndAuthSession;" in mock_gameserver_block
+    assert "vtable[0x74 / 4]" not in mock_gameserver_block
+    assert "vtable[0x78 / 4]" not in mock_gameserver_block
+    assert "return QLR_SteamAPI_BeginAuthSession( self, ticket, length, steamId );" in mock_begin_block
+    assert "QLR_SteamAPI_EndAuthSession( self, steamId );" in mock_end_block
+
+    for doc_anchor in (
+        "# Quake Live Steam Mapping Round 675: GameServer Auth Session Vtable Slots",
+        "`FUN_00465fd0` / `sub_465fd0`",
+        "`FUN_004661e0` / `sub_4661e0`",
+        "`SteamGameServer + 0x74`",
+        "`SteamGameServer + 0x78`",
+        "Focused parity estimate: **before 90% -> after 99%**",
+        "Overall Steam\nlaunch/runtime integration mapping confidence moves from **93.66% -> 93.68%**",
+        "does not enable live Steam behavior by default",
+    ):
+        assert doc_anchor in mapping_round
+
+    assert "Task A575: Pin Steam GameServer auth-session vtable slots [COMPLETED]" in implementation_plan
+    assert "GameServer\nBeginAuthSession/EndAuthSession ABI source-shape confidence" in implementation_plan
+
+
+def test_steam_gameserver_lifecycle_published_state_slot_constants_round_678_is_pinned() -> None:
+    aliases = json.loads(
+        (REPO_ROOT / "references/analysis/quakelive_symbol_aliases.json").read_text(encoding="utf-8")
+    )["quakelive_steam_srp"]
+    functions_csv = (
+        REPO_ROOT / "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+    ).read_text(encoding="utf-8")
+    imports_txt = (
+        REPO_ROOT / "references/reverse-engineering/ghidra/quakelive_steam/imports.txt"
+    ).read_text(encoding="utf-8")
+    hlil_part02 = (
+        REPO_ROOT
+        / "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part02.txt"
+    ).read_text(encoding="utf-8")
+    steamworks = (REPO_ROOT / "src/common/platform/platform_steamworks.c").read_text(encoding="utf-8")
+    harness_c = (REPO_ROOT / "tests/steamworks_harness.c").read_text(encoding="utf-8")
+    mapping_round = (
+        REPO_ROOT / "docs/reverse-engineering/quakelive_steam_mapping_round_678.md"
+    ).read_text(encoding="utf-8")
+    implementation_plan = (REPO_ROOT / "IMPLEMENTATION_PLAN.md").read_text(encoding="utf-8")
+
+    expected_aliases = {
+        "FUN_00465a60": "SteamServer_SetKeyValuesFromInfoString",
+        "sub_465a60": "SteamServer_SetKeyValuesFromInfoString",
+        "FUN_00465b00": "SteamServer_PublishSteamID",
+        "sub_465b00": "SteamServer_PublishSteamID",
+        "FUN_00465db0": "SteamServer_EnableHeartbeats",
+        "sub_465db0": "SteamServer_EnableHeartbeats",
+        "FUN_00465df0": "SteamServer_CreateUnauthenticatedUserConnection",
+        "sub_465df0": "SteamServer_CreateUnauthenticatedUserConnection",
+        "FUN_00465e80": "SteamServer_GetPublicIP",
+        "sub_465e80": "SteamServer_GetPublicIP",
+        "FUN_00466260": "SteamServer_UpdatePublishedState",
+        "sub_466260": "SteamServer_UpdatePublishedState",
+        "FUN_00466ed0": "SteamServer_Init",
+        "sub_466ed0": "SteamServer_Init",
+    }
+    for symbol, alias in expected_aliases.items():
+        assert aliases[symbol] == alias
+
+    for row in (
+        "FUN_00465a60,00465a60,141,0,unknown",
+        "FUN_00465b00,00465b00,99,0,unknown",
+        "FUN_00465db0,00465db0,53,0,unknown",
+        "FUN_00465df0,00465df0,52,0,unknown",
+        "FUN_00465e80,00465e80,18,0,unknown",
+        "FUN_00466260,00466260,1425,0,unknown",
+        "FUN_00466ed0,00466ed0,495,0,unknown",
+    ):
+        assert row in functions_csv
+
+    assert "STEAM_API.DLL!SteamGameServer @ 0015918a" in imports_txt
+    assert "STEAM_API.DLL!SteamGameServer_Init @ 00159314" in imports_txt
+
+    for retail_anchor in (
+        "00465add          result = (*(*SteamGameServer(var_8) + 0x50))(&var_2008, &var_4008)",
+        "00465b20  int32_t* eax_1 = (*(*SteamGameServer() + 0x28))(&var_c)",
+        "00465dd7      (*(*SteamGameServer() + 0x9c))(arg1 == 1)",
+        "00465e18  (*(*SteamGameServer() + 0x64))(&result)",
+        "00465e90  jump(*(*SteamGameServer() + 0x90))",
+        "0046629f          (*(*eax_2 + 0x30))(*(data_13e17ec + 0x30))",
+        "004662d3          (*(*eax_4 + 0x40))(eax_3[0xc] != 0)",
+        "004662fe              (*(*eax_6 + 0x38))(*(data_13e17f0 + 4))",
+        "0046632e          (*(*eax_8 + 0x3c))(*(data_13e1808 + 4))",
+        '00466370          (*(*eax_12 + 0x50))("g_redScore", data_12e077c)',
+        "00466440                          (*(*eax_18 + 0x6c))(edi_2[0x96d8], edi_2[0x96d9], eax_17, ",
+        "0046647b          (*(*SteamGameServer() + 0x34))(var_28_1)",
+        "00466531          (*(*SteamGameServer() + 8))(edi_4)",
+        "004667cd          (*(*eax_54 + 0x54))(ecx_46)",
+        "0046702d          (*(*eax_12 + 0x10))(zx.d(ecx_5.b))",
+        "00467056              (*(*SteamGameServer() + 0x14))(edi_2)",
+        "00467063              (*(*SteamGameServer() + 0x18))()",
+        "00467073          (*(*SteamGameServer() + 0x9c))(0)",
+        '00467090          (*(*SteamGameServer() + 4))("Quake Live")',
+        '004670a0          (*(*SteamGameServer() + 0xc))("baseq3")',
+        "004671ad      result = (*(*SteamGameServer() + 0x20))()",
+    ):
+        assert retail_anchor in hlil_part02
+
+    assert hlil_part02.index("0046702d          (*(*eax_12 + 0x10))(zx.d(ecx_5.b))") < hlil_part02.index(
+        "00467056              (*(*SteamGameServer() + 0x14))(edi_2)"
+    )
+    assert hlil_part02.index("00465b20  int32_t* eax_1 = (*(*SteamGameServer() + 0x28))(&var_c)") < hlil_part02.index(
+        '00465b39  sub_4e2cc0(0x2ca, sub_4d9220("%llu"))'
+    )
+
+    slot_macros = (
+        "#define QL_STEAM_GAMESERVER_SET_PRODUCT_SLOT (0x04 / 4)",
+        "#define QL_STEAM_GAMESERVER_SET_GAME_DESCRIPTION_SLOT (0x08 / 4)",
+        "#define QL_STEAM_GAMESERVER_SET_GAME_DIR_SLOT (0x0c / 4)",
+        "#define QL_STEAM_GAMESERVER_SET_DEDICATED_SLOT (0x10 / 4)",
+        "#define QL_STEAM_GAMESERVER_LOG_ON_SLOT (0x14 / 4)",
+        "#define QL_STEAM_GAMESERVER_LOG_ON_ANONYMOUS_SLOT (0x18 / 4)",
+        "#define QL_STEAM_GAMESERVER_BLOGGED_ON_SLOT (0x20 / 4)",
+        "#define QL_STEAM_GAMESERVER_GET_STEAM_ID_SLOT (0x28 / 4)",
+        "#define QL_STEAM_GAMESERVER_SET_MAX_PLAYER_COUNT_SLOT (0x30 / 4)",
+        "#define QL_STEAM_GAMESERVER_SET_BOT_PLAYER_COUNT_SLOT (0x34 / 4)",
+        "#define QL_STEAM_GAMESERVER_SET_SERVER_NAME_SLOT (0x38 / 4)",
+        "#define QL_STEAM_GAMESERVER_SET_MAP_NAME_SLOT (0x3c / 4)",
+        "#define QL_STEAM_GAMESERVER_SET_PASSWORD_PROTECTED_SLOT (0x40 / 4)",
+        "#define QL_STEAM_GAMESERVER_SET_KEY_VALUE_SLOT (0x50 / 4)",
+        "#define QL_STEAM_GAMESERVER_SET_GAME_TAGS_SLOT (0x54 / 4)",
+        "#define QL_STEAM_GAMESERVER_CREATE_UNAUTHENTICATED_USER_SLOT (0x64 / 4)",
+        "#define QL_STEAM_GAMESERVER_UPDATE_USER_DATA_SLOT (0x6c / 4)",
+        "#define QL_STEAM_GAMESERVER_GET_PUBLIC_IP_SLOT (0x90 / 4)",
+        "#define QL_STEAM_GAMESERVER_ENABLE_HEARTBEATS_SLOT (0x9c / 4)",
+    )
+    for macro in slot_macros:
+        assert macro in steamworks
+
+    wrapper_slots = {
+        "qboolean QL_Steamworks_ServerIsLoggedOn( void )": "QL_STEAM_GAMESERVER_BLOGGED_ON_SLOT",
+        "qboolean QL_Steamworks_ServerSetDedicated( qboolean dedicated )": "QL_STEAM_GAMESERVER_SET_DEDICATED_SLOT",
+        "qboolean QL_Steamworks_ServerLogOn( const char *account )": "QL_STEAM_GAMESERVER_LOG_ON_SLOT",
+        "qboolean QL_Steamworks_ServerSetProduct( const char *product )": "QL_STEAM_GAMESERVER_SET_PRODUCT_SLOT",
+        "qboolean QL_Steamworks_ServerSetGameDir( const char *gameDir )": "QL_STEAM_GAMESERVER_SET_GAME_DIR_SLOT",
+        "qboolean QL_Steamworks_ServerSetGameDescription( const char *description )": "QL_STEAM_GAMESERVER_SET_GAME_DESCRIPTION_SLOT",
+        "qboolean QL_Steamworks_ServerSetMaxPlayerCount( int maxPlayers )": "QL_STEAM_GAMESERVER_SET_MAX_PLAYER_COUNT_SLOT",
+        "qboolean QL_Steamworks_ServerSetBotPlayerCount( int botPlayers )": "QL_STEAM_GAMESERVER_SET_BOT_PLAYER_COUNT_SLOT",
+        "qboolean QL_Steamworks_ServerSetServerName( const char *name )": "QL_STEAM_GAMESERVER_SET_SERVER_NAME_SLOT",
+        "qboolean QL_Steamworks_ServerSetMapName( const char *mapName )": "QL_STEAM_GAMESERVER_SET_MAP_NAME_SLOT",
+        "qboolean QL_Steamworks_ServerSetPasswordProtected( qboolean passwordProtected )": "QL_STEAM_GAMESERVER_SET_PASSWORD_PROTECTED_SLOT",
+        "qboolean QL_Steamworks_ServerEnableHeartbeats( qboolean enable )": "QL_STEAM_GAMESERVER_ENABLE_HEARTBEATS_SLOT",
+        "qboolean QL_Steamworks_ServerGetSteamID( uint32_t *outIdLow, uint32_t *outIdHigh )": "QL_STEAM_GAMESERVER_GET_STEAM_ID_SLOT",
+        "qboolean QL_Steamworks_ServerCreateUnauthenticatedUserConnection( uint32_t *outIdLow, uint32_t *outIdHigh )": "QL_STEAM_GAMESERVER_CREATE_UNAUTHENTICATED_USER_SLOT",
+        "qboolean QL_Steamworks_ServerSetGameTags( const char *tags )": "QL_STEAM_GAMESERVER_SET_GAME_TAGS_SLOT",
+        "qboolean QL_Steamworks_ServerSetKeyValue( const char *key, const char *value )": "QL_STEAM_GAMESERVER_SET_KEY_VALUE_SLOT",
+        "qboolean QL_Steamworks_ServerUpdateUserData( const CSteamID *steamId, const char *playerName, uint32_t score )": "QL_STEAM_GAMESERVER_UPDATE_USER_DATA_SLOT",
+        "uint32_t QL_Steamworks_ServerGetPublicIP( void )": "QL_STEAM_GAMESERVER_GET_PUBLIC_IP_SLOT",
+    }
+    for signature, macro in wrapper_slots.items():
+        block = _extract_function_block(steamworks, signature)
+        assert "gameServer = QL_Steamworks_GetGameServer();" in block
+        assert f"vtable[{macro}]" in block
+
+    logon_block = _extract_function_block(steamworks, "qboolean QL_Steamworks_ServerLogOn( const char *account )")
+    assert "vtable[QL_STEAM_GAMESERVER_LOG_ON_ANONYMOUS_SLOT]" in logon_block
+
+    mock_gameserver_block = _extract_function_block(harness_c, "void *QLR_SteamAPI_SteamGameServer( void ) {")
+    assert "static void *vtable[QLR_STEAM_GAMESERVER_VTABLE_SLOT_COUNT];" in mock_gameserver_block
+    for harness_anchor in (
+        "vtable[QLR_STEAM_GAMESERVER_SET_PRODUCT_SLOT] = QLR_SteamGameServer_SetProduct;",
+        "vtable[QLR_STEAM_GAMESERVER_SET_GAME_DESCRIPTION_SLOT] = QLR_SteamGameServer_SetGameDescription;",
+        "vtable[QLR_STEAM_GAMESERVER_SET_GAME_DIR_SLOT] = QLR_SteamGameServer_SetGameDir;",
+        "vtable[QLR_STEAM_GAMESERVER_SET_DEDICATED_SLOT] = QLR_SteamGameServer_SetDedicated;",
+        "vtable[QLR_STEAM_GAMESERVER_LOG_ON_SLOT] = QLR_SteamGameServer_LogOn;",
+        "vtable[QLR_STEAM_GAMESERVER_LOG_ON_ANONYMOUS_SLOT] = QLR_SteamGameServer_LogOnAnonymous;",
+        "vtable[QLR_STEAM_GAMESERVER_BLOGGED_ON_SLOT] = QLR_SteamGameServer_BLoggedOn;",
+        "vtable[QLR_STEAM_GAMESERVER_GET_STEAM_ID_SLOT] = QLR_SteamGameServer_GetSteamID;",
+        "vtable[QLR_STEAM_GAMESERVER_SET_MAX_PLAYER_COUNT_SLOT] = QLR_SteamGameServer_SetMaxPlayerCount;",
+        "vtable[QLR_STEAM_GAMESERVER_SET_BOT_PLAYER_COUNT_SLOT] = QLR_SteamGameServer_SetBotPlayerCount;",
+        "vtable[QLR_STEAM_GAMESERVER_SET_SERVER_NAME_SLOT] = QLR_SteamGameServer_SetServerName;",
+        "vtable[QLR_STEAM_GAMESERVER_SET_MAP_NAME_SLOT] = QLR_SteamGameServer_SetMapName;",
+        "vtable[QLR_STEAM_GAMESERVER_SET_PASSWORD_PROTECTED_SLOT] = QLR_SteamGameServer_SetPasswordProtected;",
+        "vtable[QLR_STEAM_GAMESERVER_SET_KEY_VALUE_SLOT] = QLR_SteamGameServer_SetKeyValue;",
+        "vtable[QLR_STEAM_GAMESERVER_SET_GAME_TAGS_SLOT] = QLR_SteamGameServer_SetGameTags;",
+        "vtable[QLR_STEAM_GAMESERVER_CREATE_UNAUTHENTICATED_USER_SLOT] = QLR_SteamGameServer_CreateUnauthenticatedUserConnection;",
+        "vtable[QLR_STEAM_GAMESERVER_UPDATE_USER_DATA_SLOT] = QLR_SteamGameServer_UpdateUserData;",
+        "vtable[QLR_STEAM_GAMESERVER_GET_PUBLIC_IP_SLOT] = QLR_SteamGameServer_GetPublicIP;",
+        "vtable[QLR_STEAM_GAMESERVER_ENABLE_HEARTBEATS_SLOT] = QLR_SteamGameServer_EnableHeartbeats;",
+    ):
+        assert harness_anchor in mock_gameserver_block
+    assert "static void *vtable[0x9c / 4 + 1];" not in mock_gameserver_block
+    assert "vtable[0x" not in mock_gameserver_block
+
+    for doc_anchor in (
+        "# Quake Live Steam Mapping Round 678: GameServer Lifecycle And Published-State Slot Constants",
+        "`SteamServer_UpdatePublishedState`",
+        "`SteamServer_Init`",
+        "`SteamGameServer + 0x50`",
+        "`SteamGameServer + 0x9c`",
+        "Focused parity estimate: **before 91% -> after 99%**",
+        "Overall Steam launch/runtime integration mapping confidence moves from **93.68% -> 93.70%**",
+        "does not enable live Steam behavior by default",
+    ):
+        assert doc_anchor in mapping_round
+
+    assert "Task A579: Pin Steam GameServer lifecycle and published-state slot constants [COMPLETED]" in implementation_plan
+    assert "lifecycle/published-state ABI source-shape confidence" in implementation_plan
+
+
+def test_steam_gameserverstats_value_slot_constants_round_681_is_pinned() -> None:
+    aliases = json.loads(
+        (REPO_ROOT / "references/analysis/quakelive_symbol_aliases.json").read_text(encoding="utf-8")
+    )["quakelive_steam_srp"]
+    functions_csv = (
+        REPO_ROOT / "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+    ).read_text(encoding="utf-8")
+    imports_txt = (
+        REPO_ROOT / "references/reverse-engineering/ghidra/quakelive_steam/imports.txt"
+    ).read_text(encoding="utf-8")
+    hlil_part02 = (
+        REPO_ROOT
+        / "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part02.txt"
+    ).read_text(encoding="utf-8")
+    steamworks = (REPO_ROOT / "src/common/platform/platform_steamworks.c").read_text(encoding="utf-8")
+    harness_c = (REPO_ROOT / "tests/steamworks_harness.c").read_text(encoding="utf-8")
+    mapping_round = (
+        REPO_ROOT / "docs/reverse-engineering/quakelive_steam_mapping_round_681.md"
+    ).read_text(encoding="utf-8")
+    implementation_plan = (REPO_ROOT / "IMPLEMENTATION_PLAN.md").read_text(encoding="utf-8")
+
+    expected_aliases = {
+        "FUN_004670c0": "SteamStats_FlushPendingValues",
+        "sub_4670c0": "SteamStats_FlushPendingValues",
+        "sub_467190": "SteamStats_OnServersConnected",
+        "FUN_004671d0": "SteamStats_OnStatsReceived",
+        "sub_4671d0": "SteamStats_OnStatsReceived",
+        "FUN_004672d0": "SteamStats_SetAchievement",
+        "sub_4672d0": "SteamStats_SetAchievement",
+        "FUN_00467850": "SteamStats_Init",
+        "sub_467850": "SteamStats_Init",
+    }
+    for symbol, alias in expected_aliases.items():
+        assert aliases[symbol] == alias
+
+    for row in (
+        "FUN_004670c0,004670c0,208,0,unknown",
+        "FUN_004671d0,004671d0,256,0,unknown",
+        "FUN_004672d0,004672d0,71,0,unknown",
+        "FUN_00467850,00467850,454,0,unknown",
+    ):
+        assert row in functions_csv
+
+    assert "STEAM_API.DLL!SteamGameServer @ 0015918a" in imports_txt
+    assert "STEAM_API.DLL!SteamGameServerStats @ 0015932c" in imports_txt
+
+    for retail_anchor in (
+        "004670c0    void __fastcall sub_4670c0(void* arg1)",
+        "00467147                  eax_6 = SteamGameServerStats()",
+        "00467160                  (*(*eax_6 + 0x14))(*(arg1 + 8), *(arg1 + 0xc), *(esi_2 + 8), var_1c)",
+        "00467137                  eax_6, ecx_5 = SteamGameServerStats()",
+        "00467160                  (*(*eax_6 + 0x10))(*(arg1 + 8), *(arg1 + 0xc), *(esi_2 + 8), var_1c)",
+        "00467104                  int32_t eax_5 = SteamGameServerStats()",
+        "00467129                  (*(*eax_5 + 0x18))(*(arg1 + 8), *(arg1 + 0xc), *(esi_2 + 8), ",
+        "0046712f                  int32_t edx_4 = *(*SteamGameServerStats() + 4)",
+        "00467188      (*(*eax_8 + 0x24))(*(arg1 + 8), *(arg1 + 0xc))",
+        "00467190    int32_t __fastcall sub_467190(void* arg1)",
+        "0046719a  int32_t result = SteamGameServerStats()",
+        "004671ad      result = (*(*SteamGameServer() + 0x20))()",
+        "004671b3          int32_t eax_2 = SteamGameServerStats()",
+        "004671c3          return (**eax_2)(*(arg1 + 8), *(arg1 + 0xc))",
+        "004671d0    void* __thiscall sub_4671d0(void* arg1, int32_t* arg2)",
+        "00467240              edx_2 = *(*SteamGameServerStats() + 8)",
+        "00467230              edx_2 = *(*SteamGameServerStats() + 4)",
+        "004672d0    int32_t __thiscall sub_4672d0(void* arg1, int32_t arg2)",
+        "004672dd  int32_t eax_1 = SteamGameServerStats()",
+        "00467301  ebx.b = (*(*eax_1 + 0x1c))(*(arg1 + 8), *(arg1 + 0xc), (&data_561c00)[arg2])",
+        "004679d9  if (SteamGameServerStats() != 0 && (*(*SteamGameServer() + 0x20))() != 0)",
+    ):
+        assert retail_anchor in hlil_part02
+
+    assert hlil_part02.index("0046719a  int32_t result = SteamGameServerStats()") < hlil_part02.index(
+        "004671ad      result = (*(*SteamGameServer() + 0x20))()"
+    )
+    assert hlil_part02.index("004671ad      result = (*(*SteamGameServer() + 0x20))()") < hlil_part02.index(
+        "004671c3          return (**eax_2)(*(arg1 + 8), *(arg1 + 0xc))"
+    )
+    assert hlil_part02.index("004672dd  int32_t eax_1 = SteamGameServerStats()") < hlil_part02.index(
+        "00467301  ebx.b = (*(*eax_1 + 0x1c))"
+    )
+
+    slot_macros = (
+        "#define QL_STEAM_GAMESERVERSTATS_REQUEST_USER_STATS_SLOT 0",
+        "#define QL_STEAM_GAMESERVERSTATS_GET_USER_STAT_FLOAT_SLOT (0x04 / 4)",
+        "#define QL_STEAM_GAMESERVERSTATS_GET_USER_STAT_INT_SLOT (0x08 / 4)",
+        "#define QL_STEAM_GAMESERVERSTATS_GET_USER_ACHIEVEMENT_SLOT (0x0c / 4)",
+        "#define QL_STEAM_GAMESERVERSTATS_SET_USER_STAT_FLOAT_SLOT (0x10 / 4)",
+        "#define QL_STEAM_GAMESERVERSTATS_SET_USER_STAT_INT_SLOT (0x14 / 4)",
+        "#define QL_STEAM_GAMESERVERSTATS_UPDATE_AVG_RATE_STAT_SLOT (0x18 / 4)",
+        "#define QL_STEAM_GAMESERVERSTATS_SET_USER_ACHIEVEMENT_SLOT (0x1c / 4)",
+        "#define QL_STEAM_GAMESERVERSTATS_STORE_USER_STATS_SLOT (0x24 / 4)",
+    )
+    for macro in slot_macros:
+        assert macro in steamworks
+
+    wrapper_slots = {
+        "qboolean QL_Steamworks_ServerRequestUserStats( const CSteamID *steamId )": "QL_STEAM_GAMESERVERSTATS_REQUEST_USER_STATS_SLOT",
+        "qboolean QL_Steamworks_ServerGetUserStatInt( const CSteamID *steamId, const char *name, int *outValue )": "QL_STEAM_GAMESERVERSTATS_GET_USER_STAT_INT_SLOT",
+        "qboolean QL_Steamworks_ServerGetUserStatFloat( const CSteamID *steamId, const char *name, float *outValue )": "QL_STEAM_GAMESERVERSTATS_GET_USER_STAT_FLOAT_SLOT",
+        "qboolean QL_Steamworks_ServerGetUserAchievement( const CSteamID *steamId, const char *name, qboolean *outAchieved )": "QL_STEAM_GAMESERVERSTATS_GET_USER_ACHIEVEMENT_SLOT",
+        "qboolean QL_Steamworks_ServerSetUserStatInt( const CSteamID *steamId, const char *name, int value )": "QL_STEAM_GAMESERVERSTATS_SET_USER_STAT_INT_SLOT",
+        "qboolean QL_Steamworks_ServerSetUserStatFloat( const CSteamID *steamId, const char *name, float value )": "QL_STEAM_GAMESERVERSTATS_SET_USER_STAT_FLOAT_SLOT",
+        "qboolean QL_Steamworks_ServerUpdateAvgRateStat( const CSteamID *steamId, const char *name, float countThisSession, double sessionLength )": "QL_STEAM_GAMESERVERSTATS_UPDATE_AVG_RATE_STAT_SLOT",
+        "qboolean QL_Steamworks_ServerSetUserAchievement( const CSteamID *steamId, const char *name )": "QL_STEAM_GAMESERVERSTATS_SET_USER_ACHIEVEMENT_SLOT",
+        "qboolean QL_Steamworks_ServerStoreUserStats( const CSteamID *steamId )": "QL_STEAM_GAMESERVERSTATS_STORE_USER_STATS_SLOT",
+    }
+    for signature, macro in wrapper_slots.items():
+        block = _extract_function_block(steamworks, signature)
+        assert "gameServerStats = QL_Steamworks_GetGameServerStatsInterface();" in block
+        assert f"vtable[{macro}]" in block
+
+    request_block = _extract_function_block(steamworks, "qboolean QL_Steamworks_ServerRequestUserStats( const CSteamID *steamId )")
+    assert request_block.count("QL_Steamworks_GetGameServerStatsInterface()") == 2
+    assert "if ( !QL_Steamworks_ServerIsLoggedOn() ) {" in request_block
+    assert request_block.index("QL_Steamworks_GetGameServerStatsInterface()") < request_block.index(
+        "if ( !QL_Steamworks_ServerIsLoggedOn() ) {"
+    )
+    assert request_block.index("if ( !QL_Steamworks_ServerIsLoggedOn() ) {") < request_block.rindex(
+        "QL_Steamworks_GetGameServerStatsInterface()"
+    )
+
+    mock_stats_block = _extract_function_block(harness_c, "void *QLR_SteamAPI_SteamGameServerStats( void ) {")
+    assert "static void *vtable[QLR_STEAM_GAMESERVERSTATS_VTABLE_SLOT_COUNT];" in mock_stats_block
+    for harness_anchor in (
+        "vtable[QLR_STEAM_GAMESERVERSTATS_REQUEST_USER_STATS_SLOT] = QLR_SteamGameServerStats_RequestUserStats;",
+        "vtable[QLR_STEAM_GAMESERVERSTATS_GET_USER_STAT_FLOAT_SLOT] = QLR_SteamGameServerStats_GetUserStatFloat;",
+        "vtable[QLR_STEAM_GAMESERVERSTATS_GET_USER_STAT_INT_SLOT] = QLR_SteamGameServerStats_GetUserStatInt;",
+        "vtable[QLR_STEAM_GAMESERVERSTATS_GET_USER_ACHIEVEMENT_SLOT] = QLR_SteamGameServerStats_GetUserAchievement;",
+        "vtable[QLR_STEAM_GAMESERVERSTATS_SET_USER_STAT_FLOAT_SLOT] = QLR_SteamGameServerStats_SetUserStatFloat;",
+        "vtable[QLR_STEAM_GAMESERVERSTATS_SET_USER_STAT_INT_SLOT] = QLR_SteamGameServerStats_SetUserStatInt;",
+        "vtable[QLR_STEAM_GAMESERVERSTATS_UPDATE_AVG_RATE_STAT_SLOT] = QLR_SteamGameServerStats_UpdateAvgRateStat;",
+        "vtable[QLR_STEAM_GAMESERVERSTATS_SET_USER_ACHIEVEMENT_SLOT] = QLR_SteamGameServerStats_SetUserAchievement;",
+        "vtable[QLR_STEAM_GAMESERVERSTATS_STORE_USER_STATS_SLOT] = QLR_SteamGameServerStats_StoreUserStats;",
+    ):
+        assert harness_anchor in mock_stats_block
+    assert "static void *vtable[0x24 / 4 + 1];" not in mock_stats_block
+    assert "vtable[0x" not in mock_stats_block
+
+    for doc_anchor in (
+        "# Quake Live Steam Mapping Round 681: GameServerStats Value Slot Constants",
+        "`SteamStats_FlushPendingValues`",
+        "`SteamStats_OnStatsReceived`",
+        "`SteamStats_SetAchievement`",
+        "`SteamGameServerStats + 0x24`",
+        "Focused parity estimate: **before 90% -> after 99%**",
+        "Overall Steam launch/runtime integration mapping confidence moves from **93.70% -> 93.72%**",
+        "does not enable live Steam behavior by default",
+    ):
+        assert doc_anchor in mapping_round
+
+    assert "Task A582: Pin Steam GameServerStats value slot constants [COMPLETED]" in implementation_plan
+    assert "GameServerStats value ABI source-shape confidence" in implementation_plan
+
+
+def test_steam_userstats_client_value_slot_constants_round_685_is_pinned() -> None:
+    aliases = json.loads(
+        (REPO_ROOT / "references/analysis/quakelive_symbol_aliases.json").read_text(encoding="utf-8")
+    )["quakelive_steam_srp"]
+    functions_csv = (
+        REPO_ROOT / "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+    ).read_text(encoding="utf-8")
+    imports_txt = (
+        REPO_ROOT / "references/reverse-engineering/ghidra/quakelive_steam/imports.txt"
+    ).read_text(encoding="utf-8")
+    analysis_symbols = (
+        REPO_ROOT / "references/reverse-engineering/ghidra/quakelive_steam/analysis_symbols.txt"
+    ).read_text(encoding="utf-8")
+    hlil_part02 = (
+        REPO_ROOT
+        / "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part02.txt"
+    ).read_text(encoding="utf-8")
+    steamworks = (REPO_ROOT / "src/common/platform/platform_steamworks.c").read_text(encoding="utf-8")
+    harness_c = (REPO_ROOT / "tests/steamworks_harness.c").read_text(encoding="utf-8")
+    mapping_round = (
+        REPO_ROOT / "docs/reverse-engineering/quakelive_steam_mapping_round_685.md"
+    ).read_text(encoding="utf-8")
+    implementation_plan = (REPO_ROOT / "IMPLEMENTATION_PLAN.md").read_text(encoding="utf-8")
+
+    expected_aliases = {
+        "FUN_0045ffd0": "SteamCallbacks_OnUserStatsReceived",
+        "sub_45FFD0": "SteamCallbacks_OnUserStatsReceived",
+        "sub_45ffd0": "SteamCallbacks_OnUserStatsReceived",
+        "sub_460520": "CL_Steam_ClearStats_f",
+        "FUN_004613a0": "SteamCallbacks_Init",
+        "sub_4613a0": "SteamCallbacks_Init",
+    }
+    for symbol, alias in expected_aliases.items():
+        assert aliases[symbol] == alias
+
+    for row in (
+        "FUN_0045ffd0,0045ffd0,783,0,unknown",
+        "FUN_004613a0,004613a0,344,0,unknown",
+    ):
+        assert row in functions_csv
+
+    for imported_symbol in (
+        "STEAM_API.DLL!SteamUserStats @ 0015919c",
+        "STEAM_API.DLL!SteamAPI_RegisterCallback @ 00159248",
+    ):
+        assert imported_symbol in imports_txt
+    assert "CCallback<class_SteamCallbacks,struct_UserStatsReceived_t,0>::vftable" in analysis_symbols
+
+    for retail_anchor in (
+        "0045ffd0    int32_t sub_45ffd0()",
+        "004600ef                  int32_t edx_6 = *(*SteamUserStats() + 0x44)",
+        "0046008d                  int32_t edx_3 = *(*SteamUserStats() + 0x48)",
+        '0046018e      int32_t eax_20 = (*(*SteamUserStats() + 0x30))(edi, "name")',
+        '004601a6      int32_t eax_23 = (*(*SteamUserStats() + 0x30))(edi, "desc")',
+        "004601c6          int32_t edx_11 = *(*SteamUserStats() + 0x50)",
+        "00460520    int32_t sub_460520()",
+        "00460531  return (*(*SteamUserStats() + 0x54))(1)",
+        "0046140a  arg1[0xd] = &CCallback<class SteamCallbacks, struct UserStatsReceived_t, 0>",
+        "00461426  SteamAPI_RegisterCallback(&arg1[0xd], 0x44d)",
+    ):
+        assert retail_anchor in hlil_part02
+
+    slot_macros = (
+        "#define QL_STEAM_USERSTATS_GET_ACHIEVEMENT_DISPLAY_ATTRIBUTE_SLOT (0x30 / 4)",
+        "#define QL_STEAM_USERSTATS_REQUEST_USER_STATS_SLOT (0x40 / 4)",
+        "#define QL_STEAM_USERSTATS_GET_USER_STAT_FLOAT_SLOT (0x44 / 4)",
+        "#define QL_STEAM_USERSTATS_GET_USER_STAT_INT_SLOT (0x48 / 4)",
+        "#define QL_STEAM_USERSTATS_GET_USER_ACHIEVEMENT_SLOT (0x50 / 4)",
+        "#define QL_STEAM_USERSTATS_RESET_ALL_STATS_SLOT (0x54 / 4)",
+    )
+    for macro in slot_macros:
+        assert macro in steamworks
+
+    wrapper_slots = {
+        "qboolean QL_Steamworks_ClearStats( qboolean achievementsToo )": "QL_STEAM_USERSTATS_RESET_ALL_STATS_SLOT",
+        "qboolean QL_Steamworks_RequestUserStats( uint32_t idLow, uint32_t idHigh )": "QL_STEAM_USERSTATS_REQUEST_USER_STATS_SLOT",
+        "qboolean QL_Steamworks_GetUserStatInt( uint32_t idLow, uint32_t idHigh, const char *name, int *outValue )": "QL_STEAM_USERSTATS_GET_USER_STAT_INT_SLOT",
+        "qboolean QL_Steamworks_GetUserStatFloat( uint32_t idLow, uint32_t idHigh, const char *name, float *outValue )": "QL_STEAM_USERSTATS_GET_USER_STAT_FLOAT_SLOT",
+        "qboolean QL_Steamworks_GetUserAchievement( uint32_t idLow, uint32_t idHigh, const char *name, qboolean *outAchieved, int *outUnlockTime )": "QL_STEAM_USERSTATS_GET_USER_ACHIEVEMENT_SLOT",
+        "const char *QL_Steamworks_GetAchievementDisplayAttribute( const char *name, const char *key )": "QL_STEAM_USERSTATS_GET_ACHIEVEMENT_DISPLAY_ATTRIBUTE_SLOT",
+    }
+    for signature, macro in wrapper_slots.items():
+        block = _extract_function_block(steamworks, signature)
+        assert f"vtable[{macro}]" in block
+
+    mock_user_stats_block = _extract_function_block(harness_c, "void *QLR_SteamAPI_SteamUserStats( void ) {")
+    assert "static void *vtable[QLR_STEAM_USERSTATS_VTABLE_SLOT_COUNT];" in mock_user_stats_block
+    for harness_anchor in (
+        "vtable[QLR_STEAM_USERSTATS_GET_ACHIEVEMENT_DISPLAY_ATTRIBUTE_SLOT] = QLR_SteamUserStats_GetAchievementDisplayAttribute;",
+        "vtable[QLR_STEAM_USERSTATS_REQUEST_USER_STATS_SLOT] = QLR_SteamUserStats_RequestUserStats;",
+        "vtable[QLR_STEAM_USERSTATS_GET_USER_STAT_FLOAT_SLOT] = QLR_SteamUserStats_GetUserStatFloat;",
+        "vtable[QLR_STEAM_USERSTATS_GET_USER_STAT_INT_SLOT] = QLR_SteamUserStats_GetUserStatInt;",
+        "vtable[QLR_STEAM_USERSTATS_GET_USER_ACHIEVEMENT_SLOT] = QLR_SteamUserStats_GetUserAchievement;",
+        "vtable[QLR_STEAM_USERSTATS_RESET_ALL_STATS_SLOT] = QLR_SteamUserStats_ResetAllStats;",
+    ):
+        assert harness_anchor in mock_user_stats_block
+    assert "vtable[0x" not in mock_user_stats_block
+
+    for doc_anchor in (
+        "# Quake Live Steam Mapping Round 685: Client SteamUserStats Slot Constants",
+        "`SteamCallbacks_OnUserStatsReceived`",
+        "`CL_Steam_ClearStats_f`",
+        "`SteamUserStats + 0x54`",
+        "Focused parity estimate: **before 90% -> after 99%**",
+        "Overall Steam launch/runtime integration mapping confidence moves from **93.72% -> 93.74%**",
+        "does not enable live Steam behavior by default",
+    ):
+        assert doc_anchor in mapping_round
+
+    assert "Task A587: Pin client SteamUserStats value slot constants [COMPLETED]" in implementation_plan
+    assert "client SteamUserStats value ABI source-shape confidence" in implementation_plan
+
+
+def test_steam_client_identity_social_slot_constants_round_690_is_pinned() -> None:
+    aliases = json.loads(
+        (REPO_ROOT / "references/analysis/quakelive_symbol_aliases.json").read_text(encoding="utf-8")
+    )["quakelive_steam_srp"]
+    functions_csv = (
+        REPO_ROOT / "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+    ).read_text(encoding="utf-8")
+    imports_txt = (
+        REPO_ROOT / "references/reverse-engineering/ghidra/quakelive_steam/imports.txt"
+    ).read_text(encoding="utf-8")
+    hlil_part02 = (
+        REPO_ROOT
+        / "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part02.txt"
+    ).read_text(encoding="utf-8")
+    steamworks = (REPO_ROOT / "src/common/platform/platform_steamworks.c").read_text(encoding="utf-8")
+    harness_c = (REPO_ROOT / "tests/steamworks_harness.c").read_text(encoding="utf-8")
+    mapping_round = (
+        REPO_ROOT / "docs/reverse-engineering/quakelive_steam_mapping_round_690.md"
+    ).read_text(encoding="utf-8")
+    implementation_plan = (REPO_ROOT / "IMPLEMENTATION_PLAN.md").read_text(encoding="utf-8")
+
+    expected_aliases = {
+        "FUN_00460610": "SteamClient_SyncPersonaNameCvar",
+        "sub_460610": "SteamClient_SyncPersonaNameCvar",
+        "FUN_00460690": "SteamUtils_GetIPCountry",
+        "sub_460690": "SteamUtils_GetIPCountry",
+        "FUN_00460800": "SteamCallbacks_OnPersonaStateChange",
+        "sub_460800": "SteamCallbacks_OnPersonaStateChange",
+        "FUN_00460e60": "CL_Steam_OverlayCommand_f",
+        "sub_460e60": "CL_Steam_OverlayCommand_f",
+        "FUN_00461500": "SteamClient_Init",
+        "sub_461500": "SteamClient_Init",
+        "FUN_00464b10": "SteamLobby_SetLobbyServer",
+        "sub_464b10": "SteamLobby_SetLobbyServer",
+        "FUN_00464bb0": "SteamLobby_ShowInviteOverlay",
+        "sub_464bb0": "SteamLobby_ShowInviteOverlay",
+    }
+    for symbol, alias in expected_aliases.items():
+        assert aliases[symbol] == alias
+
+    for row in (
+        "FUN_00460610,00460610,70,0,unknown",
+        "FUN_00460690,00460690,27,0,unknown",
+        "FUN_00460800,00460800,948,0,unknown",
+        "FUN_00460e60,00460e60,195,0,unknown",
+        "FUN_00461500,00461500,209,0,unknown",
+        "FUN_00464b10,00464b10,155,0,unknown",
+        "FUN_00464bb0,00464bb0,56,0,unknown",
+    ):
+        assert row in functions_csv
+
+    for imported_symbol in (
+        "STEAM_API.DLL!SteamFriends @ 0015915a",
+        "STEAM_API.DLL!SteamUser @ 0015916a",
+        "STEAM_API.DLL!SteamUtils @ 0015914c",
+    ):
+        assert imported_symbol in imports_txt
+
+    for retail_anchor in (
+        "00460578  int32_t* eax_2 = (*(*SteamUser() + 8))(&var_c)",
+        "00460621  int32_t eax = SteamFriends()",
+        "004606a6  jump(*(*SteamUtils() + 0x10))",
+        "0046096b      int32_t eax_19 = (*(*SteamFriends() + 0x1c))(edi_1, ebx_1)",
+        "00460996      sub_429310(&var_3c, (*(*SteamFriends() + 0x18))(edi_1, ebx_1))",
+        "004609d7      sub_429310(&var_3c, (*(*SteamFriends() + 0x14))(edi_1, ebx_1))",
+        "00460a12      int32_t eax_31 = (*(*SteamFriends() + 0x2c))(edi_1, ebx_1)",
+        '00460a61      int32_t eax_37 = (*(*SteamFriends() + 0xb4))(edi_1, ebx_1, "status")',
+        '00460a8e      int32_t eax_41 = (*(*SteamFriends() + 0xb4))(edi_1, ebx_1, "lanIp")',
+        "00460ad3      (*(*SteamFriends() + 0x20))(edi_1, ebx_1, &var_2c)",
+        "00460dd6  int32_t eax_2 = (*(*SteamUtils() + 0x24))()",
+        "00460f12          result = (*(*SteamFriends() + 0x74))(esi_1, var_60, var_5c)",
+        '004615c3      (*(*SteamFriends() + 0xac))("status", "At the main menu")',
+        "00464b34          int32_t eax = SteamUser()",
+        "00464bc7          int32_t eax = SteamFriends()",
+    ):
+        assert retail_anchor in hlil_part02
+
+    slot_macros = (
+        "#define QL_STEAM_USER_BLOGGED_ON_SLOT (0x04 / 4)",
+        "#define QL_STEAM_USER_GET_STEAM_ID_SLOT (0x08 / 4)",
+        "#define QL_STEAM_FRIENDS_GET_PERSONA_NAME_SLOT 0",
+        "#define QL_STEAM_FRIENDS_GET_FRIEND_COUNT_SLOT (0x0c / 4)",
+        "#define QL_STEAM_FRIENDS_GET_FRIEND_BY_INDEX_SLOT (0x10 / 4)",
+        "#define QL_STEAM_FRIENDS_GET_FRIEND_RELATIONSHIP_SLOT (0x14 / 4)",
+        "#define QL_STEAM_FRIENDS_GET_FRIEND_PERSONA_STATE_SLOT (0x18 / 4)",
+        "#define QL_STEAM_FRIENDS_GET_FRIEND_PERSONA_NAME_SLOT (0x1c / 4)",
+        "#define QL_STEAM_FRIENDS_GET_FRIEND_GAME_PLAYED_SLOT (0x20 / 4)",
+        "#define QL_STEAM_FRIENDS_GET_PLAYER_NICKNAME_SLOT (0x2c / 4)",
+        "#define QL_STEAM_FRIENDS_SET_IN_GAME_VOICE_SPEAKING_SLOT (0x6c / 4)",
+        "#define QL_STEAM_FRIENDS_ACTIVATE_GAME_OVERLAY_TO_USER_SLOT (0x74 / 4)",
+        "#define QL_STEAM_FRIENDS_ACTIVATE_GAME_OVERLAY_TO_WEB_PAGE_SLOT (0x78 / 4)",
+        "#define QL_STEAM_FRIENDS_ACTIVATE_GAME_OVERLAY_INVITE_DIALOG_SLOT (0x84 / 4)",
+        "#define QL_STEAM_FRIENDS_SET_RICH_PRESENCE_SLOT (0xac / 4)",
+        "#define QL_STEAM_FRIENDS_GET_FRIEND_RICH_PRESENCE_SLOT (0xb4 / 4)",
+        "#define QL_STEAM_FRIENDS_INVITE_USER_TO_GAME_SLOT (0xc4 / 4)",
+        "#define QL_STEAM_UTILS_GET_IP_COUNTRY_SLOT (0x10 / 4)",
+        "#define QL_STEAM_UTILS_GET_APP_ID_SLOT (0x24 / 4)",
+    )
+    for macro in slot_macros:
+        assert macro in steamworks
+
+    wrapper_slots = {
+        "qboolean QL_Steamworks_GetPersonaName( char *buffer, size_t bufferSize )": "QL_STEAM_FRIENDS_GET_PERSONA_NAME_SLOT",
+        "qboolean QL_Steamworks_GetIPCountry( char *buffer, size_t bufferSize )": "QL_STEAM_UTILS_GET_IP_COUNTRY_SLOT",
+        "uint32_t QL_Steamworks_GetAppID( void )": "QL_STEAM_UTILS_GET_APP_ID_SLOT",
+        "qboolean QL_Steamworks_IsUserLoggedOn( void )": "QL_STEAM_USER_BLOGGED_ON_SLOT",
+        "qboolean QL_Steamworks_GetUserSteamID( uint32_t *outIdLow, uint32_t *outIdHigh )": "QL_STEAM_USER_GET_STEAM_ID_SLOT",
+        "qboolean QL_Steamworks_SetInGameVoiceSpeaking( uint32_t idLow, uint32_t idHigh, qboolean speaking )": "QL_STEAM_FRIENDS_SET_IN_GAME_VOICE_SPEAKING_SLOT",
+        "int QL_Steamworks_GetFriendCount( int flags )": "QL_STEAM_FRIENDS_GET_FRIEND_COUNT_SLOT",
+        "qboolean QL_Steamworks_GetFriendByIndex( int index, int flags, uint32_t *outIdLow, uint32_t *outIdHigh )": "QL_STEAM_FRIENDS_GET_FRIEND_BY_INDEX_SLOT",
+        "qboolean QL_Steamworks_GetFriendPersonaName( uint32_t idLow, uint32_t idHigh, char *buffer, size_t bufferSize )": "QL_STEAM_FRIENDS_GET_FRIEND_PERSONA_NAME_SLOT",
+        "qboolean QL_Steamworks_SetRichPresence( const char *key, const char *value )": "QL_STEAM_FRIENDS_SET_RICH_PRESENCE_SLOT",
+        "qboolean QL_Steamworks_ActivateOverlayToUser( const char *dialog, uint32_t idLow, uint32_t idHigh )": "QL_STEAM_FRIENDS_ACTIVATE_GAME_OVERLAY_TO_USER_SLOT",
+        "qboolean QL_Steamworks_ActivateOverlayToWebPage( const char *url )": "QL_STEAM_FRIENDS_ACTIVATE_GAME_OVERLAY_TO_WEB_PAGE_SLOT",
+        "qboolean QL_Steamworks_ShowInviteOverlay( uint32_t idLow, uint32_t idHigh )": "QL_STEAM_FRIENDS_ACTIVATE_GAME_OVERLAY_INVITE_DIALOG_SLOT",
+        "qboolean QL_Steamworks_InviteUserToGame( uint32_t idLow, uint32_t idHigh, const char *connectString )": "QL_STEAM_FRIENDS_INVITE_USER_TO_GAME_SLOT",
+    }
+    for signature, macro in wrapper_slots.items():
+        block = _extract_function_block(steamworks, signature)
+        assert f"vtable[{macro}]" in block
+
+    summary_block = _extract_function_block(
+        steamworks,
+        "qboolean QL_Steamworks_GetFriendSummary( uint32_t idLow, uint32_t idHigh, ql_steam_friend_summary_t *outSummary )",
+    )
+    for macro in (
+        "QL_STEAM_FRIENDS_GET_FRIEND_RELATIONSHIP_SLOT",
+        "QL_STEAM_FRIENDS_GET_FRIEND_PERSONA_STATE_SLOT",
+        "QL_STEAM_FRIENDS_GET_FRIEND_PERSONA_NAME_SLOT",
+        "QL_STEAM_FRIENDS_GET_FRIEND_GAME_PLAYED_SLOT",
+        "QL_STEAM_FRIENDS_GET_PLAYER_NICKNAME_SLOT",
+        "QL_STEAM_FRIENDS_GET_FRIEND_RICH_PRESENCE_SLOT",
+    ):
+        assert f"vtable[{macro}]" in summary_block
+
+    set_server_block = _extract_function_block(
+        steamworks,
+        "qboolean QL_Steamworks_SetLobbyServer( uint32_t idLow, uint32_t idHigh, uint32_t serverIp, uint16_t serverPort )",
+    )
+    assert "userVTable[QL_STEAM_USER_GET_STEAM_ID_SLOT]" in set_server_block
+    assert "matchmakingVTable[QL_STEAM_MATCHMAKING_GET_LOBBY_OWNER_SLOT]" in set_server_block
+    assert "matchmakingVTable[QL_STEAM_MATCHMAKING_SET_LOBBY_GAME_SERVER_SLOT]" in set_server_block
+
+    mock_friends_block = _extract_function_block(harness_c, "void *QLR_SteamAPI_SteamFriends( void ) {")
+    mock_utils_block = _extract_function_block(harness_c, "void *QLR_SteamAPI_SteamUtils( void ) {")
+    mock_user_block = _extract_function_block(harness_c, "void *QLR_SteamAPI_SteamUser( void ) {")
+    assert "static void *vtable[QLR_STEAM_USER_VTABLE_SLOT_COUNT];" in mock_user_block
+    for harness_anchor in (
+        "vtable[QLR_STEAM_USER_BLOGGED_ON_SLOT] = QLR_SteamUser_BLoggedOn;",
+        "vtable[QLR_STEAM_USER_GET_STEAM_ID_SLOT] = QLR_SteamUser_GetSteamID;",
+    ):
+        assert harness_anchor in mock_user_block
+    assert "vtable[0x" not in mock_user_block
+    assert "static void *vtable[QLR_STEAM_FRIENDS_VTABLE_SLOT_COUNT];" in mock_friends_block
+    for harness_anchor in (
+        "vtable[QLR_STEAM_FRIENDS_GET_PERSONA_NAME_SLOT] = QLR_SteamFriends_GetPersonaName;",
+        "vtable[QLR_STEAM_FRIENDS_GET_FRIEND_COUNT_SLOT] = QLR_SteamFriends_GetFriendCount;",
+        "vtable[QLR_STEAM_FRIENDS_GET_FRIEND_BY_INDEX_SLOT] = QLR_SteamFriends_GetFriendByIndex;",
+        "vtable[QLR_STEAM_FRIENDS_GET_FRIEND_RELATIONSHIP_SLOT] = QLR_SteamFriends_GetFriendRelationship;",
+        "vtable[QLR_STEAM_FRIENDS_GET_FRIEND_PERSONA_STATE_SLOT] = QLR_SteamFriends_GetFriendPersonaState;",
+        "vtable[QLR_STEAM_FRIENDS_GET_FRIEND_PERSONA_NAME_SLOT] = QLR_SteamFriends_GetFriendPersonaName;",
+        "vtable[QLR_STEAM_FRIENDS_GET_FRIEND_GAME_PLAYED_SLOT] = QLR_SteamFriends_GetFriendGamePlayed;",
+        "vtable[QLR_STEAM_FRIENDS_GET_PLAYER_NICKNAME_SLOT] = QLR_SteamFriends_GetPlayerNickname;",
+        "vtable[QLR_STEAM_FRIENDS_SET_IN_GAME_VOICE_SPEAKING_SLOT] = QLR_SteamFriends_SetInGameVoiceSpeaking;",
+        "vtable[QLR_STEAM_FRIENDS_ACTIVATE_GAME_OVERLAY_TO_USER_SLOT] = QLR_SteamFriends_ActivateGameOverlayToUser;",
+        "vtable[QLR_STEAM_FRIENDS_ACTIVATE_GAME_OVERLAY_TO_WEB_PAGE_SLOT] = QLR_SteamFriends_ActivateGameOverlayToWebPage;",
+        "vtable[QLR_STEAM_FRIENDS_ACTIVATE_GAME_OVERLAY_INVITE_DIALOG_SLOT] = QLR_SteamFriends_ActivateGameOverlayInviteDialog;",
+        "vtable[QLR_STEAM_FRIENDS_SET_RICH_PRESENCE_SLOT] = QLR_SteamFriends_SetRichPresence;",
+        "vtable[QLR_STEAM_FRIENDS_GET_FRIEND_RICH_PRESENCE_SLOT] = QLR_SteamFriends_GetFriendRichPresence;",
+        "vtable[QLR_STEAM_FRIENDS_INVITE_USER_TO_GAME_SLOT] = QLR_SteamFriends_InviteUserToGame;",
+    ):
+        assert harness_anchor in mock_friends_block
+    assert "vtable[0x" not in mock_friends_block
+    assert "static void *vtable[QLR_STEAM_UTILS_VTABLE_SLOT_COUNT];" in mock_utils_block
+    for harness_anchor in (
+        "vtable[QLR_STEAM_UTILS_GET_IP_COUNTRY_SLOT] = QLR_SteamUtils_GetIPCountry;",
+        "vtable[QLR_STEAM_UTILS_GET_APP_ID_SLOT] = QLR_SteamUtils_GetAppID;",
+    ):
+        assert harness_anchor in mock_utils_block
+    assert "vtable[0x" not in mock_utils_block
+    for doc_anchor in (
+        "# Quake Live Steam Mapping Round 690: Client Identity, Friends, And Utils Slot Constants",
+        "`SteamClient_SyncPersonaNameCvar`",
+        "`SteamUtils_GetIPCountry`",
+        "`SteamLobby_ShowInviteOverlay`",
+        "`SteamFriends + 0xac`",
+        "Focused parity estimate: **before 90% -> after 99%**",
+        "Overall Steam launch/runtime integration mapping confidence moves from **93.74% -> 93.76%**",
+        "does not enable live Steam behavior by default",
+    ):
+        assert doc_anchor in mapping_round
+
+    assert "Task A592: Pin client identity, friends, and utils slot constants [COMPLETED]" in implementation_plan
+    assert "client identity/friends/utils ABI source-shape confidence" in implementation_plan
+
+
+def test_steam_matchmaking_lobby_slot_constants_round_693_is_pinned() -> None:
+    aliases = json.loads(
+        (REPO_ROOT / "references/analysis/quakelive_symbol_aliases.json").read_text(encoding="utf-8")
+    )["quakelive_steam_srp"]
+    functions_csv = (
+        REPO_ROOT / "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+    ).read_text(encoding="utf-8")
+    imports_txt = (
+        REPO_ROOT / "references/reverse-engineering/ghidra/quakelive_steam/imports.txt"
+    ).read_text(encoding="utf-8")
+    hlil_part01 = (
+        REPO_ROOT
+        / "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part01.txt"
+    ).read_text(encoding="utf-8")
+    hlil_part02 = (
+        REPO_ROOT
+        / "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part02.txt"
+    ).read_text(encoding="utf-8")
+    steamworks = (REPO_ROOT / "src/common/platform/platform_steamworks.c").read_text(encoding="utf-8")
+    harness_c = (REPO_ROOT / "tests/steamworks_harness.c").read_text(encoding="utf-8")
+    mapping_round = (
+        REPO_ROOT / "docs/reverse-engineering/quakelive_steam_mapping_round_693.md"
+    ).read_text(encoding="utf-8")
+    implementation_plan = (REPO_ROOT / "IMPLEMENTATION_PLAN.md").read_text(encoding="utf-8")
+
+    expected_aliases = {
+        "FUN_004645a0": "SteamLobbyCallbacks_OnLobbyChatMessage",
+        "sub_4645a0": "SteamLobbyCallbacks_OnLobbyChatMessage",
+        "FUN_004649b0": "SteamLobby_CreateLobby",
+        "sub_4649b0": "SteamLobby_CreateLobby",
+        "FUN_004649e0": "SteamLobby_LeaveLobby",
+        "sub_4649e0": "SteamLobby_LeaveLobby",
+        "FUN_00464ac0": "SteamLobby_SayLobby",
+        "sub_464ac0": "SteamLobby_SayLobby",
+        "FUN_00464b10": "SteamLobby_SetLobbyServer",
+        "sub_464b10": "SteamLobby_SetLobbyServer",
+        "FUN_00464bf0": "SteamLobbyCallbacks_OnLobbyCreated",
+        "sub_464bf0": "SteamLobbyCallbacks_OnLobbyCreated",
+        "FUN_00464d90": "SteamLobbyCallbacks_OnLobbyEnter",
+        "sub_464d90": "SteamLobbyCallbacks_OnLobbyEnter",
+        "FUN_00465630": "SteamLobby_JoinLobby",
+        "sub_465630": "SteamLobby_JoinLobby",
+        "FUN_00465840": "SteamLobby_Init",
+        "sub_465840": "SteamLobby_Init",
+    }
+    for symbol, alias in expected_aliases.items():
+        assert aliases[symbol] == alias
+
+    for row in (
+        "FUN_004645a0,004645a0,377,0,unknown",
+        "FUN_004649b0,004649b0,37,0,unknown",
+        "FUN_004649e0,004649e0,185,0,unknown",
+        "FUN_00464ac0,00464ac0,69,0,unknown",
+        "FUN_00464b10,00464b10,155,0,unknown",
+        "FUN_00464bf0,00464bf0,416,0,unknown",
+        "FUN_00464d90,00464d90,1350,0,unknown",
+        "FUN_00465630,00465630,76,0,unknown",
+        "FUN_00465840,00465840,85,0,unknown",
+    ):
+        assert row in functions_csv
+
+    assert "STEAM_API.DLL!SteamMatchmaking @ 00159176" in imports_txt
+
+    for retail_anchor in (
+        "004645ec  int32_t edx_1 = *(*SteamMatchmaking(eax_2) + 0x6c)",
+        "004649d2  return (*(*eax + 0x34))(2, *(data_e30338 + 0x30))",
+        "00464a0f  (*(*eax + 0x3c))(data_e3033c, data_e30340)",
+        "00464aff  return (*(*eax_2 + 0x68))(data_e3033c, data_e30340, arg1, eax - &eax[1] + 1)",
+        "00464b71          result = (*(*eax_1 + 0x8c))(&var_14, data_e3033c, data_e30340)",
+        "00464ba2              return (*(*eax_5 + 0x74))(edx_5, ecx_5, arg1, arg2, edx_5, ecx_5)",
+        '00464cc4      (*(*SteamMatchmaking(eax_2) + 0x50))(edi_1, arg1[3], "hello", "world")',
+        "00464fd6      int32_t* eax_21 = (*(*SteamMatchmaking() + 0x8c))(&var_88c, esi_1, edi_1)",
+        "0046503e      int32_t eax_27 = (*(*SteamMatchmaking() + 0x54))(esi_1, edi_1)",
+        "0046507e              (*(*SteamMatchmaking() + 0x58))(esi_1, edi_1, var_858_3, &var_454, 0x400, ",
+        "004650c9      sub_429310(&var_86c, (*(*SteamMatchmaking() + 0x44))(esi_1, edi_1))",
+        "00465116      sub_429310(&var_86c, (*(*SteamMatchmaking() + 0x80))(esi_1, edi_1))",
+        "0046519b              (*(*SteamMatchmaking() + 0x48))(&var_884, esi_1, edi_1, var_858_4)",
+        "00465674  return (*(*SteamMatchmaking() + 0x38))(var_c, var_8_1)",
+    ):
+        assert retail_anchor in hlil_part02
+
+    for favorite_anchor in (
+        "00432742                      int32_t eax_83 = SteamMatchmaking()",
+        "00432798                      (*edx_26)(var_138)",
+        "004326bb                      int32_t eax_71 = SteamMatchmaking()",
+        "00432729                      (*(ecx_98 + 8))(var_138)",
+    ):
+        assert favorite_anchor in hlil_part01
+
+    slot_macros = (
+        "#define QL_STEAM_MATCHMAKING_ADD_FAVORITE_GAME_SLOT (0x08 / 4)",
+        "#define QL_STEAM_MATCHMAKING_REMOVE_FAVORITE_GAME_SLOT (0x0c / 4)",
+        "#define QL_STEAM_MATCHMAKING_CREATE_LOBBY_SLOT (0x34 / 4)",
+        "#define QL_STEAM_MATCHMAKING_JOIN_LOBBY_SLOT (0x38 / 4)",
+        "#define QL_STEAM_MATCHMAKING_LEAVE_LOBBY_SLOT (0x3c / 4)",
+        "#define QL_STEAM_MATCHMAKING_INVITE_USER_TO_LOBBY_SLOT (0x40 / 4)",
+        "#define QL_STEAM_MATCHMAKING_GET_NUM_LOBBY_MEMBERS_SLOT (0x44 / 4)",
+        "#define QL_STEAM_MATCHMAKING_GET_LOBBY_MEMBER_BY_INDEX_SLOT (0x48 / 4)",
+        "#define QL_STEAM_MATCHMAKING_SET_LOBBY_DATA_SLOT (0x50 / 4)",
+        "#define QL_STEAM_MATCHMAKING_GET_LOBBY_DATA_COUNT_SLOT (0x54 / 4)",
+        "#define QL_STEAM_MATCHMAKING_GET_LOBBY_DATA_BY_INDEX_SLOT (0x58 / 4)",
+        "#define QL_STEAM_MATCHMAKING_SEND_LOBBY_CHAT_MSG_SLOT (0x68 / 4)",
+        "#define QL_STEAM_MATCHMAKING_GET_LOBBY_CHAT_ENTRY_SLOT (0x6c / 4)",
+        "#define QL_STEAM_MATCHMAKING_SET_LOBBY_GAME_SERVER_SLOT (0x74 / 4)",
+        "#define QL_STEAM_MATCHMAKING_GET_LOBBY_MEMBER_LIMIT_SLOT (0x80 / 4)",
+        "#define QL_STEAM_MATCHMAKING_GET_LOBBY_OWNER_SLOT (0x8c / 4)",
+    )
+    for macro in slot_macros:
+        assert macro in steamworks
+
+    wrapper_slots = {
+        "static qboolean QL_Steamworks_ReadLobbyChatMessage( uint32_t idLow, uint32_t idHigh, int chatId, CSteamID *outChatter, int *outEntryType, char *buffer, size_t bufferSize )": "QL_STEAM_MATCHMAKING_GET_LOBBY_CHAT_ENTRY_SLOT",
+        "qboolean QL_Steamworks_CreateLobby( int maxMembers )": "QL_STEAM_MATCHMAKING_CREATE_LOBBY_SLOT",
+        "qboolean QL_Steamworks_LeaveLobby( uint32_t idLow, uint32_t idHigh )": "QL_STEAM_MATCHMAKING_LEAVE_LOBBY_SLOT",
+        "qboolean QL_Steamworks_JoinLobby( uint32_t idLow, uint32_t idHigh )": "QL_STEAM_MATCHMAKING_JOIN_LOBBY_SLOT",
+        "qboolean QL_Steamworks_GetLobbyOwner( uint32_t idLow, uint32_t idHigh, uint32_t *outIdLow, uint32_t *outIdHigh )": "QL_STEAM_MATCHMAKING_GET_LOBBY_OWNER_SLOT",
+        "int QL_Steamworks_GetLobbyDataCount( uint32_t idLow, uint32_t idHigh )": "QL_STEAM_MATCHMAKING_GET_LOBBY_DATA_COUNT_SLOT",
+        "qboolean QL_Steamworks_SetLobbyData( uint32_t idLow, uint32_t idHigh, const char *key, const char *value )": "QL_STEAM_MATCHMAKING_SET_LOBBY_DATA_SLOT",
+        "qboolean QL_Steamworks_GetLobbyDataByIndex( uint32_t idLow, uint32_t idHigh, int index, char *key, size_t keySize, char *value, size_t valueSize )": "QL_STEAM_MATCHMAKING_GET_LOBBY_DATA_BY_INDEX_SLOT",
+        "int QL_Steamworks_GetNumLobbyMembers( uint32_t idLow, uint32_t idHigh )": "QL_STEAM_MATCHMAKING_GET_NUM_LOBBY_MEMBERS_SLOT",
+        "int QL_Steamworks_GetLobbyMemberLimit( uint32_t idLow, uint32_t idHigh )": "QL_STEAM_MATCHMAKING_GET_LOBBY_MEMBER_LIMIT_SLOT",
+        "qboolean QL_Steamworks_GetLobbyMemberByIndex( uint32_t idLow, uint32_t idHigh, int index, uint32_t *outIdLow, uint32_t *outIdHigh )": "QL_STEAM_MATCHMAKING_GET_LOBBY_MEMBER_BY_INDEX_SLOT",
+        "qboolean QL_Steamworks_InviteUserToLobby( uint32_t lobbyIdLow, uint32_t lobbyIdHigh, uint32_t userIdLow, uint32_t userIdHigh )": "QL_STEAM_MATCHMAKING_INVITE_USER_TO_LOBBY_SLOT",
+        "qboolean QL_Steamworks_SayLobby( uint32_t idLow, uint32_t idHigh, const char *message )": "QL_STEAM_MATCHMAKING_SEND_LOBBY_CHAT_MSG_SLOT",
+    }
+    for signature, macro in wrapper_slots.items():
+        block = _extract_function_block(steamworks, signature)
+        assert f"vtable[{macro}]" in block
+
+    favorite_block = _extract_function_block(
+        steamworks,
+        "qboolean QL_Steamworks_SetFavoriteServerForApp( uint32_t serverIp, uint16_t serverPort, uint32_t appId, qboolean add )",
+    )
+    assert "vtable[QL_STEAM_MATCHMAKING_ADD_FAVORITE_GAME_SLOT]" in favorite_block
+    assert "vtable[QL_STEAM_MATCHMAKING_REMOVE_FAVORITE_GAME_SLOT]" in favorite_block
+
+    set_server_block = _extract_function_block(
+        steamworks,
+        "qboolean QL_Steamworks_SetLobbyServer( uint32_t idLow, uint32_t idHigh, uint32_t serverIp, uint16_t serverPort )",
+    )
+    assert "matchmakingVTable[QL_STEAM_MATCHMAKING_GET_LOBBY_OWNER_SLOT]" in set_server_block
+    assert "matchmakingVTable[QL_STEAM_MATCHMAKING_SET_LOBBY_GAME_SERVER_SLOT]" in set_server_block
+
+    mock_matchmaking_block = _extract_function_block(harness_c, "void *QLR_SteamAPI_SteamMatchmaking( void ) {")
+    assert "static void *vtable[QLR_STEAM_MATCHMAKING_VTABLE_SLOT_COUNT];" in mock_matchmaking_block
+    for harness_anchor in (
+        "vtable[QLR_STEAM_MATCHMAKING_ADD_FAVORITE_GAME_SLOT] = QLR_SteamMatchmaking_AddFavoriteGame;",
+        "vtable[QLR_STEAM_MATCHMAKING_REMOVE_FAVORITE_GAME_SLOT] = QLR_SteamMatchmaking_RemoveFavoriteGame;",
+        "vtable[QLR_STEAM_MATCHMAKING_CREATE_LOBBY_SLOT] = QLR_SteamMatchmaking_CreateLobby;",
+        "vtable[QLR_STEAM_MATCHMAKING_LEAVE_LOBBY_SLOT] = QLR_SteamMatchmaking_LeaveLobby;",
+        "vtable[QLR_STEAM_MATCHMAKING_JOIN_LOBBY_SLOT] = QLR_SteamMatchmaking_JoinLobby;",
+        "vtable[QLR_STEAM_MATCHMAKING_INVITE_USER_TO_LOBBY_SLOT] = QLR_SteamMatchmaking_InviteUserToLobby;",
+        "vtable[QLR_STEAM_MATCHMAKING_SEND_LOBBY_CHAT_MSG_SLOT] = QLR_SteamMatchmaking_SendLobbyChatMsg;",
+        "vtable[QLR_STEAM_MATCHMAKING_GET_LOBBY_CHAT_ENTRY_SLOT] = QLR_SteamMatchmaking_GetLobbyChatEntry;",
+        "vtable[QLR_STEAM_MATCHMAKING_SET_LOBBY_GAME_SERVER_SLOT] = QLR_SteamMatchmaking_SetLobbyGameServer;",
+        "vtable[QLR_STEAM_MATCHMAKING_GET_LOBBY_OWNER_SLOT] = QLR_SteamMatchmaking_GetLobbyOwner;",
+    ):
+        assert harness_anchor in mock_matchmaking_block
+    assert "static void *vtable[0x8c / 4 + 1];" not in mock_matchmaking_block
+    assert "vtable[0x" not in mock_matchmaking_block
+
+    for doc_anchor in (
+        "# Quake Live Steam Mapping Round 693: Client SteamMatchmaking Lobby Slot Constants",
+        "`SteamLobby_CreateLobby`",
+        "`SteamLobby_SetLobbyServer`",
+        "`SteamMatchmaking + 0x74`",
+        "Focused parity estimate: **before 90% -> after 99%**",
+        "Overall Steam launch/runtime integration mapping confidence moves from **93.76% -> 93.78%**",
+        "does not enable live Steam behavior by default",
+    ):
+        assert doc_anchor in mapping_round
+
+    assert "Task A595: Pin client SteamMatchmaking lobby slot constants [COMPLETED]" in implementation_plan
+    assert "client SteamMatchmaking lobby ABI source-shape confidence" in implementation_plan
+
+
+def test_steam_matchmaking_servers_slot_constants_round_696_is_pinned() -> None:
+    aliases = json.loads(
+        (REPO_ROOT / "references/analysis/quakelive_symbol_aliases.json").read_text(encoding="utf-8")
+    )["quakelive_steam_srp"]
+    functions_csv = (
+        REPO_ROOT / "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+    ).read_text(encoding="utf-8")
+    imports_txt = (
+        REPO_ROOT / "references/reverse-engineering/ghidra/quakelive_steam/imports.txt"
+    ).read_text(encoding="utf-8")
+    hlil_part02 = (
+        REPO_ROOT
+        / "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part02.txt"
+    ).read_text(encoding="utf-8")
+    steamworks = (REPO_ROOT / "src/common/platform/platform_steamworks.c").read_text(encoding="utf-8")
+    harness_c = (REPO_ROOT / "tests/steamworks_harness.c").read_text(encoding="utf-8")
+    mapping_round = (
+        REPO_ROOT / "docs/reverse-engineering/quakelive_steam_mapping_round_696.md"
+    ).read_text(encoding="utf-8")
+    implementation_plan = (REPO_ROOT / "IMPLEMENTATION_PLAN.md").read_text(encoding="utf-8")
+
+    expected_aliases = {
+        "FUN_00461f70": "JSBrowserDetails_RequestServerDetails",
+        "sub_461f70": "JSBrowserDetails_RequestServerDetails",
+        "FUN_00462e80": "SteamBrowser_RefreshList",
+        "sub_462e80": "SteamBrowser_RefreshList",
+        "FUN_00462eb0": "JSBrowser_RequestServers",
+        "sub_462eb0": "JSBrowser_RequestServers",
+        "FUN_00463090": "SteamBrowser_RequestServers",
+        "sub_463090": "SteamBrowser_RequestServers",
+        "FUN_004630b0": "SteamBrowser_RequestServerDetails",
+        "sub_4630b0": "SteamBrowser_RequestServerDetails",
+    }
+    for symbol, alias in expected_aliases.items():
+        assert aliases[symbol] == alias
+
+    for row in (
+        "FUN_00461f70,00461f70,107,0,unknown",
+        "FUN_00462e80,00462e80,34,0,unknown",
+        "FUN_00462eb0,00462eb0,451,0,unknown",
+        "FUN_00463090,00463090,20,0,unknown",
+        "FUN_004630b0,004630b0,87,0,unknown",
+    ):
+        assert row in functions_csv
+
+    assert "STEAM_API.DLL!SteamMatchmakingServers @ 0015928c" in imports_txt
+
+    for retail_anchor in (
+        "00461fab  (*(*SteamMatchmakingServers() + 0x34))(arg2, arg3, arg1 + 8)",
+        "00461fbd  (*(*SteamMatchmakingServers() + 0x3c))(arg2, arg3, arg1)",
+        "00461fd8  return (*(*SteamMatchmakingServers() + 0x38))(arg2, arg3, arg1 + 4)",
+        "00462a8c      (*(*SteamMatchmakingServers(data_584520 ^ &__saved_ebp) + 0x1c))(arg1, arg2)",
+        "00462e8d      int32_t eax_1 = SteamMatchmakingServers()",
+        "00462e9e      (*(*eax_1 + 0x24))(*(esi + 8))",
+        "00462ede          int32_t eax_1 = SteamMatchmakingServers()",
+        "00462eeb          (*(*eax_1 + 0x18))(*(arg1 + 8))",
+        "00462f77                  eax_9 = (*(edi_1 + 4))((*(*eax_4 + 0x24))(arg1))",
+        "00462fad                  eax_9 = (*(edi_1 + 8))((*(*eax_10 + 0x24))(&var_210, 1, arg1))",
+        "00462fe3                  eax_9 = (*(edi_1 + 0xc))((*(*eax_14 + 0x24))(&var_210, 1, arg1))",
+        "00463016                  eax_9 = (*(edi_1 + 0x10))((*(*eax_18 + 0x24))(&var_210, 1, arg1))",
+        "00463026          edi_1 = SteamMatchmakingServers()",
+        "0046304c          eax_9 = (**edi_1)((*(*eax_22 + 0x24))(&var_210, 1, arg1))",
+    ):
+        assert retail_anchor in hlil_part02
+
+    slot_macros = (
+        "#define QL_STEAM_MATCHMAKING_SERVERS_REQUEST_INTERNET_SERVER_LIST_SLOT 0",
+        "#define QL_STEAM_MATCHMAKING_SERVERS_REQUEST_LAN_SERVER_LIST_SLOT (0x04 / 4)",
+        "#define QL_STEAM_MATCHMAKING_SERVERS_REQUEST_FRIENDS_SERVER_LIST_SLOT (0x08 / 4)",
+        "#define QL_STEAM_MATCHMAKING_SERVERS_REQUEST_FAVORITES_SERVER_LIST_SLOT (0x0c / 4)",
+        "#define QL_STEAM_MATCHMAKING_SERVERS_REQUEST_HISTORY_SERVER_LIST_SLOT (0x10 / 4)",
+        "#define QL_STEAM_MATCHMAKING_SERVERS_RELEASE_REQUEST_SLOT (0x18 / 4)",
+        "#define QL_STEAM_MATCHMAKING_SERVERS_GET_SERVER_DETAILS_SLOT (0x1c / 4)",
+        "#define QL_STEAM_MATCHMAKING_SERVERS_REFRESH_QUERY_SLOT (0x24 / 4)",
+        "#define QL_STEAM_MATCHMAKING_SERVERS_PING_SERVER_SLOT (0x34 / 4)",
+        "#define QL_STEAM_MATCHMAKING_SERVERS_PLAYER_DETAILS_SLOT (0x38 / 4)",
+        "#define QL_STEAM_MATCHMAKING_SERVERS_SERVER_RULES_SLOT (0x3c / 4)",
+        "#define QL_STEAM_MATCHMAKING_SERVERS_CANCEL_SERVER_QUERY_SLOT (0x40 / 4)",
+    )
+    for macro in slot_macros:
+        assert macro in steamworks
+
+    request_list_block = _extract_function_block(
+        steamworks,
+        "ql_steam_server_list_request_t QL_Steamworks_RequestServerListForApp( ql_steam_server_browser_request_mode_t requestMode, uint32_t appId, void *responseObject )",
+    )
+    for macro in (
+        "QL_STEAM_MATCHMAKING_SERVERS_REQUEST_LAN_SERVER_LIST_SLOT",
+        "QL_STEAM_MATCHMAKING_SERVERS_REQUEST_FRIENDS_SERVER_LIST_SLOT",
+        "QL_STEAM_MATCHMAKING_SERVERS_REQUEST_FAVORITES_SERVER_LIST_SLOT",
+        "QL_STEAM_MATCHMAKING_SERVERS_REQUEST_HISTORY_SERVER_LIST_SLOT",
+        "QL_STEAM_MATCHMAKING_SERVERS_REQUEST_INTERNET_SERVER_LIST_SLOT",
+    ):
+        assert f"vtable[{macro}]" in request_list_block
+
+    wrapper_slots = {
+        "const void *QL_Steamworks_GetServerListDetails( ql_steam_server_list_request_t request, int index )": "QL_STEAM_MATCHMAKING_SERVERS_GET_SERVER_DETAILS_SLOT",
+        "void QL_Steamworks_ReleaseServerListRequest( ql_steam_server_list_request_t request )": "QL_STEAM_MATCHMAKING_SERVERS_RELEASE_REQUEST_SLOT",
+        "void QL_Steamworks_RefreshServerListRequest( ql_steam_server_list_request_t request )": "QL_STEAM_MATCHMAKING_SERVERS_REFRESH_QUERY_SLOT",
+        "void QL_Steamworks_CancelServerQuery( ql_steam_server_query_t query )": "QL_STEAM_MATCHMAKING_SERVERS_CANCEL_SERVER_QUERY_SLOT",
+    }
+    for signature, macro in wrapper_slots.items():
+        block = _extract_function_block(steamworks, signature)
+        assert f"vtable[{macro}]" in block
+        assert "vtable[0x" not in block
+
+    detail_block = _extract_function_block(
+        steamworks,
+        "qboolean QL_Steamworks_RequestServerDetails( uint32_t serverIp, uint16_t serverPort, void *pingResponse, void *playersResponse, void *rulesResponse, ql_steam_server_query_t *outPingQuery, ql_steam_server_query_t *outPlayersQuery, ql_steam_server_query_t *outRulesQuery )",
+    )
+    for macro in (
+        "QL_STEAM_MATCHMAKING_SERVERS_PING_SERVER_SLOT",
+        "QL_STEAM_MATCHMAKING_SERVERS_PLAYER_DETAILS_SLOT",
+        "QL_STEAM_MATCHMAKING_SERVERS_SERVER_RULES_SLOT",
+    ):
+        assert f"vtable[{macro}]" in detail_block
+    assert "vtable[0x" not in request_list_block
+    assert "vtable[0x" not in detail_block
+
+    mock_servers_block = _extract_function_block(harness_c, "void *QLR_SteamAPI_SteamMatchmakingServers( void ) {")
+    for harness_anchor in (
+        "vtable[QLR_STEAM_MATCHMAKING_SERVERS_REQUEST_INTERNET_SERVER_LIST_SLOT] = QLR_SteamMatchmakingServers_RequestInternetServerList;",
+        "vtable[QLR_STEAM_MATCHMAKING_SERVERS_REQUEST_LAN_SERVER_LIST_SLOT] = QLR_SteamMatchmakingServers_RequestLANServerList;",
+        "vtable[QLR_STEAM_MATCHMAKING_SERVERS_REQUEST_FRIENDS_SERVER_LIST_SLOT] = QLR_SteamMatchmakingServers_RequestFriendsServerList;",
+        "vtable[QLR_STEAM_MATCHMAKING_SERVERS_REQUEST_FAVORITES_SERVER_LIST_SLOT] = QLR_SteamMatchmakingServers_RequestFavoritesServerList;",
+        "vtable[QLR_STEAM_MATCHMAKING_SERVERS_REQUEST_HISTORY_SERVER_LIST_SLOT] = QLR_SteamMatchmakingServers_RequestHistoryServerList;",
+        "vtable[QLR_STEAM_MATCHMAKING_SERVERS_RELEASE_REQUEST_SLOT] = QLR_SteamMatchmakingServers_ReleaseRequest;",
+        "vtable[QLR_STEAM_MATCHMAKING_SERVERS_GET_SERVER_DETAILS_SLOT] = QLR_SteamMatchmakingServers_GetServerDetails;",
+        "vtable[QLR_STEAM_MATCHMAKING_SERVERS_REFRESH_QUERY_SLOT] = QLR_SteamMatchmakingServers_RefreshQuery;",
+        "vtable[QLR_STEAM_MATCHMAKING_SERVERS_PING_SERVER_SLOT] = QLR_SteamMatchmakingServers_PingServer;",
+        "vtable[QLR_STEAM_MATCHMAKING_SERVERS_PLAYER_DETAILS_SLOT] = QLR_SteamMatchmakingServers_PlayerDetails;",
+        "vtable[QLR_STEAM_MATCHMAKING_SERVERS_SERVER_RULES_SLOT] = QLR_SteamMatchmakingServers_ServerRules;",
+        "vtable[QLR_STEAM_MATCHMAKING_SERVERS_CANCEL_SERVER_QUERY_SLOT] = QLR_SteamMatchmakingServers_CancelServerQuery;",
+    ):
+        assert harness_anchor in mock_servers_block
+    assert "static void *vtable[QLR_STEAM_MATCHMAKING_SERVERS_VTABLE_SLOT_COUNT];" in mock_servers_block
+    assert "vtable[0x" not in mock_servers_block
+
+    for doc_anchor in (
+        "# Quake Live Steam Mapping Round 696: Client SteamMatchmakingServers Slot Constants",
+        "`JSBrowser_RequestServers`",
+        "`SteamBrowser_RequestServerDetails`",
+        "`SteamMatchmakingServers + 0x24`",
+        "Focused parity estimate: **before 90% -> after 99%**",
+        "Overall Steam launch/runtime integration mapping confidence moves from **93.78% -> 93.80%**",
+        "does not enable live Steam behavior by default",
+    ):
+        assert doc_anchor in mapping_round
+
+    assert "Task A598: Pin client SteamMatchmakingServers slot constants [COMPLETED]" in implementation_plan
+    assert "client SteamMatchmakingServers ABI source-shape confidence" in implementation_plan
+
+
+def test_steam_matchmaking_servers_mock_slot_mirroring_round_706_is_pinned() -> None:
+    aliases = json.loads(
+        (REPO_ROOT / "references/analysis/quakelive_symbol_aliases.json").read_text(encoding="utf-8")
+    )["quakelive_steam_srp"]
+    functions_csv = (
+        REPO_ROOT / "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+    ).read_text(encoding="utf-8")
+    imports_txt = (
+        REPO_ROOT / "references/reverse-engineering/ghidra/quakelive_steam/imports.txt"
+    ).read_text(encoding="utf-8")
+    hlil_part02 = (
+        REPO_ROOT
+        / "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part02.txt"
+    ).read_text(encoding="utf-8")
+    steamworks = (REPO_ROOT / "src/common/platform/platform_steamworks.c").read_text(encoding="utf-8")
+    harness_c = (REPO_ROOT / "tests/steamworks_harness.c").read_text(encoding="utf-8")
+    mapping_round = (
+        REPO_ROOT / "docs/reverse-engineering/quakelive_steam_mapping_round_706.md"
+    ).read_text(encoding="utf-8")
+    implementation_plan = (REPO_ROOT / "IMPLEMENTATION_PLAN.md").read_text(encoding="utf-8")
+
+    expected_aliases = {
+        "FUN_00461f70": "JSBrowserDetails_RequestServerDetails",
+        "sub_461f70": "JSBrowserDetails_RequestServerDetails",
+        "FUN_00462e80": "SteamBrowser_RefreshList",
+        "sub_462e80": "SteamBrowser_RefreshList",
+        "FUN_00462eb0": "JSBrowser_RequestServers",
+        "sub_462eb0": "JSBrowser_RequestServers",
+        "FUN_00463090": "SteamBrowser_RequestServers",
+        "sub_463090": "SteamBrowser_RequestServers",
+        "FUN_004630b0": "SteamBrowser_RequestServerDetails",
+        "sub_4630b0": "SteamBrowser_RequestServerDetails",
+    }
+    for symbol, alias in expected_aliases.items():
+        assert aliases[symbol] == alias
+
+    for row in (
+        "FUN_00461f70,00461f70,107,0,unknown",
+        "FUN_00462e80,00462e80,34,0,unknown",
+        "FUN_00462eb0,00462eb0,451,0,unknown",
+        "FUN_00463090,00463090,20,0,unknown",
+        "FUN_004630b0,004630b0,87,0,unknown",
+    ):
+        assert row in functions_csv
+
+    assert "STEAM_API.DLL!SteamMatchmakingServers @ 0015928c" in imports_txt
+
+    for retail_anchor in (
+        "00461fab  (*(*SteamMatchmakingServers() + 0x34))(arg2, arg3, arg1 + 8)",
+        "00461fbd  (*(*SteamMatchmakingServers() + 0x3c))(arg2, arg3, arg1)",
+        "00461fd8  return (*(*SteamMatchmakingServers() + 0x38))(arg2, arg3, arg1 + 4)",
+        "00462a8c      (*(*SteamMatchmakingServers(data_584520 ^ &__saved_ebp) + 0x1c))(arg1, arg2)",
+        "00462e9e      (*(*eax_1 + 0x24))(*(esi + 8))",
+        "00462eeb          (*(*eax_1 + 0x18))(*(arg1 + 8))",
+        "00462f77                  eax_9 = (*(edi_1 + 4))((*(*eax_4 + 0x24))(arg1))",
+        "00462fad                  eax_9 = (*(edi_1 + 8))((*(*eax_10 + 0x24))(&var_210, 1, arg1))",
+        "00462fe3                  eax_9 = (*(edi_1 + 0xc))((*(*eax_14 + 0x24))(&var_210, 1, arg1))",
+        "00463016                  eax_9 = (*(edi_1 + 0x10))((*(*eax_18 + 0x24))(&var_210, 1, arg1))",
+        "0046304c          eax_9 = (**edi_1)((*(*eax_22 + 0x24))(&var_210, 1, arg1))",
+    ):
+        assert retail_anchor in hlil_part02
+
+    slot_values = {
+        "REQUEST_INTERNET_SERVER_LIST": "0",
+        "REQUEST_LAN_SERVER_LIST": "(0x04 / 4)",
+        "REQUEST_FRIENDS_SERVER_LIST": "(0x08 / 4)",
+        "REQUEST_FAVORITES_SERVER_LIST": "(0x0c / 4)",
+        "REQUEST_HISTORY_SERVER_LIST": "(0x10 / 4)",
+        "RELEASE_REQUEST": "(0x18 / 4)",
+        "GET_SERVER_DETAILS": "(0x1c / 4)",
+        "REFRESH_QUERY": "(0x24 / 4)",
+        "PING_SERVER": "(0x34 / 4)",
+        "PLAYER_DETAILS": "(0x38 / 4)",
+        "SERVER_RULES": "(0x3c / 4)",
+        "CANCEL_SERVER_QUERY": "(0x40 / 4)",
+    }
+    for name, value in slot_values.items():
+        assert f"#define QL_STEAM_MATCHMAKING_SERVERS_{name}_SLOT {value}" in steamworks
+        assert f"#define QLR_STEAM_MATCHMAKING_SERVERS_{name}_SLOT {value}" in harness_c
+
+    assert (
+        "#define QLR_STEAM_MATCHMAKING_SERVERS_VTABLE_SLOT_COUNT "
+        "(QLR_STEAM_MATCHMAKING_SERVERS_CANCEL_SERVER_QUERY_SLOT + 1)"
+    ) in harness_c
+
+    mock_servers_block = _extract_function_block(harness_c, "void *QLR_SteamAPI_SteamMatchmakingServers( void ) {")
+    assert "static void *vtable[QLR_STEAM_MATCHMAKING_SERVERS_VTABLE_SLOT_COUNT];" in mock_servers_block
+    for macro, fn_name in (
+        ("REQUEST_INTERNET_SERVER_LIST", "QLR_SteamMatchmakingServers_RequestInternetServerList"),
+        ("REQUEST_LAN_SERVER_LIST", "QLR_SteamMatchmakingServers_RequestLANServerList"),
+        ("REQUEST_FRIENDS_SERVER_LIST", "QLR_SteamMatchmakingServers_RequestFriendsServerList"),
+        ("REQUEST_FAVORITES_SERVER_LIST", "QLR_SteamMatchmakingServers_RequestFavoritesServerList"),
+        ("REQUEST_HISTORY_SERVER_LIST", "QLR_SteamMatchmakingServers_RequestHistoryServerList"),
+        ("RELEASE_REQUEST", "QLR_SteamMatchmakingServers_ReleaseRequest"),
+        ("GET_SERVER_DETAILS", "QLR_SteamMatchmakingServers_GetServerDetails"),
+        ("REFRESH_QUERY", "QLR_SteamMatchmakingServers_RefreshQuery"),
+        ("PING_SERVER", "QLR_SteamMatchmakingServers_PingServer"),
+        ("PLAYER_DETAILS", "QLR_SteamMatchmakingServers_PlayerDetails"),
+        ("SERVER_RULES", "QLR_SteamMatchmakingServers_ServerRules"),
+        ("CANCEL_SERVER_QUERY", "QLR_SteamMatchmakingServers_CancelServerQuery"),
+    ):
+        assert f"vtable[QLR_STEAM_MATCHMAKING_SERVERS_{macro}_SLOT] = {fn_name};" in mock_servers_block
+
+    assert "static void *vtable[0x40 / 4 + 1];" not in mock_servers_block
+    assert "vtable[0x" not in mock_servers_block
+
+    for doc_anchor in (
+        "# Quake Live Steam Mapping Round 706: Mock SteamMatchmakingServers Slot Mirroring",
+        "`SteamBrowser_RequestServers`",
+        "`SteamBrowser_RequestServerDetails`",
+        "`QLR_STEAM_MATCHMAKING_SERVERS_REQUEST_INTERNET_SERVER_LIST_SLOT`",
+        "`QLR_STEAM_MATCHMAKING_SERVERS_VTABLE_SLOT_COUNT`",
+        "Focused parity estimate: **before 88% -> after 99%**",
+        "Overall Steam launch/runtime integration mapping confidence moves from **93.94% -> 93.96%**",
+        "does not enable live Steam behavior by default",
+    ):
+        assert doc_anchor in mapping_round
+
+    assert "Task A608: Mirror SteamMatchmakingServers mock slot constants [COMPLETED]" in implementation_plan
+    assert "SteamMatchmakingServers harness slot-mirroring source-shape confidence" in implementation_plan
+
+
+def test_steam_browser_owner_completion_guard_round_741_is_pinned() -> None:
+    aliases = json.loads(
+        (REPO_ROOT / "references/analysis/quakelive_symbol_aliases.json").read_text(encoding="utf-8")
+    )["quakelive_steam_srp"]
+    functions_csv = (
+        REPO_ROOT / "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+    ).read_text(encoding="utf-8")
+    imports_txt = (
+        REPO_ROOT / "references/reverse-engineering/ghidra/quakelive_steam/imports.txt"
+    ).read_text(encoding="utf-8")
+    hlil_part02 = (
+        REPO_ROOT
+        / "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part02.txt"
+    ).read_text(encoding="utf-8")
+    steamworks = (REPO_ROOT / "src/common/platform/platform_steamworks.c").read_text(encoding="utf-8")
+    cl_main = (REPO_ROOT / "src/code/client/cl_main.c").read_text(encoding="utf-8")
+    harness_py = (REPO_ROOT / "tests/test_steamworks_harness.py").read_text(encoding="utf-8")
+    mapping_round = (
+        REPO_ROOT / "docs/reverse-engineering/quakelive_steam_mapping_round_741.md"
+    ).read_text(encoding="utf-8")
+    implementation_plan = (REPO_ROOT / "IMPLEMENTATION_PLAN.md").read_text(encoding="utf-8")
+
+    begin_owner_block = _extract_function_block(
+        steamworks,
+        "qboolean QL_Steamworks_BeginServerBrowserOwnerRequestForApp( ql_steam_server_browser_owner_t *owner, ql_steam_server_browser_request_mode_t requestMode, uint32_t appId, void *responseObject )",
+    )
+    complete_owner_block = _extract_function_block(
+        steamworks, "qboolean QL_Steamworks_CompleteServerBrowserOwnerRequest( ql_steam_server_browser_owner_t *owner )"
+    )
+    complete_native_refresh_block = _extract_function_block(
+        cl_main, "static void CL_SteamBrowser_CompleteNativeRefresh( qboolean timedOut )"
+    )
+    native_refresh_complete_block = _extract_function_block(
+        cl_main,
+        "static void CL_SteamBrowser_NativeRefreshCompleteImpl( clSteamNativeServerListResponse_t *self, ql_steam_server_list_request_t request, int response )",
+    )
+
+    assert aliases["FUN_00462e60"] == "JSBrowser_OnRefreshComplete"
+    assert aliases["FUN_00462e80"] == "SteamBrowser_RefreshList"
+    assert aliases["FUN_00462eb0"] == "JSBrowser_RequestServers"
+    assert aliases["FUN_00463090"] == "SteamBrowser_RequestServers"
+    assert "FUN_00462e60,00462e60,22,0,unknown" in functions_csv
+    assert "FUN_00462e80,00462e80,34,0,unknown" in functions_csv
+    assert "FUN_00462eb0,00462eb0,451,0,unknown" in functions_csv
+    assert "STEAM_API.DLL!SteamMatchmakingServers @ 0015928c" in imports_txt
+
+    for retail_anchor in (
+        "00462e67  *(arg1 + 4) = 0",
+        '00462e73  return sub_4f3260(esi, edi, "servers.refresh.end", nullptr)',
+        "00462e8b  if (*(esi + 8) != 0)",
+        "00462e9e      (*(*eax_1 + 0x24))(*(esi + 8))",
+        "00462eca  if (*(arg1 + 4) == 0)",
+        "00462eed          *(arg1 + 8) = 0",
+        '00463058      result = sub_4f3260(arg1, edi_1, "servers.refresh.start", nullptr)',
+    ):
+        assert retail_anchor in hlil_part02
+
+    assert "if ( owner->refreshActive ) {" in begin_owner_block
+    assert "return qfalse;" in begin_owner_block
+    assert "owner->refreshActive = qtrue;" in begin_owner_block
+    assert "owner->request = request;" in begin_owner_block
+
+    assert "if ( !owner ) {" in complete_owner_block
+    assert "if ( !owner->refreshActive ) {" in complete_owner_block
+    assert complete_owner_block.index("if ( !owner->refreshActive ) {") < complete_owner_block.index(
+        "owner->refreshActive = qfalse;"
+    )
+    assert "owner->request = NULL;" not in complete_owner_block
+    assert "return qtrue;" in complete_owner_block
+
+    assert "if ( timedOut && !cl_steamBrowserState.nativeRefreshActive ) {" in complete_native_refresh_block
+    assert "if ( !QL_Steamworks_CompleteServerBrowserOwnerRequest( &cl_steamNativeBrowserOwner ) ) {" in complete_native_refresh_block
+    assert "return;" in complete_native_refresh_block
+    assert complete_native_refresh_block.index(
+        "if ( !QL_Steamworks_CompleteServerBrowserOwnerRequest( &cl_steamNativeBrowserOwner ) ) {"
+    ) < complete_native_refresh_block.index("cl_steamBrowserState.nativeRefreshActive = qfalse;")
+    assert complete_native_refresh_block.index("cl_steamBrowserState.refreshActive = qfalse;") < complete_native_refresh_block.index(
+        'CL_Steam_PublishBrowserEvent( "servers.refresh.end", NULL );'
+    )
+    assert "if ( self != &cl_steamNativeListResponse || request != cl_steamNativeBrowserOwner.request ) {" in native_refresh_complete_block
+    assert "CL_SteamBrowser_CompleteNativeRefresh( qfalse );" in native_refresh_complete_block
+
+    assert "assert not lib.QLR_Steamworks_CompleteServerBrowserOwnerRequest(ctypes.byref(owner))" in harness_py
+    assert "assert owner.request == 0x13572468" in harness_py
+
+    for doc_anchor in (
+        "# Quake Live Steam Mapping Round 741: Steam Browser Owner Completion Guard",
+        "`JSBrowser_OnRefreshComplete`",
+        "`SteamBrowser_RefreshList`",
+        "`QL_Steamworks_CompleteServerBrowserOwnerRequest`",
+        "`CL_SteamBrowser_CompleteNativeRefresh`",
+        "Focused native Steam browser owner completion guard confidence:\n**86% -> 99%**.",
+        "overall Steam launch/runtime integration mapping confidence **94.36% -> 94.38%**",
+    ):
+        assert doc_anchor in mapping_round
+
+    assert "Task A643: Pin Steam browser owner completion guard [COMPLETED]" in implementation_plan
+    assert "overall Steam launch/runtime\nintegration mapping confidence **94.36% -> 94.38%**" in implementation_plan
+
+
+def test_steam_browser_detail_terminal_channels_round_745_are_pinned() -> None:
+    aliases = json.loads(
+        (REPO_ROOT / "references/analysis/quakelive_symbol_aliases.json").read_text(encoding="utf-8")
+    )["quakelive_steam_srp"]
+    functions_csv = (
+        REPO_ROOT / "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+    ).read_text(encoding="utf-8")
+    imports_txt = (
+        REPO_ROOT / "references/reverse-engineering/ghidra/quakelive_steam/imports.txt"
+    ).read_text(encoding="utf-8")
+    hlil_part02 = (
+        REPO_ROOT
+        / "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part02.txt"
+    ).read_text(encoding="utf-8")
+    steamworks_h = (REPO_ROOT / "src/common/platform/platform_steamworks.h").read_text(encoding="utf-8")
+    steamworks = (REPO_ROOT / "src/common/platform/platform_steamworks.c").read_text(encoding="utf-8")
+    cl_main = (REPO_ROOT / "src/code/client/cl_main.c").read_text(encoding="utf-8")
+    harness_c = (REPO_ROOT / "tests/steamworks_harness.c").read_text(encoding="utf-8")
+    harness_py = (REPO_ROOT / "tests/test_steamworks_harness.py").read_text(encoding="utf-8")
+    mapping_round = (
+        REPO_ROOT / "docs/reverse-engineering/quakelive_steam_mapping_round_745.md"
+    ).read_text(encoding="utf-8")
+    implementation_plan = (REPO_ROOT / "IMPLEMENTATION_PLAN.md").read_text(encoding="utf-8")
+
+    init_lifecycle_block = _extract_function_block(
+        steamworks,
+        "qboolean QL_Steamworks_InitServerBrowserDetailLifecycle( uint32_t serverIp, uint16_t serverPort, ql_steam_server_browser_detail_lifecycle_t *outLifecycle )",
+    )
+    complete_terminal_block = _extract_function_block(
+        steamworks,
+        "qboolean QL_Steamworks_CompleteServerBrowserDetailTerminal( ql_steam_server_browser_detail_lifecycle_t *lifecycle, uint32_t terminalChannel, qboolean *outReleaseReady )",
+    )
+    legacy_callback_block = _extract_function_block(
+        steamworks,
+        "qboolean QL_Steamworks_CompleteServerBrowserDetailCallback( ql_steam_server_browser_detail_lifecycle_t *lifecycle, qboolean *outReleaseReady )",
+    )
+    request_terminal_block = _extract_function_block(
+        steamworks,
+        "qboolean QL_Steamworks_CompleteServerBrowserDetailRequestTerminal( ql_steam_server_browser_detail_request_t *request, uint32_t terminalChannel, qboolean *outReleaseReady )",
+    )
+    request_callback_block = _extract_function_block(
+        steamworks,
+        "qboolean QL_Steamworks_CompleteServerBrowserDetailRequestCallback( ql_steam_server_browser_detail_request_t *request, qboolean *outReleaseReady )",
+    )
+    complete_native_detail_block = _extract_function_block(
+        cl_main,
+        "static void CL_SteamBrowser_CompleteNativeDetailTerminal( clSteamNativeServerDetail_t *detail, uint32_t terminalChannel )",
+    )
+    native_ping_responded_block = _extract_function_block(
+        cl_main,
+        "static void CL_SteamBrowser_NativePingRespondedImpl( clSteamNativeServerPingResponse_t *self, const void *serverDetails )",
+    )
+    native_ping_failed_block = _extract_function_block(
+        cl_main,
+        "static void CL_SteamBrowser_NativePingFailedImpl( clSteamNativeServerPingResponse_t *self )",
+    )
+    native_rules_failed_block = _extract_function_block(
+        cl_main,
+        "static void CL_SteamBrowser_NativeRulesFailedImpl( clSteamNativeServerRulesResponse_t *self )",
+    )
+    native_rules_complete_block = _extract_function_block(
+        cl_main,
+        "static void CL_SteamBrowser_NativeRulesRefreshCompleteImpl( clSteamNativeServerRulesResponse_t *self )",
+    )
+    native_players_failed_block = _extract_function_block(
+        cl_main,
+        "static void CL_SteamBrowser_NativePlayersFailedImpl( clSteamNativeServerPlayersResponse_t *self )",
+    )
+    native_players_complete_block = _extract_function_block(
+        cl_main,
+        "static void CL_SteamBrowser_NativePlayersRefreshCompleteImpl( clSteamNativeServerPlayersResponse_t *self )",
+    )
+
+    assert aliases["FUN_00461f70"] == "JSBrowserDetails_RequestServerDetails"
+    assert aliases["FUN_004630b0"] == "SteamBrowser_RequestServerDetails"
+    assert aliases["FUN_00462eb0"] == "JSBrowser_RequestServers"
+    assert "FUN_00461f70,00461f70,107,0,unknown" in functions_csv
+    assert "FUN_004630b0,004630b0,87,0,unknown" in functions_csv
+    assert "FUN_00462eb0,00462eb0,451,0,unknown" in functions_csv
+    assert "STEAM_API.DLL!SteamMatchmakingServers @ 0015928c" in imports_txt
+
+    for retail_anchor in (
+        "00461fab  (*(*SteamMatchmakingServers() + 0x34))(arg2, arg3, arg1 + 8)",
+        "00461fbd  (*(*SteamMatchmakingServers() + 0x3c))(arg2, arg3, arg1)",
+        "00461fd8  return (*(*SteamMatchmakingServers() + 0x38))(arg2, arg3, arg1 + 4)",
+        "004630b0    int32_t sub_4630b0(int32_t arg1, int32_t arg2)",
+        "004630f3  return sub_461f70(eax, arg1, arg2)",
+    ):
+        assert retail_anchor in hlil_part02
+
+    assert "#define QL_STEAM_SERVER_BROWSER_DETAIL_TERMINAL_PING 0x01u" in steamworks_h
+    assert "#define QL_STEAM_SERVER_BROWSER_DETAIL_TERMINAL_RULES 0x02u" in steamworks_h
+    assert "#define QL_STEAM_SERVER_BROWSER_DETAIL_TERMINAL_PLAYERS 0x04u" in steamworks_h
+    assert "uint32_t completedTerminalChannels;" in steamworks_h
+    assert "QL_Steamworks_CompleteServerBrowserDetailTerminal" in steamworks_h
+    assert "QL_Steamworks_CompleteServerBrowserDetailRequestTerminal" in steamworks_h
+
+    assert "outLifecycle->completedTerminalChannels = 0u;" in init_lifecycle_block
+    assert "QL_Steamworks_IsServerBrowserDetailTerminalChannel( terminalChannel )" in complete_terminal_block
+    assert "lifecycle->completedTerminalChannels & terminalChannel" in complete_terminal_block
+    assert "lifecycle->completedTerminalChannels |= terminalChannel;" in complete_terminal_block
+    assert "QL_Steamworks_CountServerBrowserDetailTerminalChannels( lifecycle->completedTerminalChannels )" in complete_terminal_block
+    assert "( lifecycle->completedTerminalChannels & QL_STEAM_SERVER_BROWSER_DETAIL_TERMINAL_ALL ) == QL_STEAM_SERVER_BROWSER_DETAIL_TERMINAL_ALL" in complete_terminal_block
+    assert "QL_Steamworks_NextServerBrowserDetailTerminalChannel( lifecycle )" in legacy_callback_block
+    assert "QL_Steamworks_CompleteServerBrowserDetailTerminal( &request->lifecycle, terminalChannel, &releaseReady )" in request_terminal_block
+    assert "request->queriesActive = qfalse;" in request_terminal_block
+    assert "QL_Steamworks_NextServerBrowserDetailTerminalChannel( request ? &request->lifecycle : NULL )" in request_callback_block
+    assert "QL_Steamworks_CompleteServerBrowserDetailRequestTerminal( request, terminalChannel, outReleaseReady )" in request_callback_block
+
+    assert "QL_Steamworks_CompleteServerBrowserDetailRequestTerminal( &detail->request, terminalChannel, &releaseReady )" in complete_native_detail_block
+    assert "CL_SteamBrowser_FreeNativeDetail( detail, qfalse );" in complete_native_detail_block
+    assert "QL_STEAM_SERVER_BROWSER_DETAIL_TERMINAL_PING" in native_ping_responded_block
+    assert "QL_STEAM_SERVER_BROWSER_DETAIL_TERMINAL_PING" in native_ping_failed_block
+    assert "QL_STEAM_SERVER_BROWSER_DETAIL_TERMINAL_RULES" in native_rules_failed_block
+    assert "QL_STEAM_SERVER_BROWSER_DETAIL_TERMINAL_RULES" in native_rules_complete_block
+    assert "QL_STEAM_SERVER_BROWSER_DETAIL_TERMINAL_PLAYERS" in native_players_failed_block
+    assert "QL_STEAM_SERVER_BROWSER_DETAIL_TERMINAL_PLAYERS" in native_players_complete_block
+
+    assert "QLR_Steamworks_CompleteServerBrowserDetailTerminal" in harness_c
+    assert "QLR_Steamworks_CompleteServerBrowserDetailRequestTerminal" in harness_c
+    assert "DETAIL_TERMINAL_ALL = DETAIL_TERMINAL_PING | DETAIL_TERMINAL_RULES | DETAIL_TERMINAL_PLAYERS" in harness_py
+    assert '("completedTerminalChannels", ctypes.c_uint32),' in harness_py
+    assert "QLR_Steamworks_CompleteServerBrowserDetailTerminal.argtypes" in harness_py
+    assert "QLR_Steamworks_CompleteServerBrowserDetailRequestTerminal.argtypes" in harness_py
+    assert "assert not lib.QLR_Steamworks_CompleteServerBrowserDetailTerminal" in harness_py
+    assert "assert not lib.QLR_Steamworks_CompleteServerBrowserDetailRequestTerminal" in harness_py
+
+    for doc_anchor in (
+        "# Quake Live Steam Mapping Round 745: Steam Browser Detail Terminal Channel Ownership",
+        "`JSBrowserDetails_RequestServerDetails`",
+        "`QL_STEAM_SERVER_BROWSER_DETAIL_TERMINAL_PING`",
+        "`QL_Steamworks_CompleteServerBrowserDetailTerminal`",
+        "Focused native Steam browser detail terminal-channel ownership confidence:\n**84% -> 99%**.",
+        "overall Steam launch/runtime integration mapping confidence **94.38% -> 94.40%**",
+    ):
+        assert doc_anchor in mapping_round
+
+    assert "Task A647: Pin Steam browser detail terminal channel ownership [COMPLETED]" in implementation_plan
+    assert "overall Steam launch/runtime\nintegration mapping confidence **94.38% -> 94.40%**" in implementation_plan
+
+
+def test_steam_browser_ping_response_filtered_completion_round_748_is_pinned() -> None:
+    aliases = json.loads(
+        (REPO_ROOT / "references/analysis/quakelive_symbol_aliases.json").read_text(encoding="utf-8")
+    )["quakelive_steam_srp"]
+    functions_csv = (
+        REPO_ROOT / "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+    ).read_text(encoding="utf-8")
+    imports_txt = (
+        REPO_ROOT / "references/reverse-engineering/ghidra/quakelive_steam/imports.txt"
+    ).read_text(encoding="utf-8")
+    hlil_part02 = (
+        REPO_ROOT
+        / "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part02.txt"
+    ).read_text(encoding="utf-8")
+    hlil_part06 = (
+        REPO_ROOT
+        / "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part06.txt"
+    ).read_text(encoding="utf-8")
+    steamworks = (REPO_ROOT / "src/common/platform/platform_steamworks.c").read_text(encoding="utf-8")
+    cl_main = (REPO_ROOT / "src/code/client/cl_main.c").read_text(encoding="utf-8")
+    mapping_round = (
+        REPO_ROOT / "docs/reverse-engineering/quakelive_steam_mapping_round_748.md"
+    ).read_text(encoding="utf-8")
+    implementation_plan = (REPO_ROOT / "IMPLEMENTATION_PLAN.md").read_text(encoding="utf-8")
+
+    read_ping_for_app_block = _extract_function_block(
+        steamworks,
+        "qboolean QL_Steamworks_ReadServerBrowserPingResponseForApp( const void *serverDetails, uint32_t appId, ql_steam_server_browser_response_t *outResponse )",
+    )
+    native_ping_responded_block = _extract_function_block(
+        cl_main,
+        "static void CL_SteamBrowser_NativePingRespondedImpl( clSteamNativeServerPingResponse_t *self, const void *serverDetails )",
+    )
+    native_ping_failed_block = _extract_function_block(
+        cl_main,
+        "static void CL_SteamBrowser_NativePingFailedImpl( clSteamNativeServerPingResponse_t *self )",
+    )
+
+    assert aliases["FUN_00461fe0"] == "JSBrowserDetails_OnServerResponded"
+    assert aliases["FUN_00462340"] == "JSBrowserDetails_OnServerFailedToRespond"
+    assert aliases["FUN_00461f70"] == "JSBrowserDetails_RequestServerDetails"
+    assert "FUN_00461fe0,00461fe0,863,0,unknown" in functions_csv
+    assert "FUN_00462340,00462340,20,0,unknown" in functions_csv
+    assert "STEAM_API.DLL!SteamUtils @ 0015914c" in imports_txt
+    assert "STEAM_API.DLL!SteamMatchmakingServers @ 0015928c" in imports_txt
+
+    for retail_anchor in (
+        "00461fe0    struct _EXCEPTION_REGISTRATION_RECORD** __thiscall sub_461fe0",
+        "00462024      result = (*(*SteamUtils(data_584520 ^ &__saved_ebp) + 0x24))()",
+        "0046202c      if (*(arg2 + 0x90) == result)",
+        '004622ff          sub_4f3260(arg2, arg1, sub_4d9220("servers.details.%u_%u.response"), &var_20)',
+        "00462304          *(arg1 + 0x4c) += 1",
+        "00462311          if (*(arg1 + 0x4c) == 3)",
+        "00462340    void* __fastcall sub_462340(void* arg1)",
+        "00462340  *(arg1 + 0x4c) += 1",
+    ):
+        assert retail_anchor in hlil_part02
+
+    assert "00532b0c  struct ISteamMatchmakingPingResponse::JSBrowserDetails::VTable" in hlil_part06
+    assert "00532b0c      int32_t (* const _purecall)() = sub_461fe0" in hlil_part06
+    assert "00532b10      int32_t (* const _purecall)() = sub_462340" in hlil_part06
+
+    assert "QL_Steamworks_ServerBrowserAppIdsCompatible( raw->appId, appId )" in read_ping_for_app_block
+    assert read_ping_for_app_block.index("QL_Steamworks_ServerBrowserAppIdsCompatible") < read_ping_for_app_block.index(
+        "QL_Steamworks_CopyServerBrowserResponse( outResponse, &server );"
+    )
+
+    filtered_completion_shape = (
+        "if ( QL_Steamworks_ReadServerBrowserPingResponseForApp( serverDetails, detail->appId, &response ) ) {\n"
+        "\t\tCL_SteamBrowser_PublishNativeServerResponse( &response );\n"
+        "\t\tCL_SteamBrowser_CompleteNativeDetailTerminal( detail, QL_STEAM_SERVER_BROWSER_DETAIL_TERMINAL_PING );\n"
+        "\t}"
+    )
+    assert filtered_completion_shape in native_ping_responded_block
+    assert native_ping_responded_block.count("QL_STEAM_SERVER_BROWSER_DETAIL_TERMINAL_PING") == 1
+    assert native_ping_responded_block.index("QL_Steamworks_ReadServerBrowserPingResponseForApp") < native_ping_responded_block.index(
+        "CL_SteamBrowser_CompleteNativeDetailTerminal( detail, QL_STEAM_SERVER_BROWSER_DETAIL_TERMINAL_PING );"
+    )
+    assert "CL_SteamBrowser_PublishNativeServerResponse( &response );" in native_ping_responded_block
+    assert "CL_SteamBrowser_CompleteNativeDetailTerminal( CL_SteamBrowser_NativeDetailFromPing( self ), QL_STEAM_SERVER_BROWSER_DETAIL_TERMINAL_PING );" in native_ping_failed_block
+
+    for doc_anchor in (
+        "# Quake Live Steam Mapping Round 748: Steam Browser Ping Response Filtered Completion",
+        "`JSBrowserDetails_OnServerResponded`",
+        "`SteamUtils + 0x24`",
+        "`QL_Steamworks_ReadServerBrowserPingResponseForApp`",
+        "`CL_SteamBrowser_NativePingRespondedImpl`",
+        "Focused native Steam browser ping response filtered-completion confidence:\n**86% -> 99%**.",
+        "overall Steam launch/runtime integration mapping confidence **94.40% -> 94.42%**",
+    ):
+        assert doc_anchor in mapping_round
+
+    assert "Task A650: Pin Steam browser ping response filtered completion [COMPLETED]" in implementation_plan
+    assert "overall Steam launch/runtime\nintegration mapping confidence **94.40% -> 94.42%**" in implementation_plan
+
+
+def test_steam_browser_rules_players_terminal_event_boundary_round_750_is_pinned() -> None:
+    aliases = json.loads(
+        (REPO_ROOT / "references/analysis/quakelive_symbol_aliases.json").read_text(encoding="utf-8")
+    )["quakelive_steam_srp"]
+    functions_csv = (
+        REPO_ROOT / "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+    ).read_text(encoding="utf-8")
+    imports_txt = (
+        REPO_ROOT / "references/reverse-engineering/ghidra/quakelive_steam/imports.txt"
+    ).read_text(encoding="utf-8")
+    hlil_part02 = (
+        REPO_ROOT
+        / "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part02.txt"
+    ).read_text(encoding="utf-8")
+    hlil_part06 = (
+        REPO_ROOT
+        / "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part06.txt"
+    ).read_text(encoding="utf-8")
+    steamworks = (REPO_ROOT / "src/common/platform/platform_steamworks.c").read_text(encoding="utf-8")
+    cl_main = (REPO_ROOT / "src/code/client/cl_main.c").read_text(encoding="utf-8")
+    mapping_round = (
+        REPO_ROOT / "docs/reverse-engineering/quakelive_steam_mapping_round_750.md"
+    ).read_text(encoding="utf-8")
+    implementation_plan = (REPO_ROOT / "IMPLEMENTATION_PLAN.md").read_text(encoding="utf-8")
+
+    expected_aliases = {
+        "FUN_00462360": ("JSBrowserDetails_OnRuleResponded", 295),
+        "FUN_00462490": ("JSBrowserDetails_OnRulesFailed", 263),
+        "FUN_004625a0": ("JSBrowserDetails_OnRulesRefreshComplete", 263),
+        "FUN_004626b0": ("JSBrowserDetails_OnPlayerResponded", 375),
+        "FUN_00462830": ("JSBrowserDetails_OnPlayersFailed", 266),
+        "FUN_00462940": ("JSBrowserDetails_OnPlayersRefreshComplete", 266),
+    }
+    for symbol, (alias, size) in expected_aliases.items():
+        address = symbol.removeprefix("FUN_")
+        assert aliases[symbol] == alias
+        assert f"{symbol},{address},{size},0,unknown" in functions_csv
+
+    assert "STEAM_API.DLL!SteamMatchmakingServers @ 0015928c" in imports_txt
+
+    for retail_anchor in (
+        '0046245d  sub_4f3260(arg1, arg1 + 0x14, sub_4d9220("servers.rules.%s.response"), &var_20)',
+        '0046255d  sub_4f3260(arg1, arg1 + 0x14, sub_4d9220("servers.rules.%s.failed"), &var_20)',
+        "00462562  *(arg1 + 0x54) += 1",
+        "0046256c  if (*(arg1 + 0x54) == 3)",
+        '0046266d  sub_4f3260(arg1, arg1 + 0x14, sub_4d9220("servers.rules.%s.end"), &var_20)',
+        "00462672  *(arg1 + 0x54) += 1",
+        "0046267c  if (*(arg1 + 0x54) == 3)",
+        '004627fc  sub_4f3260(arg1, arg1 + 0x10, sub_4d9220("servers.players.%s.response"), &var_20)',
+        '004628fd  sub_4f3260(arg1, arg1 + 0x10, sub_4d9220("servers.players.%s.failed"), &var_20)',
+        "00462902  *(arg1 + 0x50) += 1",
+        "0046290f  if (*(arg1 + 0x50) == 3)",
+        '00462a0d  sub_4f3260(arg1, arg1 + 0x10, sub_4d9220("servers.players.%s.end"), &var_20)',
+        "00462a12  *(arg1 + 0x50) += 1",
+        "00462a1f  if (*(arg1 + 0x50) == 3)",
+    ):
+        assert retail_anchor in hlil_part02
+
+    for vtable_anchor in (
+        "00532b18  struct ISteamMatchmakingPlayersResponse::JSBrowserDetails::VTable",
+        "00532b18      int32_t (* const _purecall)() = sub_4626b0",
+        "00532b1c      int32_t (* const _purecall)() = sub_462830",
+        "00532b20      int32_t (* const _purecall)() = sub_462940",
+        "00532b28  struct ISteamMatchmakingRulesResponse::JSBrowserDetails::VTable",
+        "00532b28      int32_t (__thiscall* const vFunc_0)(class Awesomium::JSArray* arg1, int32_t arg2, int32_t arg3) = sub_462360",
+        "00532b2c      int32_t (__fastcall* const vFunc_1)(class Awesomium::JSArray* arg1) = sub_462490",
+        "00532b30      int32_t (__fastcall* const vFunc_2)(class Awesomium::JSArray* arg1) = sub_4625a0",
+    ):
+        assert vtable_anchor in hlil_part06
+
+    format_event_block = _extract_function_block(
+        steamworks,
+        "qboolean QL_Steamworks_FormatServerBrowserDetailEventName( ql_steam_server_browser_detail_channel_t channel, ql_steam_server_browser_detail_phase_t phase, const char *detailId, char *buffer, size_t bufferSize )",
+    )
+    build_rule_block = _extract_function_block(
+        steamworks,
+        "qboolean QL_Steamworks_BuildServerBrowserRuleResponse( const ql_steam_server_browser_detail_identity_t *identity, const char *rule, const char *value, ql_steam_server_browser_rule_response_t *outResponse )",
+    )
+    build_player_block = _extract_function_block(
+        steamworks,
+        "qboolean QL_Steamworks_BuildServerBrowserPlayerResponse( const ql_steam_server_browser_detail_identity_t *identity, const char *name, int score, int time, ql_steam_server_browser_player_response_t *outResponse )",
+    )
+    native_rule_responded_block = _extract_function_block(
+        cl_main,
+        "static void CL_SteamBrowser_NativeRuleRespondedImpl( clSteamNativeServerRulesResponse_t *self, const char *rule, const char *value )",
+    )
+    native_rules_failed_block = _extract_function_block(
+        cl_main,
+        "static void CL_SteamBrowser_NativeRulesFailedImpl( clSteamNativeServerRulesResponse_t *self )",
+    )
+    native_rules_complete_block = _extract_function_block(
+        cl_main,
+        "static void CL_SteamBrowser_NativeRulesRefreshCompleteImpl( clSteamNativeServerRulesResponse_t *self )",
+    )
+    native_player_responded_block = _extract_function_block(
+        cl_main,
+        "static void CL_SteamBrowser_NativePlayerRespondedImpl( clSteamNativeServerPlayersResponse_t *self, const char *name, int score, float timePlayed )",
+    )
+    native_players_failed_block = _extract_function_block(
+        cl_main,
+        "static void CL_SteamBrowser_NativePlayersFailedImpl( clSteamNativeServerPlayersResponse_t *self )",
+    )
+    native_players_complete_block = _extract_function_block(
+        cl_main,
+        "static void CL_SteamBrowser_NativePlayersRefreshCompleteImpl( clSteamNativeServerPlayersResponse_t *self )",
+    )
+
+    assert 'Com_sprintf( buffer, bufferSize, "servers.%s.%s.%s", channelLabel, detailId ? detailId : "", phaseLabel );' in format_event_block
+    assert "QL_STEAM_SERVER_BROWSER_DETAIL_RULES, QL_STEAM_SERVER_BROWSER_DETAIL_RESPONSE" in build_rule_block
+    assert "QL_STEAM_SERVER_BROWSER_DETAIL_PLAYERS, QL_STEAM_SERVER_BROWSER_DETAIL_RESPONSE" in build_player_block
+    assert "CL_SteamBrowser_PublishNativeRuleResponse( &response );" in native_rule_responded_block
+    assert "CL_SteamBrowser_CompleteNativeDetailTerminal" not in native_rule_responded_block
+    assert "CL_SteamBrowser_PublishNativePlayerResponse( &response );" in native_player_responded_block
+    assert "CL_SteamBrowser_CompleteNativeDetailTerminal" not in native_player_responded_block
+
+    assert "QL_STEAM_SERVER_BROWSER_DETAIL_RULES, QL_STEAM_SERVER_BROWSER_DETAIL_FAILED" in native_rules_failed_block
+    assert "QL_STEAM_SERVER_BROWSER_DETAIL_RULES, QL_STEAM_SERVER_BROWSER_DETAIL_END" in native_rules_complete_block
+    assert native_rules_failed_block.index("CL_SteamBrowser_PublishNativeDetailEvent( &event, qtrue );") < native_rules_failed_block.index(
+        "CL_SteamBrowser_CompleteNativeDetailTerminal( detail, QL_STEAM_SERVER_BROWSER_DETAIL_TERMINAL_RULES );"
+    )
+    assert native_rules_complete_block.index("CL_SteamBrowser_PublishNativeDetailEvent( &event, qtrue );") < native_rules_complete_block.index(
+        "CL_SteamBrowser_CompleteNativeDetailTerminal( detail, QL_STEAM_SERVER_BROWSER_DETAIL_TERMINAL_RULES );"
+    )
+
+    assert "QL_STEAM_SERVER_BROWSER_DETAIL_PLAYERS, QL_STEAM_SERVER_BROWSER_DETAIL_FAILED" in native_players_failed_block
+    assert "QL_STEAM_SERVER_BROWSER_DETAIL_PLAYERS, QL_STEAM_SERVER_BROWSER_DETAIL_END" in native_players_complete_block
+    assert native_players_failed_block.index("CL_SteamBrowser_PublishNativeDetailEvent( &event, qtrue );") < native_players_failed_block.index(
+        "CL_SteamBrowser_CompleteNativeDetailTerminal( detail, QL_STEAM_SERVER_BROWSER_DETAIL_TERMINAL_PLAYERS );"
+    )
+    assert native_players_complete_block.index("CL_SteamBrowser_PublishNativeDetailEvent( &event, qtrue );") < native_players_complete_block.index(
+        "CL_SteamBrowser_CompleteNativeDetailTerminal( detail, QL_STEAM_SERVER_BROWSER_DETAIL_TERMINAL_PLAYERS );"
+    )
+
+    for doc_anchor in (
+        "# Quake Live Steam Mapping Round 750: Steam Browser Rules And Players Terminal Event Boundary",
+        "`JSBrowserDetails_OnRulesFailed`",
+        "`JSBrowserDetails_OnPlayersRefreshComplete`",
+        "`CL_SteamBrowser_NativeRulesRefreshCompleteImpl`",
+        "`CL_SteamBrowser_NativePlayersRefreshCompleteImpl`",
+        "Focused native Steam browser rules/players terminal-event boundary confidence:\n**87% -> 99%**.",
+        "overall Steam launch/runtime integration mapping confidence **94.42% -> 94.44%**",
+    ):
+        assert doc_anchor in mapping_round
+
+    assert "Task A652: Pin Steam browser rules/players terminal event boundary [COMPLETED]" in implementation_plan
+    assert "overall Steam launch/runtime\nintegration mapping confidence **94.42% -> 94.44%**" in implementation_plan
+
+
+def test_steam_ugc_apps_workshop_slot_constants_round_699_is_pinned() -> None:
+    aliases = json.loads(
+        (REPO_ROOT / "references/analysis/quakelive_symbol_aliases.json").read_text(encoding="utf-8")
+    )["quakelive_steam_srp"]
+    functions_csv = (
+        REPO_ROOT / "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+    ).read_text(encoding="utf-8")
+    imports_txt = (
+        REPO_ROOT / "references/reverse-engineering/ghidra/quakelive_steam/imports.txt"
+    ).read_text(encoding="utf-8")
+    hlil_part02 = (
+        REPO_ROOT
+        / "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part02.txt"
+    ).read_text(encoding="utf-8")
+    steamworks = (REPO_ROOT / "src/common/platform/platform_steamworks.c").read_text(encoding="utf-8")
+    harness_c = (REPO_ROOT / "tests/steamworks_harness.c").read_text(encoding="utf-8")
+    mapping_round = (
+        REPO_ROOT / "docs/reverse-engineering/quakelive_steam_mapping_round_699.md"
+    ).read_text(encoding="utf-8")
+    implementation_plan = (REPO_ROOT / "IMPLEMENTATION_PLAN.md").read_text(encoding="utf-8")
+
+    expected_aliases = {
+        "FUN_00460590": "SteamApps_BIsSubscribedApp",
+        "sub_460590": "SteamApps_BIsSubscribedApp",
+        "FUN_00460660": "SteamUGC_GetItemDownloadInfo",
+        "sub_460660": "SteamUGC_GetItemDownloadInfo",
+        "FUN_00460dc0": "SteamWorkshop_GetAllUGC",
+        "sub_460dc0": "SteamWorkshop_GetAllUGC",
+        "FUN_00469260": "SteamWorkshop_SubscribeItem",
+        "sub_469260": "SteamWorkshop_SubscribeItem",
+        "FUN_004692b0": "SteamWorkshop_UnsubscribeItem",
+        "sub_4692b0": "SteamWorkshop_UnsubscribeItem",
+        "FUN_00469400": "SteamWorkshop_AdvanceDownloadQueue",
+        "sub_469400": "SteamWorkshop_AdvanceDownloadQueue",
+        "FUN_00469470": "SteamWorkshop_FinalizeItem",
+        "sub_469470": "SteamWorkshop_FinalizeItem",
+        "FUN_004697a0": "SteamWorkshop_Init",
+        "sub_4697a0": "SteamWorkshop_Init",
+        "FUN_004699c0": "SteamWorkshop_RequestDownload",
+        "sub_4699c0": "SteamWorkshop_RequestDownload",
+    }
+    for symbol, alias in expected_aliases.items():
+        assert aliases[symbol] == alias
+
+    for row in (
+        "FUN_00460590,00460590,40,0,unknown",
+        "FUN_00460660,00460660,42,0,unknown",
+        "FUN_00460dc0,00460dc0,158,0,unknown",
+        "FUN_00469260,00469260,76,0,unknown",
+        "FUN_004692b0,004692b0,29,0,unknown",
+        "FUN_00469400,00469400,105,0,unknown",
+        "FUN_00469470,00469470,331,0,unknown",
+        "FUN_004697a0,004697a0,526,0,unknown",
+        "FUN_004699c0,004699c0,309,0,unknown",
+    ):
+        assert row in functions_csv
+
+    for imported_symbol in (
+        "STEAM_API.DLL!SteamApps @ 001591e0",
+        "STEAM_API.DLL!SteamUGC @ 001591ae",
+        "STEAM_API.DLL!SteamGameServerUGC @ 001592fe",
+        "STEAM_API.DLL!SteamGameServerUtils @ 00159344",
+    ):
+        assert imported_symbol in imports_txt
+
+    for retail_anchor in (
+        "0045fd88              int32_t edx_4 = *(*SteamUGC(eax_2) + 0x10)",
+        "0045fdaa                  int32_t edx_6 = *(*SteamUGC() + 0x14)",
+        "0045feb2      (*(*eax_13 + 0x34))(*arg1, arg1[1])",
+        "0045fd60      (*(*eax_3 + 0x34))(*arg1, arg1[1])",
+        "004605b7      return zx.d((*(*SteamApps() + 0x1c))(arg1))",
+        "00460689  return zx.d((*(*SteamUGC() + 0xd8))(arg1, arg2, arg3, arg4))",
+        "00460df3  eax_4, edx_3 = (*(*SteamUGC() + 4))(1, 0, eax_2, eax_2, arg1)",
+        "00460e04  eax_7, result = (*(*SteamUGC() + 0xc))(eax_4, edx_3)",
+        "0046794f  int32_t eax_8 = (*(*SteamGameServerUtils(eax_2) + 0x24))()",
+        "0046927b  (*(*data_e30344 + 0xc0))(arg1, arg2)",
+        "0046928d  char result = (*(*data_e30344 + 0xd0))(arg1, arg2)",
+        "004692cc  return (*(*data_e30344 + 0xc4))(arg1, arg2)",
+        "00469466  return (*(*data_e30344 + 0xdc))(data_e40bb8, data_e40bbc, 1)",
+        "004694ca  (*(*ecx + 0xd4))(arg1, arg2, &var_114, &var_108, 0x100, &var_10c)",
+        "004694dc  void* i = (*(*data_e30344 + 0xd0))(arg1, arg2)",
+        "004698c6  (*(*ecx_6 + 0xcc))(&var_908, 0x100)",
+        "004698d6  int32_t eax_15 = (*(*data_e30344 + 0xc8))()",
+        "00469944          (*(*ecx_10 + 0xd4))(var_908[i * 2], *(&var_904 + (i << 3)), &var_914, &var_108, ",
+        "00469a66      if (((*(*data_e30344 + 0xd0))(edi_2, esi_2) & 4) == 0)",
+        "00469ad0          (*(*data_e30344 + 0xdc))(edi_2, esi_2, 1)",
+    ):
+        assert retail_anchor in hlil_part02
+
+    slot_macros = (
+        "#define QL_STEAM_APPS_BIS_SUBSCRIBED_APP_SLOT (0x1c / 4)",
+        "#define QL_STEAM_GAMESERVER_UTILS_GET_APP_ID_SLOT (0x24 / 4)",
+        "#define QL_STEAM_UGC_CREATE_QUERY_ALL_UGC_REQUEST_SLOT (0x04 / 4)",
+        "#define QL_STEAM_UGC_SEND_QUERY_UGC_REQUEST_SLOT (0x0c / 4)",
+        "#define QL_STEAM_UGC_GET_QUERY_UGC_RESULT_SLOT (0x10 / 4)",
+        "#define QL_STEAM_UGC_GET_QUERY_UGC_PREVIEW_URL_SLOT (0x14 / 4)",
+        "#define QL_STEAM_UGC_RELEASE_QUERY_UGC_REQUEST_SLOT (0x34 / 4)",
+        "#define QL_STEAM_UGC_SUBSCRIBE_ITEM_SLOT (0xc0 / 4)",
+        "#define QL_STEAM_UGC_UNSUBSCRIBE_ITEM_SLOT (0xc4 / 4)",
+        "#define QL_STEAM_UGC_GET_NUM_SUBSCRIBED_ITEMS_SLOT (0xc8 / 4)",
+        "#define QL_STEAM_UGC_GET_SUBSCRIBED_ITEMS_SLOT (0xcc / 4)",
+        "#define QL_STEAM_UGC_GET_ITEM_STATE_SLOT (0xd0 / 4)",
+        "#define QL_STEAM_UGC_GET_ITEM_INSTALL_INFO_SLOT (0xd4 / 4)",
+        "#define QL_STEAM_UGC_GET_ITEM_DOWNLOAD_INFO_SLOT (0xd8 / 4)",
+        "#define QL_STEAM_UGC_DOWNLOAD_ITEM_SLOT (0xdc / 4)",
+    )
+    for macro in slot_macros:
+        assert macro in steamworks
+
+    wrapper_slots = {
+        "uint32_t QL_Steamworks_ServerGetAppID( void )": "QL_STEAM_GAMESERVER_UTILS_GET_APP_ID_SLOT",
+        "uint32_t QL_Steamworks_GetNumSubscribedItems( void )": "QL_STEAM_UGC_GET_NUM_SUBSCRIBED_ITEMS_SLOT",
+        "uint32_t QL_Steamworks_GetSubscribedItems( uint64_t *outItemIds, uint32_t maxItems )": "QL_STEAM_UGC_GET_SUBSCRIBED_ITEMS_SLOT",
+        "qboolean QL_Steamworks_GetItemInstallInfo( uint32_t idLow, uint32_t idHigh, uint64_t *outSizeOnDisk, char *folder, size_t folderSize, uint32_t *outTimestamp )": "QL_STEAM_UGC_GET_ITEM_INSTALL_INFO_SLOT",
+        "uint32_t QL_Steamworks_GetItemState( uint32_t idLow, uint32_t idHigh )": "QL_STEAM_UGC_GET_ITEM_STATE_SLOT",
+        "qboolean QL_Steamworks_SubscribeItem( uint32_t idLow, uint32_t idHigh )": "QL_STEAM_UGC_SUBSCRIBE_ITEM_SLOT",
+        "qboolean QL_Steamworks_UnsubscribeItem( uint32_t idLow, uint32_t idHigh )": "QL_STEAM_UGC_UNSUBSCRIBE_ITEM_SLOT",
+        "qboolean QL_Steamworks_DownloadItem( uint32_t idLow, uint32_t idHigh, qboolean highPriority )": "QL_STEAM_UGC_DOWNLOAD_ITEM_SLOT",
+        "qboolean QL_Steamworks_GetQueryUGCResult( uint64_t queryHandle, uint32_t index, uint64_t *outPublishedFileId, char *title, size_t titleSize, char *description, size_t descriptionSize )": "QL_STEAM_UGC_GET_QUERY_UGC_RESULT_SLOT",
+        "qboolean QL_Steamworks_GetQueryUGCPreviewURL( uint64_t queryHandle, uint32_t index, char *buffer, size_t bufferSize )": "QL_STEAM_UGC_GET_QUERY_UGC_PREVIEW_URL_SLOT",
+        "void QL_Steamworks_ReleaseQueryUGCRequest( uint64_t queryHandle )": "QL_STEAM_UGC_RELEASE_QUERY_UGC_REQUEST_SLOT",
+        "qboolean QL_Steamworks_IsSubscribedApp( uint32_t appId )": "QL_STEAM_APPS_BIS_SUBSCRIBED_APP_SLOT",
+        "qboolean QL_Steamworks_GetItemDownloadInfo( uint32_t idLow, uint32_t idHigh, uint64_t *outDownloaded, uint64_t *outTotal )": "QL_STEAM_UGC_GET_ITEM_DOWNLOAD_INFO_SLOT",
+    }
+    for signature, macro in wrapper_slots.items():
+        block = _extract_function_block(steamworks, signature)
+        assert f"vtable[{macro}]" in block
+        assert "vtable[0x" not in block
+
+    request_query_block = _extract_function_block(
+        steamworks, "qboolean QL_Steamworks_RequestAllUGCQuery( uint32_t filter )"
+    )
+    assert "vtable[QL_STEAM_UGC_CREATE_QUERY_ALL_UGC_REQUEST_SLOT]" in request_query_block
+    assert "vtable[QL_STEAM_UGC_SEND_QUERY_UGC_REQUEST_SLOT]" in request_query_block
+    assert "vtable[0x" not in request_query_block
+
+    mock_utils_block = _extract_function_block(harness_c, "void *QLR_SteamAPI_SteamGameServerUtils( void ) {")
+    mock_ugc_block = _extract_function_block(harness_c, "void *QLR_SteamAPI_SteamUGC( void ) {")
+    mock_server_ugc_block = _extract_function_block(harness_c, "void *QLR_SteamAPI_SteamGameServerUGC( void ) {")
+    assert "static void *vtable[QLR_STEAM_GAMESERVER_UTILS_VTABLE_SLOT_COUNT];" in mock_utils_block
+    assert "vtable[QLR_STEAM_GAMESERVER_UTILS_GET_APP_ID_SLOT] = QLR_SteamGameServerUtils_GetAppID;" in mock_utils_block
+    assert "vtable[0x" not in mock_utils_block
+    assert "static void *vtable[QLR_STEAM_UGC_VTABLE_SLOT_COUNT];" in mock_ugc_block
+    for harness_anchor in (
+        "vtable[QLR_STEAM_UGC_CREATE_QUERY_ALL_UGC_REQUEST_SLOT] = QLR_SteamUGC_CreateQueryAllUGCRequest;",
+        "vtable[QLR_STEAM_UGC_SEND_QUERY_UGC_REQUEST_SLOT] = QLR_SteamUGC_SendQueryUGCRequest;",
+        "vtable[QLR_STEAM_UGC_GET_QUERY_UGC_RESULT_SLOT] = QLR_SteamUGC_GetQueryUGCResult;",
+        "vtable[QLR_STEAM_UGC_GET_QUERY_UGC_PREVIEW_URL_SLOT] = QLR_SteamUGC_GetQueryUGCPreviewURL;",
+        "vtable[QLR_STEAM_UGC_RELEASE_QUERY_UGC_REQUEST_SLOT] = QLR_SteamUGC_ReleaseQueryUGCRequest;",
+        "vtable[QLR_STEAM_UGC_SUBSCRIBE_ITEM_SLOT] = QLR_SteamUGC_SubscribeItem;",
+        "vtable[QLR_STEAM_UGC_UNSUBSCRIBE_ITEM_SLOT] = QLR_SteamUGC_UnsubscribeItem;",
+        "vtable[QLR_STEAM_UGC_GET_NUM_SUBSCRIBED_ITEMS_SLOT] = QLR_SteamUGC_GetNumSubscribedItems;",
+        "vtable[QLR_STEAM_UGC_GET_SUBSCRIBED_ITEMS_SLOT] = QLR_SteamUGC_GetSubscribedItems;",
+        "vtable[QLR_STEAM_UGC_GET_ITEM_STATE_SLOT] = QLR_SteamUGC_GetItemState;",
+        "vtable[QLR_STEAM_UGC_GET_ITEM_INSTALL_INFO_SLOT] = QLR_SteamUGC_GetItemInstallInfo;",
+        "vtable[QLR_STEAM_UGC_GET_ITEM_DOWNLOAD_INFO_SLOT] = QLR_SteamUGC_GetItemDownloadInfo;",
+        "vtable[QLR_STEAM_UGC_DOWNLOAD_ITEM_SLOT] = QLR_SteamUGC_DownloadItem;",
+    ):
+        assert harness_anchor in mock_ugc_block
+    assert "vtable[0x" not in mock_ugc_block
+    assert "static void *vtable[QLR_STEAM_UGC_VTABLE_SLOT_COUNT];" in mock_server_ugc_block
+    for harness_anchor in (
+        "vtable[QLR_STEAM_UGC_SUBSCRIBE_ITEM_SLOT] = QLR_SteamGameServerUGC_SubscribeItem;",
+        "vtable[QLR_STEAM_UGC_UNSUBSCRIBE_ITEM_SLOT] = QLR_SteamGameServerUGC_UnsubscribeItem;",
+        "vtable[QLR_STEAM_UGC_GET_NUM_SUBSCRIBED_ITEMS_SLOT] = QLR_SteamUGC_GetNumSubscribedItems;",
+        "vtable[QLR_STEAM_UGC_GET_SUBSCRIBED_ITEMS_SLOT] = QLR_SteamUGC_GetSubscribedItems;",
+        "vtable[QLR_STEAM_UGC_GET_ITEM_STATE_SLOT] = QLR_SteamGameServerUGC_GetItemState;",
+        "vtable[QLR_STEAM_UGC_GET_ITEM_INSTALL_INFO_SLOT] = QLR_SteamUGC_GetItemInstallInfo;",
+        "vtable[QLR_STEAM_UGC_GET_ITEM_DOWNLOAD_INFO_SLOT] = QLR_SteamGameServerUGC_GetItemDownloadInfo;",
+        "vtable[QLR_STEAM_UGC_DOWNLOAD_ITEM_SLOT] = QLR_SteamGameServerUGC_DownloadItem;",
+    ):
+        assert harness_anchor in mock_server_ugc_block
+    assert "vtable[0x" not in mock_server_ugc_block
+
+    for doc_anchor in (
+        "# Quake Live Steam Mapping Round 699: SteamApps And Workshop UGC Slot Constants",
+        "`SteamWorkshop_GetAllUGC`",
+        "`SteamWorkshop_RequestDownload`",
+        "`SteamUGC + 0xdc`",
+        "Focused parity estimate: **before 90% -> after 99%**",
+        "Overall Steam launch/runtime integration mapping confidence moves from **93.80% -> 93.82%**",
+        "does not enable live Steam behavior by default",
+    ):
+        assert doc_anchor in mapping_round
+
+    assert "Task A601: Pin SteamApps and Workshop UGC slot constants [COMPLETED]" in implementation_plan
+    assert "SteamApps/Workshop UGC ABI source-shape confidence" in implementation_plan
+
+
+def test_steam_ugc_mock_slot_mirroring_round_707_is_pinned() -> None:
+    aliases = json.loads(
+        (REPO_ROOT / "references/analysis/quakelive_symbol_aliases.json").read_text(encoding="utf-8")
+    )["quakelive_steam_srp"]
+    functions_csv = (
+        REPO_ROOT / "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+    ).read_text(encoding="utf-8")
+    imports_txt = (
+        REPO_ROOT / "references/reverse-engineering/ghidra/quakelive_steam/imports.txt"
+    ).read_text(encoding="utf-8")
+    hlil_part02 = (
+        REPO_ROOT
+        / "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part02.txt"
+    ).read_text(encoding="utf-8")
+    steamworks = (REPO_ROOT / "src/common/platform/platform_steamworks.c").read_text(encoding="utf-8")
+    harness_c = (REPO_ROOT / "tests/steamworks_harness.c").read_text(encoding="utf-8")
+    mapping_round = (
+        REPO_ROOT / "docs/reverse-engineering/quakelive_steam_mapping_round_707.md"
+    ).read_text(encoding="utf-8")
+    implementation_plan = (REPO_ROOT / "IMPLEMENTATION_PLAN.md").read_text(encoding="utf-8")
+
+    expected_aliases = {
+        "FUN_00460660": "SteamUGC_GetItemDownloadInfo",
+        "sub_460660": "SteamUGC_GetItemDownloadInfo",
+        "FUN_00460dc0": "SteamWorkshop_GetAllUGC",
+        "sub_460dc0": "SteamWorkshop_GetAllUGC",
+        "FUN_00469260": "SteamWorkshop_SubscribeItem",
+        "sub_469260": "SteamWorkshop_SubscribeItem",
+        "FUN_004692b0": "SteamWorkshop_UnsubscribeItem",
+        "sub_4692b0": "SteamWorkshop_UnsubscribeItem",
+        "FUN_00469400": "SteamWorkshop_AdvanceDownloadQueue",
+        "sub_469400": "SteamWorkshop_AdvanceDownloadQueue",
+        "FUN_00469470": "SteamWorkshop_FinalizeItem",
+        "sub_469470": "SteamWorkshop_FinalizeItem",
+        "FUN_004697a0": "SteamWorkshop_Init",
+        "sub_4697a0": "SteamWorkshop_Init",
+        "FUN_004699c0": "SteamWorkshop_RequestDownload",
+        "sub_4699c0": "SteamWorkshop_RequestDownload",
+    }
+    for symbol, alias in expected_aliases.items():
+        assert aliases[symbol] == alias
+
+    for row in (
+        "FUN_00460660,00460660,42,0,unknown",
+        "FUN_00460dc0,00460dc0,158,0,unknown",
+        "FUN_00469260,00469260,76,0,unknown",
+        "FUN_004692b0,004692b0,29,0,unknown",
+        "FUN_00469400,00469400,105,0,unknown",
+        "FUN_00469470,00469470,331,0,unknown",
+        "FUN_004697a0,004697a0,526,0,unknown",
+        "FUN_004699c0,004699c0,309,0,unknown",
+    ):
+        assert row in functions_csv
+
+    for imported_symbol in (
+        "STEAM_API.DLL!SteamUGC @ 001591ae",
+        "STEAM_API.DLL!SteamGameServerUGC @ 001592fe",
+        "STEAM_API.DLL!SteamGameServerUtils @ 00159344",
+    ):
+        assert imported_symbol in imports_txt
+
+    for retail_anchor in (
+        "0045fd88              int32_t edx_4 = *(*SteamUGC(eax_2) + 0x10)",
+        "0045fdaa                  int32_t edx_6 = *(*SteamUGC() + 0x14)",
+        "0045feb2      (*(*eax_13 + 0x34))(*arg1, arg1[1])",
+        "0045fd60      (*(*eax_3 + 0x34))(*arg1, arg1[1])",
+        "00460689  return zx.d((*(*SteamUGC() + 0xd8))(arg1, arg2, arg3, arg4))",
+        "00460df3  eax_4, edx_3 = (*(*SteamUGC() + 4))(1, 0, eax_2, eax_2, arg1)",
+        "00460e04  eax_7, result = (*(*SteamUGC() + 0xc))(eax_4, edx_3)",
+        "0046794f  int32_t eax_8 = (*(*SteamGameServerUtils(eax_2) + 0x24))()",
+        "0046927b  (*(*data_e30344 + 0xc0))(arg1, arg2)",
+        "0046928d  char result = (*(*data_e30344 + 0xd0))(arg1, arg2)",
+        "004692cc  return (*(*data_e30344 + 0xc4))(arg1, arg2)",
+        "00469466  return (*(*data_e30344 + 0xdc))(data_e40bb8, data_e40bbc, 1)",
+        "004694ca  (*(*ecx + 0xd4))(arg1, arg2, &var_114, &var_108, 0x100, &var_10c)",
+        "004698c6  (*(*ecx_6 + 0xcc))(&var_908, 0x100)",
+        "004698d6  int32_t eax_15 = (*(*data_e30344 + 0xc8))()",
+        "00469a66      if (((*(*data_e30344 + 0xd0))(edi_2, esi_2) & 4) == 0)",
+        "00469ad0          (*(*data_e30344 + 0xdc))(edi_2, esi_2, 1)",
+    ):
+        assert retail_anchor in hlil_part02
+
+    slot_values = {
+        "CREATE_QUERY_ALL_UGC_REQUEST": "(0x04 / 4)",
+        "SEND_QUERY_UGC_REQUEST": "(0x0c / 4)",
+        "GET_QUERY_UGC_RESULT": "(0x10 / 4)",
+        "GET_QUERY_UGC_PREVIEW_URL": "(0x14 / 4)",
+        "RELEASE_QUERY_UGC_REQUEST": "(0x34 / 4)",
+        "SUBSCRIBE_ITEM": "(0xc0 / 4)",
+        "UNSUBSCRIBE_ITEM": "(0xc4 / 4)",
+        "GET_NUM_SUBSCRIBED_ITEMS": "(0xc8 / 4)",
+        "GET_SUBSCRIBED_ITEMS": "(0xcc / 4)",
+        "GET_ITEM_STATE": "(0xd0 / 4)",
+        "GET_ITEM_INSTALL_INFO": "(0xd4 / 4)",
+        "GET_ITEM_DOWNLOAD_INFO": "(0xd8 / 4)",
+        "DOWNLOAD_ITEM": "(0xdc / 4)",
+    }
+    for name, value in slot_values.items():
+        assert f"#define QL_STEAM_UGC_{name}_SLOT {value}" in steamworks
+        assert f"#define QLR_STEAM_UGC_{name}_SLOT {value}" in harness_c
+
+    assert "#define QL_STEAM_GAMESERVER_UTILS_GET_APP_ID_SLOT (0x24 / 4)" in steamworks
+    assert "#define QLR_STEAM_GAMESERVER_UTILS_GET_APP_ID_SLOT (0x24 / 4)" in harness_c
+    assert "#define QLR_STEAM_GAMESERVER_UTILS_VTABLE_SLOT_COUNT (QLR_STEAM_GAMESERVER_UTILS_GET_APP_ID_SLOT + 1)" in harness_c
+    assert "#define QLR_STEAM_UGC_VTABLE_SLOT_COUNT (QLR_STEAM_UGC_DOWNLOAD_ITEM_SLOT + 1)" in harness_c
+
+    mock_utils_block = _extract_function_block(harness_c, "void *QLR_SteamAPI_SteamGameServerUtils( void ) {")
+    mock_ugc_block = _extract_function_block(harness_c, "void *QLR_SteamAPI_SteamUGC( void ) {")
+    mock_server_ugc_block = _extract_function_block(harness_c, "void *QLR_SteamAPI_SteamGameServerUGC( void ) {")
+
+    assert "static void *vtable[QLR_STEAM_GAMESERVER_UTILS_VTABLE_SLOT_COUNT];" in mock_utils_block
+    assert "vtable[QLR_STEAM_GAMESERVER_UTILS_GET_APP_ID_SLOT] = QLR_SteamGameServerUtils_GetAppID;" in mock_utils_block
+    assert "vtable[0x" not in mock_utils_block
+
+    assert "static void *vtable[QLR_STEAM_UGC_VTABLE_SLOT_COUNT];" in mock_ugc_block
+    for macro, fn_name in (
+        ("CREATE_QUERY_ALL_UGC_REQUEST", "QLR_SteamUGC_CreateQueryAllUGCRequest"),
+        ("SEND_QUERY_UGC_REQUEST", "QLR_SteamUGC_SendQueryUGCRequest"),
+        ("GET_QUERY_UGC_RESULT", "QLR_SteamUGC_GetQueryUGCResult"),
+        ("GET_QUERY_UGC_PREVIEW_URL", "QLR_SteamUGC_GetQueryUGCPreviewURL"),
+        ("RELEASE_QUERY_UGC_REQUEST", "QLR_SteamUGC_ReleaseQueryUGCRequest"),
+        ("SUBSCRIBE_ITEM", "QLR_SteamUGC_SubscribeItem"),
+        ("UNSUBSCRIBE_ITEM", "QLR_SteamUGC_UnsubscribeItem"),
+        ("GET_NUM_SUBSCRIBED_ITEMS", "QLR_SteamUGC_GetNumSubscribedItems"),
+        ("GET_SUBSCRIBED_ITEMS", "QLR_SteamUGC_GetSubscribedItems"),
+        ("GET_ITEM_STATE", "QLR_SteamUGC_GetItemState"),
+        ("GET_ITEM_INSTALL_INFO", "QLR_SteamUGC_GetItemInstallInfo"),
+        ("GET_ITEM_DOWNLOAD_INFO", "QLR_SteamUGC_GetItemDownloadInfo"),
+        ("DOWNLOAD_ITEM", "QLR_SteamUGC_DownloadItem"),
+    ):
+        assert f"vtable[QLR_STEAM_UGC_{macro}_SLOT] = {fn_name};" in mock_ugc_block
+    assert "static void *vtable[0xdc / 4 + 1];" not in mock_ugc_block
+    assert "vtable[0x" not in mock_ugc_block
+
+    assert "static void *vtable[QLR_STEAM_UGC_VTABLE_SLOT_COUNT];" in mock_server_ugc_block
+    for macro, fn_name in (
+        ("SUBSCRIBE_ITEM", "QLR_SteamGameServerUGC_SubscribeItem"),
+        ("UNSUBSCRIBE_ITEM", "QLR_SteamGameServerUGC_UnsubscribeItem"),
+        ("GET_NUM_SUBSCRIBED_ITEMS", "QLR_SteamUGC_GetNumSubscribedItems"),
+        ("GET_SUBSCRIBED_ITEMS", "QLR_SteamUGC_GetSubscribedItems"),
+        ("GET_ITEM_STATE", "QLR_SteamGameServerUGC_GetItemState"),
+        ("GET_ITEM_INSTALL_INFO", "QLR_SteamUGC_GetItemInstallInfo"),
+        ("GET_ITEM_DOWNLOAD_INFO", "QLR_SteamGameServerUGC_GetItemDownloadInfo"),
+        ("DOWNLOAD_ITEM", "QLR_SteamGameServerUGC_DownloadItem"),
+    ):
+        assert f"vtable[QLR_STEAM_UGC_{macro}_SLOT] = {fn_name};" in mock_server_ugc_block
+    assert "static void *vtable[0xdc / 4 + 1];" not in mock_server_ugc_block
+    assert "vtable[0x" not in mock_server_ugc_block
+
+    for doc_anchor in (
+        "# Quake Live Steam Mapping Round 707: Mock SteamUGC Slot Mirroring",
+        "`SteamWorkshop_GetAllUGC`",
+        "`SteamWorkshop_RequestDownload`",
+        "`QLR_STEAM_UGC_CREATE_QUERY_ALL_UGC_REQUEST_SLOT`",
+        "`QLR_STEAM_UGC_VTABLE_SLOT_COUNT`",
+        "`QLR_STEAM_GAMESERVER_UTILS_GET_APP_ID_SLOT`",
+        "Focused parity estimate: **before 88% -> after 99%**",
+        "Overall Steam launch/runtime integration mapping confidence moves from **93.96% -> 93.98%**",
+        "does not enable live Steam behavior by default",
+    ):
+        assert doc_anchor in mapping_round
+
+    assert "Task A609: Mirror SteamUGC mock slot constants [COMPLETED]" in implementation_plan
+    assert "SteamUGC harness slot-mirroring source-shape confidence" in implementation_plan
+
+
+def test_steam_avatar_image_slot_constants_round_700_is_pinned() -> None:
+    aliases = json.loads(
+        (REPO_ROOT / "references/analysis/quakelive_symbol_aliases.json").read_text(encoding="utf-8")
+    )["quakelive_steam_srp"]
+    functions_csv = (
+        REPO_ROOT / "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+    ).read_text(encoding="utf-8")
+    imports_txt = (
+        REPO_ROOT / "references/reverse-engineering/ghidra/quakelive_steam/imports.txt"
+    ).read_text(encoding="utf-8")
+    analysis_symbols = (
+        REPO_ROOT / "references/reverse-engineering/ghidra/quakelive_steam/analysis_symbols.txt"
+    ).read_text(encoding="utf-8")
+    hlil_part02 = (
+        REPO_ROOT
+        / "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part02.txt"
+    ).read_text(encoding="utf-8")
+    steamworks = (REPO_ROOT / "src/common/platform/platform_steamworks.c").read_text(encoding="utf-8")
+    harness_c = (REPO_ROOT / "tests/steamworks_harness.c").read_text(encoding="utf-8")
+    mapping_round = (
+        REPO_ROOT / "docs/reverse-engineering/quakelive_steam_mapping_round_700.md"
+    ).read_text(encoding="utf-8")
+    implementation_plan = (REPO_ROOT / "IMPLEMENTATION_PLAN.md").read_text(encoding="utf-8")
+
+    assert aliases["FUN_00460f30"] == "SteamClient_GetAvatarImageHandle"
+    assert aliases["sub_460f30"] == "SteamClient_GetAvatarImageHandle"
+    assert "FUN_00460f30,00460f30,278,0,unknown" in functions_csv
+
+    for imported_symbol in (
+        "STEAM_API.DLL!SteamFriends @ 0015915a",
+        "STEAM_API.DLL!SteamUtils @ 0015914c",
+    ):
+        assert imported_symbol in imports_txt
+
+    for symbol in (
+        "00532b68 IMPORTED CCallback<class_SteamDataSource,struct_AvatarImageLoaded_t,0>::vftable",
+        "00532b80 IMPORTED SteamDataSource::vftable",
+    ):
+        assert symbol in analysis_symbols
+
+    for retail_anchor in (
+        "00460f30    int32_t sub_460f30(int32_t arg1, int32_t arg2)",
+        "00460f8a  int32_t eax_6 = (*(*SteamFriends() + 0x90))(arg1, arg2)",
+        "00460fa8      (*(*SteamUtils() + 0x14))(eax_6, &var_c, &var_8)",
+        "00460fd4      if ((*(*SteamUtils() + 0x18))(eax_6, eax_8, esi_4) != 0)",
+        "00463472  int32_t edx_1 = *(*SteamUtils(data_584520 ^ &__saved_ebp) + 0x14)",
+        "004634b4  (*(*eax_5 + 0x18))(arg1[0x27], eax_4, edi_3)",
+        "004641de          int32_t edx_3 = *(*SteamFriends() + 0x90)",
+        "004641eb          result = edx_3(var_70, var_6c)",
+    ):
+        assert retail_anchor in hlil_part02
+
+    slot_macros = (
+        "#define QL_STEAM_FRIENDS_GET_SMALL_FRIEND_AVATAR_SLOT (0x88 / 4)",
+        "#define QL_STEAM_FRIENDS_GET_MEDIUM_FRIEND_AVATAR_SLOT (0x8c / 4)",
+        "#define QL_STEAM_FRIENDS_GET_LARGE_FRIEND_AVATAR_SLOT (0x90 / 4)",
+        "#define QL_STEAM_UTILS_GET_IMAGE_SIZE_SLOT (0x14 / 4)",
+        "#define QL_STEAM_UTILS_GET_IMAGE_RGBA_SLOT (0x18 / 4)",
+    )
+    for macro in slot_macros:
+        assert macro in steamworks
+
+    avatar_method_block = _extract_function_block(
+        steamworks,
+        "static int QL_Steamworks_GetAvatarMethodIndex( ql_steam_avatar_size_t size ) {",
+    )
+    request_avatar_block = _extract_function_block(
+        steamworks,
+        "ql_steam_avatar_image_state_t QL_Steamworks_RequestAvatarImage( uint32_t idLow, uint32_t idHigh, ql_steam_avatar_size_t size, int *outImage ) {",
+    )
+    load_avatar_block = _extract_function_block(
+        steamworks,
+        "qboolean QL_Steamworks_LoadAvatarRGBA( uint32_t idLow, uint32_t idHigh, ql_steam_avatar_size_t size, uint8_t **outPixels, uint32_t *outWidth, uint32_t *outHeight ) {",
+    )
+
+    assert "return QL_STEAM_FRIENDS_GET_SMALL_FRIEND_AVATAR_SLOT;" in avatar_method_block
+    assert "return QL_STEAM_FRIENDS_GET_MEDIUM_FRIEND_AVATAR_SLOT;" in avatar_method_block
+    assert "return QL_STEAM_FRIENDS_GET_LARGE_FRIEND_AVATAR_SLOT;" in avatar_method_block
+    assert "0x88 / 4" not in avatar_method_block
+    assert "0x8c / 4" not in avatar_method_block
+    assert "0x90 / 4" not in avatar_method_block
+
+    assert "friendsVTable[QL_Steamworks_GetAvatarMethodIndex( size )]" in request_avatar_block
+    assert "image = getAvatar( friends, NULL, steamId );" in request_avatar_block
+    assert "image == -1" in request_avatar_block
+    assert "return QL_STEAM_AVATAR_IMAGE_PENDING;" in request_avatar_block
+    assert "return QL_STEAM_AVATAR_IMAGE_READY;" in request_avatar_block
+
+    assert "QL_Steamworks_RequestAvatarImage( idLow, idHigh, size, &image ) != QL_STEAM_AVATAR_IMAGE_READY" in load_avatar_block
+    assert "utilsVTable[QL_STEAM_UTILS_GET_IMAGE_SIZE_SLOT]" in load_avatar_block
+    assert "utilsVTable[QL_STEAM_UTILS_GET_IMAGE_RGBA_SLOT]" in load_avatar_block
+    assert "utilsVTable[0x" not in load_avatar_block
+    assert "getImageSize( utils, NULL, image, &width, &height )" in load_avatar_block
+    assert "getImageRGBA( utils, NULL, image, pixels, (int)bufferSize )" in load_avatar_block
+
+    mock_friends_block = _extract_function_block(harness_c, "void *QLR_SteamAPI_SteamFriends( void ) {")
+    mock_utils_block = _extract_function_block(harness_c, "void *QLR_SteamAPI_SteamUtils( void ) {")
+    assert "static void *vtable[QLR_STEAM_FRIENDS_VTABLE_SLOT_COUNT];" in mock_friends_block
+    for harness_anchor in (
+        "vtable[QLR_STEAM_FRIENDS_GET_SMALL_FRIEND_AVATAR_SLOT] = QLR_SteamFriends_GetSmallFriendAvatar;",
+        "vtable[QLR_STEAM_FRIENDS_GET_MEDIUM_FRIEND_AVATAR_SLOT] = QLR_SteamFriends_GetMediumFriendAvatar;",
+        "vtable[QLR_STEAM_FRIENDS_GET_LARGE_FRIEND_AVATAR_SLOT] = QLR_SteamFriends_GetLargeFriendAvatar;",
+    ):
+        assert harness_anchor in mock_friends_block
+    assert "vtable[0x" not in mock_friends_block
+    assert "static void *vtable[QLR_STEAM_UTILS_VTABLE_SLOT_COUNT];" in mock_utils_block
+    for harness_anchor in (
+        "vtable[QLR_STEAM_UTILS_GET_IMAGE_SIZE_SLOT] = QLR_SteamUtils_GetImageSize;",
+        "vtable[QLR_STEAM_UTILS_GET_IMAGE_RGBA_SLOT] = QLR_SteamUtils_GetImageRGBA;",
+    ):
+        assert harness_anchor in mock_utils_block
+    assert "vtable[0x" not in mock_utils_block
+
+    for doc_anchor in (
+        "# Quake Live Steam Mapping Round 700: Steam Avatar Image Slot Constants",
+        "`SteamClient_GetAvatarImageHandle`",
+        "`SteamFriends + 0x90`",
+        "`SteamUtils + 0x18`",
+        "Focused parity estimate: **before 90% -> after 99%**",
+        "Overall Steam launch/runtime integration mapping confidence moves from **93.82% -> 93.84%**",
+        "does not enable live Steam behavior by default",
+    ):
+        assert doc_anchor in mapping_round
+
+    assert "Task A602: Pin Steam avatar image slot constants [COMPLETED]" in implementation_plan
+    assert "Steam avatar image ABI source-shape confidence" in implementation_plan
+
+
+def test_steam_friends_utils_mock_slot_mirroring_round_708_is_pinned() -> None:
+    aliases = json.loads(
+        (REPO_ROOT / "references/analysis/quakelive_symbol_aliases.json").read_text(encoding="utf-8")
+    )["quakelive_steam_srp"]
+    functions_csv = (
+        REPO_ROOT / "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+    ).read_text(encoding="utf-8")
+    imports_txt = (
+        REPO_ROOT / "references/reverse-engineering/ghidra/quakelive_steam/imports.txt"
+    ).read_text(encoding="utf-8")
+    analysis_symbols = (
+        REPO_ROOT / "references/reverse-engineering/ghidra/quakelive_steam/analysis_symbols.txt"
+    ).read_text(encoding="utf-8")
+    hlil_part02 = (
+        REPO_ROOT
+        / "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part02.txt"
+    ).read_text(encoding="utf-8")
+    steamworks = (REPO_ROOT / "src/common/platform/platform_steamworks.c").read_text(encoding="utf-8")
+    harness_c = (REPO_ROOT / "tests/steamworks_harness.c").read_text(encoding="utf-8")
+    mapping_round = (
+        REPO_ROOT / "docs/reverse-engineering/quakelive_steam_mapping_round_708.md"
+    ).read_text(encoding="utf-8")
+    implementation_plan = (REPO_ROOT / "IMPLEMENTATION_PLAN.md").read_text(encoding="utf-8")
+
+    expected_aliases = {
+        "FUN_00460610": "SteamClient_SyncPersonaNameCvar",
+        "sub_460610": "SteamClient_SyncPersonaNameCvar",
+        "FUN_00460690": "SteamUtils_GetIPCountry",
+        "sub_460690": "SteamUtils_GetIPCountry",
+        "FUN_00460800": "SteamCallbacks_OnPersonaStateChange",
+        "sub_460800": "SteamCallbacks_OnPersonaStateChange",
+        "FUN_00460e60": "CL_Steam_OverlayCommand_f",
+        "sub_460e60": "CL_Steam_OverlayCommand_f",
+        "FUN_00460f30": "SteamClient_GetAvatarImageHandle",
+        "sub_460f30": "SteamClient_GetAvatarImageHandle",
+        "FUN_00461500": "SteamClient_Init",
+        "sub_461500": "SteamClient_Init",
+        "FUN_00464bb0": "SteamLobby_ShowInviteOverlay",
+        "sub_464bb0": "SteamLobby_ShowInviteOverlay",
+    }
+    for symbol, alias in expected_aliases.items():
+        assert aliases[symbol] == alias
+
+    for row in (
+        "FUN_00460610,00460610,70,0,unknown",
+        "FUN_00460690,00460690,27,0,unknown",
+        "FUN_00460800,00460800,948,0,unknown",
+        "FUN_00460e60,00460e60,195,0,unknown",
+        "FUN_00460f30,00460f30,278,0,unknown",
+        "FUN_00461500,00461500,209,0,unknown",
+        "FUN_00464bb0,00464bb0,56,0,unknown",
+    ):
+        assert row in functions_csv
+
+    for imported_symbol in (
+        "STEAM_API.DLL!SteamFriends @ 0015915a",
+        "STEAM_API.DLL!SteamUtils @ 0015914c",
+    ):
+        assert imported_symbol in imports_txt
+
+    for symbol in (
+        "00532b68 IMPORTED CCallback<class_SteamDataSource,struct_AvatarImageLoaded_t,0>::vftable",
+        "00532b80 IMPORTED SteamDataSource::vftable",
+    ):
+        assert symbol in analysis_symbols
+
+    for retail_anchor in (
+        "00460621  int32_t eax = SteamFriends()",
+        "004606a6  jump(*(*SteamUtils() + 0x10))",
+        "0046096b      int32_t eax_19 = (*(*SteamFriends() + 0x1c))(edi_1, ebx_1)",
+        "00460996      sub_429310(&var_3c, (*(*SteamFriends() + 0x18))(edi_1, ebx_1))",
+        "004609d7      sub_429310(&var_3c, (*(*SteamFriends() + 0x14))(edi_1, ebx_1))",
+        "00460a12      int32_t eax_31 = (*(*SteamFriends() + 0x2c))(edi_1, ebx_1)",
+        '00460a61      int32_t eax_37 = (*(*SteamFriends() + 0xb4))(edi_1, ebx_1, "status")',
+        "00460ad3      (*(*SteamFriends() + 0x20))(edi_1, ebx_1, &var_2c)",
+        "00460dd6  int32_t eax_2 = (*(*SteamUtils() + 0x24))()",
+        "00460f12          result = (*(*SteamFriends() + 0x74))(esi_1, var_60, var_5c)",
+        "00460f8a  int32_t eax_6 = (*(*SteamFriends() + 0x90))(arg1, arg2)",
+        "00460fa8      (*(*SteamUtils() + 0x14))(eax_6, &var_c, &var_8)",
+        "00460fd4      if ((*(*SteamUtils() + 0x18))(eax_6, eax_8, esi_4) != 0)",
+        '004615c3      (*(*SteamFriends() + 0xac))("status", "At the main menu")',
+        "004641de          int32_t edx_3 = *(*SteamFriends() + 0x90)",
+        "00464bc7          int32_t eax = SteamFriends()",
+    ):
+        assert retail_anchor in hlil_part02
+
+    friends_slot_values = {
+        "GET_PERSONA_NAME": "0",
+        "GET_FRIEND_COUNT": "(0x0c / 4)",
+        "GET_FRIEND_BY_INDEX": "(0x10 / 4)",
+        "GET_FRIEND_RELATIONSHIP": "(0x14 / 4)",
+        "GET_FRIEND_PERSONA_STATE": "(0x18 / 4)",
+        "GET_FRIEND_PERSONA_NAME": "(0x1c / 4)",
+        "GET_FRIEND_GAME_PLAYED": "(0x20 / 4)",
+        "GET_PLAYER_NICKNAME": "(0x2c / 4)",
+        "SET_IN_GAME_VOICE_SPEAKING": "(0x6c / 4)",
+        "ACTIVATE_GAME_OVERLAY_TO_USER": "(0x74 / 4)",
+        "ACTIVATE_GAME_OVERLAY_TO_WEB_PAGE": "(0x78 / 4)",
+        "ACTIVATE_GAME_OVERLAY_INVITE_DIALOG": "(0x84 / 4)",
+        "GET_SMALL_FRIEND_AVATAR": "(0x88 / 4)",
+        "GET_MEDIUM_FRIEND_AVATAR": "(0x8c / 4)",
+        "GET_LARGE_FRIEND_AVATAR": "(0x90 / 4)",
+        "SET_RICH_PRESENCE": "(0xac / 4)",
+        "GET_FRIEND_RICH_PRESENCE": "(0xb4 / 4)",
+        "INVITE_USER_TO_GAME": "(0xc4 / 4)",
+    }
+    for name, value in friends_slot_values.items():
+        assert f"#define QL_STEAM_FRIENDS_{name}_SLOT {value}" in steamworks
+        assert f"#define QLR_STEAM_FRIENDS_{name}_SLOT {value}" in harness_c
+
+    utils_slot_values = {
+        "GET_IP_COUNTRY": "(0x10 / 4)",
+        "GET_IMAGE_SIZE": "(0x14 / 4)",
+        "GET_IMAGE_RGBA": "(0x18 / 4)",
+        "GET_APP_ID": "(0x24 / 4)",
+    }
+    for name, value in utils_slot_values.items():
+        assert f"#define QL_STEAM_UTILS_{name}_SLOT {value}" in steamworks
+        assert f"#define QLR_STEAM_UTILS_{name}_SLOT {value}" in harness_c
+
+    assert "#define QLR_STEAM_FRIENDS_VTABLE_SLOT_COUNT (QLR_STEAM_FRIENDS_INVITE_USER_TO_GAME_SLOT + 1)" in harness_c
+    assert "#define QLR_STEAM_UTILS_VTABLE_SLOT_COUNT (QLR_STEAM_UTILS_GET_APP_ID_SLOT + 1)" in harness_c
+
+    mock_friends_block = _extract_function_block(harness_c, "void *QLR_SteamAPI_SteamFriends( void ) {")
+    mock_utils_block = _extract_function_block(harness_c, "void *QLR_SteamAPI_SteamUtils( void ) {")
+
+    assert "static void *vtable[QLR_STEAM_FRIENDS_VTABLE_SLOT_COUNT];" in mock_friends_block
+    for macro, fn_name in (
+        ("GET_PERSONA_NAME", "QLR_SteamFriends_GetPersonaName"),
+        ("GET_FRIEND_COUNT", "QLR_SteamFriends_GetFriendCount"),
+        ("GET_FRIEND_BY_INDEX", "QLR_SteamFriends_GetFriendByIndex"),
+        ("GET_FRIEND_RELATIONSHIP", "QLR_SteamFriends_GetFriendRelationship"),
+        ("GET_FRIEND_PERSONA_STATE", "QLR_SteamFriends_GetFriendPersonaState"),
+        ("GET_FRIEND_PERSONA_NAME", "QLR_SteamFriends_GetFriendPersonaName"),
+        ("GET_FRIEND_GAME_PLAYED", "QLR_SteamFriends_GetFriendGamePlayed"),
+        ("GET_PLAYER_NICKNAME", "QLR_SteamFriends_GetPlayerNickname"),
+        ("SET_IN_GAME_VOICE_SPEAKING", "QLR_SteamFriends_SetInGameVoiceSpeaking"),
+        ("ACTIVATE_GAME_OVERLAY_TO_USER", "QLR_SteamFriends_ActivateGameOverlayToUser"),
+        ("ACTIVATE_GAME_OVERLAY_TO_WEB_PAGE", "QLR_SteamFriends_ActivateGameOverlayToWebPage"),
+        ("ACTIVATE_GAME_OVERLAY_INVITE_DIALOG", "QLR_SteamFriends_ActivateGameOverlayInviteDialog"),
+        ("GET_SMALL_FRIEND_AVATAR", "QLR_SteamFriends_GetSmallFriendAvatar"),
+        ("GET_MEDIUM_FRIEND_AVATAR", "QLR_SteamFriends_GetMediumFriendAvatar"),
+        ("GET_LARGE_FRIEND_AVATAR", "QLR_SteamFriends_GetLargeFriendAvatar"),
+        ("SET_RICH_PRESENCE", "QLR_SteamFriends_SetRichPresence"),
+        ("GET_FRIEND_RICH_PRESENCE", "QLR_SteamFriends_GetFriendRichPresence"),
+        ("INVITE_USER_TO_GAME", "QLR_SteamFriends_InviteUserToGame"),
+    ):
+        assert f"vtable[QLR_STEAM_FRIENDS_{macro}_SLOT] = {fn_name};" in mock_friends_block
+    assert "static void *vtable[0xc4 / 4 + 1];" not in mock_friends_block
+    assert "vtable[0x" not in mock_friends_block
+
+    assert "static void *vtable[QLR_STEAM_UTILS_VTABLE_SLOT_COUNT];" in mock_utils_block
+    for macro, fn_name in (
+        ("GET_IP_COUNTRY", "QLR_SteamUtils_GetIPCountry"),
+        ("GET_IMAGE_SIZE", "QLR_SteamUtils_GetImageSize"),
+        ("GET_IMAGE_RGBA", "QLR_SteamUtils_GetImageRGBA"),
+        ("GET_APP_ID", "QLR_SteamUtils_GetAppID"),
+    ):
+        assert f"vtable[QLR_STEAM_UTILS_{macro}_SLOT] = {fn_name};" in mock_utils_block
+    assert "static void *vtable[0x24 / 4 + 1];" not in mock_utils_block
+    assert "vtable[0x" not in mock_utils_block
+
+    for doc_anchor in (
+        "# Quake Live Steam Mapping Round 708: Mock SteamFriends And SteamUtils Slot Mirroring",
+        "`SteamClient_SyncPersonaNameCvar`",
+        "`SteamClient_GetAvatarImageHandle`",
+        "`QLR_STEAM_FRIENDS_GET_PERSONA_NAME_SLOT`",
+        "`QLR_STEAM_FRIENDS_VTABLE_SLOT_COUNT`",
+        "`QLR_STEAM_UTILS_GET_IMAGE_RGBA_SLOT`",
+        "Focused parity estimate: **before 88% -> after 99%**",
+        "Overall Steam launch/runtime integration mapping confidence moves from **93.98% -> 94.00%**",
+        "does not enable live Steam behavior by default",
+    ):
+        assert doc_anchor in mapping_round
+
+    assert "Task A610: Mirror SteamFriends and SteamUtils mock slot constants [COMPLETED]" in implementation_plan
+    assert "SteamFriends/SteamUtils harness slot-mirroring source-shape confidence" in implementation_plan
+
+
+def test_steam_user_userstats_mock_slot_mirroring_round_709_is_pinned() -> None:
+    aliases = json.loads(
+        (REPO_ROOT / "references/analysis/quakelive_symbol_aliases.json").read_text(encoding="utf-8")
+    )["quakelive_steam_srp"]
+    functions_csv = (
+        REPO_ROOT / "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+    ).read_text(encoding="utf-8")
+    imports_txt = (
+        REPO_ROOT / "references/reverse-engineering/ghidra/quakelive_steam/imports.txt"
+    ).read_text(encoding="utf-8")
+    analysis_symbols = (
+        REPO_ROOT / "references/reverse-engineering/ghidra/quakelive_steam/analysis_symbols.txt"
+    ).read_text(encoding="utf-8")
+    hlil_part01 = (
+        REPO_ROOT
+        / "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part01.txt"
+    ).read_text(encoding="utf-8")
+    hlil_part02 = (
+        REPO_ROOT
+        / "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part02.txt"
+    ).read_text(encoding="utf-8")
+    steamworks = (REPO_ROOT / "src/common/platform/platform_steamworks.c").read_text(encoding="utf-8")
+    harness_c = (REPO_ROOT / "tests/steamworks_harness.c").read_text(encoding="utf-8")
+    mapping_round = (
+        REPO_ROOT / "docs/reverse-engineering/quakelive_steam_mapping_round_709.md"
+    ).read_text(encoding="utf-8")
+    implementation_plan = (REPO_ROOT / "IMPLEMENTATION_PLAN.md").read_text(encoding="utf-8")
+
+    expected_aliases = {
+        "FUN_0045ffd0": "SteamCallbacks_OnUserStatsReceived",
+        "sub_45FFD0": "SteamCallbacks_OnUserStatsReceived",
+        "sub_45ffd0": "SteamCallbacks_OnUserStatsReceived",
+        "sub_460520": "CL_Steam_ClearStats_f",
+        "FUN_00460550": "SteamClient_GetSteamID",
+        "sub_460550": "SteamClient_GetSteamID",
+        "FUN_00460d10": "SteamVoice_SendCapturedPacket",
+        "sub_460D10": "SteamVoice_SendCapturedPacket",
+        "sub_460d10": "SteamVoice_SendCapturedPacket",
+        "FUN_004613a0": "SteamCallbacks_Init",
+        "sub_4613a0": "SteamCallbacks_Init",
+        "FUN_00461a60": "SteamVoice_ProcessIncomingPackets",
+        "sub_461A60": "SteamVoice_ProcessIncomingPackets",
+        "sub_461a60": "SteamVoice_ProcessIncomingPackets",
+    }
+    for symbol, alias in expected_aliases.items():
+        assert aliases[symbol] == alias
+
+    for row in (
+        "FUN_0045ffd0,0045ffd0,783,0,unknown",
+        "FUN_00460550,00460550,53,0,unknown",
+        "FUN_00460d10,00460d10,170,0,unknown",
+        "FUN_004613a0,004613a0,344,0,unknown",
+        "FUN_00461a60,00461a60,400,0,unknown",
+    ):
+        assert row in functions_csv
+
+    for imported_symbol in (
+        "STEAM_API.DLL!SteamUser @ 0015916a",
+        "STEAM_API.DLL!SteamUserStats @ 0015919c",
+    ):
+        assert imported_symbol in imports_txt
+    assert "CCallback<class_SteamCallbacks,struct_UserStatsReceived_t,0>::vftable" in analysis_symbols
+
+    for retail_anchor in (
+        "0043233b                  int32_t edx_5 = *(*SteamUserStats() + 0x40)",
+        "004600ef                  int32_t edx_6 = *(*SteamUserStats() + 0x44)",
+        "0046008d                  int32_t edx_3 = *(*SteamUserStats() + 0x48)",
+        '0046018e      int32_t eax_20 = (*(*SteamUserStats() + 0x30))(edi, "name")',
+        '004601a6      int32_t eax_23 = (*(*SteamUserStats() + 0x30))(edi, "desc")',
+        "004601c6          int32_t edx_11 = *(*SteamUserStats() + 0x50)",
+        "00460531  return (*(*SteamUserStats() + 0x54))(1)",
+    ):
+        assert retail_anchor in (hlil_part01 + hlil_part02)
+
+    for retail_anchor in (
+        "00460578  int32_t* eax_2 = (*(*SteamUser() + 8))(&var_c)",
+        "0046044c      (*(*SteamUser() + 0x1c))()",
+        "004604b1      (*(*SteamUser() + 0x20))()",
+        "00460d4b          (*(*SteamUser() + 0x28))(1, 0xe2c218, 0x4000, &data_e2c210, 0, 0, 0, 0, 0)",
+        "00461b07          int32_t edx_5 = *(*SteamUser() + 0x2c)",
+        "00460459      int32_t var_20_2 = (*(*SteamUser() + 0x30))()",
+    ):
+        assert retail_anchor in hlil_part02
+
+    user_slot_values = {
+        "BLOGGED_ON": "(0x04 / 4)",
+        "GET_STEAM_ID": "(0x08 / 4)",
+        "START_VOICE_RECORDING": "(0x1c / 4)",
+        "STOP_VOICE_RECORDING": "(0x20 / 4)",
+        "GET_VOICE": "(0x28 / 4)",
+        "DECOMPRESS_VOICE": "(0x2c / 4)",
+        "GET_VOICE_OPTIMAL_SAMPLE_RATE": "(0x30 / 4)",
+    }
+    for name, value in user_slot_values.items():
+        assert f"#define QL_STEAM_USER_{name}_SLOT {value}" in steamworks
+        assert f"#define QLR_STEAM_USER_{name}_SLOT {value}" in harness_c
+
+    userstats_slot_values = {
+        "GET_ACHIEVEMENT_DISPLAY_ATTRIBUTE": "(0x30 / 4)",
+        "REQUEST_USER_STATS": "(0x40 / 4)",
+        "GET_USER_STAT_FLOAT": "(0x44 / 4)",
+        "GET_USER_STAT_INT": "(0x48 / 4)",
+        "GET_USER_ACHIEVEMENT": "(0x50 / 4)",
+        "RESET_ALL_STATS": "(0x54 / 4)",
+    }
+    for name, value in userstats_slot_values.items():
+        assert f"#define QL_STEAM_USERSTATS_{name}_SLOT {value}" in steamworks
+        assert f"#define QLR_STEAM_USERSTATS_{name}_SLOT {value}" in harness_c
+
+    assert "#define QLR_STEAM_USER_VTABLE_SLOT_COUNT (QLR_STEAM_USER_GET_VOICE_OPTIMAL_SAMPLE_RATE_SLOT + 1)" in harness_c
+    assert "#define QLR_STEAM_USERSTATS_VTABLE_SLOT_COUNT (QLR_STEAM_USERSTATS_RESET_ALL_STATS_SLOT + 1)" in harness_c
+
+    wrapper_slots = {
+        "qboolean QL_Steamworks_IsUserLoggedOn( void )": "QL_STEAM_USER_BLOGGED_ON_SLOT",
+        "qboolean QL_Steamworks_GetUserSteamID( uint32_t *outIdLow, uint32_t *outIdHigh )": "QL_STEAM_USER_GET_STEAM_ID_SLOT",
+        "qboolean QL_Steamworks_StartVoiceRecording( void )": "QL_STEAM_USER_START_VOICE_RECORDING_SLOT",
+        "qboolean QL_Steamworks_StopVoiceRecording( void )": "QL_STEAM_USER_STOP_VOICE_RECORDING_SLOT",
+        "qboolean QL_Steamworks_GetCompressedVoice( void *data, uint32_t dataSize, uint32_t *outSize )": "QL_STEAM_USER_GET_VOICE_SLOT",
+        "qboolean QL_Steamworks_DecompressVoice( const void *compressedData, uint32_t compressedSize, void *data, uint32_t dataSize, uint32_t *outSize, uint32_t sampleRate )": "QL_STEAM_USER_DECOMPRESS_VOICE_SLOT",
+        "uint32_t QL_Steamworks_GetVoiceOptimalSampleRate( void )": "QL_STEAM_USER_GET_VOICE_OPTIMAL_SAMPLE_RATE_SLOT",
+        "qboolean QL_Steamworks_ClearStats( qboolean achievementsToo )": "QL_STEAM_USERSTATS_RESET_ALL_STATS_SLOT",
+        "qboolean QL_Steamworks_RequestUserStats( uint32_t idLow, uint32_t idHigh )": "QL_STEAM_USERSTATS_REQUEST_USER_STATS_SLOT",
+        "qboolean QL_Steamworks_GetUserStatFloat( uint32_t idLow, uint32_t idHigh, const char *name, float *outValue )": "QL_STEAM_USERSTATS_GET_USER_STAT_FLOAT_SLOT",
+        "qboolean QL_Steamworks_GetUserStatInt( uint32_t idLow, uint32_t idHigh, const char *name, int *outValue )": "QL_STEAM_USERSTATS_GET_USER_STAT_INT_SLOT",
+        "qboolean QL_Steamworks_GetUserAchievement( uint32_t idLow, uint32_t idHigh, const char *name, qboolean *outAchieved, int *outUnlockTime )": "QL_STEAM_USERSTATS_GET_USER_ACHIEVEMENT_SLOT",
+        "const char *QL_Steamworks_GetAchievementDisplayAttribute( const char *name, const char *key )": "QL_STEAM_USERSTATS_GET_ACHIEVEMENT_DISPLAY_ATTRIBUTE_SLOT",
+    }
+    for signature, macro in wrapper_slots.items():
+        block = _extract_function_block(steamworks, signature)
+        assert f"vtable[{macro}]" in block
+
+    mock_user_block = _extract_function_block(harness_c, "void *QLR_SteamAPI_SteamUser( void ) {")
+    assert "static void *vtable[QLR_STEAM_USER_VTABLE_SLOT_COUNT];" in mock_user_block
+    for macro, fn_name in (
+        ("BLOGGED_ON", "QLR_SteamUser_BLoggedOn"),
+        ("GET_STEAM_ID", "QLR_SteamUser_GetSteamID"),
+        ("START_VOICE_RECORDING", "QLR_SteamUser_StartVoiceRecording"),
+        ("STOP_VOICE_RECORDING", "QLR_SteamUser_StopVoiceRecording"),
+        ("GET_VOICE", "QLR_SteamUser_GetVoice"),
+        ("DECOMPRESS_VOICE", "QLR_SteamUser_DecompressVoice"),
+        ("GET_VOICE_OPTIMAL_SAMPLE_RATE", "QLR_SteamUser_GetVoiceOptimalSampleRate"),
+    ):
+        assert f"vtable[QLR_STEAM_USER_{macro}_SLOT] = {fn_name};" in mock_user_block
+    assert "static void *vtable[0x30 / 4 + 1];" not in mock_user_block
+    assert "vtable[0x" not in mock_user_block
+
+    mock_userstats_block = _extract_function_block(harness_c, "void *QLR_SteamAPI_SteamUserStats( void ) {")
+    assert "static void *vtable[QLR_STEAM_USERSTATS_VTABLE_SLOT_COUNT];" in mock_userstats_block
+    for macro, fn_name in (
+        ("GET_ACHIEVEMENT_DISPLAY_ATTRIBUTE", "QLR_SteamUserStats_GetAchievementDisplayAttribute"),
+        ("REQUEST_USER_STATS", "QLR_SteamUserStats_RequestUserStats"),
+        ("GET_USER_STAT_FLOAT", "QLR_SteamUserStats_GetUserStatFloat"),
+        ("GET_USER_STAT_INT", "QLR_SteamUserStats_GetUserStatInt"),
+        ("GET_USER_ACHIEVEMENT", "QLR_SteamUserStats_GetUserAchievement"),
+        ("RESET_ALL_STATS", "QLR_SteamUserStats_ResetAllStats"),
+    ):
+        assert f"vtable[QLR_STEAM_USERSTATS_{macro}_SLOT] = {fn_name};" in mock_userstats_block
+    assert "static void *vtable[0x54 / 4 + 1];" not in mock_userstats_block
+    assert "vtable[0x" not in mock_userstats_block
+
+    for doc_anchor in (
+        "# Quake Live Steam Mapping Round 709: Mock SteamUser And SteamUserStats Slot Mirroring",
+        "`SteamClient_GetSteamID`",
+        "`SteamVoice_SendCapturedPacket`",
+        "`SteamCallbacks_OnUserStatsReceived`",
+        "`QLR_STEAM_USER_BLOGGED_ON_SLOT`",
+        "`QLR_STEAM_USER_VTABLE_SLOT_COUNT`",
+        "`QLR_STEAM_USERSTATS_REQUEST_USER_STATS_SLOT`",
+        "`QLR_STEAM_USERSTATS_VTABLE_SLOT_COUNT`",
+        "Focused parity estimate: **before 88% -> after 99%**",
+        "Overall Steam launch/runtime integration mapping confidence moves from **94.00% -> 94.02%**",
+        "does not enable live Steam behavior by default",
+    ):
+        assert doc_anchor in mapping_round
+
+    assert "Task A611: Mirror SteamUser and SteamUserStats mock slot constants [COMPLETED]" in implementation_plan
+    assert "SteamUser/SteamUserStats harness slot-mirroring source-shape confidence" in implementation_plan
+
+
+def test_steam_networking_mock_slot_mirroring_round_710_is_pinned() -> None:
+    aliases = json.loads(
+        (REPO_ROOT / "references/analysis/quakelive_symbol_aliases.json").read_text(encoding="utf-8")
+    )["quakelive_steam_srp"]
+    functions_csv = (
+        REPO_ROOT / "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+    ).read_text(encoding="utf-8")
+    imports_txt = (
+        REPO_ROOT / "references/reverse-engineering/ghidra/quakelive_steam/imports.txt"
+    ).read_text(encoding="utf-8")
+    analysis_symbols = (
+        REPO_ROOT / "references/reverse-engineering/ghidra/quakelive_steam/analysis_symbols.txt"
+    ).read_text(encoding="utf-8")
+    hlil_part02 = (
+        REPO_ROOT
+        / "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part02.txt"
+    ).read_text(encoding="utf-8")
+    steamworks = (REPO_ROOT / "src/common/platform/platform_steamworks.c").read_text(encoding="utf-8")
+    harness_c = (REPO_ROOT / "tests/steamworks_harness.c").read_text(encoding="utf-8")
+    mapping_round = (
+        REPO_ROOT / "docs/reverse-engineering/quakelive_steam_mapping_round_710.md"
+    ).read_text(encoding="utf-8")
+    implementation_plan = (REPO_ROOT / "IMPLEMENTATION_PLAN.md").read_text(encoding="utf-8")
+
+    expected_aliases = {
+        "FUN_0045fef0": "SteamCallbacks_OnP2PSessionRequest",
+        "sub_45FEF0": "SteamCallbacks_OnP2PSessionRequest",
+        "sub_45fef0": "SteamCallbacks_OnP2PSessionRequest",
+        "FUN_00460d10": "SteamVoice_SendCapturedPacket",
+        "sub_460D10": "SteamVoice_SendCapturedPacket",
+        "sub_460d10": "SteamVoice_SendCapturedPacket",
+        "FUN_00461a60": "SteamVoice_ProcessIncomingPackets",
+        "sub_461A60": "SteamVoice_ProcessIncomingPackets",
+        "sub_461a60": "SteamVoice_ProcessIncomingPackets",
+        "FUN_00465b70": "SteamServerCallbacks_OnP2PSessionRequest",
+        "sub_465B70": "SteamServerCallbacks_OnP2PSessionRequest",
+        "sub_465b70": "SteamServerCallbacks_OnP2PSessionRequest",
+        "FUN_00466850": "SteamServer_Frame",
+        "sub_466850": "SteamServer_Frame",
+    }
+    for symbol, alias in expected_aliases.items():
+        assert aliases[symbol] == alias
+
+    for row in (
+        "FUN_0045fef0,0045fef0,93,0,unknown",
+        "FUN_00460d10,00460d10,170,0,unknown",
+        "FUN_00461a60,00461a60,400,0,unknown",
+        "FUN_00465b70,00465b70,146,0,unknown",
+        "FUN_00466850,00466850,827,0,unknown",
+    ):
+        assert row in functions_csv
+
+    for imported_symbol in (
+        "STEAM_API.DLL!SteamNetworking @ 001591ba",
+        "STEAM_API.DLL!SteamGameServerNetworking @ 001592a6",
+    ):
+        assert imported_symbol in imports_txt
+    for symbol in (
+        "CCallback<class_SteamCallbacks,struct_P2PSessionRequest_t,0>::vftable",
+        "CCallback<class_SteamServerCallbacks,struct_P2PSessionRequest_t,1>::vftable",
+    ):
+        assert symbol in analysis_symbols
+
+    for retail_anchor in (
+        "0045ff30  int32_t eax = SteamNetworking()",
+        "0045ff44  return (*(*eax + 0xc))(*arg1, arg1[1])",
+        "00460db4              (**eax_4)(var_c, eax, 0xe2c218, data_e2c210, 1, 1)",
+        "00461a9d  for (i = (*(*SteamNetworking() + 4))(&var_806c, 1); i != 0;",
+        "00461ad8      int32_t edx_3 = *(*SteamNetworking() + 8)",
+        "00465be6              int32_t eax_4 = SteamGameServerNetworking()",
+        "00465bff              return (*(*eax_4 + 0xc))(*arg1, arg1[1])",
+        "004668ca                          int32_t eax_4 = SteamGameServerNetworking()",
+        "00466928          if ((*(*SteamGameServerNetworking() + 4))(&var_424, 1) != 0)",
+        "00466961                  int32_t edx_6 = *(*SteamGameServerNetworking() + 8)",
+        "00466a23                                  int32_t eax_17 = SteamGameServerNetworking()",
+    ):
+        assert retail_anchor in hlil_part02
+
+    slot_values = {
+        "SEND_P2P_PACKET": "0",
+        "IS_P2P_PACKET_AVAILABLE": "1",
+        "READ_P2P_PACKET": "2",
+        "ACCEPT_P2P_SESSION": "(0x0c / 4)",
+    }
+    for name, value in slot_values.items():
+        assert f"#define QL_STEAM_NETWORKING_{name}_SLOT {value}" in steamworks
+        assert f"#define QLR_STEAM_NETWORKING_{name}_SLOT {value}" in harness_c
+    assert "#define QLR_STEAM_NETWORKING_VTABLE_SLOT_COUNT (QLR_STEAM_NETWORKING_ACCEPT_P2P_SESSION_SLOT + 1)" in harness_c
+
+    wrapper_slots = {
+        "qboolean QL_Steamworks_SendP2PPacket( const CSteamID *steamId, const void *data, uint32_t length, int sendType, int channel )": "QL_STEAM_NETWORKING_SEND_P2P_PACKET_SLOT",
+        "qboolean QL_Steamworks_IsP2PPacketAvailable( uint32_t *outSize, int channel )": "QL_STEAM_NETWORKING_IS_P2P_PACKET_AVAILABLE_SLOT",
+        "qboolean QL_Steamworks_ReadP2PPacket( void *data, uint32_t dataSize, uint32_t *outSize, CSteamID *outSteamId, int channel )": "QL_STEAM_NETWORKING_READ_P2P_PACKET_SLOT",
+        "qboolean QL_Steamworks_AcceptP2PSession( const CSteamID *steamId )": "QL_STEAM_NETWORKING_ACCEPT_P2P_SESSION_SLOT",
+        "qboolean QL_Steamworks_ServerSendP2PPacket( const CSteamID *steamId, const void *data, uint32_t length, int sendType, int channel )": "QL_STEAM_NETWORKING_SEND_P2P_PACKET_SLOT",
+        "qboolean QL_Steamworks_ServerIsP2PPacketAvailable( uint32_t *outSize, int channel )": "QL_STEAM_NETWORKING_IS_P2P_PACKET_AVAILABLE_SLOT",
+        "qboolean QL_Steamworks_ServerReadP2PPacket( void *data, uint32_t dataSize, uint32_t *outSize, CSteamID *outSteamId, int channel )": "QL_STEAM_NETWORKING_READ_P2P_PACKET_SLOT",
+        "qboolean QL_Steamworks_ServerAcceptP2PSession( const CSteamID *steamId )": "QL_STEAM_NETWORKING_ACCEPT_P2P_SESSION_SLOT",
+    }
+    for signature, macro in wrapper_slots.items():
+        block = _extract_function_block(steamworks, signature)
+        assert f"vtable[{macro}]" in block
+
+    mock_client_block = _extract_function_block(harness_c, "void *QLR_SteamAPI_SteamNetworking( void ) {")
+    assert "static void *vtable[QLR_STEAM_NETWORKING_VTABLE_SLOT_COUNT];" in mock_client_block
+    for macro, fn_name in (
+        ("SEND_P2P_PACKET", "QLR_SteamNetworking_SendP2PPacket"),
+        ("IS_P2P_PACKET_AVAILABLE", "QLR_SteamNetworking_IsP2PPacketAvailable"),
+        ("READ_P2P_PACKET", "QLR_SteamNetworking_ReadP2PPacket"),
+        ("ACCEPT_P2P_SESSION", "QLR_SteamNetworking_AcceptP2PSessionWithUser"),
+    ):
+        assert f"vtable[QLR_STEAM_NETWORKING_{macro}_SLOT] = {fn_name};" in mock_client_block
+    assert "static void *vtable[0x0c / 4 + 1];" not in mock_client_block
+    assert "vtable[0x" not in mock_client_block
+
+    mock_server_block = _extract_function_block(harness_c, "void *QLR_SteamAPI_SteamGameServerNetworking( void ) {")
+    assert "static void *vtable[QLR_STEAM_NETWORKING_VTABLE_SLOT_COUNT];" in mock_server_block
+    for macro, fn_name in (
+        ("SEND_P2P_PACKET", "QLR_SteamGameServerNetworking_SendP2PPacket"),
+        ("IS_P2P_PACKET_AVAILABLE", "QLR_SteamGameServerNetworking_IsP2PPacketAvailable"),
+        ("READ_P2P_PACKET", "QLR_SteamGameServerNetworking_ReadP2PPacket"),
+        ("ACCEPT_P2P_SESSION", "QLR_SteamGameServerNetworking_AcceptP2PSessionWithUser"),
+    ):
+        assert f"vtable[QLR_STEAM_NETWORKING_{macro}_SLOT] = {fn_name};" in mock_server_block
+    assert "static void *vtable[0x0c / 4 + 1];" not in mock_server_block
+    assert "vtable[0x" not in mock_server_block
+
+    for doc_anchor in (
+        "# Quake Live Steam Mapping Round 710: Mock SteamNetworking Slot Mirroring",
+        "`SteamVoice_SendCapturedPacket`",
+        "`SteamVoice_ProcessIncomingPackets`",
+        "`SteamServer_Frame`",
+        "`QLR_STEAM_NETWORKING_SEND_P2P_PACKET_SLOT`",
+        "`QLR_STEAM_NETWORKING_VTABLE_SLOT_COUNT`",
+        "Focused parity estimate: **before 88% -> after 99%**",
+        "Overall Steam launch/runtime integration mapping confidence moves from **94.02% -> 94.04%**",
+        "does not enable live Steam behavior by default",
+    ):
+        assert doc_anchor in mapping_round
+
+    assert "Task A612: Mirror SteamNetworking mock slot constants [COMPLETED]" in implementation_plan
+    assert "SteamNetworking harness slot-mirroring source-shape confidence" in implementation_plan
+
+
+def test_steam_matchmaking_mock_slot_mirroring_round_711_is_pinned() -> None:
+    aliases = json.loads(
+        (REPO_ROOT / "references/analysis/quakelive_symbol_aliases.json").read_text(encoding="utf-8")
+    )["quakelive_steam_srp"]
+    functions_csv = (
+        REPO_ROOT / "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+    ).read_text(encoding="utf-8")
+    imports_txt = (
+        REPO_ROOT / "references/reverse-engineering/ghidra/quakelive_steam/imports.txt"
+    ).read_text(encoding="utf-8")
+    analysis_symbols = (
+        REPO_ROOT / "references/reverse-engineering/ghidra/quakelive_steam/analysis_symbols.txt"
+    ).read_text(encoding="utf-8")
+    hlil_part01 = (
+        REPO_ROOT
+        / "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part01.txt"
+    ).read_text(encoding="utf-8")
+    hlil_part02 = (
+        REPO_ROOT
+        / "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part02.txt"
+    ).read_text(encoding="utf-8")
+    steamworks = (REPO_ROOT / "src/common/platform/platform_steamworks.c").read_text(encoding="utf-8")
+    harness_c = (REPO_ROOT / "tests/steamworks_harness.c").read_text(encoding="utf-8")
+    mapping_round = (
+        REPO_ROOT / "docs/reverse-engineering/quakelive_steam_mapping_round_711.md"
+    ).read_text(encoding="utf-8")
+    implementation_plan = (REPO_ROOT / "IMPLEMENTATION_PLAN.md").read_text(encoding="utf-8")
+
+    expected_aliases = {
+        "FUN_004645a0": "SteamLobbyCallbacks_OnLobbyChatMessage",
+        "sub_4645A0": "SteamLobbyCallbacks_OnLobbyChatMessage",
+        "sub_4645a0": "SteamLobbyCallbacks_OnLobbyChatMessage",
+        "FUN_004649b0": "SteamLobby_CreateLobby",
+        "sub_4649B0": "SteamLobby_CreateLobby",
+        "sub_4649b0": "SteamLobby_CreateLobby",
+        "FUN_004649e0": "SteamLobby_LeaveLobby",
+        "sub_4649E0": "SteamLobby_LeaveLobby",
+        "sub_4649e0": "SteamLobby_LeaveLobby",
+        "FUN_00464ac0": "SteamLobby_SayLobby",
+        "sub_464AC0": "SteamLobby_SayLobby",
+        "sub_464ac0": "SteamLobby_SayLobby",
+        "FUN_00464b10": "SteamLobby_SetLobbyServer",
+        "sub_464B10": "SteamLobby_SetLobbyServer",
+        "sub_464b10": "SteamLobby_SetLobbyServer",
+        "FUN_00464bf0": "SteamLobbyCallbacks_OnLobbyCreated",
+        "sub_464BF0": "SteamLobbyCallbacks_OnLobbyCreated",
+        "sub_464bf0": "SteamLobbyCallbacks_OnLobbyCreated",
+        "FUN_00464d90": "SteamLobbyCallbacks_OnLobbyEnter",
+        "sub_464D90": "SteamLobbyCallbacks_OnLobbyEnter",
+        "sub_464d90": "SteamLobbyCallbacks_OnLobbyEnter",
+        "FUN_00465630": "SteamLobby_JoinLobby",
+        "sub_465630": "SteamLobby_JoinLobby",
+    }
+    for symbol, alias in expected_aliases.items():
+        assert aliases[symbol] == alias
+
+    for row in (
+        "FUN_004645a0,004645a0,377,0,unknown",
+        "FUN_004649b0,004649b0,37,0,unknown",
+        "FUN_004649e0,004649e0,185,0,unknown",
+        "FUN_00464ac0,00464ac0,69,0,unknown",
+        "FUN_00464b10,00464b10,155,0,unknown",
+        "FUN_00464bf0,00464bf0,416,0,unknown",
+        "FUN_00464d90,00464d90,1350,0,unknown",
+        "FUN_00465630,00465630,76,0,unknown",
+        "FUN_00465840,00465840,85,0,unknown",
+    ):
+        assert row in functions_csv
+
+    assert "STEAM_API.DLL!SteamMatchmaking @ 00159176" in imports_txt
+    for symbol in (
+        "CCallback<class_SteamLobbyCallbacks,struct_LobbyCreated_t,0>::vftable",
+        "CCallback<class_SteamLobbyCallbacks,struct_LobbyEnter_t,0>::vftable",
+        "CCallback<class_SteamLobbyCallbacks,struct_LobbyChatMsg_t,0>::vftable",
+        "CCallback<class_SteamLobbyCallbacks,struct_GameLobbyJoinRequested_t,0>::vftable",
+    ):
+        assert symbol in analysis_symbols
+
+    for retail_anchor in (
+        "004645ec  int32_t edx_1 = *(*SteamMatchmaking(eax_2) + 0x6c)",
+        "004649d2  return (*(*eax + 0x34))(2, *(data_e30338 + 0x30))",
+        "00464a0f  (*(*eax + 0x3c))(data_e3033c, data_e30340)",
+        "00464aff  return (*(*eax_2 + 0x68))(data_e3033c, data_e30340, arg1, eax - &eax[1] + 1)",
+        "00464b71          result = (*(*eax_1 + 0x8c))(&var_14, data_e3033c, data_e30340)",
+        "00464ba2              return (*(*eax_5 + 0x74))(edx_5, ecx_5, arg1, arg2, edx_5, ecx_5)",
+        '00464cc4      (*(*SteamMatchmaking(eax_2) + 0x50))(edi_1, arg1[3], "hello", "world")',
+        "00464fd6      int32_t* eax_21 = (*(*SteamMatchmaking() + 0x8c))(&var_88c, esi_1, edi_1)",
+        "0046503e      int32_t eax_27 = (*(*SteamMatchmaking() + 0x54))(esi_1, edi_1)",
+        "0046507e              (*(*SteamMatchmaking() + 0x58))(esi_1, edi_1, var_858_3, &var_454, 0x400, ",
+        "004650c9      sub_429310(&var_86c, (*(*SteamMatchmaking() + 0x44))(esi_1, edi_1))",
+        "00465116      sub_429310(&var_86c, (*(*SteamMatchmaking() + 0x80))(esi_1, edi_1))",
+        "0046519b              (*(*SteamMatchmaking() + 0x48))(&var_884, esi_1, edi_1, var_858_4)",
+        "00465674  return (*(*SteamMatchmaking() + 0x38))(var_c, var_8_1)",
+    ):
+        assert retail_anchor in hlil_part02
+
+    for favorite_anchor in (
+        "00432742                      int32_t eax_83 = SteamMatchmaking()",
+        "00432798                      (*edx_26)(var_138)",
+        "004326bb                      int32_t eax_71 = SteamMatchmaking()",
+        "00432729                      (*(ecx_98 + 8))(var_138)",
+    ):
+        assert favorite_anchor in hlil_part01
+
+    slot_values = {
+        "ADD_FAVORITE_GAME": "(0x08 / 4)",
+        "REMOVE_FAVORITE_GAME": "(0x0c / 4)",
+        "CREATE_LOBBY": "(0x34 / 4)",
+        "JOIN_LOBBY": "(0x38 / 4)",
+        "LEAVE_LOBBY": "(0x3c / 4)",
+        "INVITE_USER_TO_LOBBY": "(0x40 / 4)",
+        "GET_NUM_LOBBY_MEMBERS": "(0x44 / 4)",
+        "GET_LOBBY_MEMBER_BY_INDEX": "(0x48 / 4)",
+        "SET_LOBBY_DATA": "(0x50 / 4)",
+        "GET_LOBBY_DATA_COUNT": "(0x54 / 4)",
+        "GET_LOBBY_DATA_BY_INDEX": "(0x58 / 4)",
+        "SEND_LOBBY_CHAT_MSG": "(0x68 / 4)",
+        "GET_LOBBY_CHAT_ENTRY": "(0x6c / 4)",
+        "SET_LOBBY_GAME_SERVER": "(0x74 / 4)",
+        "GET_LOBBY_MEMBER_LIMIT": "(0x80 / 4)",
+        "GET_LOBBY_OWNER": "(0x8c / 4)",
+    }
+    for name, value in slot_values.items():
+        assert f"#define QL_STEAM_MATCHMAKING_{name}_SLOT {value}" in steamworks
+        assert f"#define QLR_STEAM_MATCHMAKING_{name}_SLOT {value}" in harness_c
+    assert "#define QLR_STEAM_MATCHMAKING_VTABLE_SLOT_COUNT (QLR_STEAM_MATCHMAKING_GET_LOBBY_OWNER_SLOT + 1)" in harness_c
+
+    wrapper_slots = {
+        "static qboolean QL_Steamworks_ReadLobbyChatMessage( uint32_t idLow, uint32_t idHigh, int chatId, CSteamID *outChatter, int *outEntryType, char *buffer, size_t bufferSize )": "QL_STEAM_MATCHMAKING_GET_LOBBY_CHAT_ENTRY_SLOT",
+        "qboolean QL_Steamworks_CreateLobby( int maxMembers )": "QL_STEAM_MATCHMAKING_CREATE_LOBBY_SLOT",
+        "qboolean QL_Steamworks_LeaveLobby( uint32_t idLow, uint32_t idHigh )": "QL_STEAM_MATCHMAKING_LEAVE_LOBBY_SLOT",
+        "qboolean QL_Steamworks_JoinLobby( uint32_t idLow, uint32_t idHigh )": "QL_STEAM_MATCHMAKING_JOIN_LOBBY_SLOT",
+        "qboolean QL_Steamworks_GetLobbyOwner( uint32_t idLow, uint32_t idHigh, uint32_t *outIdLow, uint32_t *outIdHigh )": "QL_STEAM_MATCHMAKING_GET_LOBBY_OWNER_SLOT",
+        "int QL_Steamworks_GetLobbyDataCount( uint32_t idLow, uint32_t idHigh )": "QL_STEAM_MATCHMAKING_GET_LOBBY_DATA_COUNT_SLOT",
+        "qboolean QL_Steamworks_SetLobbyData( uint32_t idLow, uint32_t idHigh, const char *key, const char *value )": "QL_STEAM_MATCHMAKING_SET_LOBBY_DATA_SLOT",
+        "qboolean QL_Steamworks_GetLobbyDataByIndex( uint32_t idLow, uint32_t idHigh, int index, char *key, size_t keySize, char *value, size_t valueSize )": "QL_STEAM_MATCHMAKING_GET_LOBBY_DATA_BY_INDEX_SLOT",
+        "int QL_Steamworks_GetNumLobbyMembers( uint32_t idLow, uint32_t idHigh )": "QL_STEAM_MATCHMAKING_GET_NUM_LOBBY_MEMBERS_SLOT",
+        "int QL_Steamworks_GetLobbyMemberLimit( uint32_t idLow, uint32_t idHigh )": "QL_STEAM_MATCHMAKING_GET_LOBBY_MEMBER_LIMIT_SLOT",
+        "qboolean QL_Steamworks_GetLobbyMemberByIndex( uint32_t idLow, uint32_t idHigh, int index, uint32_t *outIdLow, uint32_t *outIdHigh )": "QL_STEAM_MATCHMAKING_GET_LOBBY_MEMBER_BY_INDEX_SLOT",
+        "qboolean QL_Steamworks_InviteUserToLobby( uint32_t lobbyIdLow, uint32_t lobbyIdHigh, uint32_t userIdLow, uint32_t userIdHigh )": "QL_STEAM_MATCHMAKING_INVITE_USER_TO_LOBBY_SLOT",
+        "qboolean QL_Steamworks_SayLobby( uint32_t idLow, uint32_t idHigh, const char *message )": "QL_STEAM_MATCHMAKING_SEND_LOBBY_CHAT_MSG_SLOT",
+    }
+    for signature, macro in wrapper_slots.items():
+        block = _extract_function_block(steamworks, signature)
+        assert f"vtable[{macro}]" in block
+
+    mock_matchmaking_block = _extract_function_block(harness_c, "void *QLR_SteamAPI_SteamMatchmaking( void ) {")
+    assert "static void *vtable[QLR_STEAM_MATCHMAKING_VTABLE_SLOT_COUNT];" in mock_matchmaking_block
+    for macro, fn_name in (
+        ("ADD_FAVORITE_GAME", "QLR_SteamMatchmaking_AddFavoriteGame"),
+        ("REMOVE_FAVORITE_GAME", "QLR_SteamMatchmaking_RemoveFavoriteGame"),
+        ("CREATE_LOBBY", "QLR_SteamMatchmaking_CreateLobby"),
+        ("LEAVE_LOBBY", "QLR_SteamMatchmaking_LeaveLobby"),
+        ("JOIN_LOBBY", "QLR_SteamMatchmaking_JoinLobby"),
+        ("INVITE_USER_TO_LOBBY", "QLR_SteamMatchmaking_InviteUserToLobby"),
+        ("SEND_LOBBY_CHAT_MSG", "QLR_SteamMatchmaking_SendLobbyChatMsg"),
+        ("GET_LOBBY_CHAT_ENTRY", "QLR_SteamMatchmaking_GetLobbyChatEntry"),
+        ("SET_LOBBY_GAME_SERVER", "QLR_SteamMatchmaking_SetLobbyGameServer"),
+        ("GET_LOBBY_OWNER", "QLR_SteamMatchmaking_GetLobbyOwner"),
+    ):
+        assert f"vtable[QLR_STEAM_MATCHMAKING_{macro}_SLOT] = {fn_name};" in mock_matchmaking_block
+    assert "static void *vtable[0x8c / 4 + 1];" not in mock_matchmaking_block
+    assert "vtable[0x" not in mock_matchmaking_block
+
+    for doc_anchor in (
+        "# Quake Live Steam Mapping Round 711: Mock SteamMatchmaking Slot Mirroring",
+        "`SteamLobby_CreateLobby`",
+        "`SteamLobby_SetLobbyServer`",
+        "`SteamLobbyCallbacks_OnLobbyEnter`",
+        "`QLR_STEAM_MATCHMAKING_CREATE_LOBBY_SLOT`",
+        "`QLR_STEAM_MATCHMAKING_VTABLE_SLOT_COUNT`",
+        "Focused parity estimate: **before 88% -> after 99%**",
+        "Overall Steam launch/runtime integration mapping confidence moves from **94.04% -> 94.06%**",
+        "does not enable live Steam behavior by default",
+    ):
+        assert doc_anchor in mapping_round
+
+    assert "Task A613: Mirror SteamMatchmaking mock slot constants [COMPLETED]" in implementation_plan
+    assert "SteamMatchmaking harness slot-mirroring source-shape confidence" in implementation_plan
+
+
+def test_steam_gameserver_mock_slot_mirroring_round_712_is_pinned() -> None:
+    aliases = json.loads(
+        (REPO_ROOT / "references/analysis/quakelive_symbol_aliases.json").read_text(encoding="utf-8")
+    )["quakelive_steam_srp"]
+    functions_csv = (
+        REPO_ROOT / "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+    ).read_text(encoding="utf-8")
+    imports_txt = (
+        REPO_ROOT / "references/reverse-engineering/ghidra/quakelive_steam/imports.txt"
+    ).read_text(encoding="utf-8")
+    hlil_part02 = (
+        REPO_ROOT
+        / "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part02.txt"
+    ).read_text(encoding="utf-8")
+    steamworks = (REPO_ROOT / "src/common/platform/platform_steamworks.c").read_text(encoding="utf-8")
+    harness_c = (REPO_ROOT / "tests/steamworks_harness.c").read_text(encoding="utf-8")
+    mapping_round = (
+        REPO_ROOT / "docs/reverse-engineering/quakelive_steam_mapping_round_712.md"
+    ).read_text(encoding="utf-8")
+    implementation_plan = (REPO_ROOT / "IMPLEMENTATION_PLAN.md").read_text(encoding="utf-8")
+
+    expected_aliases = {
+        "FUN_00465a30": "SteamServer_IsInitialized",
+        "sub_465a30": "SteamServer_IsInitialized",
+        "FUN_00465a40": "SteamServer_SetMaxPlayerCount",
+        "sub_465a40": "SteamServer_SetMaxPlayerCount",
+        "FUN_00465a60": "SteamServer_SetKeyValuesFromInfoString",
+        "sub_465a60": "SteamServer_SetKeyValuesFromInfoString",
+        "FUN_00465b00": "SteamServer_PublishSteamID",
+        "sub_465b00": "SteamServer_PublishSteamID",
+        "FUN_00465d50": "SteamServer_HandleIncomingPacket",
+        "sub_465d50": "SteamServer_HandleIncomingPacket",
+        "FUN_00465db0": "SteamServer_EnableHeartbeats",
+        "sub_465db0": "SteamServer_EnableHeartbeats",
+        "FUN_00465df0": "SteamServer_CreateUnauthenticatedUserConnection",
+        "sub_465df0": "SteamServer_CreateUnauthenticatedUserConnection",
+        "FUN_00465e80": "SteamServer_GetPublicIP",
+        "sub_465e80": "SteamServer_GetPublicIP",
+        "FUN_00465fd0": "SteamServer_BeginAuthSession",
+        "sub_465fd0": "SteamServer_BeginAuthSession",
+        "FUN_004661e0": "SteamServer_EndAuthSession",
+        "sub_4661e0": "SteamServer_EndAuthSession",
+        "FUN_00466260": "SteamServer_UpdatePublishedState",
+        "sub_466260": "SteamServer_UpdatePublishedState",
+        "FUN_00466850": "SteamServer_Frame",
+        "sub_466850": "SteamServer_Frame",
+        "FUN_00466b90": "SteamServer_EndOrphanedAuthSessions",
+        "sub_466b90": "SteamServer_EndOrphanedAuthSessions",
+        "FUN_00466ed0": "SteamServer_Init",
+        "sub_466ed0": "SteamServer_Init",
+    }
+    for symbol, alias in expected_aliases.items():
+        assert aliases[symbol] == alias
+
+    for row in (
+        "FUN_00465a30,00465a30,6,0,unknown",
+        "FUN_00465a40,00465a40,26,0,unknown",
+        "FUN_00465a60,00465a60,141,0,unknown",
+        "FUN_00465b00,00465b00,99,0,unknown",
+        "FUN_00465d50,00465d50,94,0,unknown",
+        "FUN_00465db0,00465db0,53,0,unknown",
+        "FUN_00465df0,00465df0,52,0,unknown",
+        "FUN_00465e80,00465e80,18,0,unknown",
+        "FUN_00465fd0,00465fd0,230,0,unknown",
+        "FUN_004661e0,004661e0,126,0,unknown",
+        "FUN_00466260,00466260,1425,0,unknown",
+        "FUN_00466850,00466850,827,0,unknown",
+        "FUN_00466b90,00466b90,535,0,unknown",
+        "FUN_00466ed0,00466ed0,495,0,unknown",
+    ):
+        assert row in functions_csv
+
+    for import_anchor in (
+        "STEAM_API.DLL!SteamGameServer @ 0015918a",
+        "STEAM_API.DLL!SteamGameServerNetworking @ 001592a6",
+        "STEAM_API.DLL!SteamGameServerStats @ 0015932c",
+        "STEAM_API.DLL!SteamGameServerUGC @ 001592fe",
+        "STEAM_API.DLL!SteamGameServerUtils @ 00159344",
+        "STEAM_API.DLL!SteamGameServer_Init @ 00159314",
+        "STEAM_API.DLL!SteamGameServer_RunCallbacks @ 001592de",
+        "STEAM_API.DLL!SteamGameServer_Shutdown @ 001592c2",
+    ):
+        assert import_anchor in imports_txt
+
+    for retail_anchor in (
+        "00465a35  return data_e30358",
+        "00465a59  return (*(*eax_1 + 0x30))(*(data_13e17ec + 0x30))",
+        "00465add          result = (*(*SteamGameServer(var_8) + 0x50))(&var_2008, &var_4008)",
+        "00465b20  int32_t* eax_1 = (*(*SteamGameServer() + 0x28))(&var_c)",
+        "00465d84  int32_t eax_2 = SteamGameServer()",
+        "00465dad  return zx.d((*(*eax_2 + 0x94))(*(arg2 + 8), *(arg2 + 0x10), esi_6, zx.d(*(arg1 + 0x12))))",
+        "00465dd7      (*(*SteamGameServer() + 0x9c))(arg1 == 1)",
+        "00465e18  (*(*SteamGameServer() + 0x64))(&result)",
+        "00465e90  jump(*(*SteamGameServer() + 0x90))",
+        "0046606d  int32_t eax_5 = (*(*SteamGameServer() + 0x74))(arg1, arg2, ebx, arg4)",
+        "0046621f  (*(edx + 0x78))(edi, arg2)",
+        "0046629f          (*(*eax_2 + 0x30))(*(data_13e17ec + 0x30))",
+        "004662d3          (*(*eax_4 + 0x40))(eax_3[0xc] != 0)",
+        "004662fe              (*(*eax_6 + 0x38))(*(data_13e17f0 + 4))",
+        "0046632e          (*(*eax_8 + 0x3c))(*(data_13e1808 + 4))",
+        '00466370          (*(*eax_12 + 0x50))("g_redScore", data_12e077c)',
+        "00466440                          (*(*eax_18 + 0x6c))(edi_2[0x96d8], edi_2[0x96d9], eax_17, ",
+        "0046647b          (*(*SteamGameServer() + 0x34))(var_28_1)",
+        "00466531          (*(*SteamGameServer() + 8))(edi_4)",
+        "004667cd          (*(*eax_54 + 0x54))(ecx_46)",
+        "00466850    int32_t sub_466850()",
+        "00466acb          for (i_2 = (*(*SteamGameServer() + 0x98))(&var_408, 0x400, &var_42c, &var_420); ",
+        "00466cdd              (*(*SteamGameServer() + 0x78))(edi_4, ebx_2)",
+        "00466fc1          uint32_t eax_10 = zx.d(SteamGameServer_Init(",
+        "0046702d          (*(*eax_12 + 0x10))(zx.d(ecx_5.b))",
+        "00467056              (*(*SteamGameServer() + 0x14))(edi_2)",
+        "00467063              (*(*SteamGameServer() + 0x18))()",
+        "00467073          (*(*SteamGameServer() + 0x9c))(0)",
+        '00467090          (*(*SteamGameServer() + 4))("Quake Live")',
+        '004670a0          (*(*SteamGameServer() + 0xc))("baseq3")',
+        "004671ad      result = (*(*SteamGameServer() + 0x20))()",
+    ):
+        assert retail_anchor in hlil_part02
+
+    slot_values = {
+        "SET_PRODUCT": "(0x04 / 4)",
+        "SET_GAME_DESCRIPTION": "(0x08 / 4)",
+        "SET_GAME_DIR": "(0x0c / 4)",
+        "SET_DEDICATED": "(0x10 / 4)",
+        "LOG_ON": "(0x14 / 4)",
+        "LOG_ON_ANONYMOUS": "(0x18 / 4)",
+        "BLOGGED_ON": "(0x20 / 4)",
+        "GET_STEAM_ID": "(0x28 / 4)",
+        "SET_MAX_PLAYER_COUNT": "(0x30 / 4)",
+        "SET_BOT_PLAYER_COUNT": "(0x34 / 4)",
+        "SET_SERVER_NAME": "(0x38 / 4)",
+        "SET_MAP_NAME": "(0x3c / 4)",
+        "SET_PASSWORD_PROTECTED": "(0x40 / 4)",
+        "SET_KEY_VALUE": "(0x50 / 4)",
+        "SET_GAME_TAGS": "(0x54 / 4)",
+        "CREATE_UNAUTHENTICATED_USER": "(0x64 / 4)",
+        "UPDATE_USER_DATA": "(0x6c / 4)",
+        "BEGIN_AUTH_SESSION": "(0x74 / 4)",
+        "END_AUTH_SESSION": "(0x78 / 4)",
+        "GET_PUBLIC_IP": "(0x90 / 4)",
+        "HANDLE_INCOMING_PACKET": "(0x94 / 4)",
+        "GET_NEXT_OUTGOING_PACKET": "(0x98 / 4)",
+        "ENABLE_HEARTBEATS": "(0x9c / 4)",
+    }
+    for name, value in slot_values.items():
+        assert f"#define QL_STEAM_GAMESERVER_{name}_SLOT {value}" in steamworks
+        assert f"#define QLR_STEAM_GAMESERVER_{name}_SLOT {value}" in harness_c
+    assert "#define QLR_STEAM_GAMESERVER_VTABLE_SLOT_COUNT (QLR_STEAM_GAMESERVER_ENABLE_HEARTBEATS_SLOT + 1)" in harness_c
+
+    wrapper_slots = {
+        "qboolean QL_Steamworks_ServerIsLoggedOn( void )": "QL_STEAM_GAMESERVER_BLOGGED_ON_SLOT",
+        "qboolean QL_Steamworks_ServerSetDedicated( qboolean dedicated )": "QL_STEAM_GAMESERVER_SET_DEDICATED_SLOT",
+        "qboolean QL_Steamworks_ServerLogOn( const char *account )": "QL_STEAM_GAMESERVER_LOG_ON_SLOT",
+        "qboolean QL_Steamworks_ServerSetProduct( const char *product )": "QL_STEAM_GAMESERVER_SET_PRODUCT_SLOT",
+        "qboolean QL_Steamworks_ServerSetGameDir( const char *gameDir )": "QL_STEAM_GAMESERVER_SET_GAME_DIR_SLOT",
+        "qboolean QL_Steamworks_ServerSetGameDescription( const char *description )": "QL_STEAM_GAMESERVER_SET_GAME_DESCRIPTION_SLOT",
+        "qboolean QL_Steamworks_ServerSetMaxPlayerCount( int maxPlayers )": "QL_STEAM_GAMESERVER_SET_MAX_PLAYER_COUNT_SLOT",
+        "qboolean QL_Steamworks_ServerSetBotPlayerCount( int botPlayers )": "QL_STEAM_GAMESERVER_SET_BOT_PLAYER_COUNT_SLOT",
+        "qboolean QL_Steamworks_ServerSetServerName( const char *name )": "QL_STEAM_GAMESERVER_SET_SERVER_NAME_SLOT",
+        "qboolean QL_Steamworks_ServerSetMapName( const char *mapName )": "QL_STEAM_GAMESERVER_SET_MAP_NAME_SLOT",
+        "qboolean QL_Steamworks_ServerSetPasswordProtected( qboolean passwordProtected )": "QL_STEAM_GAMESERVER_SET_PASSWORD_PROTECTED_SLOT",
+        "qboolean QL_Steamworks_ServerEnableHeartbeats( qboolean enable )": "QL_STEAM_GAMESERVER_ENABLE_HEARTBEATS_SLOT",
+        "qboolean QL_Steamworks_ServerGetSteamID( uint32_t *outIdLow, uint32_t *outIdHigh )": "QL_STEAM_GAMESERVER_GET_STEAM_ID_SLOT",
+        "qboolean QL_Steamworks_ServerCreateUnauthenticatedUserConnection( uint32_t *outIdLow, uint32_t *outIdHigh )": "QL_STEAM_GAMESERVER_CREATE_UNAUTHENTICATED_USER_SLOT",
+        "qboolean QL_Steamworks_ServerSetGameTags( const char *tags )": "QL_STEAM_GAMESERVER_SET_GAME_TAGS_SLOT",
+        "qboolean QL_Steamworks_ServerSetKeyValue( const char *key, const char *value )": "QL_STEAM_GAMESERVER_SET_KEY_VALUE_SLOT",
+        "qboolean QL_Steamworks_ServerUpdateUserData( const CSteamID *steamId, const char *playerName, uint32_t score )": "QL_STEAM_GAMESERVER_UPDATE_USER_DATA_SLOT",
+        "uint32_t QL_Steamworks_ServerGetPublicIP( void )": "QL_STEAM_GAMESERVER_GET_PUBLIC_IP_SLOT",
+        "qboolean QL_Steamworks_ServerBeginAuthSession( const CSteamID *steamId, const char *ticketHex, ql_auth_response_t *response )": "QL_STEAM_GAMESERVER_BEGIN_AUTH_SESSION_SLOT",
+        "void QL_Steamworks_ServerEndAuthSession( const CSteamID *steamId )": "QL_STEAM_GAMESERVER_END_AUTH_SESSION_SLOT",
+        "qboolean QL_Steamworks_ServerHandleIncomingPacket( const void *data, int dataSize, uint32_t ip, uint16_t port )": "QL_STEAM_GAMESERVER_HANDLE_INCOMING_PACKET_SLOT",
+        "int QL_Steamworks_ServerGetNextOutgoingPacket( void *data, int dataSize, uint32_t *outIp, uint16_t *outPort )": "QL_STEAM_GAMESERVER_GET_NEXT_OUTGOING_PACKET_SLOT",
+    }
+    for signature, macro in wrapper_slots.items():
+        block = _extract_function_block(steamworks, signature)
+        assert f"vtable[{macro}]" in block
+    logon_block = _extract_function_block(steamworks, "qboolean QL_Steamworks_ServerLogOn( const char *account )")
+    assert "vtable[QL_STEAM_GAMESERVER_LOG_ON_ANONYMOUS_SLOT]" in logon_block
+
+    mock_gameserver_block = _extract_function_block(harness_c, "void *QLR_SteamAPI_SteamGameServer( void ) {")
+    assert "static void *vtable[QLR_STEAM_GAMESERVER_VTABLE_SLOT_COUNT];" in mock_gameserver_block
+    for macro, fn_name in (
+        ("SET_PRODUCT", "QLR_SteamGameServer_SetProduct"),
+        ("SET_GAME_DESCRIPTION", "QLR_SteamGameServer_SetGameDescription"),
+        ("SET_GAME_DIR", "QLR_SteamGameServer_SetGameDir"),
+        ("SET_DEDICATED", "QLR_SteamGameServer_SetDedicated"),
+        ("LOG_ON", "QLR_SteamGameServer_LogOn"),
+        ("LOG_ON_ANONYMOUS", "QLR_SteamGameServer_LogOnAnonymous"),
+        ("BLOGGED_ON", "QLR_SteamGameServer_BLoggedOn"),
+        ("GET_STEAM_ID", "QLR_SteamGameServer_GetSteamID"),
+        ("SET_MAX_PLAYER_COUNT", "QLR_SteamGameServer_SetMaxPlayerCount"),
+        ("SET_BOT_PLAYER_COUNT", "QLR_SteamGameServer_SetBotPlayerCount"),
+        ("SET_SERVER_NAME", "QLR_SteamGameServer_SetServerName"),
+        ("SET_MAP_NAME", "QLR_SteamGameServer_SetMapName"),
+        ("SET_PASSWORD_PROTECTED", "QLR_SteamGameServer_SetPasswordProtected"),
+        ("SET_KEY_VALUE", "QLR_SteamGameServer_SetKeyValue"),
+        ("SET_GAME_TAGS", "QLR_SteamGameServer_SetGameTags"),
+        ("CREATE_UNAUTHENTICATED_USER", "QLR_SteamGameServer_CreateUnauthenticatedUserConnection"),
+        ("UPDATE_USER_DATA", "QLR_SteamGameServer_UpdateUserData"),
+        ("BEGIN_AUTH_SESSION", "QLR_SteamGameServer_BeginAuthSession"),
+        ("END_AUTH_SESSION", "QLR_SteamGameServer_EndAuthSession"),
+        ("GET_PUBLIC_IP", "QLR_SteamGameServer_GetPublicIP"),
+        ("HANDLE_INCOMING_PACKET", "QLR_SteamGameServer_HandleIncomingPacket"),
+        ("GET_NEXT_OUTGOING_PACKET", "QLR_SteamGameServer_GetNextOutgoingPacket"),
+        ("ENABLE_HEARTBEATS", "QLR_SteamGameServer_EnableHeartbeats"),
+    ):
+        assert f"vtable[QLR_STEAM_GAMESERVER_{macro}_SLOT] = {fn_name};" in mock_gameserver_block
+    assert "static void *vtable[0x9c / 4 + 1];" not in mock_gameserver_block
+    assert "vtable[0x" not in mock_gameserver_block
+
+    for doc_anchor in (
+        "# Quake Live Steam Mapping Round 712: Mock SteamGameServer Slot Mirroring",
+        "`SteamServer_UpdatePublishedState`",
+        "`SteamServer_Init`",
+        "`SteamServer_BeginAuthSession`",
+        "`QLR_STEAM_GAMESERVER_SET_PRODUCT_SLOT`",
+        "`QLR_STEAM_GAMESERVER_VTABLE_SLOT_COUNT`",
+        "Focused parity estimate: **before 88% -> after 99%**",
+        "Overall Steam launch/runtime integration mapping confidence moves from **94.06% -> 94.08%**",
+        "does not enable live Steam behavior by default",
+    ):
+        assert doc_anchor in mapping_round
+
+    assert "Task A614: Mirror SteamGameServer mock slot constants [COMPLETED]" in implementation_plan
+    assert "SteamGameServer harness slot-mirroring source-shape confidence" in implementation_plan
+
+
+def test_steam_gameserverstats_mock_slot_mirroring_round_713_is_pinned() -> None:
+    aliases = json.loads(
+        (REPO_ROOT / "references/analysis/quakelive_symbol_aliases.json").read_text(encoding="utf-8")
+    )["quakelive_steam_srp"]
+    functions_csv = (
+        REPO_ROOT / "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+    ).read_text(encoding="utf-8")
+    imports_txt = (
+        REPO_ROOT / "references/reverse-engineering/ghidra/quakelive_steam/imports.txt"
+    ).read_text(encoding="utf-8")
+    analysis_symbols = (
+        REPO_ROOT / "references/reverse-engineering/ghidra/quakelive_steam/analysis_symbols.txt"
+    ).read_text(encoding="utf-8")
+    hlil_part02 = (
+        REPO_ROOT
+        / "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part02.txt"
+    ).read_text(encoding="utf-8")
+    steamworks = (REPO_ROOT / "src/common/platform/platform_steamworks.c").read_text(encoding="utf-8")
+    harness_c = (REPO_ROOT / "tests/steamworks_harness.c").read_text(encoding="utf-8")
+    mapping_round = (
+        REPO_ROOT / "docs/reverse-engineering/quakelive_steam_mapping_round_713.md"
+    ).read_text(encoding="utf-8")
+    implementation_plan = (REPO_ROOT / "IMPLEMENTATION_PLAN.md").read_text(encoding="utf-8")
+
+    expected_aliases = {
+        "FUN_004670c0": "SteamStats_FlushPendingValues",
+        "sub_4670c0": "SteamStats_FlushPendingValues",
+        "sub_467190": "SteamStats_OnServersConnected",
+        "FUN_004671d0": "SteamStats_OnStatsReceived",
+        "sub_4671d0": "SteamStats_OnStatsReceived",
+        "FUN_004672d0": "SteamStats_SetAchievement",
+        "sub_4672d0": "SteamStats_SetAchievement",
+        "FUN_00467360": "SteamStats_OnStatsStored",
+        "sub_467360": "SteamStats_OnStatsStored",
+        "FUN_00467560": "SteamStats_Shutdown",
+        "sub_467560": "SteamStats_Shutdown",
+        "FUN_00467850": "SteamStats_Init",
+        "sub_467850": "SteamStats_Init",
+    }
+    for symbol, alias in expected_aliases.items():
+        assert aliases[symbol] == alias
+
+    for row in (
+        "FUN_004670c0,004670c0,208,0,unknown",
+        "FUN_004671d0,004671d0,256,0,unknown",
+        "FUN_004672d0,004672d0,71,0,unknown",
+        "FUN_00467360,00467360,195,0,unknown",
+        "FUN_00467560,00467560,88,0,unknown",
+        "FUN_00467850,00467850,454,0,unknown",
+    ):
+        assert row in functions_csv
+
+    assert "STEAM_API.DLL!SteamGameServer @ 0015918a" in imports_txt
+    assert "STEAM_API.DLL!SteamGameServerStats @ 0015932c" in imports_txt
+    for symbol in (
+        "CCallback<class_idSteamStats,struct_GSStatsReceived_t,1>::vftable",
+        "CCallback<class_idSteamStats,struct_GSStatsStored_t,1>::vftable",
+    ):
+        assert symbol in analysis_symbols
+
+    for retail_anchor in (
+        "004670c0    void __fastcall sub_4670c0(void* arg1)",
+        "00467147                  eax_6 = SteamGameServerStats()",
+        "00467160                  (*(*eax_6 + 0x14))(*(arg1 + 8), *(arg1 + 0xc), *(esi_2 + 8), var_1c)",
+        "00467137                  eax_6, ecx_5 = SteamGameServerStats()",
+        "00467160                  (*(*eax_6 + 0x10))(*(arg1 + 8), *(arg1 + 0xc), *(esi_2 + 8), var_1c)",
+        "00467104                  int32_t eax_5 = SteamGameServerStats()",
+        "00467129                  (*(*eax_5 + 0x18))(*(arg1 + 8), *(arg1 + 0xc), *(esi_2 + 8), ",
+        "0046712f                  int32_t edx_4 = *(*SteamGameServerStats() + 4)",
+        "00467188      (*(*eax_8 + 0x24))(*(arg1 + 8), *(arg1 + 0xc))",
+        "00467190    int32_t __fastcall sub_467190(void* arg1)",
+        "0046719a  int32_t result = SteamGameServerStats()",
+        "004671ad      result = (*(*SteamGameServer() + 0x20))()",
+        "004671c3          return (**eax_2)(*(arg1 + 8), *(arg1 + 0xc))",
+        "004671d0    void* __thiscall sub_4671d0(void* arg1, int32_t* arg2)",
+        "00467240              edx_2 = *(*SteamGameServerStats() + 8)",
+        "00467230              edx_2 = *(*SteamGameServerStats() + 4)",
+        "004672d0    int32_t __thiscall sub_4672d0(void* arg1, int32_t arg2)",
+        "00467301  ebx.b = (*(*eax_1 + 0x1c))(*(arg1 + 8), *(arg1 + 0xc), (&data_561c00)[arg2])",
+        "00467360    void* __thiscall sub_467360(void* arg1, int32_t* arg2)",
+        "00467560    void* __fastcall sub_467560(void* arg1)",
+        "00467850    int32_t* __thiscall sub_467850(int32_t* arg1, int32_t arg2, int32_t arg3)",
+        "004679d9  if (SteamGameServerStats() != 0 && (*(*SteamGameServer() + 0x20))() != 0)",
+    ):
+        assert retail_anchor in hlil_part02
+
+    slot_values = {
+        "REQUEST_USER_STATS": "0",
+        "GET_USER_STAT_FLOAT": "(0x04 / 4)",
+        "GET_USER_STAT_INT": "(0x08 / 4)",
+        "GET_USER_ACHIEVEMENT": "(0x0c / 4)",
+        "SET_USER_STAT_FLOAT": "(0x10 / 4)",
+        "SET_USER_STAT_INT": "(0x14 / 4)",
+        "UPDATE_AVG_RATE_STAT": "(0x18 / 4)",
+        "SET_USER_ACHIEVEMENT": "(0x1c / 4)",
+        "STORE_USER_STATS": "(0x24 / 4)",
+    }
+    for name, value in slot_values.items():
+        assert f"#define QL_STEAM_GAMESERVERSTATS_{name}_SLOT {value}" in steamworks
+        assert f"#define QLR_STEAM_GAMESERVERSTATS_{name}_SLOT {value}" in harness_c
+    assert "#define QLR_STEAM_GAMESERVERSTATS_VTABLE_SLOT_COUNT (QLR_STEAM_GAMESERVERSTATS_STORE_USER_STATS_SLOT + 1)" in harness_c
+
+    wrapper_slots = {
+        "qboolean QL_Steamworks_ServerRequestUserStats( const CSteamID *steamId )": "QL_STEAM_GAMESERVERSTATS_REQUEST_USER_STATS_SLOT",
+        "qboolean QL_Steamworks_ServerGetUserStatInt( const CSteamID *steamId, const char *name, int *outValue )": "QL_STEAM_GAMESERVERSTATS_GET_USER_STAT_INT_SLOT",
+        "qboolean QL_Steamworks_ServerGetUserStatFloat( const CSteamID *steamId, const char *name, float *outValue )": "QL_STEAM_GAMESERVERSTATS_GET_USER_STAT_FLOAT_SLOT",
+        "qboolean QL_Steamworks_ServerGetUserAchievement( const CSteamID *steamId, const char *name, qboolean *outAchieved )": "QL_STEAM_GAMESERVERSTATS_GET_USER_ACHIEVEMENT_SLOT",
+        "qboolean QL_Steamworks_ServerSetUserStatInt( const CSteamID *steamId, const char *name, int value )": "QL_STEAM_GAMESERVERSTATS_SET_USER_STAT_INT_SLOT",
+        "qboolean QL_Steamworks_ServerSetUserStatFloat( const CSteamID *steamId, const char *name, float value )": "QL_STEAM_GAMESERVERSTATS_SET_USER_STAT_FLOAT_SLOT",
+        "qboolean QL_Steamworks_ServerUpdateAvgRateStat( const CSteamID *steamId, const char *name, float countThisSession, double sessionLength )": "QL_STEAM_GAMESERVERSTATS_UPDATE_AVG_RATE_STAT_SLOT",
+        "qboolean QL_Steamworks_ServerSetUserAchievement( const CSteamID *steamId, const char *name )": "QL_STEAM_GAMESERVERSTATS_SET_USER_ACHIEVEMENT_SLOT",
+        "qboolean QL_Steamworks_ServerStoreUserStats( const CSteamID *steamId )": "QL_STEAM_GAMESERVERSTATS_STORE_USER_STATS_SLOT",
+    }
+    for signature, macro in wrapper_slots.items():
+        block = _extract_function_block(steamworks, signature)
+        assert f"vtable[{macro}]" in block
+
+    request_block = _extract_function_block(steamworks, "qboolean QL_Steamworks_ServerRequestUserStats( const CSteamID *steamId )")
+    assert request_block.index("QL_Steamworks_GetGameServerStatsInterface()") < request_block.index(
+        "if ( !QL_Steamworks_ServerIsLoggedOn() ) {"
+    )
+    assert request_block.index("if ( !QL_Steamworks_ServerIsLoggedOn() ) {") < request_block.rindex(
+        "QL_Steamworks_GetGameServerStatsInterface()"
+    )
+
+    mock_stats_block = _extract_function_block(harness_c, "void *QLR_SteamAPI_SteamGameServerStats( void ) {")
+    assert "static void *vtable[QLR_STEAM_GAMESERVERSTATS_VTABLE_SLOT_COUNT];" in mock_stats_block
+    for macro, fn_name in (
+        ("REQUEST_USER_STATS", "QLR_SteamGameServerStats_RequestUserStats"),
+        ("GET_USER_STAT_FLOAT", "QLR_SteamGameServerStats_GetUserStatFloat"),
+        ("GET_USER_STAT_INT", "QLR_SteamGameServerStats_GetUserStatInt"),
+        ("GET_USER_ACHIEVEMENT", "QLR_SteamGameServerStats_GetUserAchievement"),
+        ("SET_USER_STAT_FLOAT", "QLR_SteamGameServerStats_SetUserStatFloat"),
+        ("SET_USER_STAT_INT", "QLR_SteamGameServerStats_SetUserStatInt"),
+        ("UPDATE_AVG_RATE_STAT", "QLR_SteamGameServerStats_UpdateAvgRateStat"),
+        ("SET_USER_ACHIEVEMENT", "QLR_SteamGameServerStats_SetUserAchievement"),
+        ("STORE_USER_STATS", "QLR_SteamGameServerStats_StoreUserStats"),
+    ):
+        assert f"vtable[QLR_STEAM_GAMESERVERSTATS_{macro}_SLOT] = {fn_name};" in mock_stats_block
+    assert "static void *vtable[0x24 / 4 + 1];" not in mock_stats_block
+    assert "vtable[0x" not in mock_stats_block
+
+    for doc_anchor in (
+        "# Quake Live Steam Mapping Round 713: Mock SteamGameServerStats Slot Mirroring",
+        "`SteamStats_FlushPendingValues`",
+        "`SteamStats_OnStatsStored`",
+        "`SteamStats_Init`",
+        "`QLR_STEAM_GAMESERVERSTATS_REQUEST_USER_STATS_SLOT`",
+        "`QLR_STEAM_GAMESERVERSTATS_VTABLE_SLOT_COUNT`",
+        "Focused parity estimate: **before 88% -> after 99%**",
+        "Overall Steam launch/runtime integration mapping confidence moves from **94.08% -> 94.10%**",
+        "does not enable live Steam behavior by default",
+    ):
+        assert doc_anchor in mapping_round
+
+    assert "Task A615: Mirror SteamGameServerStats mock slot constants [COMPLETED]" in implementation_plan
+    assert "SteamGameServerStats harness slot-mirroring source-shape confidence" in implementation_plan
+
+
+def test_steam_apps_mock_slot_mirroring_round_714_is_pinned() -> None:
+    aliases = json.loads(
+        (REPO_ROOT / "references/analysis/quakelive_symbol_aliases.json").read_text(encoding="utf-8")
+    )["quakelive_steam_srp"]
+    functions_csv = (
+        REPO_ROOT / "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+    ).read_text(encoding="utf-8")
+    imports_txt = (
+        REPO_ROOT / "references/reverse-engineering/ghidra/quakelive_steam/imports.txt"
+    ).read_text(encoding="utf-8")
+    hlil_part02 = (
+        REPO_ROOT
+        / "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part02.txt"
+    ).read_text(encoding="utf-8")
+    steamworks = (REPO_ROOT / "src/common/platform/platform_steamworks.c").read_text(encoding="utf-8")
+    harness_c = (REPO_ROOT / "tests/steamworks_harness.c").read_text(encoding="utf-8")
+    harness_py = (REPO_ROOT / "tests/test_steamworks_harness.py").read_text(encoding="utf-8")
+    mapping_round = (
+        REPO_ROOT / "docs/reverse-engineering/quakelive_steam_mapping_round_714.md"
+    ).read_text(encoding="utf-8")
+    mapping_round_699 = (
+        REPO_ROOT / "docs/reverse-engineering/quakelive_steam_mapping_round_699.md"
+    ).read_text(encoding="utf-8")
+    implementation_plan = (REPO_ROOT / "IMPLEMENTATION_PLAN.md").read_text(encoding="utf-8")
+
+    assert aliases["FUN_00460590"] == "SteamApps_BIsSubscribedApp"
+    assert aliases["sub_460590"] == "SteamApps_BIsSubscribedApp"
+    assert "FUN_00460590,00460590,40,0,unknown" in functions_csv
+    assert "STEAM_API.DLL!SteamApps @ 001591e0" in imports_txt
+    assert "004605b7      return zx.d((*(*SteamApps() + 0x1c))(arg1))" in hlil_part02
+
+    for source_anchor in (
+        '#define QL_STEAMWORKS_EXPORT_STEAM_APPS "SteamApps"',
+        '#define QL_STEAMWORKS_EXPORT_STEAM_API_STEAM_APPS "SteamAPI_SteamApps"',
+        "#define QL_STEAM_APPS_BIS_SUBSCRIBED_APP_SLOT (0x1c / 4)",
+        "QL_Steamworks_LoadSymbolAlias( (void **)&state.SteamApps, QL_STEAMWORKS_EXPORT_STEAM_APPS, QL_STEAMWORKS_EXPORT_STEAM_API_STEAM_APPS )",
+    ):
+        assert source_anchor in steamworks
+
+    apps_wrapper_block = _extract_function_block(
+        steamworks, "qboolean QL_Steamworks_IsSubscribedApp( uint32_t appId ) {"
+    )
+    assert "apps = state.SteamApps();" in apps_wrapper_block
+    assert "vtable[QL_STEAM_APPS_BIS_SUBSCRIBED_APP_SLOT]" in apps_wrapper_block
+    assert "vtable[0x" not in apps_wrapper_block
+
+    for harness_anchor in (
+        "#define QLR_STEAM_APPS_BIS_SUBSCRIBED_APP_SLOT (0x1c / 4)",
+        "#define QLR_STEAM_APPS_VTABLE_SLOT_COUNT (QLR_STEAM_APPS_BIS_SUBSCRIBED_APP_SLOT + 1)",
+        "void *QLR_SteamAPI_SteamApps( void );",
+        "static int QLR_FASTCALL QLR_SteamApps_BIsSubscribedApp( void *self, void *unused, uint32_t appId );",
+        "state.SteamApps = qlr_mock_state.steam_apps_export_available ? QLR_SteamAPI_SteamApps : NULL;",
+        "QLR_EXPORT qboolean QLR_Steamworks_IsSubscribedApp( uint32_t appId )",
+        "QLR_EXPORT void QLR_SteamworksMock_SetSteamAppsSubscribedResult( int result )",
+        "QLR_EXPORT int QLR_SteamworksMock_GetSteamAppsInterfaceCalls( void )",
+        "QLR_EXPORT uint32_t QLR_SteamworksMock_GetSteamAppsLastAppId( void )",
+    ):
+        assert harness_anchor in harness_c
+
+    dlsym_block = _extract_function_block(harness_c, "void *dlsym( void *handle, const char *symbol ) {")
+    assert "strcmp( symbol, QLR_STEAMWORKS_EXPORT_STEAM_APPS ) == 0 || strcmp( symbol, QLR_STEAMWORKS_EXPORT_STEAM_API_STEAM_APPS ) == 0" in dlsym_block
+    assert "return qlr_mock_state.steam_apps_export_available ? QLR_SteamAPI_SteamApps : NULL;" in dlsym_block
+
+    mock_apps_block = _extract_function_block(harness_c, "void *QLR_SteamAPI_SteamApps( void ) {")
+    assert "static void *vtable[QLR_STEAM_APPS_VTABLE_SLOT_COUNT];" in mock_apps_block
+    assert "++qlr_mock_state.steam_apps_interface_calls;" in mock_apps_block
+    assert "vtable[QLR_STEAM_APPS_BIS_SUBSCRIBED_APP_SLOT] = QLR_SteamApps_BIsSubscribedApp;" in mock_apps_block
+    assert "vtable[0x" not in mock_apps_block
+
+    subscribed_block = _extract_function_block(
+        harness_c, "static int QLR_FASTCALL QLR_SteamApps_BIsSubscribedApp( void *self, void *unused, uint32_t appId ) {"
+    )
+    assert "qlr_mock_state.steam_apps_last_app_id = appId;" in subscribed_block
+    assert "return qlr_mock_state.steam_apps_subscribed_result;" in subscribed_block
+
+    for harness_py_anchor in (
+        "lib.QLR_Steamworks_IsSubscribedApp.argtypes = [ctypes.c_uint32]",
+        "lib.QLR_SteamworksMock_SetSteamAppsSubscribedResult.argtypes = [ctypes.c_int]",
+        "lib.QLR_SteamworksMock_GetSteamAppsInterfaceCalls.restype = ctypes.c_int",
+        "lib.QLR_SteamworksMock_GetSteamAppsLastAppId.restype = ctypes.c_uint32",
+        "def test_steam_apps_subscription_wrapper_uses_mock_vtable(",
+        "assert lib.QLR_SteamworksMock_GetSteamAppsLastAppId() == REFERENCE_RETAIL_APP_ID",
+    ):
+        assert harness_py_anchor in harness_py
+
+    for doc_anchor in (
+        "# Quake Live Steam Mapping Round 714: Mock SteamApps Subscription Wiring",
+        "`FUN_00460590` / `sub_460590`",
+        "`SteamApps + 0x1c`",
+        "`QLR_STEAM_APPS_BIS_SUBSCRIBED_APP_SLOT`",
+        "Focused parity estimate: **before 85% -> after 99%**",
+        "Overall Steam launch/runtime integration mapping confidence moves from **94.10% -> 94.12%**",
+        "does not enable live Steam behavior by default",
+    ):
+        assert doc_anchor in mapping_round
+
+    assert "Round 714 later added the missing harness `SteamApps` mirror" in mapping_round_699
+    assert "Task A616: Mirror SteamApps subscription mock interface [COMPLETED]" in implementation_plan
+    assert "SteamApps harness subscription source-shape confidence" in implementation_plan
+
+
+def test_steamworks_mock_loader_export_constants_round_715_is_pinned() -> None:
+    imports_txt = (
+        REPO_ROOT / "references/reverse-engineering/ghidra/quakelive_steam/imports.txt"
+    ).read_text(encoding="utf-8")
+    steamworks = (REPO_ROOT / "src/common/platform/platform_steamworks.c").read_text(encoding="utf-8")
+    harness_c = (REPO_ROOT / "tests/steamworks_harness.c").read_text(encoding="utf-8")
+    harness_py = (REPO_ROOT / "tests/test_steamworks_harness.py").read_text(encoding="utf-8")
+    mapping_round = (
+        REPO_ROOT / "docs/reverse-engineering/quakelive_steam_mapping_round_715.md"
+    ).read_text(encoding="utf-8")
+    mapping_round_701 = (
+        REPO_ROOT / "docs/reverse-engineering/quakelive_steam_mapping_round_701.md"
+    ).read_text(encoding="utf-8")
+    implementation_plan = (REPO_ROOT / "IMPLEMENTATION_PLAN.md").read_text(encoding="utf-8")
+
+    retail_exports = (
+        "SteamAPI_Init",
+        "SteamAPI_RegisterCallResult",
+        "SteamAPI_RegisterCallback",
+        "SteamAPI_RunCallbacks",
+        "SteamAPI_Shutdown",
+        "SteamAPI_UnregisterCallResult",
+        "SteamAPI_UnregisterCallback",
+        "SteamApps",
+        "SteamFriends",
+        "SteamGameServer",
+        "SteamGameServerNetworking",
+        "SteamGameServerStats",
+        "SteamGameServerUGC",
+        "SteamGameServerUtils",
+        "SteamGameServer_Init",
+        "SteamGameServer_RunCallbacks",
+        "SteamGameServer_Shutdown",
+        "SteamMatchmaking",
+        "SteamMatchmakingServers",
+        "SteamNetworking",
+        "SteamUGC",
+        "SteamUser",
+        "SteamUserStats",
+        "SteamUtils",
+    )
+    for export in retail_exports:
+        assert f"STEAM_API.DLL!{export} @" in imports_txt
+
+    export_constants = {
+        "STEAM_API_INIT": "SteamAPI_Init",
+        "STEAM_API_SHUTDOWN": "SteamAPI_Shutdown",
+        "STEAM_API_RUN_CALLBACKS": "SteamAPI_RunCallbacks",
+        "STEAM_API_REGISTER_CALLBACK": "SteamAPI_RegisterCallback",
+        "STEAM_API_UNREGISTER_CALLBACK": "SteamAPI_UnregisterCallback",
+        "STEAM_API_REGISTER_CALL_RESULT": "SteamAPI_RegisterCallResult",
+        "STEAM_API_UNREGISTER_CALL_RESULT": "SteamAPI_UnregisterCallResult",
+        "STEAM_USER": "SteamUser",
+        "STEAM_API_STEAM_USER": "SteamAPI_SteamUser",
+        "STEAM_FRIENDS": "SteamFriends",
+        "STEAM_API_STEAM_FRIENDS": "SteamAPI_SteamFriends",
+        "STEAM_NETWORKING": "SteamNetworking",
+        "STEAM_API_STEAM_NETWORKING": "SteamAPI_SteamNetworking",
+        "STEAM_UTILS": "SteamUtils",
+        "STEAM_API_STEAM_UTILS": "SteamAPI_SteamUtils",
+        "STEAM_USER_STATS": "SteamUserStats",
+        "STEAM_API_STEAM_USER_STATS": "SteamAPI_SteamUserStats",
+        "STEAM_MATCHMAKING": "SteamMatchmaking",
+        "STEAM_API_STEAM_MATCHMAKING": "SteamAPI_SteamMatchmaking",
+        "STEAM_MATCHMAKING_SERVERS": "SteamMatchmakingServers",
+        "STEAM_API_STEAM_MATCHMAKING_SERVERS": "SteamAPI_SteamMatchmakingServers",
+        "STEAM_APPS": "SteamApps",
+        "STEAM_API_STEAM_APPS": "SteamAPI_SteamApps",
+        "STEAM_UGC": "SteamUGC",
+        "STEAM_API_STEAM_UGC": "SteamAPI_SteamUGC",
+        "STEAM_API_ISTEAMUSER_GET_AUTH_SESSION_TICKET": "SteamAPI_ISteamUser_GetAuthSessionTicket",
+        "STEAM_API_ISTEAMUSER_GET_AUTH_TICKET_FOR_WEB_API": "SteamAPI_ISteamUser_GetAuthTicketForWebApi",
+        "STEAM_API_ISTEAMUSER_BEGIN_AUTH_SESSION": "SteamAPI_ISteamUser_BeginAuthSession",
+        "STEAM_API_ISTEAMUSER_CANCEL_AUTH_TICKET": "SteamAPI_ISteamUser_CancelAuthTicket",
+        "STEAM_API_ISTEAMUSER_END_AUTH_SESSION": "SteamAPI_ISteamUser_EndAuthSession",
+        "STEAM_API_ISTEAMUSER_GET_STEAM_ID": "SteamAPI_ISteamUser_GetSteamID",
+        "STEAM_GAME_SERVER": "SteamGameServer",
+        "STEAM_GAME_SERVER_STATS": "SteamGameServerStats",
+        "STEAM_GAME_SERVER_UTILS": "SteamGameServerUtils",
+        "STEAM_GAME_SERVER_UGC": "SteamGameServerUGC",
+        "STEAM_GAME_SERVER_INIT": "SteamGameServer_Init",
+        "STEAM_GAME_SERVER_SHUTDOWN": "SteamGameServer_Shutdown",
+        "STEAM_GAME_SERVER_RUN_CALLBACKS": "SteamGameServer_RunCallbacks",
+        "STEAM_GAME_SERVER_NETWORKING": "SteamGameServerNetworking",
+    }
+    for suffix, export in export_constants.items():
+        assert f'#define QL_STEAMWORKS_EXPORT_{suffix} "{export}"' in steamworks
+        assert f'#define QLR_STEAMWORKS_EXPORT_{suffix} "{export}"' in harness_c
+
+    dlsym_block = _extract_function_block(harness_c, "void *dlsym( void *handle, const char *symbol ) {")
+    for retail_suffix, sdk_suffix, flag_name, function_name in (
+        ("STEAM_UTILS", "STEAM_API_STEAM_UTILS", "steam_utils_export_available", "QLR_SteamAPI_SteamUtils"),
+        ("STEAM_USER_STATS", "STEAM_API_STEAM_USER_STATS", "steam_user_stats_export_available", "QLR_SteamAPI_SteamUserStats"),
+        ("STEAM_NETWORKING", "STEAM_API_STEAM_NETWORKING", "steam_networking_export_available", "QLR_SteamAPI_SteamNetworking"),
+        ("STEAM_MATCHMAKING_SERVERS", "STEAM_API_STEAM_MATCHMAKING_SERVERS", "steam_matchmaking_servers_export_available", "QLR_SteamAPI_SteamMatchmakingServers"),
+    ):
+        assert (
+            f"strcmp( symbol, QLR_STEAMWORKS_EXPORT_{retail_suffix} ) == 0 || "
+            f"strcmp( symbol, QLR_STEAMWORKS_EXPORT_{sdk_suffix} ) == 0"
+        ) in dlsym_block
+        assert f"return qlr_mock_state.{flag_name} ? {function_name} : NULL;" in dlsym_block
+
+    for suffix, flag_name, function_name in (
+        ("STEAM_GAME_SERVER", "steam_game_server_export_available", "QLR_SteamAPI_SteamGameServer"),
+        ("STEAM_GAME_SERVER_UTILS", "steam_game_server_utils_export_available", "QLR_SteamAPI_SteamGameServerUtils"),
+        ("STEAM_GAME_SERVER_STATS", "steam_game_server_stats_export_available", "QLR_SteamAPI_SteamGameServerStats"),
+        ("STEAM_GAME_SERVER_UGC", "steam_game_server_ugc_export_available", "QLR_SteamAPI_SteamGameServerUGC"),
+        ("STEAM_GAME_SERVER_INIT", "steam_game_server_init_export_available", "QLR_SteamAPI_SteamGameServerInit"),
+        ("STEAM_GAME_SERVER_SHUTDOWN", "steam_game_server_shutdown_export_available", "QLR_SteamAPI_SteamGameServerShutdown"),
+        ("STEAM_GAME_SERVER_RUN_CALLBACKS", "steam_game_server_run_callbacks_export_available", "QLR_SteamAPI_SteamGameServerRunCallbacks"),
+        ("STEAM_GAME_SERVER_NETWORKING", "steam_game_server_networking_export_available", "QLR_SteamAPI_SteamGameServerNetworking"),
+    ):
+        assert f"strcmp( symbol, QLR_STEAMWORKS_EXPORT_{suffix} ) == 0" in dlsym_block
+        assert f"return qlr_mock_state.{flag_name} ? {function_name} : NULL;" in dlsym_block
+
+    for suffix, flag_name, function_name in (
+        ("STEAM_API_REGISTER_CALLBACK", "steam_api_register_callback_export_available", "QLR_SteamAPI_RegisterCallback"),
+        ("STEAM_API_UNREGISTER_CALLBACK", "steam_api_unregister_callback_export_available", "QLR_SteamAPI_UnregisterCallback"),
+        ("STEAM_API_REGISTER_CALL_RESULT", "steam_api_register_call_result_export_available", "QLR_SteamAPI_RegisterCallResult"),
+        ("STEAM_API_UNREGISTER_CALL_RESULT", "steam_api_unregister_call_result_export_available", "QLR_SteamAPI_UnregisterCallResult"),
+    ):
+        assert f"strcmp( symbol, QLR_STEAMWORKS_EXPORT_{suffix} ) == 0" in dlsym_block
+        assert f"return qlr_mock_state.{flag_name} ? {function_name} : NULL;" in dlsym_block
+
+    for retail_suffix, sdk_suffix, flag_name, function_name in (
+        ("STEAM_USER", "STEAM_API_STEAM_USER", "steam_user_export_available", "QLR_SteamAPI_SteamUser"),
+        ("STEAM_FRIENDS", "STEAM_API_STEAM_FRIENDS", "steam_friends_export_available", "QLR_SteamAPI_SteamFriends"),
+        ("STEAM_APPS", "STEAM_API_STEAM_APPS", "steam_apps_export_available", "QLR_SteamAPI_SteamApps"),
+        ("STEAM_MATCHMAKING", "STEAM_API_STEAM_MATCHMAKING", "steam_matchmaking_export_available", "QLR_SteamAPI_SteamMatchmaking"),
+        ("STEAM_UGC", "STEAM_API_STEAM_UGC", "steam_ugc_export_available", "QLR_SteamAPI_SteamUGC"),
+    ):
+        assert (
+            f"strcmp( symbol, QLR_STEAMWORKS_EXPORT_{retail_suffix} ) == 0 || "
+            f"strcmp( symbol, QLR_STEAMWORKS_EXPORT_{sdk_suffix} ) == 0"
+        ) in dlsym_block
+        assert f"return qlr_mock_state.{flag_name} ? {function_name} : NULL;" in dlsym_block
+
+    assert "strcmp( symbol, QLR_STEAMWORKS_EXPORT_STEAM_API_INIT ) == 0" in dlsym_block
+    assert "return qlr_mock_state.steam_api_init_export_available ? QLR_SteamAPI_Init : NULL;" in dlsym_block
+    assert "strcmp( symbol, QLR_STEAMWORKS_EXPORT_STEAM_API_SHUTDOWN ) == 0" in dlsym_block
+    assert "return qlr_mock_state.steam_api_shutdown_export_available ? QLR_SteamAPI_Shutdown : NULL;" in dlsym_block
+    assert "strcmp( symbol, QLR_STEAMWORKS_EXPORT_STEAM_API_RUN_CALLBACKS ) == 0" in dlsym_block
+    assert "return qlr_mock_state.steam_api_run_callbacks_export_available ? QLR_SteamAPI_RunCallbacks : NULL;" in dlsym_block
+    assert "strcmp( symbol, QLR_STEAMWORKS_EXPORT_STEAM_API_ISTEAMUSER_GET_AUTH_SESSION_TICKET ) == 0" in dlsym_block
+    assert "return qlr_mock_state.auth_session_ticket_export_available ? QLR_SteamAPI_GetAuthSessionTicket : NULL;" in dlsym_block
+    assert "strcmp( symbol, QLR_STEAMWORKS_EXPORT_STEAM_API_ISTEAMUSER_GET_AUTH_TICKET_FOR_WEB_API ) == 0" in dlsym_block
+    assert "return qlr_mock_state.web_api_ticket_export_available ? QLR_SteamAPI_GetAuthTicketForWebApi : NULL;" in dlsym_block
+    assert "strcmp( symbol, QLR_STEAMWORKS_EXPORT_STEAM_API_ISTEAMUSER_BEGIN_AUTH_SESSION ) == 0" in dlsym_block
+    assert "return qlr_mock_state.begin_auth_session_export_available ? QLR_SteamAPI_BeginAuthSession : NULL;" in dlsym_block
+    assert "strcmp( symbol, QLR_STEAMWORKS_EXPORT_STEAM_API_ISTEAMUSER_CANCEL_AUTH_TICKET ) == 0" in dlsym_block
+    assert "return qlr_mock_state.cancel_auth_ticket_export_available ? QLR_SteamAPI_CancelAuthTicket : NULL;" in dlsym_block
+    assert "strcmp( symbol, QLR_STEAMWORKS_EXPORT_STEAM_API_ISTEAMUSER_END_AUTH_SESSION ) == 0" in dlsym_block
+    assert "return qlr_mock_state.end_auth_session_export_available ? QLR_SteamAPI_EndAuthSession : NULL;" in dlsym_block
+    assert "strcmp( symbol, QLR_STEAMWORKS_EXPORT_STEAM_API_ISTEAMUSER_GET_STEAM_ID ) == 0" in dlsym_block
+    assert "return qlr_mock_state.get_steam_id_export_available ? QLR_SteamAPI_GetSteamID : NULL;" in dlsym_block
+
+    for raw_literal in export_constants.values():
+        assert f'strcmp( symbol, "{raw_literal}" )' not in dlsym_block
+
+    for windows_loader_anchor in (
+        "static HMODULE WINAPI QLR_LoadLibraryA( LPCSTR filename )",
+        "static FARPROC WINAPI QLR_GetProcAddress( HMODULE module, LPCSTR symbol )",
+        "static BOOL WINAPI QLR_FreeLibrary( HMODULE module )",
+        "#define LoadLibraryA QLR_LoadLibraryA",
+        "#define GetProcAddress QLR_GetProcAddress",
+        "#define FreeLibrary QLR_FreeLibrary",
+    ):
+        assert windows_loader_anchor in harness_c
+
+    dynamic_loader_test = harness_py.split(
+        "def test_dynamic_loader_resolves_retail_first_mock_exports_without_prime_state(", 1
+    )[1].split("\ndef test_", 1)[0]
+    assert "lib.QLR_SteamworksMock_PrimeState()" not in dynamic_loader_test
+
+    for doc_anchor in (
+        "# Quake Live Steam Mapping Round 715: Mock Loader Export Boundary Mirroring",
+        "`STEAM_API.DLL!SteamGameServer_Init @ 00159314`",
+        "`QLR_STEAMWORKS_EXPORT_STEAM_GAME_SERVER_INIT`",
+        "`QLR_GetProcAddress`",
+        "Focused parity estimate: **before 90% -> after 99%**",
+        "Overall Steam launch/runtime integration mapping confidence moves from **94.12% -> 94.14%**",
+        "does not enable live Steam behavior by default",
+    ):
+        assert doc_anchor in mapping_round
+
+    assert "Round 715 later mirrored these export constants in the Steamworks harness loader" in mapping_round_701
+    assert "Task A617: Mirror Steamworks mock loader export constants [COMPLETED]" in implementation_plan
+    assert "Steamworks mock loader export-boundary confidence" in implementation_plan
+
+
+def test_steamworks_web_api_callback_failure_round_716_is_pinned() -> None:
+    imports_txt = (
+        REPO_ROOT / "references/reverse-engineering/ghidra/quakelive_steam/imports.txt"
+    ).read_text(encoding="utf-8")
+    auth_credentials = (REPO_ROOT / "src/common/auth_credentials.h").read_text(encoding="utf-8")
+    steamworks = (REPO_ROOT / "src/common/platform/platform_steamworks.c").read_text(encoding="utf-8")
+    harness_c = (REPO_ROOT / "tests/steamworks_harness.c").read_text(encoding="utf-8")
+    harness_py = (REPO_ROOT / "tests/test_steamworks_harness.py").read_text(encoding="utf-8")
+    mapping_round = (
+        REPO_ROOT / "docs/reverse-engineering/quakelive_steam_mapping_round_716.md"
+    ).read_text(encoding="utf-8")
+    implementation_plan = (REPO_ROOT / "IMPLEMENTATION_PLAN.md").read_text(encoding="utf-8")
+
+    for import_name in (
+        "SteamAPI_RegisterCallback",
+        "SteamAPI_RunCallbacks",
+    ):
+        assert f"STEAM_API.DLL!{import_name} @" in imports_txt
+
+    assert "#define QL_STEAM_WEB_API_AUTH_TICKET_MAX_LENGTH 2560" in auth_credentials
+    assert '#define QL_STEAMWORKS_EXPORT_STEAM_API_ISTEAMUSER_GET_AUTH_TICKET_FOR_WEB_API "SteamAPI_ISteamUser_GetAuthTicketForWebApi"' in steamworks
+    assert '#define QL_STEAMWORKS_EXPORT_STEAM_API_ISTEAMUSER_CANCEL_AUTH_TICKET "SteamAPI_ISteamUser_CancelAuthTicket"' in steamworks
+    assert "#define QL_STEAM_CALLBACK_GET_TICKET_FOR_WEB_API_RESPONSE 0xa8" in steamworks
+    assert "#define QL_STEAM_ERESULT_OK 1" in steamworks
+    assert "#define QL_STEAM_WEB_API_TICKET_CALLBACK_PUMPS 16" in steamworks
+
+    register_webapi_block = _extract_function_block(steamworks, "static qboolean QL_Steamworks_RegisterWebApiAuthTicketCallback( void )")
+    request_webapi_block = _extract_function_block(
+        steamworks,
+        "qboolean QL_Steamworks_RequestWebApiAuthTicket( const char *identity, char *ticketBuffer, size_t ticketBufferSize, int *ticketLength, uint32_t *ticketHandle, int *steamResult )",
+    )
+    dispatch_webapi_block = _extract_function_block(
+        steamworks,
+        "static void QL_Steamworks_DispatchGetTicketForWebApiResponse( void *context, const void *payload )",
+    )
+
+    assert "QL_STEAM_CALLBACK_GET_TICKET_FOR_WEB_API_RESPONSE" in register_webapi_block
+    assert "QL_STEAM_CALLBACK_SIZE_GET_TICKET_FOR_WEB_API_RESPONSE" in register_webapi_block
+    assert "QL_Steamworks_DispatchGetTicketForWebApiResponse" in register_webapi_block
+    assert "raw->authTicket != callbackState->webApiTicketHandle" in dispatch_webapi_block
+    assert "raw->ticketLength == 0u || raw->ticketLength > sizeof( callbackState->webApiTicket )" in dispatch_webapi_block
+    assert "QL_Steamworks_CancelAuthTicket( handle );" in request_webapi_block
+    assert request_webapi_block.count("QL_Steamworks_CancelAuthTicket( handle );") == 3
+    assert "callbackState->webApiTicketResult != QL_STEAM_ERESULT_OK || callbackState->webApiTicketLength == 0u" in request_webapi_block
+    assert "pump < QL_STEAM_WEB_API_TICKET_CALLBACK_PUMPS" in request_webapi_block
+
+    for harness_anchor in (
+        "#define QLR_STEAM_CALLBACK_GET_TICKET_FOR_WEB_API_RESPONSE 0xa8",
+        '#define QLR_STEAMWORKS_EXPORT_STEAM_API_ISTEAMUSER_GET_AUTH_TICKET_FOR_WEB_API "SteamAPI_ISteamUser_GetAuthTicketForWebApi"',
+        '#define QLR_STEAMWORKS_EXPORT_STEAM_API_ISTEAMUSER_CANCEL_AUTH_TICKET "SteamAPI_ISteamUser_CancelAuthTicket"',
+        "#define QLR_STEAM_ERESULT_OK 1",
+        "HAuthTicket web_api_ticket_callback_handle;",
+        "uint32_t web_api_ticket_callback_length;",
+        "qboolean web_api_ticket_queue_callback;",
+        "QLR_EXPORT void QLR_SteamworksMock_SetWebApiTicketCallbackBehavior",
+        "if ( !qlr_mock_state.web_api_ticket_queue_callback )",
+        "event.authTicket = qlr_mock_state.web_api_ticket_callback_handle;",
+        "event.ticketLength = qlr_mock_state.web_api_ticket_callback_length;",
+        "if ( copyLength > sizeof( event.ticket ) )",
+    ):
+        assert harness_anchor in harness_c
+
+    webapi_failure_test = harness_py.split(
+        "def test_web_api_auth_ticket_adapter_cancels_unusable_callback_results(", 1
+    )[1].split("\n\n@pytest.mark.parametrize", 1)[0]
+    for mode in (
+        "missing_callback",
+        "mismatched_handle",
+        "steam_result_failure",
+        "oversized_callback_ticket",
+    ):
+        assert mode in harness_py
+    assert "QLR_SteamworksMock_SetWebApiTicketCallbackBehavior" in webapi_failure_test
+    assert "QLR_SteamworksMock_GetCancelAuthTicketCalls() == 1" in webapi_failure_test
+    assert "QLR_SteamworksMock_GetCancelledTicketHandle() == 41" in webapi_failure_test
+
+    for doc_anchor in (
+        "# Quake Live Steam Mapping Round 716: Web API Ticket Callback Failure Wiring",
+        "`SteamAPI_RegisterCallback`",
+        "`QL_STEAM_CALLBACK_GET_TICKET_FOR_WEB_API_RESPONSE`",
+        "`QLR_SteamworksMock_SetWebApiTicketCallbackBehavior`",
+        "Focused parity estimate: **before 88% -> after 99%**",
+        "Overall Steam launch/runtime integration mapping confidence moves from **94.14% -> 94.16%**",
+        "does not enable live Steam behavior by default",
+    ):
+        assert doc_anchor in mapping_round
+
+    assert "Task A618: Pin Web API ticket callback failure wiring [COMPLETED]" in implementation_plan
+    assert "Web API ticket callback failure-path confidence" in implementation_plan
+
+
+def test_steamworks_web_api_callback_lifecycle_round_717_is_pinned() -> None:
+    imports_txt = (
+        REPO_ROOT / "references/reverse-engineering/ghidra/quakelive_steam/imports.txt"
+    ).read_text(encoding="utf-8")
+    hlil_part02 = (
+        REPO_ROOT
+        / "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part02.txt"
+    ).read_text(encoding="utf-8")
+    steamworks = (REPO_ROOT / "src/common/platform/platform_steamworks.c").read_text(encoding="utf-8")
+    harness_c = (REPO_ROOT / "tests/steamworks_harness.c").read_text(encoding="utf-8")
+    harness_py = (REPO_ROOT / "tests/test_steamworks_harness.py").read_text(encoding="utf-8")
+    mapping_round = (
+        REPO_ROOT / "docs/reverse-engineering/quakelive_steam_mapping_round_717.md"
+    ).read_text(encoding="utf-8")
+    mapping_round_716 = (
+        REPO_ROOT / "docs/reverse-engineering/quakelive_steam_mapping_round_716.md"
+    ).read_text(encoding="utf-8")
+    implementation_plan = (REPO_ROOT / "IMPLEMENTATION_PLAN.md").read_text(encoding="utf-8")
+
+    assert "STEAM_API.DLL!SteamAPI_RegisterCallback @ 00159248" in imports_txt
+    assert "STEAM_API.DLL!SteamAPI_UnregisterCallback @ 0015922a" in imports_txt
+
+    for retail_anchor in (
+        "004613f5  SteamAPI_RegisterCallback(&arg1[8], 0x151)",
+        "004614ed  SteamAPI_RegisterCallback(&arg1[0x21], 0x150)",
+        "0046743d      SteamAPI_UnregisterCallback(arg1)",
+        "004675b0  return SteamAPI_UnregisterCallback(result)",
+    ):
+        assert retail_anchor in hlil_part02
+
+    register_client_block = _extract_function_block(
+        steamworks, "qboolean QL_Steamworks_RegisterClientCallbacks( const ql_steam_client_callback_bindings_t *bindings )"
+    )
+    unregister_client_block = _extract_function_block(steamworks, "void QL_Steamworks_UnregisterClientCallbacks( void )")
+    register_webapi_block = _extract_function_block(steamworks, "static qboolean QL_Steamworks_RegisterWebApiAuthTicketCallback( void )")
+
+    assert "callbackState->webApiTicketResponse.callbackFlags & QL_STEAM_CALLBACK_FLAG_REGISTERED" in register_client_block
+    assert "QL_Steamworks_UnregisterClientCallbacks();" in register_client_block
+    assert register_client_block.index("QL_Steamworks_UnregisterClientCallbacks();") < register_client_block.index("memset( callbackState, 0, sizeof( *callbackState ) );")
+    assert "QL_Steamworks_RegisterCallbackObject( &callbackState->webApiTicketResponse )" in register_webapi_block
+    assert "QL_Steamworks_UnregisterCallbackObject( &callbackState->webApiTicketResponse );" in unregister_client_block
+    assert unregister_client_block.index("QL_Steamworks_UnregisterCallbackObject( &callbackState->webApiTicketResponse );") < unregister_client_block.index(
+        "QL_Steamworks_UnregisterCallbackObject( &callbackState->friendRichPresenceUpdate );"
+    )
+    assert unregister_client_block.index("QL_Steamworks_UnregisterCallbackObject( &callbackState->richPresenceJoinRequested );") < unregister_client_block.index(
+        "memset( callbackState, 0, sizeof( *callbackState ) );"
+    )
+
+    for harness_anchor in (
+        "QLR_EXPORT qboolean QLR_SteamworksMock_GetWebApiTicketCallbackRegistered( void )",
+        "state.clientCallbacks.webApiTicketResponse.callbackFlags & 0x01",
+        "QLR_EXPORT int QLR_SteamworksMock_GetRegisteredCallbackCount( void )",
+        "return qlr_mock_state.registered_callback_count;",
+    ):
+        assert harness_anchor in harness_c
+
+    lifecycle_test = harness_py.split(
+        "def test_web_api_ticket_callback_yields_to_client_callback_bundle(", 1
+    )[1].split("\n\n@pytest.mark.parametrize", 1)[0]
+    for harness_py_anchor in (
+        "QLR_SteamworksMock_GetWebApiTicketCallbackRegistered",
+        "QLR_SteamworksMock_GetRegisteredCallbackCount",
+        "QLR_Steamworks_RequestWebApi",
+        "QLR_Steamworks_RegisterHarnessCallbacks",
+        "QLR_SteamworksMock_GetRegisterCallbackCalls() == 19",
+        "QLR_SteamworksMock_GetUnregisterCallbackCalls() == 1",
+        "QLR_SteamworksMock_GetRegisteredCallbackCount() == 18",
+        "QLR_SteamworksMock_QueueRichPresenceJoinRequested",
+        "QLR_SteamworksMock_GetUnregisterCallbackCalls() == 19",
+    ):
+        assert harness_py_anchor in lifecycle_test
+
+    for doc_anchor in (
+        "# Quake Live Steam Mapping Round 717: Web API Callback Lifecycle Handoff",
+        "`STEAM_API.DLL!SteamAPI_UnregisterCallback @ 0015922a`",
+        "`QL_Steamworks_UnregisterCallbackObject( &callbackState->webApiTicketResponse )`",
+        "`QLR_SteamworksMock_GetWebApiTicketCallbackRegistered`",
+        "Focused parity estimate: **before 86% -> after 99%**",
+        "Overall Steam launch/runtime integration mapping confidence moves from **94.16% -> 94.18%**",
+        "does not enable live Steam behavior by default",
+    ):
+        assert doc_anchor in mapping_round
+
+    assert "Round 717 later pinned the Web API callback lifecycle handoff" in mapping_round_716
+    assert "Task A619: Pin Web API callback lifecycle handoff [COMPLETED]" in implementation_plan
+    assert "Web API callback lifecycle-handoff confidence" in implementation_plan
+
+
+def test_steamworks_web_api_callback_reuse_round_718_is_pinned() -> None:
+    imports_txt = (
+        REPO_ROOT / "references/reverse-engineering/ghidra/quakelive_steam/imports.txt"
+    ).read_text(encoding="utf-8")
+    hlil_part02 = (
+        REPO_ROOT
+        / "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part02.txt"
+    ).read_text(encoding="utf-8")
+    steamworks = (REPO_ROOT / "src/common/platform/platform_steamworks.c").read_text(encoding="utf-8")
+    harness_py = (REPO_ROOT / "tests/test_steamworks_harness.py").read_text(encoding="utf-8")
+    mapping_round = (
+        REPO_ROOT / "docs/reverse-engineering/quakelive_steam_mapping_round_718.md"
+    ).read_text(encoding="utf-8")
+    mapping_round_717 = (
+        REPO_ROOT / "docs/reverse-engineering/quakelive_steam_mapping_round_717.md"
+    ).read_text(encoding="utf-8")
+    implementation_plan = (REPO_ROOT / "IMPLEMENTATION_PLAN.md").read_text(encoding="utf-8")
+
+    assert "STEAM_API.DLL!SteamAPI_RegisterCallback @ 00159248" in imports_txt
+    assert "004613f5  SteamAPI_RegisterCallback(&arg1[8], 0x151)" in hlil_part02
+    assert "004614ed  SteamAPI_RegisterCallback(&arg1[0x21], 0x150)" in hlil_part02
+
+    register_webapi_block = _extract_function_block(steamworks, "static qboolean QL_Steamworks_RegisterWebApiAuthTicketCallback( void )")
+    request_webapi_block = _extract_function_block(
+        steamworks,
+        "qboolean QL_Steamworks_RequestWebApiAuthTicket( const char *identity, char *ticketBuffer, size_t ticketBufferSize, int *ticketLength, uint32_t *ticketHandle, int *steamResult )",
+    )
+    reset_webapi_block = _extract_function_block(
+        steamworks, "static void QL_Steamworks_ResetWebApiAuthTicketState( ql_steam_client_callback_state_t *callbackState )"
+    )
+
+    assert "callbackState->webApiTicketResponse.callbackFlags & QL_STEAM_CALLBACK_FLAG_REGISTERED" in register_webapi_block
+    assert "return qtrue;" in register_webapi_block
+    assert register_webapi_block.index("callbackState->webApiTicketResponse.callbackFlags & QL_STEAM_CALLBACK_FLAG_REGISTERED") < register_webapi_block.index(
+        "QL_Steamworks_PrepareCallbackObject( &callbackState->webApiTicketResponse"
+    )
+    assert register_webapi_block.index("return qtrue;") < register_webapi_block.index(
+        "QL_Steamworks_PrepareCallbackObject( &callbackState->webApiTicketResponse"
+    )
+    assert request_webapi_block.index("QL_Steamworks_RegisterWebApiAuthTicketCallback()") < request_webapi_block.index(
+        "QL_Steamworks_ResetWebApiAuthTicketState( callbackState );"
+    )
+    assert "callbackState->webApiTicketActive = qfalse;" in reset_webapi_block
+    assert "callbackState->webApiTicketCompleted = qfalse;" in reset_webapi_block
+    assert "webApiTicketResponse" not in reset_webapi_block
+
+    sequential_test = harness_py.split(
+        "def test_web_api_ticket_callback_is_reused_across_sequential_requests(", 1
+    )[1].split("\n\n@pytest.mark.parametrize", 1)[0]
+    for harness_py_anchor in (
+        "QLR_Steamworks_RequestWebApi",
+        "QLR_SteamworksMock_SetWebApiTicket",
+        "ticket_handle.value == 41",
+        "ticket_handle.value == 42",
+        "ticket_buffer.value == b\"abcdef\"",
+        "ticket_buffer.value == b\"01234567\"",
+        "QLR_SteamworksMock_GetRegisterCallbackCalls() == 1",
+        "QLR_SteamworksMock_GetRegisteredCallbackCount() == 1",
+        "QLR_SteamworksMock_GetWebApiTicketCallbackRegistered()",
+        "QLR_SteamworksMock_GetWebApiTicketCalls() == 2",
+        "QLR_SteamworksMock_GetCancelAuthTicketCalls() == 0",
+        "QLR_SteamworksMock_GetUnregisterCallbackCalls() == 1",
+    ):
+        assert harness_py_anchor in sequential_test
+
+    for doc_anchor in (
+        "# Quake Live Steam Mapping Round 718: Web API Callback Reuse",
+        "`QL_Steamworks_RegisterWebApiAuthTicketCallback`",
+        "`callbackState->webApiTicketResponse.callbackFlags & QL_STEAM_CALLBACK_FLAG_REGISTERED`",
+        "`test_web_api_ticket_callback_is_reused_across_sequential_requests`",
+        "Focused parity estimate: **before 87% -> after 99%**",
+        "Overall Steam launch/runtime integration mapping confidence moves from **94.18% -> 94.20%**",
+        "does not enable live Steam behavior by default",
+    ):
+        assert doc_anchor in mapping_round
+
+    assert "Round 718 later pinned sequential Web API auth-ticket callback reuse" in mapping_round_717
+    assert "Task A620: Pin Web API callback reuse across sequential requests [COMPLETED]" in implementation_plan
+    assert "Web API callback sequential-reuse confidence" in implementation_plan
+
+
+def test_steamworks_web_api_optional_export_round_719_is_pinned() -> None:
+    metadata_txt = (
+        REPO_ROOT / "references/reverse-engineering/ghidra/quakelive_steam/metadata.txt"
+    ).read_text(encoding="utf-8")
+    imports_txt = (
+        REPO_ROOT / "references/reverse-engineering/ghidra/quakelive_steam/imports.txt"
+    ).read_text(encoding="utf-8")
+    hlil_part19 = (
+        REPO_ROOT
+        / "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part19.txt"
+    ).read_text(encoding="utf-8")
+    steamworks = (REPO_ROOT / "src/common/platform/platform_steamworks.c").read_text(encoding="utf-8")
+    harness_c = (REPO_ROOT / "tests/steamworks_harness.c").read_text(encoding="utf-8")
+    harness_py = (REPO_ROOT / "tests/test_steamworks_harness.py").read_text(encoding="utf-8")
+    mapping_round = (
+        REPO_ROOT / "docs/reverse-engineering/quakelive_steam_mapping_round_719.md"
+    ).read_text(encoding="utf-8")
+    mapping_round_718 = (
+        REPO_ROOT / "docs/reverse-engineering/quakelive_steam_mapping_round_718.md"
+    ).read_text(encoding="utf-8")
+    implementation_plan = (REPO_ROOT / "IMPLEMENTATION_PLAN.md").read_text(encoding="utf-8")
+
+    assert "program_name=quakelive_steam.exe" in metadata_txt
+    assert "import_count=351" in metadata_txt
+    assert "STEAM_API.DLL!SteamAPI_RegisterCallback @ 00159248" in imports_txt
+    assert "STEAM_API.DLL!SteamAPI_RunCallbacks @ 00159274" in imports_txt
+    assert "SteamAPI_ISteamUser_GetAuthTicketForWebApi" not in imports_txt
+    assert "017c6a1c  extern SteamAPI_RegisterCallback" in hlil_part19
+    assert "017c6a20  extern SteamAPI_RunCallbacks" in hlil_part19
+
+    load_block = _extract_function_block(steamworks, "qboolean QL_Steamworks_LoadLibrary( void )")
+    has_adapter_block = _extract_function_block(steamworks, "qboolean QL_Steamworks_HasWebApiAuthTicketAdapter( void )")
+    request_webapi_block = _extract_function_block(
+        steamworks,
+        "qboolean QL_Steamworks_RequestWebApiAuthTicket( const char *identity, char *ticketBuffer, size_t ticketBufferSize, int *ticketLength, uint32_t *ticketHandle, int *steamResult )",
+    )
+    request_retail_block = _extract_function_block(
+        steamworks,
+        "qboolean QL_Steamworks_RequestAuthTicket( char *ticketBuffer, size_t ticketBufferSize, int *ticketLength, uint32_t *ticketHandle )",
+    )
+
+    assert "QL_Steamworks_LoadSymbol( (void **)&state.GetAuthSessionTicket, QL_STEAMWORKS_EXPORT_STEAM_API_ISTEAMUSER_GET_AUTH_SESSION_TICKET )" in load_block
+    assert "QL_Steamworks_LoadOptionalSymbol( (void **)&state.GetAuthTicketForWebApi, QL_STEAMWORKS_EXPORT_STEAM_API_ISTEAMUSER_GET_AUTH_TICKET_FOR_WEB_API );" in load_block
+    assert 'return QL_Steamworks_HasWebApiAuthTicketAdapter() ? "GetAuthTicketForWebApi" : "retail GetAuthSessionTicket";' in steamworks
+    assert 'return QL_Steamworks_HasWebApiAuthTicketAdapter() ? "GetAuthTicketForWebApi adapter available" : "missing GetAuthTicketForWebApi adapter";' in steamworks
+    assert "return state.GetAuthTicketForWebApi && state.SteamAPI_RegisterCallback && state.SteamAPI_RunCallbacks ? qtrue : qfalse;" in has_adapter_block
+    assert "if ( !state.GetAuthTicketForWebApi || !state.SteamAPI_RegisterCallback || !state.SteamAPI_RunCallbacks ) {" in request_webapi_block
+    assert "HAuthTicket handle = state.GetAuthSessionTicket( user, rawTicket, sizeof( rawTicket ), &rawLength );" in request_retail_block
+
+    dlsym_block = _extract_function_block(harness_c, "void *dlsym( void *handle, const char *symbol )")
+    prime_state_block = _extract_function_block(harness_c, "QLR_EXPORT void QLR_SteamworksMock_PrimeState( void )")
+    assert "qboolean web_api_ticket_export_available;" in harness_c
+    assert "QLR_SteamworksMock_SetWebApiTicketExportAvailable" in harness_c
+    assert "return qlr_mock_state.web_api_ticket_export_available ? QLR_SteamAPI_GetAuthTicketForWebApi : NULL;" in dlsym_block
+    assert "state.GetAuthTicketForWebApi = qlr_mock_state.web_api_ticket_export_available ? QLR_SteamAPI_GetAuthTicketForWebApi : NULL;" in prime_state_block
+
+    optional_export_test = harness_py.split(
+        "def test_missing_web_api_ticket_export_keeps_retail_auth_session_ticket_path(", 1
+    )[1].split("\n\n@pytest.mark.parametrize", 1)[0]
+    for harness_py_anchor in (
+        "QLR_SteamworksMock_SetWebApiTicketExportAvailable(0)",
+        "not lib.QLR_Steamworks_HasWebApiAuthTicketAdapter()",
+        "not lib.QLR_Steamworks_RequestWebApi",
+        "lib.QLR_SteamworksMock_GetWebApiTicketCalls() == 0",
+        "lib.QLR_SteamworksMock_GetRegisterCallbackCalls() == 0",
+        "lib.QLR_SteamworksMock_GetRegisteredCallbackCount() == 0",
+        "lib.QLR_Steamworks_Request(",
+        "retail_buffer.value == b\"12345678\"",
+        "retail_handle.value == 1",
+    ):
+        assert harness_py_anchor in optional_export_test
+
+    for doc_anchor in (
+        "# Quake Live Steam Mapping Round 719: Optional Web API Auth Ticket Export",
+        "`SteamAPI_ISteamUser_GetAuthTicketForWebApi` is absent from the retail static import table",
+        "`QL_Steamworks_LoadOptionalSymbol`",
+        "`test_missing_web_api_ticket_export_keeps_retail_auth_session_ticket_path`",
+        "Focused parity estimate: **before 86% -> after 99%**",
+        "Overall Steam launch/runtime integration mapping confidence moves from **94.20% -> 94.22%**",
+        "does not enable live Steam behavior by default",
+    ):
+        assert doc_anchor in mapping_round
+
+    assert "Round 719 later pinned the optional Web API auth-ticket export boundary" in mapping_round_718
+    assert "Task A621: Pin optional Web API auth-ticket export fallback [COMPLETED]" in implementation_plan
+    assert "optional Web API auth-ticket export confidence" in implementation_plan
+
+
+def test_steamworks_required_auth_session_export_round_720_is_pinned() -> None:
+    aliases = json.loads(
+        (REPO_ROOT / "references/analysis/quakelive_symbol_aliases.json").read_text(encoding="utf-8")
+    )["quakelive_steam_srp"]
+    functions_csv = (
+        REPO_ROOT / "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+    ).read_text(encoding="utf-8")
+    imports_txt = (
+        REPO_ROOT / "references/reverse-engineering/ghidra/quakelive_steam/imports.txt"
+    ).read_text(encoding="utf-8")
+    hlil_part02 = (
+        REPO_ROOT
+        / "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part02.txt"
+    ).read_text(encoding="utf-8")
+    hlil_part04 = (
+        REPO_ROOT
+        / "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part04.txt"
+    ).read_text(encoding="utf-8")
+    steamworks = (REPO_ROOT / "src/common/platform/platform_steamworks.c").read_text(encoding="utf-8")
+    harness_c = (REPO_ROOT / "tests/steamworks_harness.c").read_text(encoding="utf-8")
+    harness_py = (REPO_ROOT / "tests/test_steamworks_harness.py").read_text(encoding="utf-8")
+    mapping_round = (
+        REPO_ROOT / "docs/reverse-engineering/quakelive_steam_mapping_round_720.md"
+    ).read_text(encoding="utf-8")
+    mapping_round_719 = (
+        REPO_ROOT / "docs/reverse-engineering/quakelive_steam_mapping_round_719.md"
+    ).read_text(encoding="utf-8")
+    implementation_plan = (REPO_ROOT / "IMPLEMENTATION_PLAN.md").read_text(encoding="utf-8")
+
+    assert aliases["FUN_004605c0"] == "SteamClient_GetAuthSessionTicket"
+    assert aliases["sub_4605c0"] == "SteamClient_GetAuthSessionTicket"
+    assert "FUN_004605c0,004605c0,43,0,unknown" in functions_csv
+    assert "STEAM_API.DLL!SteamUser @ 0015916a" in imports_txt
+    assert "SteamAPI_ISteamUser_GetAuthSessionTicket" not in imports_txt
+    assert "004605c0    int32_t __convention(\"regparm\") sub_4605c0" in hlil_part02
+    assert "data_e2c208 = (*(*SteamUser(result) + 0x34))(arg4, arg5, &result)" in hlil_part02
+    assert "004b9374              int32_t eax_13 = sub_4605c0(eax_12, &var_1808, ecx_11, &var_1808, 0x1000)" in hlil_part04
+
+    load_block = _extract_function_block(steamworks, "qboolean QL_Steamworks_LoadLibrary( void )")
+    request_retail_block = _extract_function_block(
+        steamworks,
+        "qboolean QL_Steamworks_RequestAuthTicket( char *ticketBuffer, size_t ticketBufferSize, int *ticketLength, uint32_t *ticketHandle )",
+    )
+    required_export_guard = (
+        "if ( !QL_Steamworks_LoadSymbol( (void **)&state.GetAuthSessionTicket, "
+        "QL_STEAMWORKS_EXPORT_STEAM_API_ISTEAMUSER_GET_AUTH_SESSION_TICKET ) ) {\n"
+        "\t\tQL_Steamworks_UnloadLibrary();\n"
+        "\t\treturn qfalse;\n"
+        "\t}"
+    )
+
+    assert required_export_guard in load_block
+    assert "if ( !user || !state.GetAuthSessionTicket ) {" in request_retail_block
+    assert "HAuthTicket handle = state.GetAuthSessionTicket( user, rawTicket, sizeof( rawTicket ), &rawLength );" in request_retail_block
+
+    dlsym_block = _extract_function_block(harness_c, "void *dlsym( void *handle, const char *symbol )")
+    prime_state_block = _extract_function_block(harness_c, "QLR_EXPORT void QLR_SteamworksMock_PrimeState( void )")
+    assert "qboolean auth_session_ticket_export_available;" in harness_c
+    assert "QLR_SteamworksMock_SetAuthSessionTicketExportAvailable" in harness_c
+    assert "return qlr_mock_state.auth_session_ticket_export_available ? QLR_SteamAPI_GetAuthSessionTicket : NULL;" in dlsym_block
+    assert "state.GetAuthSessionTicket = qlr_mock_state.auth_session_ticket_export_available ? QLR_SteamAPI_GetAuthSessionTicket : NULL;" in prime_state_block
+
+    required_export_test = harness_py.split(
+        "def test_missing_auth_session_ticket_export_rejects_steamworks_init(", 1
+    )[1].split("\n\ndef test_validate_maps_auth_results", 1)[0]
+    for harness_py_anchor in (
+        "QLR_SteamworksMock_SetAuthSessionTicketExportAvailable(0)",
+        "not lib.QLR_Steamworks_Init()",
+        "not lib.QLR_Steamworks_Request(",
+        "retail_buffer.value == b\"\"",
+        "retail_length.value == 0",
+        "retail_handle.value == 0",
+        "not lib.QLR_Steamworks_HasWebApiAuthTicketAdapter()",
+        "not lib.QLR_Steamworks_RequestWebApi",
+        "lib.QLR_SteamworksMock_GetWebApiTicketCalls() == 0",
+        "lib.QLR_SteamworksMock_GetRegisterCallbackCalls() == 0",
+        "lib.QLR_SteamworksMock_GetRegisteredCallbackCount() == 0",
+    ):
+        assert harness_py_anchor in required_export_test
+
+    for doc_anchor in (
+        "# Quake Live Steam Mapping Round 720: Required Auth Session Ticket Export",
+        "`FUN_004605c0` maps to `SteamClient_GetAuthSessionTicket`",
+        "`QL_Steamworks_LoadSymbol`",
+        "`test_missing_auth_session_ticket_export_rejects_steamworks_init`",
+        "Focused parity estimate: **before 87% -> after 99%**",
+        "Overall Steam launch/runtime integration mapping confidence moves from **94.22% -> 94.24%**",
+        "does not enable live Steam behavior by default",
+    ):
+        assert doc_anchor in mapping_round
+
+    assert "Round 720 later pinned the required retail auth-session-ticket export boundary" in mapping_round_719
+    assert "Task A622: Pin required auth-session-ticket export failure [COMPLETED]" in implementation_plan
+    assert "required auth-session-ticket export confidence" in implementation_plan
+
+
+def test_steamworks_required_user_auth_companion_exports_round_723_are_pinned() -> None:
+    aliases = json.loads(
+        (REPO_ROOT / "references/analysis/quakelive_symbol_aliases.json").read_text(encoding="utf-8")
+    )["quakelive_steam_srp"]
+    functions_csv = (
+        REPO_ROOT / "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+    ).read_text(encoding="utf-8")
+    imports_txt = (
+        REPO_ROOT / "references/reverse-engineering/ghidra/quakelive_steam/imports.txt"
+    ).read_text(encoding="utf-8")
+    hlil_part02 = (
+        REPO_ROOT
+        / "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part02.txt"
+    ).read_text(encoding="utf-8")
+    steamworks = (REPO_ROOT / "src/common/platform/platform_steamworks.c").read_text(encoding="utf-8")
+    harness_c = (REPO_ROOT / "tests/steamworks_harness.c").read_text(encoding="utf-8")
+    harness_py = (REPO_ROOT / "tests/test_steamworks_harness.py").read_text(encoding="utf-8")
+    mapping_round = (
+        REPO_ROOT / "docs/reverse-engineering/quakelive_steam_mapping_round_723.md"
+    ).read_text(encoding="utf-8")
+    mapping_round_720 = (
+        REPO_ROOT / "docs/reverse-engineering/quakelive_steam_mapping_round_720.md"
+    ).read_text(encoding="utf-8")
+    implementation_plan = (REPO_ROOT / "IMPLEMENTATION_PLAN.md").read_text(encoding="utf-8")
+
+    assert aliases["FUN_00460550"] == "SteamClient_GetSteamID"
+    assert aliases["FUN_004605f0"] == "SteamClient_CancelAuthTicket"
+    assert "FUN_00460550,00460550,53,0,unknown" in functions_csv
+    assert "FUN_004605f0,004605f0,27,0,unknown" in functions_csv
+    assert "STEAM_API.DLL!SteamUser @ 0015916a" in imports_txt
+    for dynamic_export in (
+        "SteamAPI_ISteamUser_BeginAuthSession",
+        "SteamAPI_ISteamUser_CancelAuthTicket",
+        "SteamAPI_ISteamUser_EndAuthSession",
+        "SteamAPI_ISteamUser_GetSteamID",
+    ):
+        assert dynamic_export not in imports_txt
+    assert "00460550    int32_t sub_460550()" in hlil_part02
+    assert "004605f0    int32_t sub_4605f0()" in hlil_part02
+    assert "return (*(*result + 0x40))(data_e2c208)" in hlil_part02
+
+    load_block = _extract_function_block(steamworks, "qboolean QL_Steamworks_LoadLibrary( void )")
+    validate_block = _extract_function_block(
+        steamworks,
+        "qboolean QL_Steamworks_ValidateTicket( const char *ticketHex, ql_auth_response_t *response )",
+    )
+    cancel_block = _extract_function_block(steamworks, "qboolean QL_Steamworks_CancelAuthTicket( uint32_t ticketHandle )")
+
+    for required_call in (
+        "QL_Steamworks_LoadSymbol( (void **)&state.BeginAuthSession, QL_STEAMWORKS_EXPORT_STEAM_API_ISTEAMUSER_BEGIN_AUTH_SESSION )",
+        "QL_Steamworks_LoadSymbol( (void **)&state.CancelAuthTicket, QL_STEAMWORKS_EXPORT_STEAM_API_ISTEAMUSER_CANCEL_AUTH_TICKET )",
+        "QL_Steamworks_LoadSymbol( (void **)&state.EndAuthSession, QL_STEAMWORKS_EXPORT_STEAM_API_ISTEAMUSER_END_AUTH_SESSION )",
+        "QL_Steamworks_LoadSymbol( (void **)&state.GetSteamID, QL_STEAMWORKS_EXPORT_STEAM_API_ISTEAMUSER_GET_STEAM_ID )",
+    ):
+        assert required_call in load_block
+        assert load_block.index(required_call) < load_block.index(
+            "QL_Steamworks_LoadOptionalSymbol( (void **)&state.SteamGameServer, QL_STEAMWORKS_EXPORT_STEAM_GAME_SERVER );"
+        )
+    assert "if ( !user || !state.BeginAuthSession || !state.GetSteamID ) {" in validate_block
+    assert "CSteamID steamId = state.GetSteamID( user );" in validate_block
+    assert "EBeginAuthSessionResult result = state.BeginAuthSession( user, ticketData, (int)ticketLength, steamId );" in validate_block
+    assert "if ( result == k_EBeginAuthSessionResultOK && state.EndAuthSession ) {" in validate_block
+    assert "state.EndAuthSession( user, steamId );" in validate_block
+    assert "if ( ticketHandle == 0 || !state.initialised || !state.SteamUser || !state.CancelAuthTicket ) {" in cancel_block
+    assert "state.CancelAuthTicket( user, (HAuthTicket)ticketHandle );" in cancel_block
+
+    dlsym_block = _extract_function_block(harness_c, "void *dlsym( void *handle, const char *symbol )")
+    prime_state_block = _extract_function_block(harness_c, "QLR_EXPORT void QLR_SteamworksMock_PrimeState( void )")
+    for harness_anchor in (
+        "qboolean begin_auth_session_export_available;",
+        "qboolean cancel_auth_ticket_export_available;",
+        "qboolean end_auth_session_export_available;",
+        "qboolean get_steam_id_export_available;",
+        "QLR_SteamworksMock_SetBeginAuthSessionExportAvailable",
+        "QLR_SteamworksMock_SetCancelAuthTicketExportAvailable",
+        "QLR_SteamworksMock_SetEndAuthSessionExportAvailable",
+        "QLR_SteamworksMock_SetGetSteamIDExportAvailable",
+    ):
+        assert harness_anchor in harness_c
+    for dlsym_anchor in (
+        "return qlr_mock_state.begin_auth_session_export_available ? QLR_SteamAPI_BeginAuthSession : NULL;",
+        "return qlr_mock_state.cancel_auth_ticket_export_available ? QLR_SteamAPI_CancelAuthTicket : NULL;",
+        "return qlr_mock_state.end_auth_session_export_available ? QLR_SteamAPI_EndAuthSession : NULL;",
+        "return qlr_mock_state.get_steam_id_export_available ? QLR_SteamAPI_GetSteamID : NULL;",
+    ):
+        assert dlsym_anchor in dlsym_block
+    for prime_anchor in (
+        "state.BeginAuthSession = qlr_mock_state.begin_auth_session_export_available ? QLR_SteamAPI_BeginAuthSession : NULL;",
+        "state.CancelAuthTicket = qlr_mock_state.cancel_auth_ticket_export_available ? QLR_SteamAPI_CancelAuthTicket : NULL;",
+        "state.EndAuthSession = qlr_mock_state.end_auth_session_export_available ? QLR_SteamAPI_EndAuthSession : NULL;",
+        "state.GetSteamID = qlr_mock_state.get_steam_id_export_available ? QLR_SteamAPI_GetSteamID : NULL;",
+    ):
+        assert prime_anchor in prime_state_block
+
+    required_companion_test = harness_py.split(
+        "def test_missing_required_user_auth_companion_exports_reject_steamworks_init(", 1
+    )[1].split("\n\ndef test_validate_maps_auth_results", 1)[0]
+    for setter_anchor in (
+        "QLR_SteamworksMock_SetBeginAuthSessionExportAvailable",
+        "QLR_SteamworksMock_SetCancelAuthTicketExportAvailable",
+        "QLR_SteamworksMock_SetEndAuthSessionExportAvailable",
+        "QLR_SteamworksMock_SetGetSteamIDExportAvailable",
+    ):
+        assert setter_anchor in harness_py
+
+    for harness_py_anchor in (
+        "getattr(lib, setter_name)(0)",
+        "not lib.QLR_Steamworks_Init()",
+        "not lib.QLR_Steamworks_Request(",
+        "lib.QLR_Steamworks_Validate(b\"12345678\", ctypes.byref(response))",
+        "not lib.QLR_Steamworks_CancelTicket(123)",
+        "lib.QLR_SteamworksMock_GetCancelAuthTicketCalls() == 0",
+        "not lib.QLR_Steamworks_RequestWebApi",
+        "lib.QLR_SteamworksMock_GetRegisterCallbackCalls() == 0",
+    ):
+        assert harness_py_anchor in required_companion_test
+
+    for doc_anchor in (
+        "# Quake Live Steam Mapping Round 723: Required User Auth Companion Exports",
+        "`BeginAuthSession`, `CancelAuthTicket`, `EndAuthSession`, and `GetSteamID`",
+        "`test_missing_required_user_auth_companion_exports_reject_steamworks_init`",
+        "Focused parity estimate: **before 87% -> after 99%**",
+        "Overall Steam launch/runtime integration mapping confidence moves from **94.24% -> 94.26%**",
+        "does not enable live Steam behavior by default",
+    ):
+        assert doc_anchor in mapping_round
+
+    assert "Round 723 later pinned the remaining required user-auth companion exports" in mapping_round_720
+    assert "Task A625: Pin required user-auth companion export failures [COMPLETED]" in implementation_plan
+    assert "required user-auth companion export confidence" in implementation_plan
+
+
+def test_steamworks_required_core_runtime_exports_round_725_are_pinned() -> None:
+    imports_txt = (
+        REPO_ROOT / "references/reverse-engineering/ghidra/quakelive_steam/imports.txt"
+    ).read_text(encoding="utf-8")
+    hlil_part02 = (
+        REPO_ROOT
+        / "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part02.txt"
+    ).read_text(encoding="utf-8")
+    hlil_part19 = (
+        REPO_ROOT
+        / "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part19.txt"
+    ).read_text(encoding="utf-8")
+    steamworks = (REPO_ROOT / "src/common/platform/platform_steamworks.c").read_text(encoding="utf-8")
+    harness_c = (REPO_ROOT / "tests/steamworks_harness.c").read_text(encoding="utf-8")
+    harness_py = (REPO_ROOT / "tests/test_steamworks_harness.py").read_text(encoding="utf-8")
+    mapping_round = (
+        REPO_ROOT / "docs/reverse-engineering/quakelive_steam_mapping_round_725.md"
+    ).read_text(encoding="utf-8")
+    mapping_round_723 = (
+        REPO_ROOT / "docs/reverse-engineering/quakelive_steam_mapping_round_723.md"
+    ).read_text(encoding="utf-8")
+    implementation_plan = (REPO_ROOT / "IMPLEMENTATION_PLAN.md").read_text(encoding="utf-8")
+
+    for import_anchor in (
+        "STEAM_API.DLL!SteamAPI_Init @ 00159264",
+        "STEAM_API.DLL!SteamAPI_RunCallbacks @ 00159274",
+        "STEAM_API.DLL!SteamAPI_Shutdown @ 001591cc",
+        "STEAM_API.DLL!SteamUser @ 0015916a",
+        "STEAM_API.DLL!SteamFriends @ 0015915a",
+        "STEAM_API.DLL!SteamMatchmaking @ 00159176",
+        "STEAM_API.DLL!SteamApps @ 001591e0",
+        "STEAM_API.DLL!SteamUGC @ 001591ae",
+    ):
+        assert import_anchor in imports_txt
+
+    for hlil_anchor in (
+        "0046151b      uint32_t eax_1 = zx.d(SteamAPI_Init())",
+        "00461d63      SteamAPI_RunCallbacks()",
+        "00460540  return SteamAPI_Shutdown() __tailcall",
+    ):
+        assert hlil_anchor in hlil_part02
+
+    for extern_anchor in (
+        "017c6a14  extern SteamAPI_Init",
+        "017c6a20  extern SteamAPI_RunCallbacks",
+        "017c6a24  extern SteamAPI_Shutdown",
+        "017c6a30  extern SteamApps",
+        "017c6a34  extern SteamFriends",
+        "017c6a58  extern SteamMatchmaking",
+        "017c6a64  extern SteamUGC",
+        "017c6a68  extern SteamUser",
+    ):
+        assert extern_anchor in hlil_part19
+
+    load_block = _extract_function_block(steamworks, "qboolean QL_Steamworks_LoadLibrary( void )")
+    for required_call in (
+        "QL_Steamworks_LoadSymbol( (void **)&state.SteamAPI_Init, QL_STEAMWORKS_EXPORT_STEAM_API_INIT )",
+        "QL_Steamworks_LoadSymbol( (void **)&state.SteamAPI_Shutdown, QL_STEAMWORKS_EXPORT_STEAM_API_SHUTDOWN )",
+        "QL_Steamworks_LoadSymbol( (void **)&state.SteamAPI_RunCallbacks, QL_STEAMWORKS_EXPORT_STEAM_API_RUN_CALLBACKS )",
+        "QL_Steamworks_LoadSymbolAlias( (void **)&state.SteamUser, QL_STEAMWORKS_EXPORT_STEAM_USER, QL_STEAMWORKS_EXPORT_STEAM_API_STEAM_USER )",
+        "QL_Steamworks_LoadSymbolAlias( (void **)&state.SteamFriends, QL_STEAMWORKS_EXPORT_STEAM_FRIENDS, QL_STEAMWORKS_EXPORT_STEAM_API_STEAM_FRIENDS )",
+        "QL_Steamworks_LoadSymbolAlias( (void **)&state.SteamMatchmaking, QL_STEAMWORKS_EXPORT_STEAM_MATCHMAKING, QL_STEAMWORKS_EXPORT_STEAM_API_STEAM_MATCHMAKING )",
+        "QL_Steamworks_LoadSymbolAlias( (void **)&state.SteamApps, QL_STEAMWORKS_EXPORT_STEAM_APPS, QL_STEAMWORKS_EXPORT_STEAM_API_STEAM_APPS )",
+        "QL_Steamworks_LoadSymbolAlias( (void **)&state.SteamUGC, QL_STEAMWORKS_EXPORT_STEAM_UGC, QL_STEAMWORKS_EXPORT_STEAM_API_STEAM_UGC )",
+    ):
+        assert required_call in load_block
+        assert load_block.index(required_call) < load_block.index(
+            "QL_Steamworks_LoadOptionalSymbol( (void **)&state.GetAuthTicketForWebApi, QL_STEAMWORKS_EXPORT_STEAM_API_ISTEAMUSER_GET_AUTH_TICKET_FOR_WEB_API );"
+        )
+
+    dlsym_block = _extract_function_block(harness_c, "void *dlsym( void *handle, const char *symbol )")
+    prime_state_block = _extract_function_block(harness_c, "QLR_EXPORT void QLR_SteamworksMock_PrimeState( void )")
+    for harness_anchor in (
+        "qboolean steam_api_init_export_available;",
+        "qboolean steam_api_shutdown_export_available;",
+        "qboolean steam_api_run_callbacks_export_available;",
+        "qboolean steam_user_export_available;",
+        "qboolean steam_friends_export_available;",
+        "qboolean steam_matchmaking_export_available;",
+        "qboolean steam_apps_export_available;",
+        "qboolean steam_ugc_export_available;",
+        "QLR_SteamworksMock_SetSteamAPIInitExportAvailable",
+        "QLR_SteamworksMock_SetSteamAPIShutdownExportAvailable",
+        "QLR_SteamworksMock_SetSteamAPIRunCallbacksExportAvailable",
+        "QLR_SteamworksMock_SetSteamUserExportAvailable",
+        "QLR_SteamworksMock_SetSteamFriendsExportAvailable",
+        "QLR_SteamworksMock_SetSteamMatchmakingExportAvailable",
+        "QLR_SteamworksMock_SetSteamAppsExportAvailable",
+        "QLR_SteamworksMock_SetSteamUGCExportAvailable",
+    ):
+        assert harness_anchor in harness_c
+
+    for dlsym_anchor in (
+        "return qlr_mock_state.steam_api_init_export_available ? QLR_SteamAPI_Init : NULL;",
+        "return qlr_mock_state.steam_api_shutdown_export_available ? QLR_SteamAPI_Shutdown : NULL;",
+        "return qlr_mock_state.steam_api_run_callbacks_export_available ? QLR_SteamAPI_RunCallbacks : NULL;",
+        "return qlr_mock_state.steam_user_export_available ? QLR_SteamAPI_SteamUser : NULL;",
+        "return qlr_mock_state.steam_friends_export_available ? QLR_SteamAPI_SteamFriends : NULL;",
+        "return qlr_mock_state.steam_matchmaking_export_available ? QLR_SteamAPI_SteamMatchmaking : NULL;",
+        "return qlr_mock_state.steam_apps_export_available ? QLR_SteamAPI_SteamApps : NULL;",
+        "return qlr_mock_state.steam_ugc_export_available ? QLR_SteamAPI_SteamUGC : NULL;",
+    ):
+        assert dlsym_anchor in dlsym_block
+
+    for prime_anchor in (
+        "state.SteamAPI_Init = qlr_mock_state.steam_api_init_export_available ? QLR_SteamAPI_Init : NULL;",
+        "state.SteamAPI_Shutdown = qlr_mock_state.steam_api_shutdown_export_available ? QLR_SteamAPI_Shutdown : NULL;",
+        "state.SteamAPI_RunCallbacks = qlr_mock_state.steam_api_run_callbacks_export_available ? QLR_SteamAPI_RunCallbacks : NULL;",
+        "state.SteamUser = qlr_mock_state.steam_user_export_available ? QLR_SteamAPI_SteamUser : NULL;",
+        "state.SteamFriends = qlr_mock_state.steam_friends_export_available ? QLR_SteamAPI_SteamFriends : NULL;",
+        "state.SteamApps = qlr_mock_state.steam_apps_export_available ? QLR_SteamAPI_SteamApps : NULL;",
+        "state.SteamMatchmaking = qlr_mock_state.steam_matchmaking_export_available ? QLR_SteamAPI_SteamMatchmaking : NULL;",
+        "state.SteamUGC = qlr_mock_state.steam_ugc_export_available ? QLR_SteamAPI_SteamUGC : NULL;",
+    ):
+        assert prime_anchor in prime_state_block
+
+    core_export_test = harness_py.split(
+        "def test_missing_required_core_runtime_exports_reject_steamworks_init(", 1
+    )[1].split("\n\ndef test_missing_auth_session_ticket_export_rejects_steamworks_init", 1)[0]
+    for setter_anchor in (
+        "QLR_SteamworksMock_SetSteamAPIInitExportAvailable",
+        "QLR_SteamworksMock_SetSteamAPIShutdownExportAvailable",
+        "QLR_SteamworksMock_SetSteamAPIRunCallbacksExportAvailable",
+        "QLR_SteamworksMock_SetSteamUserExportAvailable",
+        "QLR_SteamworksMock_SetSteamFriendsExportAvailable",
+        "QLR_SteamworksMock_SetSteamMatchmakingExportAvailable",
+        "QLR_SteamworksMock_SetSteamAppsExportAvailable",
+        "QLR_SteamworksMock_SetSteamUGCExportAvailable",
+    ):
+        assert setter_anchor in harness_py
+
+    for harness_py_anchor in (
+        "getattr(lib, setter_name)(0)",
+        "not lib.QLR_Steamworks_Init()",
+        "not lib.QLR_Steamworks_Request(",
+        "lib.QLR_Steamworks_Validate(b\"12345678\", ctypes.byref(response))",
+        "not lib.QLR_Steamworks_CancelTicket(123)",
+        "lib.QLR_SteamworksMock_GetCancelAuthTicketCalls() == 0",
+        "not lib.QLR_Steamworks_RequestWebApi",
+        "lib.QLR_SteamworksMock_GetWebApiTicketCalls() == 0",
+        "lib.QLR_SteamworksMock_GetRegisterCallbackCalls() == 0",
+    ):
+        assert harness_py_anchor in core_export_test
+
+    for doc_anchor in (
+        "# Quake Live Steam Mapping Round 725: Required Core Runtime Exports",
+        "`SteamAPI_Init`, `SteamAPI_Shutdown`, and `SteamAPI_RunCallbacks`",
+        "`SteamUser`, `SteamFriends`, `SteamMatchmaking`, `SteamApps`, and `SteamUGC`",
+        "`test_missing_required_core_runtime_exports_reject_steamworks_init`",
+        "Focused parity estimate: **before 87% -> after 99%**",
+        "Overall Steam launch/runtime integration mapping confidence moves from **94.26% -> 94.28%**",
+        "does not enable live Steam behavior by default",
+    ):
+        assert doc_anchor in mapping_round
+
+    assert "Round 725 later pinned the required core Steam runtime and client interface exports" in mapping_round_723
+    assert "Task A627: Pin required core Steam runtime export failures [COMPLETED]" in implementation_plan
+    assert "required core Steam runtime export confidence" in implementation_plan
+
+
+def test_steamworks_optional_callback_export_fallbacks_round_729_are_pinned() -> None:
+    imports_txt = (
+        REPO_ROOT / "references/reverse-engineering/ghidra/quakelive_steam/imports.txt"
+    ).read_text(encoding="utf-8")
+    hlil_part02 = (
+        REPO_ROOT
+        / "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part02.txt"
+    ).read_text(encoding="utf-8")
+    hlil_part19 = (
+        REPO_ROOT
+        / "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part19.txt"
+    ).read_text(encoding="utf-8")
+    steamworks = (REPO_ROOT / "src/common/platform/platform_steamworks.c").read_text(encoding="utf-8")
+    harness_c = (REPO_ROOT / "tests/steamworks_harness.c").read_text(encoding="utf-8")
+    harness_py = (REPO_ROOT / "tests/test_steamworks_harness.py").read_text(encoding="utf-8")
+    mapping_round = (
+        REPO_ROOT / "docs/reverse-engineering/quakelive_steam_mapping_round_729.md"
+    ).read_text(encoding="utf-8")
+    mapping_round_719 = (
+        REPO_ROOT / "docs/reverse-engineering/quakelive_steam_mapping_round_719.md"
+    ).read_text(encoding="utf-8")
+    implementation_plan = (REPO_ROOT / "IMPLEMENTATION_PLAN.md").read_text(encoding="utf-8")
+
+    for import_anchor in (
+        "STEAM_API.DLL!SteamAPI_RegisterCallback @ 00159248",
+        "STEAM_API.DLL!SteamAPI_UnregisterCallback @ 0015922a",
+        "STEAM_API.DLL!SteamAPI_RegisterCallResult @ 001591ec",
+        "STEAM_API.DLL!SteamAPI_UnregisterCallResult @ 0015920a",
+    ):
+        assert import_anchor in imports_txt
+
+    for hlil_anchor in (
+        "004613f5  SteamAPI_RegisterCallback(&arg1[8], 0x151)",
+        "00460e25      SteamAPI_UnregisterCallResult(eax_8, ecx_4, edx_5)",
+        "00460e4e  return SteamAPI_RegisterCallResult(eax_8, eax_7, result)",
+        "017c6a18  extern SteamAPI_RegisterCallResult",
+        "017c6a1c  extern SteamAPI_RegisterCallback",
+        "017c6a28  extern SteamAPI_UnregisterCallResult",
+        "017c6a2c  extern SteamAPI_UnregisterCallback",
+    ):
+        corpus = hlil_part19 if hlil_anchor.startswith("017c") else hlil_part02
+        assert hlil_anchor in corpus
+
+    load_block = _extract_function_block(steamworks, "qboolean QL_Steamworks_LoadLibrary( void )")
+    register_object_block = _extract_function_block(
+        steamworks, "static qboolean QL_Steamworks_RegisterCallbackObject( ql_steam_callback_base_t *object )"
+    )
+    unregister_object_block = _extract_function_block(
+        steamworks, "static void QL_Steamworks_UnregisterCallbackObject( ql_steam_callback_base_t *object )"
+    )
+    has_adapter_block = _extract_function_block(steamworks, "qboolean QL_Steamworks_HasWebApiAuthTicketAdapter( void )")
+    request_webapi_block = _extract_function_block(
+        steamworks,
+        "qboolean QL_Steamworks_RequestWebApiAuthTicket( const char *identity, char *ticketBuffer, size_t ticketBufferSize, int *ticketLength, uint32_t *ticketHandle, int *steamResult )",
+    )
+    bind_ugc_block = _extract_function_block(steamworks, "qboolean QL_Steamworks_BindUGCQueryCallResult( SteamAPICall_t callHandle )")
+    unbind_call_result_block = _extract_function_block(
+        steamworks,
+        "static void QL_Steamworks_UnbindCallResultObject( ql_steam_callback_base_t *object, SteamAPICall_t *callHandle, qboolean *bound )",
+    )
+
+    for optional_load in (
+        "QL_Steamworks_LoadOptionalSymbol( (void **)&state.SteamAPI_RegisterCallback, QL_STEAMWORKS_EXPORT_STEAM_API_REGISTER_CALLBACK );",
+        "QL_Steamworks_LoadOptionalSymbol( (void **)&state.SteamAPI_UnregisterCallback, QL_STEAMWORKS_EXPORT_STEAM_API_UNREGISTER_CALLBACK );",
+        "QL_Steamworks_LoadOptionalSymbol( (void **)&state.SteamAPI_RegisterCallResult, QL_STEAMWORKS_EXPORT_STEAM_API_REGISTER_CALL_RESULT );",
+        "QL_Steamworks_LoadOptionalSymbol( (void **)&state.SteamAPI_UnregisterCallResult, QL_STEAMWORKS_EXPORT_STEAM_API_UNREGISTER_CALL_RESULT );",
+    ):
+        assert optional_load in load_block
+
+    assert "if ( !object || !state.SteamAPI_RegisterCallback ) {" in register_object_block
+    assert "state.SteamAPI_RegisterCallback( object, object->callbackId );" in register_object_block
+    assert "if ( state.SteamAPI_UnregisterCallback ) {" in unregister_object_block
+    assert "state.SteamAPI_UnregisterCallback( object );" in unregister_object_block
+    assert "object->callbackFlags &= ~QL_STEAM_CALLBACK_FLAG_REGISTERED;" in unregister_object_block
+    assert "return state.GetAuthTicketForWebApi && state.SteamAPI_RegisterCallback && state.SteamAPI_RunCallbacks ? qtrue : qfalse;" in has_adapter_block
+    assert "if ( !state.GetAuthTicketForWebApi || !state.SteamAPI_RegisterCallback || !state.SteamAPI_RunCallbacks ) {" in request_webapi_block
+    assert "if ( callHandle == 0 || !state.SteamAPI_RegisterCallResult ) {" in bind_ugc_block
+    assert "state.SteamAPI_RegisterCallResult( &callbackState->ugcQueryCompleted, callHandle );" in bind_ugc_block
+    assert "if ( state.SteamAPI_UnregisterCallResult ) {" in unbind_call_result_block
+    assert "state.SteamAPI_UnregisterCallResult( object, *callHandle );" in unbind_call_result_block
+    assert unbind_call_result_block.index("*callHandle = 0;") < unbind_call_result_block.index("*bound = qfalse;")
+
+    dlsym_block = _extract_function_block(harness_c, "void *dlsym( void *handle, const char *symbol )")
+    prime_state_block = _extract_function_block(harness_c, "QLR_EXPORT void QLR_SteamworksMock_PrimeState( void )")
+    for harness_anchor in (
+        "qboolean steam_api_register_callback_export_available;",
+        "qboolean steam_api_unregister_callback_export_available;",
+        "qboolean steam_api_register_call_result_export_available;",
+        "qboolean steam_api_unregister_call_result_export_available;",
+        "QLR_SteamworksMock_SetSteamAPIRegisterCallbackExportAvailable",
+        "QLR_SteamworksMock_SetSteamAPIUnregisterCallbackExportAvailable",
+        "QLR_SteamworksMock_SetSteamAPIRegisterCallResultExportAvailable",
+        "QLR_SteamworksMock_SetSteamAPIUnregisterCallResultExportAvailable",
+    ):
+        assert harness_anchor in harness_c
+
+    for dlsym_anchor in (
+        "return qlr_mock_state.steam_api_register_callback_export_available ? QLR_SteamAPI_RegisterCallback : NULL;",
+        "return qlr_mock_state.steam_api_unregister_callback_export_available ? QLR_SteamAPI_UnregisterCallback : NULL;",
+        "return qlr_mock_state.steam_api_register_call_result_export_available ? QLR_SteamAPI_RegisterCallResult : NULL;",
+        "return qlr_mock_state.steam_api_unregister_call_result_export_available ? QLR_SteamAPI_UnregisterCallResult : NULL;",
+    ):
+        assert dlsym_anchor in dlsym_block
+
+    for prime_anchor in (
+        "state.SteamAPI_RegisterCallback = qlr_mock_state.steam_api_register_callback_export_available ? QLR_SteamAPI_RegisterCallback : NULL;",
+        "state.SteamAPI_UnregisterCallback = qlr_mock_state.steam_api_unregister_callback_export_available ? QLR_SteamAPI_UnregisterCallback : NULL;",
+        "state.SteamAPI_RegisterCallResult = qlr_mock_state.steam_api_register_call_result_export_available ? QLR_SteamAPI_RegisterCallResult : NULL;",
+        "state.SteamAPI_UnregisterCallResult = qlr_mock_state.steam_api_unregister_call_result_export_available ? QLR_SteamAPI_UnregisterCallResult : NULL;",
+    ):
+        assert prime_anchor in prime_state_block
+
+    for harness_py_anchor in (
+        "def test_missing_optional_callback_registration_export_keeps_retail_auth_path(",
+        "QLR_SteamworksMock_SetSteamAPIRegisterCallbackExportAvailable(0)",
+        "assert lib.QLR_Steamworks_Init()",
+        "assert not lib.QLR_Steamworks_HasWebApiAuthTicketAdapter()",
+        "assert not lib.QLR_Steamworks_RegisterHarnessCallbacks()",
+        "assert not lib.QLR_Steamworks_RegisterServerHarnessCallbacks()",
+        "def test_missing_optional_callback_unregister_export_clears_local_flags(",
+        "QLR_SteamworksMock_SetSteamAPIUnregisterCallbackExportAvailable(0)",
+        "def test_missing_optional_call_result_registration_export_fails_ugc_binding_cleanly(",
+        "QLR_SteamworksMock_SetSteamAPIRegisterCallResultExportAvailable(0)",
+        "assert lib.QLR_SteamworksMock_GetUGCReleaseQueryCalls() == 1",
+        "def test_missing_optional_call_result_unregister_export_clears_local_binding(",
+        "QLR_SteamworksMock_SetSteamAPIUnregisterCallResultExportAvailable(0)",
+        "assert lib.QLR_SteamworksMock_GetUnregisterCallResultCalls() == 0",
+    ):
+        assert harness_py_anchor in harness_py
+
+    for doc_anchor in (
+        "# Quake Live Steam Mapping Round 729: Optional Callback Export Fallbacks",
+        "`QL_Steamworks_LoadOptionalSymbol`",
+        "`steam_api_register_callback_export_available`",
+        "`SteamAPI_RegisterCallResult` makes UGC query binding fail cleanly",
+        "Focused parity estimate: **before 88% -> after 99%**",
+        "Overall Steam launch/runtime integration mapping confidence moves from **94.28% -> 94.30%**",
+        "does not change the strict-retail Windows replacement score",
+    ):
+        assert doc_anchor in mapping_round
+
+    assert "Round 729 later pinned the optional callback and call-result export fallbacks" in mapping_round_719
+    assert "Task A631: Pin optional callback export fallbacks [COMPLETED]" in implementation_plan
+    assert "optional callback export fallback confidence" in implementation_plan
+
+
+def test_steamworks_optional_auxiliary_interface_exports_round_731_are_pinned() -> None:
+    imports_txt = (
+        REPO_ROOT / "references/reverse-engineering/ghidra/quakelive_steam/imports.txt"
+    ).read_text(encoding="utf-8")
+    hlil_part02 = (
+        REPO_ROOT
+        / "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part02.txt"
+    ).read_text(encoding="utf-8")
+    hlil_part19 = (
+        REPO_ROOT
+        / "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part19.txt"
+    ).read_text(encoding="utf-8")
+    steamworks = (REPO_ROOT / "src/common/platform/platform_steamworks.c").read_text(encoding="utf-8")
+    harness_c = (REPO_ROOT / "tests/steamworks_harness.c").read_text(encoding="utf-8")
+    harness_py = (REPO_ROOT / "tests/test_steamworks_harness.py").read_text(encoding="utf-8")
+    mapping_round = (
+        REPO_ROOT / "docs/reverse-engineering/quakelive_steam_mapping_round_731.md"
+    ).read_text(encoding="utf-8")
+    mapping_round_729 = (
+        REPO_ROOT / "docs/reverse-engineering/quakelive_steam_mapping_round_729.md"
+    ).read_text(encoding="utf-8")
+    implementation_plan = (REPO_ROOT / "IMPLEMENTATION_PLAN.md").read_text(encoding="utf-8")
+
+    for import_anchor in (
+        "STEAM_API.DLL!SteamUtils @ 0015914c",
+        "STEAM_API.DLL!SteamUserStats @ 0015919c",
+        "STEAM_API.DLL!SteamNetworking @ 001591ba",
+        "STEAM_API.DLL!SteamMatchmakingServers @ 0015928c",
+    ):
+        assert import_anchor in imports_txt
+
+    for hlil_anchor in (
+        "017c6a70  extern SteamUtils",
+        "017c6a6c  extern SteamUserStats",
+        "017c6a60  extern SteamNetworking",
+        "017c6a5c  extern SteamMatchmakingServers",
+    ):
+        assert hlil_anchor in hlil_part19
+
+    for hlil_anchor in (
+        "004606a6  jump(*(*SteamUtils() + 0x10))",
+        "00460dd6  int32_t eax_2 = (*(*SteamUtils() + 0x24))()",
+        "00460531  return (*(*SteamUserStats() + 0x54))(1)",
+        "0045ff30  int32_t eax = SteamNetworking()",
+        "00461a9d  for (i = (*(*SteamNetworking() + 4))(&var_806c, 1); i != 0;",
+        "00462e8d      int32_t eax_1 = SteamMatchmakingServers()",
+        "00462ede          int32_t eax_1 = SteamMatchmakingServers()",
+    ):
+        assert hlil_anchor in hlil_part02
+
+    load_block = _extract_function_block(steamworks, "qboolean QL_Steamworks_LoadLibrary( void )")
+    for optional_alias in (
+        "QL_Steamworks_LoadOptionalSymbolAlias( (void **)&state.SteamNetworking, QL_STEAMWORKS_EXPORT_STEAM_NETWORKING, QL_STEAMWORKS_EXPORT_STEAM_API_STEAM_NETWORKING );",
+        "QL_Steamworks_LoadOptionalSymbolAlias( (void **)&state.SteamUtils, QL_STEAMWORKS_EXPORT_STEAM_UTILS, QL_STEAMWORKS_EXPORT_STEAM_API_STEAM_UTILS );",
+        "QL_Steamworks_LoadOptionalSymbolAlias( (void **)&state.SteamUserStats, QL_STEAMWORKS_EXPORT_STEAM_USER_STATS, QL_STEAMWORKS_EXPORT_STEAM_API_STEAM_USER_STATS );",
+        "QL_Steamworks_LoadOptionalSymbolAlias( (void **)&state.SteamMatchmakingServers, QL_STEAMWORKS_EXPORT_STEAM_MATCHMAKING_SERVERS, QL_STEAMWORKS_EXPORT_STEAM_API_STEAM_MATCHMAKING_SERVERS );",
+    ):
+        assert optional_alias in load_block
+
+    for source_anchor in (
+        "if ( !QL_Steamworks_Init() || !state.SteamNetworking ) {",
+        "if ( !QL_Steamworks_Init() || !state.SteamMatchmakingServers ) {",
+        "if ( !QL_Steamworks_Init() || !state.SteamUserStats ) {",
+        "if ( !QL_Steamworks_Init() || !state.SteamUtils ) {",
+        "return QL_Steamworks_GetServerBrowserInterface() != NULL ? qtrue : qfalse;",
+        "return 0u;",
+        "if ( !state.initialised || !state.SteamUserStats ) {",
+        "return fn( userStats, NULL, idLow, idHigh ) != 0 ? qtrue : qfalse;",
+        "networking = QL_Steamworks_GetNetworkingInterface();",
+        "serverBrowser = QL_Steamworks_GetServerBrowserInterface();",
+    ):
+        assert source_anchor in steamworks
+
+    dlsym_block = _extract_function_block(harness_c, "void *dlsym( void *handle, const char *symbol )")
+    prime_state_block = _extract_function_block(harness_c, "QLR_EXPORT void QLR_SteamworksMock_PrimeState( void )")
+    for harness_anchor in (
+        "qboolean steam_utils_export_available;",
+        "qboolean steam_user_stats_export_available;",
+        "qboolean steam_networking_export_available;",
+        "qboolean steam_matchmaking_servers_export_available;",
+        "QLR_SteamworksMock_SetSteamUtilsExportAvailable",
+        "QLR_SteamworksMock_SetSteamUserStatsExportAvailable",
+        "QLR_SteamworksMock_SetSteamNetworkingExportAvailable",
+        "QLR_SteamworksMock_SetSteamMatchmakingServersExportAvailable",
+    ):
+        assert harness_anchor in harness_c
+
+    for dlsym_anchor in (
+        "return qlr_mock_state.steam_utils_export_available ? QLR_SteamAPI_SteamUtils : NULL;",
+        "return qlr_mock_state.steam_user_stats_export_available ? QLR_SteamAPI_SteamUserStats : NULL;",
+        "return qlr_mock_state.steam_networking_export_available ? QLR_SteamAPI_SteamNetworking : NULL;",
+        "return qlr_mock_state.steam_matchmaking_servers_export_available ? QLR_SteamAPI_SteamMatchmakingServers : NULL;",
+    ):
+        assert dlsym_anchor in dlsym_block
+
+    for prime_anchor in (
+        "state.SteamUtils = qlr_mock_state.steam_utils_export_available ? QLR_SteamAPI_SteamUtils : NULL;",
+        "state.SteamUserStats = qlr_mock_state.steam_user_stats_export_available ? QLR_SteamAPI_SteamUserStats : NULL;",
+        "state.SteamNetworking = qlr_mock_state.steam_networking_export_available ? QLR_SteamAPI_SteamNetworking : NULL;",
+        "state.SteamMatchmakingServers = qlr_mock_state.steam_matchmaking_servers_export_available ? QLR_SteamAPI_SteamMatchmakingServers : NULL;",
+    ):
+        assert prime_anchor in prime_state_block
+
+    for harness_py_anchor in (
+        "def _assert_retail_auth_ticket_path_works(",
+        "def test_missing_optional_steamutils_export_keeps_auth_path_and_disables_utils(",
+        "QLR_SteamworksMock_SetSteamUtilsExportAvailable(0)",
+        "assert lib.QLR_Steamworks_GetAppID() == 0",
+        "def test_missing_optional_steamuserstats_export_keeps_auth_path_and_disables_stats(",
+        "QLR_SteamworksMock_SetSteamUserStatsExportAvailable(0)",
+        "assert lib.QLR_SteamworksMock_GetUserStatsRequestCalls() == 0",
+        "def test_missing_optional_steamnetworking_export_keeps_auth_path_and_disables_p2p(",
+        "QLR_SteamworksMock_SetSteamNetworkingExportAvailable(0)",
+        "assert lib.QLR_SteamworksMock_GetP2PAcceptCalls() == 0",
+        "def test_missing_optional_steammatchmakingservers_export_keeps_auth_path_and_disables_native_browser(",
+        "QLR_SteamworksMock_SetSteamMatchmakingServersExportAvailable(0)",
+        "assert lib.QLR_SteamworksMock_GetServerBrowserInternetCalls() == 0",
+        "_assert_retail_auth_ticket_path_works(lib)",
+    ):
+        assert harness_py_anchor in harness_py
+
+    for doc_anchor in (
+        "# Quake Live Steam Mapping Round 731: Optional Auxiliary Interface Exports",
+        "`SteamUtils`, `SteamUserStats`, `SteamNetworking`, and",
+        "`QL_Steamworks_LoadOptionalSymbolAlias`",
+        "`steam_utils_export_available`",
+        "Focused parity estimate: **before 88% -> after 99%**",
+        "Overall Steam launch/runtime integration mapping confidence moves from **94.30% -> 94.32%**",
+        "does not change the strict-retail Windows replacement score",
+    ):
+        assert doc_anchor in mapping_round
+
+    assert "Round 731 later pinned the optional auxiliary client interface export" in mapping_round_729
+    assert "Task A633: Pin optional auxiliary Steam interface export fallbacks [COMPLETED]" in implementation_plan
+    assert "optional auxiliary interface export fallback confidence" in implementation_plan
+
+
+def test_steamworks_optional_gameserver_exports_round_737_are_pinned() -> None:
+    imports_txt = (
+        REPO_ROOT / "references/reverse-engineering/ghidra/quakelive_steam/imports.txt"
+    ).read_text(encoding="utf-8")
+    hlil_part02 = (
+        REPO_ROOT
+        / "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part02.txt"
+    ).read_text(encoding="utf-8")
+    hlil_part19 = (
+        REPO_ROOT
+        / "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part19.txt"
+    ).read_text(encoding="utf-8")
+    steamworks = (REPO_ROOT / "src/common/platform/platform_steamworks.c").read_text(encoding="utf-8")
+    harness_c = (REPO_ROOT / "tests/steamworks_harness.c").read_text(encoding="utf-8")
+    harness_py = (REPO_ROOT / "tests/test_steamworks_harness.py").read_text(encoding="utf-8")
+    mapping_round = (
+        REPO_ROOT / "docs/reverse-engineering/quakelive_steam_mapping_round_737.md"
+    ).read_text(encoding="utf-8")
+    mapping_round_731 = (
+        REPO_ROOT / "docs/reverse-engineering/quakelive_steam_mapping_round_731.md"
+    ).read_text(encoding="utf-8")
+    implementation_plan = (REPO_ROOT / "IMPLEMENTATION_PLAN.md").read_text(encoding="utf-8")
+
+    for import_anchor in (
+        "STEAM_API.DLL!SteamGameServer @ 0015918a",
+        "STEAM_API.DLL!SteamGameServerNetworking @ 001592a6",
+        "STEAM_API.DLL!SteamGameServerStats @ 0015932c",
+        "STEAM_API.DLL!SteamGameServerUGC @ 001592fe",
+        "STEAM_API.DLL!SteamGameServerUtils @ 00159344",
+        "STEAM_API.DLL!SteamGameServer_Init @ 00159314",
+        "STEAM_API.DLL!SteamGameServer_RunCallbacks @ 001592de",
+        "STEAM_API.DLL!SteamGameServer_Shutdown @ 001592c2",
+    ):
+        assert import_anchor in imports_txt
+
+    for hlil_anchor in (
+        "017c6a38  extern SteamGameServer",
+        "017c6a3c  extern SteamGameServerNetworking",
+        "017c6a40  extern SteamGameServerStats",
+        "017c6a44  extern SteamGameServerUGC",
+        "017c6a48  extern SteamGameServerUtils",
+        "017c6a4c  extern SteamGameServer_Init",
+        "017c6a50  extern SteamGameServer_RunCallbacks",
+        "017c6a54  extern SteamGameServer_Shutdown",
+    ):
+        assert hlil_anchor in hlil_part19
+
+    for hlil_anchor in (
+        "00465d39      SteamGameServer_Shutdown()",
+        "00466873      SteamGameServer_RunCallbacks()",
+        "00466fc1          uint32_t eax_10 = zx.d(SteamGameServer_Init(",
+        "00465be6              int32_t eax_4 = SteamGameServerNetworking()",
+        "00466928          if ((*(*SteamGameServerNetworking() + 4))(&var_424, 1) != 0)",
+        "0046794f  int32_t eax_8 = (*(*SteamGameServerUtils(eax_2) + 0x24))()",
+        "004679d9  if (SteamGameServerStats() != 0 && (*(*SteamGameServer() + 0x20))() != 0)",
+    ):
+        assert hlil_anchor in hlil_part02
+
+    load_block = _extract_function_block(steamworks, "qboolean QL_Steamworks_LoadLibrary( void )")
+    for optional_load in (
+        "QL_Steamworks_LoadOptionalSymbol( (void **)&state.SteamGameServer, QL_STEAMWORKS_EXPORT_STEAM_GAME_SERVER );",
+        "QL_Steamworks_LoadOptionalSymbol( (void **)&state.SteamGameServerStats, QL_STEAMWORKS_EXPORT_STEAM_GAME_SERVER_STATS );",
+        "QL_Steamworks_LoadOptionalSymbol( (void **)&state.SteamGameServerUtils, QL_STEAMWORKS_EXPORT_STEAM_GAME_SERVER_UTILS );",
+        "QL_Steamworks_LoadOptionalSymbol( (void **)&state.SteamGameServerUGC, QL_STEAMWORKS_EXPORT_STEAM_GAME_SERVER_UGC );",
+        "QL_Steamworks_LoadOptionalSymbol( (void **)&state.SteamGameServer_Init, QL_STEAMWORKS_EXPORT_STEAM_GAME_SERVER_INIT );",
+        "QL_Steamworks_LoadOptionalSymbol( (void **)&state.SteamGameServer_Shutdown, QL_STEAMWORKS_EXPORT_STEAM_GAME_SERVER_SHUTDOWN );",
+        "QL_Steamworks_LoadOptionalSymbol( (void **)&state.SteamGameServer_RunCallbacks, QL_STEAMWORKS_EXPORT_STEAM_GAME_SERVER_RUN_CALLBACKS );",
+        "QL_Steamworks_LoadOptionalSymbol( (void **)&state.SteamGameServerNetworking, QL_STEAMWORKS_EXPORT_STEAM_GAME_SERVER_NETWORKING );",
+    ):
+        assert optional_load in load_block
+
+    init_block = _extract_function_block(
+        steamworks,
+        "qboolean QL_Steamworks_ServerInitWithVersion( uint32_t ip, uint16_t gamePort, qboolean secure, qboolean dedicated, const char *version )",
+    )
+    shutdown_block = _extract_function_block(steamworks, "void QL_Steamworks_ServerShutdown( void )")
+    run_callbacks_block = _extract_function_block(steamworks, "void QL_Steamworks_RunServerCallbacks( void )")
+    get_gameserver_block = _extract_function_block(steamworks, "static void *QL_Steamworks_GetGameServer( void )")
+    stats_interface_block = _extract_function_block(steamworks, "static void *QL_Steamworks_GetGameServerStatsInterface( void )")
+    utils_interface_block = _extract_function_block(steamworks, "static void *QL_Steamworks_GetGameServerUtilsInterface( void )")
+    ugc_interface_block = _extract_function_block(steamworks, "static void *QL_Steamworks_GetUGCInterface( void )")
+    networking_interface_block = _extract_function_block(steamworks, "static void *QL_Steamworks_GetGameServerNetworking( void )")
+
+    assert "if ( !QL_Steamworks_Init() || !state.SteamGameServer_Init ) {" in init_block
+    assert "state.SteamGameServer_Init( ip, 0, gamePort, 0xffffu, serverMode, versionString )" in init_block
+    assert "if ( state.gameServerInitialised && state.SteamGameServer_Shutdown ) {" in shutdown_block
+    assert "state.gameServerInitialised = qfalse;" in shutdown_block
+    assert "if ( !state.initialised || !state.gameServerInitialised || !state.SteamGameServer_RunCallbacks ) {" in run_callbacks_block
+    assert "state.SteamGameServer_RunCallbacks();" in run_callbacks_block
+    assert "!state.initialised || !state.gameServerInitialised || !state.SteamGameServer" in get_gameserver_block
+    assert "!state.initialised || !state.gameServerInitialised || !state.SteamGameServerStats" in stats_interface_block
+    assert "!state.initialised || !state.gameServerInitialised || !state.SteamGameServerUtils" in utils_interface_block
+    assert "state.useGameServerUGC && state.gameServerInitialised && state.SteamGameServerUGC" in ugc_interface_block
+    assert "return state.SteamUGC();" in ugc_interface_block
+    assert "!state.initialised || !state.gameServerInitialised || !state.SteamGameServerNetworking" in networking_interface_block
+
+    dlsym_block = _extract_function_block(harness_c, "void *dlsym( void *handle, const char *symbol )")
+    prime_state_block = _extract_function_block(harness_c, "QLR_EXPORT void QLR_SteamworksMock_PrimeState( void )")
+    for suffix, flag_name, function_name in (
+        ("STEAM_GAME_SERVER", "steam_game_server_export_available", "QLR_SteamAPI_SteamGameServer"),
+        ("STEAM_GAME_SERVER_STATS", "steam_game_server_stats_export_available", "QLR_SteamAPI_SteamGameServerStats"),
+        ("STEAM_GAME_SERVER_UTILS", "steam_game_server_utils_export_available", "QLR_SteamAPI_SteamGameServerUtils"),
+        ("STEAM_GAME_SERVER_UGC", "steam_game_server_ugc_export_available", "QLR_SteamAPI_SteamGameServerUGC"),
+        ("STEAM_GAME_SERVER_INIT", "steam_game_server_init_export_available", "QLR_SteamAPI_SteamGameServerInit"),
+        ("STEAM_GAME_SERVER_SHUTDOWN", "steam_game_server_shutdown_export_available", "QLR_SteamAPI_SteamGameServerShutdown"),
+        ("STEAM_GAME_SERVER_RUN_CALLBACKS", "steam_game_server_run_callbacks_export_available", "QLR_SteamAPI_SteamGameServerRunCallbacks"),
+        ("STEAM_GAME_SERVER_NETWORKING", "steam_game_server_networking_export_available", "QLR_SteamAPI_SteamGameServerNetworking"),
+    ):
+        assert f"qboolean {flag_name};" in harness_c
+        assert f"strcmp( symbol, QLR_STEAMWORKS_EXPORT_{suffix} ) == 0" in dlsym_block
+        assert f"return qlr_mock_state.{flag_name} ? {function_name} : NULL;" in dlsym_block
+        assert f"qlr_mock_state.{flag_name} = qtrue;" in harness_c
+
+    for setter_name in (
+        "QLR_SteamworksMock_SetSteamGameServerExportAvailable",
+        "QLR_SteamworksMock_SetSteamGameServerStatsExportAvailable",
+        "QLR_SteamworksMock_SetSteamGameServerUtilsExportAvailable",
+        "QLR_SteamworksMock_SetSteamGameServerUGCExportAvailable",
+        "QLR_SteamworksMock_SetSteamGameServerInitExportAvailable",
+        "QLR_SteamworksMock_SetSteamGameServerShutdownExportAvailable",
+        "QLR_SteamworksMock_SetSteamGameServerRunCallbacksExportAvailable",
+        "QLR_SteamworksMock_SetSteamGameServerNetworkingExportAvailable",
+    ):
+        assert setter_name in harness_c
+        assert setter_name in harness_py
+
+    for prime_anchor in (
+        "state.SteamGameServerUGC = qlr_mock_state.steam_game_server_ugc_export_available ? QLR_SteamAPI_SteamGameServerUGC : NULL;",
+        "state.SteamGameServer_Init = qlr_mock_state.steam_game_server_init_export_available ? QLR_SteamAPI_SteamGameServerInit : NULL;",
+        "state.SteamGameServer = qlr_mock_state.steam_game_server_export_available ? QLR_SteamAPI_SteamGameServer : NULL;",
+        "state.SteamGameServerUtils = qlr_mock_state.steam_game_server_utils_export_available ? QLR_SteamAPI_SteamGameServerUtils : NULL;",
+        "state.SteamGameServerStats = qlr_mock_state.steam_game_server_stats_export_available ? QLR_SteamAPI_SteamGameServerStats : NULL;",
+        "state.SteamGameServer_Shutdown = qlr_mock_state.steam_game_server_shutdown_export_available ? QLR_SteamAPI_SteamGameServerShutdown : NULL;",
+        "state.SteamGameServer_RunCallbacks = qlr_mock_state.steam_game_server_run_callbacks_export_available ? QLR_SteamAPI_SteamGameServerRunCallbacks : NULL;",
+        "state.SteamGameServerNetworking = qlr_mock_state.steam_game_server_networking_export_available ? QLR_SteamAPI_SteamGameServerNetworking : NULL;",
+    ):
+        assert prime_anchor in prime_state_block
+
+    for harness_py_anchor in (
+        "def test_missing_optional_gameserver_init_export_keeps_client_auth_path_and_rejects_server_init(",
+        "QLR_SteamworksMock_SetSteamGameServerInitExportAvailable(0)",
+        "assert lib.QLR_SteamworksMock_GetSteamGameServerInitCalls() == 0",
+        "def test_missing_optional_gameserver_export_keeps_server_init_but_disables_gameserver_helpers(",
+        "QLR_SteamworksMock_SetSteamGameServerExportAvailable(0)",
+        "assert lib.QLR_SteamworksMock_GetSteamGameServerProductCalls() == 0",
+        "def test_missing_optional_gameserver_shutdown_export_clears_server_state_without_runtime_shutdown(",
+        "QLR_SteamworksMock_SetSteamGameServerShutdownExportAvailable(0)",
+        "assert lib.QLR_SteamworksMock_GetSteamGameServerShutdownCalls() == 0",
+        "def test_missing_optional_gameserver_run_callbacks_export_skips_server_callback_pump(",
+        "QLR_SteamworksMock_SetSteamGameServerRunCallbacksExportAvailable(0)",
+        "assert lib.QLR_SteamworksMock_GetClientCallbackCaptureCount() == 0",
+        "def test_missing_optional_gameserver_stats_export_keeps_server_init_and_disables_server_stats(",
+        "QLR_SteamworksMock_SetSteamGameServerStatsExportAvailable(0)",
+        "assert lib.QLR_SteamworksMock_GetSteamGameServerStatsRequestCalls() == 0",
+        "def test_missing_optional_gameserver_utils_export_keeps_server_init_and_disables_server_app_id(",
+        "QLR_SteamworksMock_SetSteamGameServerUtilsExportAvailable(0)",
+        "assert lib.QLR_Steamworks_ServerGetAppID() == 0",
+        "def test_missing_optional_gameserver_ugc_export_falls_back_to_client_ugc_owner(",
+        "QLR_SteamworksMock_SetSteamGameServerUGCExportAvailable(0)",
+        "assert lib.QLR_SteamworksMock_GetSteamGameServerUGCSubscribeCalls() == 0",
+        "def test_missing_optional_gameserver_networking_export_keeps_server_init_and_disables_server_p2p(",
+        "QLR_SteamworksMock_SetSteamGameServerNetworkingExportAvailable(0)",
+        "assert lib.QLR_SteamworksMock_GetServerP2PAcceptCalls() == 0",
+        "_assert_retail_auth_ticket_path_works(lib)",
+    ):
+        assert harness_py_anchor in harness_py
+
+    for doc_anchor in (
+        "# Quake Live Steam Mapping Round 737: Optional GameServer Export Fallbacks",
+        "`SteamGameServer`, `SteamGameServerStats`, `SteamGameServerUtils`,",
+        "`QL_Steamworks_LoadOptionalSymbol`",
+        "`steam_game_server_init_export_available`",
+        "`SteamGameServer` itself is not required by `SteamGameServer_Init`",
+        "Focused parity estimate: **before 88% -> after 99%**",
+        "Overall Steam launch/runtime integration mapping confidence moves from **94.32% -> 94.34%**",
+        "does not enable live Steam behavior by default",
+    ):
+        assert doc_anchor in mapping_round
+
+    assert "Round 737 later pinned the optional GameServer export fallbacks" in mapping_round_731
+    assert "Task A639: Pin optional Steam GameServer export fallbacks [COMPLETED]" in implementation_plan
+    assert "optional GameServer export fallback confidence" in implementation_plan
+
+
+def test_steamworks_runtime_export_boundary_round_701_is_pinned() -> None:
+    aliases = json.loads(
+        (REPO_ROOT / "references/analysis/quakelive_symbol_aliases.json").read_text(encoding="utf-8")
+    )["quakelive_steam_srp"]
+    functions_csv = (
+        REPO_ROOT / "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+    ).read_text(encoding="utf-8")
+    imports_txt = (
+        REPO_ROOT / "references/reverse-engineering/ghidra/quakelive_steam/imports.txt"
+    ).read_text(encoding="utf-8")
+    hlil_part02 = (
+        REPO_ROOT
+        / "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part02.txt"
+    ).read_text(encoding="utf-8")
+    steamworks = (REPO_ROOT / "src/common/platform/platform_steamworks.c").read_text(encoding="utf-8")
+    mapping_round = (
+        REPO_ROOT / "docs/reverse-engineering/quakelive_steam_mapping_round_701.md"
+    ).read_text(encoding="utf-8")
+    implementation_plan = (REPO_ROOT / "IMPLEMENTATION_PLAN.md").read_text(encoding="utf-8")
+
+    retail_imports = (
+        "SteamAPI_Init",
+        "SteamAPI_RegisterCallResult",
+        "SteamAPI_RegisterCallback",
+        "SteamAPI_RunCallbacks",
+        "SteamAPI_Shutdown",
+        "SteamAPI_UnregisterCallResult",
+        "SteamAPI_UnregisterCallback",
+        "SteamApps",
+        "SteamFriends",
+        "SteamGameServer",
+        "SteamGameServerNetworking",
+        "SteamGameServerStats",
+        "SteamGameServerUGC",
+        "SteamGameServerUtils",
+        "SteamGameServer_Init",
+        "SteamGameServer_RunCallbacks",
+        "SteamGameServer_Shutdown",
+        "SteamMatchmaking",
+        "SteamMatchmakingServers",
+        "SteamNetworking",
+        "SteamUGC",
+        "SteamUser",
+        "SteamUserStats",
+        "SteamUtils",
+    )
+    for import_name in retail_imports:
+        assert f"STEAM_API.DLL!{import_name} @" in imports_txt
+
+    assert aliases["sub_460540"] == "SteamAPI_Shutdown"
+    assert "SteamAPI_Shutdown,00460540,6,1,unknown" in functions_csv
+
+    for retail_anchor in (
+        "00460540    int32_t SteamAPI_Shutdown()",
+        "00460540  return SteamAPI_Shutdown() __tailcall",
+        "00460e25      SteamAPI_UnregisterCallResult(eax_8, ecx_4, edx_5)",
+        "00460e4e  return SteamAPI_RegisterCallResult(eax_8, eax_7, result)",
+        "004613f5  SteamAPI_RegisterCallback(&arg1[8], 0x151)",
+        "0046151b      uint32_t eax_1 = zx.d(SteamAPI_Init())",
+        "00461d63      SteamAPI_RunCallbacks()",
+        "00465d39      SteamGameServer_Shutdown()",
+        "00466873      SteamGameServer_RunCallbacks()",
+        "00466fc1          uint32_t eax_10 = zx.d(SteamGameServer_Init(",
+    ):
+        assert retail_anchor in hlil_part02
+
+    for macro in (
+        '#define QL_STEAMWORKS_EXPORT_STEAM_API_INIT "SteamAPI_Init"',
+        '#define QL_STEAMWORKS_EXPORT_STEAM_API_SHUTDOWN "SteamAPI_Shutdown"',
+        '#define QL_STEAMWORKS_EXPORT_STEAM_API_RUN_CALLBACKS "SteamAPI_RunCallbacks"',
+        '#define QL_STEAMWORKS_EXPORT_STEAM_API_REGISTER_CALLBACK "SteamAPI_RegisterCallback"',
+        '#define QL_STEAMWORKS_EXPORT_STEAM_API_UNREGISTER_CALLBACK "SteamAPI_UnregisterCallback"',
+        '#define QL_STEAMWORKS_EXPORT_STEAM_API_REGISTER_CALL_RESULT "SteamAPI_RegisterCallResult"',
+        '#define QL_STEAMWORKS_EXPORT_STEAM_API_UNREGISTER_CALL_RESULT "SteamAPI_UnregisterCallResult"',
+        '#define QL_STEAMWORKS_EXPORT_STEAM_USER "SteamUser"',
+        '#define QL_STEAMWORKS_EXPORT_STEAM_API_STEAM_USER "SteamAPI_SteamUser"',
+        '#define QL_STEAMWORKS_EXPORT_STEAM_FRIENDS "SteamFriends"',
+        '#define QL_STEAMWORKS_EXPORT_STEAM_API_STEAM_FRIENDS "SteamAPI_SteamFriends"',
+        '#define QL_STEAMWORKS_EXPORT_STEAM_MATCHMAKING "SteamMatchmaking"',
+        '#define QL_STEAMWORKS_EXPORT_STEAM_API_STEAM_MATCHMAKING "SteamAPI_SteamMatchmaking"',
+        '#define QL_STEAMWORKS_EXPORT_STEAM_APPS "SteamApps"',
+        '#define QL_STEAMWORKS_EXPORT_STEAM_API_STEAM_APPS "SteamAPI_SteamApps"',
+        '#define QL_STEAMWORKS_EXPORT_STEAM_UGC "SteamUGC"',
+        '#define QL_STEAMWORKS_EXPORT_STEAM_API_STEAM_UGC "SteamAPI_SteamUGC"',
+        '#define QL_STEAMWORKS_EXPORT_STEAM_API_ISTEAMUSER_GET_AUTH_SESSION_TICKET "SteamAPI_ISteamUser_GetAuthSessionTicket"',
+        '#define QL_STEAMWORKS_EXPORT_STEAM_API_ISTEAMUSER_BEGIN_AUTH_SESSION "SteamAPI_ISteamUser_BeginAuthSession"',
+        '#define QL_STEAMWORKS_EXPORT_STEAM_API_ISTEAMUSER_END_AUTH_SESSION "SteamAPI_ISteamUser_EndAuthSession"',
+        '#define QL_STEAMWORKS_EXPORT_STEAM_GAME_SERVER "SteamGameServer"',
+        '#define QL_STEAMWORKS_EXPORT_STEAM_GAME_SERVER_INIT "SteamGameServer_Init"',
+        '#define QL_STEAMWORKS_EXPORT_STEAM_GAME_SERVER_RUN_CALLBACKS "SteamGameServer_RunCallbacks"',
+    ):
+        assert macro in steamworks
+
+    load_block = _extract_function_block(steamworks, "qboolean QL_Steamworks_LoadLibrary( void ) {")
+    load_alias_block = _extract_function_block(
+        steamworks,
+        "static qboolean QL_Steamworks_LoadSymbolAlias( void **target, const char *retailName, const char *sdkName ) {",
+    )
+    load_optional_alias_block = _extract_function_block(
+        steamworks,
+        "static void QL_Steamworks_LoadOptionalSymbolAlias( void **target, const char *retailName, const char *sdkName ) {",
+    )
+
+    for required_call in (
+        "QL_Steamworks_LoadSymbol( (void **)&state.SteamAPI_Init, QL_STEAMWORKS_EXPORT_STEAM_API_INIT )",
+        "QL_Steamworks_LoadSymbol( (void **)&state.SteamAPI_Shutdown, QL_STEAMWORKS_EXPORT_STEAM_API_SHUTDOWN )",
+        "QL_Steamworks_LoadSymbol( (void **)&state.SteamAPI_RunCallbacks, QL_STEAMWORKS_EXPORT_STEAM_API_RUN_CALLBACKS )",
+        "QL_Steamworks_LoadSymbolAlias( (void **)&state.SteamUser, QL_STEAMWORKS_EXPORT_STEAM_USER, QL_STEAMWORKS_EXPORT_STEAM_API_STEAM_USER )",
+        "QL_Steamworks_LoadSymbolAlias( (void **)&state.SteamFriends, QL_STEAMWORKS_EXPORT_STEAM_FRIENDS, QL_STEAMWORKS_EXPORT_STEAM_API_STEAM_FRIENDS )",
+        "QL_Steamworks_LoadSymbolAlias( (void **)&state.SteamApps, QL_STEAMWORKS_EXPORT_STEAM_APPS, QL_STEAMWORKS_EXPORT_STEAM_API_STEAM_APPS )",
+        "QL_Steamworks_LoadSymbolAlias( (void **)&state.SteamUGC, QL_STEAMWORKS_EXPORT_STEAM_UGC, QL_STEAMWORKS_EXPORT_STEAM_API_STEAM_UGC )",
+        "QL_Steamworks_LoadSymbol( (void **)&state.GetAuthSessionTicket, QL_STEAMWORKS_EXPORT_STEAM_API_ISTEAMUSER_GET_AUTH_SESSION_TICKET )",
+        "QL_Steamworks_LoadSymbol( (void **)&state.BeginAuthSession, QL_STEAMWORKS_EXPORT_STEAM_API_ISTEAMUSER_BEGIN_AUTH_SESSION )",
+        "QL_Steamworks_LoadSymbol( (void **)&state.EndAuthSession, QL_STEAMWORKS_EXPORT_STEAM_API_ISTEAMUSER_END_AUTH_SESSION )",
+        "QL_Steamworks_LoadOptionalSymbol( (void **)&state.SteamGameServer_Init, QL_STEAMWORKS_EXPORT_STEAM_GAME_SERVER_INIT );",
+        "QL_Steamworks_LoadOptionalSymbol( (void **)&state.SteamGameServer_RunCallbacks, QL_STEAMWORKS_EXPORT_STEAM_GAME_SERVER_RUN_CALLBACKS );",
+    ):
+        assert required_call in load_block
+
+    for raw_loader_call in (
+        'QL_Steamworks_LoadSymbol( (void **)&state.SteamAPI_Init, "SteamAPI_Init" )',
+        'QL_Steamworks_LoadSymbolAlias( (void **)&state.SteamUser, "SteamUser", "SteamAPI_SteamUser" )',
+        'QL_Steamworks_LoadOptionalSymbol( (void **)&state.SteamGameServer_Init, "SteamGameServer_Init" );',
+    ):
+        assert raw_loader_call not in load_block
+
+    assert load_block.index("QL_Steamworks_LoadSymbol( (void **)&state.SteamAPI_Init, QL_STEAMWORKS_EXPORT_STEAM_API_INIT )") < load_block.index(
+        "QL_Steamworks_LoadOptionalSymbol( (void **)&state.SteamAPI_RegisterCallback, QL_STEAMWORKS_EXPORT_STEAM_API_REGISTER_CALLBACK );"
+    )
+    assert load_block.index("QL_Steamworks_LoadSymbolAlias( (void **)&state.SteamApps, QL_STEAMWORKS_EXPORT_STEAM_APPS, QL_STEAMWORKS_EXPORT_STEAM_API_STEAM_APPS )") < load_block.index(
+        "QL_Steamworks_LoadSymbol( (void **)&state.GetAuthSessionTicket, QL_STEAMWORKS_EXPORT_STEAM_API_ISTEAMUSER_GET_AUTH_SESSION_TICKET )"
+    )
+    assert load_block.index("QL_Steamworks_LoadSymbol( (void **)&state.GetSteamID, QL_STEAMWORKS_EXPORT_STEAM_API_ISTEAMUSER_GET_STEAM_ID )") < load_block.index(
+        "QL_Steamworks_LoadOptionalSymbol( (void **)&state.SteamGameServer, QL_STEAMWORKS_EXPORT_STEAM_GAME_SERVER );"
+    )
+    assert "QL_Steamworks_LoadSymbol( target, retailName )" in load_alias_block
+    assert "QL_Steamworks_LoadSymbol( target, sdkName )" in load_alias_block
+    assert load_alias_block.index("QL_Steamworks_LoadSymbol( target, retailName )") < load_alias_block.index(
+        "QL_Steamworks_LoadSymbol( target, sdkName )"
+    )
+    assert "QL_Steamworks_LoadSymbol( target, retailName )" in load_optional_alias_block
+    assert "QL_Steamworks_LoadOptionalSymbol( target, sdkName );" in load_optional_alias_block
+    assert "SteamAPI_RestartAppIfNecessary" not in steamworks
+
+    for doc_anchor in (
+        "# Quake Live Steam Mapping Round 701: Steamworks Runtime Export Boundary Constants",
+        "`SteamAPI_Init`",
+        "`SteamGameServer_Init`",
+        "`SteamAPI_SteamUser`",
+        "Focused parity estimate: **before 88% -> after 99%**",
+        "Overall Steam launch/runtime integration mapping confidence moves from **93.84% -> 93.86%**",
+        "does not enable live Steam behavior by default",
+    ):
+        assert doc_anchor in mapping_round
+
+    assert "Task A603: Pin Steamworks runtime export boundary constants [COMPLETED]" in implementation_plan
+    assert "Steamworks runtime export-boundary source-shape confidence" in implementation_plan
+
+
+def test_steam_callback_payload_size_constants_round_702_is_pinned() -> None:
+    aliases = json.loads(
+        (REPO_ROOT / "references/analysis/quakelive_symbol_aliases.json").read_text(encoding="utf-8")
+    )["quakelive_steam_srp"]
+    functions_csv = (
+        REPO_ROOT / "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+    ).read_text(encoding="utf-8")
+    hlil_part02 = (
+        REPO_ROOT
+        / "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part02.txt"
+    ).read_text(encoding="utf-8")
+    hlil_part06 = (
+        REPO_ROOT
+        / "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part06.txt"
+    ).read_text(encoding="utf-8")
+    steamworks = (REPO_ROOT / "src/common/platform/platform_steamworks.c").read_text(encoding="utf-8")
+    mapping_round = (
+        REPO_ROOT / "docs/reverse-engineering/quakelive_steam_mapping_round_702.md"
+    ).read_text(encoding="utf-8")
+    implementation_plan = (REPO_ROOT / "IMPLEMENTATION_PLAN.md").read_text(encoding="utf-8")
+
+    register_webapi_block = _extract_function_block(steamworks, "static qboolean QL_Steamworks_RegisterWebApiAuthTicketCallback( void )")
+    register_client_block = _extract_function_block(
+        steamworks, "qboolean QL_Steamworks_RegisterClientCallbacks( const ql_steam_client_callback_bindings_t *bindings )"
+    )
+    register_avatar_block = _extract_function_block(
+        steamworks, "qboolean QL_Steamworks_RegisterAvatarCallbacks( const ql_steam_avatar_callback_bindings_t *bindings )"
+    )
+    register_server_block = _extract_function_block(
+        steamworks, "qboolean QL_Steamworks_RegisterServerCallbacks( const ql_steam_server_callback_bindings_t *bindings )"
+    )
+    register_lobby_block = _extract_function_block(
+        steamworks, "qboolean QL_Steamworks_RegisterLobbyCallbacks( const ql_steam_lobby_callback_bindings_t *bindings )"
+    )
+    register_micro_block = _extract_function_block(
+        steamworks, "qboolean QL_Steamworks_RegisterMicroCallbacks( const ql_steam_micro_callback_bindings_t *bindings )"
+    )
+    register_workshop_block = _extract_function_block(
+        steamworks, "qboolean QL_Steamworks_RegisterWorkshopCallbacks( const ql_steam_workshop_callback_bindings_t *bindings )"
+    )
+
+    expected_aliases = {
+        "FUN_00461050": "SteamCallback_RunCallResult",
+        "sub_461050": "SteamCallback_RunCallResult",
+        "FUN_00461060": "SteamCallback_GetPayloadSize264",
+        "sub_461060": "SteamCallback_GetPayloadSize264",
+        "FUN_00461070": "SteamCallback_GetPayloadSize16",
+        "sub_461070": "SteamCallback_GetPayloadSize16",
+        "FUN_00461080": "SteamCallback_GetPayloadSize8",
+        "sub_461080": "SteamCallback_GetPayloadSize8",
+        "FUN_00461090": "SteamCallback_GetPayloadSize128",
+        "sub_461090": "SteamCallback_GetPayloadSize128",
+        "FUN_00463600": "SteamCallback_GetPayloadSize20",
+        "sub_463600": "SteamCallback_GetPayloadSize20",
+        "FUN_00465680": "SteamCallback_GetPayloadSize24",
+        "sub_465680": "SteamCallback_GetPayloadSize24",
+        "FUN_00465690": "SteamCallback_GetPayloadSize32",
+        "sub_465690": "SteamCallback_GetPayloadSize32",
+        "FUN_00465ea0": "SteamCallback_GetPayloadSize4",
+        "sub_465EA0": "SteamCallback_GetPayloadSize4",
+        "sub_465ea0": "SteamCallback_GetPayloadSize4",
+        "FUN_00467450": "SteamCallback_GetPayloadSize1",
+        "sub_467450": "SteamCallback_GetPayloadSize1",
+        "FUN_00467480": "SteamCallback_GetPayloadSize12",
+        "sub_467480": "SteamCallback_GetPayloadSize12",
+        "FUN_00469310": "SteamCallback_Run",
+        "sub_469310": "SteamCallback_Run",
+    }
+    for retail_name, source_name in expected_aliases.items():
+        assert aliases[retail_name] == source_name
+
+    for function_row in (
+        "FUN_00461050,00461050,14,0,unknown",
+        "FUN_00461060,00461060,6,0,unknown",
+        "FUN_00461070,00461070,6,0,unknown",
+        "FUN_00461080,00461080,6,0,unknown",
+        "FUN_00461090,00461090,6,0,unknown",
+        "FUN_00463600,00463600,6,0,unknown",
+        "FUN_00465680,00465680,6,0,unknown",
+        "FUN_00465690,00465690,6,0,unknown",
+        "FUN_00465ea0,00465ea0,6,0,unknown",
+        "FUN_00467450,00467450,6,0,unknown",
+        "FUN_00467480,00467480,6,0,unknown",
+        "FUN_00469310,00469310,21,0,unknown",
+    ):
+        assert function_row in functions_csv
+
+    for hlil_anchor in (
+        "00461050    int32_t __fastcall sub_461050(void* arg1)",
+        "0046105c  jump(*(arg1 + 0x10))",
+        "00461060    int32_t sub_461060() __pure",
+        "00461065  return 0x108",
+        "00461070    int32_t sub_461070() __pure",
+        "00461075  return 0x10",
+        "00461080    int32_t sub_461080() __pure",
+        "00461085  return 8",
+        "00461090    int32_t sub_461090() __pure",
+        "00461095  return 0x80",
+        "00463600    int32_t sub_463600() __pure",
+        "00463605  return 0x14",
+        "00465680    int32_t sub_465680() __pure",
+        "00465685  return 0x18",
+        "00465690    int32_t sub_465690() __pure",
+        "00465695  return 0x20",
+        "00465ea0    int32_t sub_465ea0() __pure",
+        "00465ea5  return 4",
+        "00467450    int32_t sub_467450() __pure",
+        "00467455  return 1",
+        "00467480    int32_t sub_467480() __pure",
+        "00467485  return 0xc",
+        "00469310    int32_t __thiscall sub_469310(void* arg1, int32_t arg2)",
+        "00469322  return (*(arg1 + 0x10))(arg2)",
+    ):
+        assert hlil_anchor in hlil_part02
+
+    for vtable_anchor in (
+        "005327c8      int32_t (* const vFunc_2)() __pure = sub_465680",
+        "00532844      int32_t (* const vFunc_2)() = sub_461060",
+        "00532854      int32_t (* const vFunc_2)() __pure = sub_465680",
+        "00532864      int32_t (* const vFunc_2)() = sub_461070",
+        "00532874      int32_t (* const vFunc_2)() = sub_461080",
+        "00532884      int32_t (* const vFunc_2)() = sub_461090",
+        "00532894      int32_t (* const vFunc_2)() __pure = sub_467480",
+        "00532b70      int32_t (* const vFunc_2)() __pure = sub_463600",
+        "00532e7c      int32_t (* const vFunc_2)() = sub_461070",
+        "00532e8c      int32_t (* const vFunc_2)() __pure = sub_465680",
+        "00532e9c      int32_t (* const vFunc_2)() __pure = sub_465690",
+        "00532eac      int32_t (* const vFunc_2)() __pure = sub_465680",
+        "00532ebc      int32_t (* const vFunc_2)() __pure = sub_465680",
+        "00532ecc      int32_t (* const vFunc_2)() __pure = sub_465680",
+        "00532edc      int32_t (* const vFunc_2)() __pure = sub_465680",
+        "00532eec      int32_t (* const vFunc_2)() = sub_461070",
+        "00532f24      int32_t (* const vFunc_2)() __pure = sub_465680",
+        "005332f4      int32_t (* const vFunc_2)() __pure = sub_467450",
+        "00533304      int32_t (* const vFunc_2)() = sub_465ea0",
+        "00533314      int32_t (* const vFunc_2)() = sub_465ea0",
+        "00533324      int32_t (* const vFunc_2)() __pure = sub_463600",
+        "00533334      int32_t (* const vFunc_2)() = sub_461080",
+        "005336c8      int32_t (* const vFunc_2)() __pure = sub_467450",
+        "005336d8      int32_t (* const vFunc_2)() __pure = sub_467480",
+        "005336e8      int32_t (* const vFunc_2)() __pure = sub_467480",
+        "00533864      int32_t (* const vFunc_2)() = sub_461070",
+        "00533874      int32_t (* const vFunc_2)() __pure = sub_465680",
+    ):
+        assert vtable_anchor in hlil_part06
+
+    size_macros = {
+        "QL_STEAM_CALLBACK_SIZE_GAME_RICH_PRESENCE_JOIN_REQUESTED": "0x108",
+        "QL_STEAM_CALLBACK_SIZE_USER_STATS_RECEIVED": "0x18",
+        "QL_STEAM_CALLBACK_SIZE_PERSONA_STATE_CHANGE": "0x10",
+        "QL_STEAM_CALLBACK_SIZE_P2P_SESSION_REQUEST": "0x08",
+        "QL_STEAM_CALLBACK_SIZE_GAME_SERVER_CHANGE_REQUESTED": "0x80",
+        "QL_STEAM_CALLBACK_SIZE_FRIEND_RICH_PRESENCE_UPDATE": "0x0c",
+        "QL_STEAM_CALLBACK_SIZE_AVATAR_IMAGE_LOADED": "0x14",
+        "QL_STEAM_CALLBACK_SIZE_UGC_QUERY_COMPLETED": "0x18",
+        "QL_STEAM_CALLBACK_SIZE_GET_TICKET_FOR_WEB_API_RESPONSE": "0xa0c",
+        "QL_STEAM_CALLBACK_SIZE_ITEM_INSTALLED": "0x10",
+        "QL_STEAM_CALLBACK_SIZE_DOWNLOAD_ITEM_RESULT": "0x18",
+        "QL_STEAM_CALLBACK_SIZE_LOBBY_CREATED": "0x10",
+        "QL_STEAM_CALLBACK_SIZE_LOBBY_ENTER": "0x18",
+        "QL_STEAM_CALLBACK_SIZE_LOBBY_CHAT_UPDATE": "0x20",
+        "QL_STEAM_CALLBACK_SIZE_LOBBY_CHAT_MESSAGE": "0x18",
+        "QL_STEAM_CALLBACK_SIZE_LOBBY_DATA_UPDATE": "0x18",
+        "QL_STEAM_CALLBACK_SIZE_LOBBY_GAME_CREATED": "0x18",
+        "QL_STEAM_CALLBACK_SIZE_LOBBY_KICKED": "0x18",
+        "QL_STEAM_CALLBACK_SIZE_GAME_LOBBY_JOIN_REQUESTED": "0x10",
+        "QL_STEAM_CALLBACK_SIZE_MICROTXN_AUTHORIZATION_RESPONSE": "0x18",
+        "QL_STEAM_CALLBACK_SIZE_SERVERS_CONNECTED": "0x01",
+        "QL_STEAM_CALLBACK_SIZE_SERVER_CONNECT_FAILURE": "0x04",
+        "QL_STEAM_CALLBACK_SIZE_SERVERS_DISCONNECTED": "0x04",
+        "QL_STEAM_CALLBACK_SIZE_VALIDATE_AUTH_TICKET_RESPONSE": "0x14",
+        "QL_STEAM_CALLBACK_SIZE_GS_STATS_RECEIVED": "0x0c",
+        "QL_STEAM_CALLBACK_SIZE_GS_STATS_STORED": "0x0c",
+    }
+    for macro, value in size_macros.items():
+        assert f"#define {macro} {value}" in steamworks
+
+    static_assert_pairs = (
+        ("ql_steam_size_game_rich_presence_join_requested_raw", "ql_steam_game_rich_presence_join_requested_raw_t", "QL_STEAM_CALLBACK_SIZE_GAME_RICH_PRESENCE_JOIN_REQUESTED"),
+        ("ql_steam_size_user_stats_received_raw", "ql_steam_user_stats_received_raw_t", "QL_STEAM_CALLBACK_SIZE_USER_STATS_RECEIVED"),
+        ("ql_steam_size_persona_state_change_raw", "ql_steam_persona_state_change_raw_t", "QL_STEAM_CALLBACK_SIZE_PERSONA_STATE_CHANGE"),
+        ("ql_steam_size_p2p_session_request_raw", "ql_steam_p2p_session_request_raw_t", "QL_STEAM_CALLBACK_SIZE_P2P_SESSION_REQUEST"),
+        ("ql_steam_size_game_server_change_requested_raw", "ql_steam_game_server_change_requested_raw_t", "QL_STEAM_CALLBACK_SIZE_GAME_SERVER_CHANGE_REQUESTED"),
+        ("ql_steam_size_friend_rich_presence_update_raw", "ql_steam_friend_rich_presence_update_raw_t", "QL_STEAM_CALLBACK_SIZE_FRIEND_RICH_PRESENCE_UPDATE"),
+        ("ql_steam_size_avatar_image_loaded_raw", "ql_steam_avatar_image_loaded_raw_t", "QL_STEAM_CALLBACK_SIZE_AVATAR_IMAGE_LOADED"),
+        ("ql_steam_size_ugc_query_completed_raw", "ql_steam_ugc_query_completed_raw_t", "QL_STEAM_CALLBACK_SIZE_UGC_QUERY_COMPLETED"),
+        ("ql_steam_size_get_ticket_for_web_api_response_raw", "ql_steam_get_ticket_for_web_api_response_raw_t", "QL_STEAM_CALLBACK_SIZE_GET_TICKET_FOR_WEB_API_RESPONSE"),
+        ("ql_steam_size_item_installed_raw", "ql_steam_item_installed_raw_t", "QL_STEAM_CALLBACK_SIZE_ITEM_INSTALLED"),
+        ("ql_steam_size_download_item_result_raw", "ql_steam_download_item_result_raw_t", "QL_STEAM_CALLBACK_SIZE_DOWNLOAD_ITEM_RESULT"),
+        ("ql_steam_size_lobby_created_raw", "ql_steam_lobby_created_raw_t", "QL_STEAM_CALLBACK_SIZE_LOBBY_CREATED"),
+        ("ql_steam_size_lobby_enter_raw", "ql_steam_lobby_enter_raw_t", "QL_STEAM_CALLBACK_SIZE_LOBBY_ENTER"),
+        ("ql_steam_size_lobby_chat_update_raw", "ql_steam_lobby_chat_update_raw_t", "QL_STEAM_CALLBACK_SIZE_LOBBY_CHAT_UPDATE"),
+        ("ql_steam_size_lobby_chat_message_raw", "ql_steam_lobby_chat_message_raw_t", "QL_STEAM_CALLBACK_SIZE_LOBBY_CHAT_MESSAGE"),
+        ("ql_steam_size_lobby_data_update_raw", "ql_steam_lobby_data_update_raw_t", "QL_STEAM_CALLBACK_SIZE_LOBBY_DATA_UPDATE"),
+        ("ql_steam_size_lobby_game_created_raw", "ql_steam_lobby_game_created_raw_t", "QL_STEAM_CALLBACK_SIZE_LOBBY_GAME_CREATED"),
+        ("ql_steam_size_lobby_kicked_raw", "ql_steam_lobby_kicked_raw_t", "QL_STEAM_CALLBACK_SIZE_LOBBY_KICKED"),
+        ("ql_steam_size_game_lobby_join_requested_raw", "ql_steam_game_lobby_join_requested_raw_t", "QL_STEAM_CALLBACK_SIZE_GAME_LOBBY_JOIN_REQUESTED"),
+        ("ql_steam_size_microtxn_authorization_response_raw", "ql_steam_microtxn_authorization_response_raw_t", "QL_STEAM_CALLBACK_SIZE_MICROTXN_AUTHORIZATION_RESPONSE"),
+        ("ql_steam_size_servers_connected_raw", "ql_steam_servers_connected_raw_t", "QL_STEAM_CALLBACK_SIZE_SERVERS_CONNECTED"),
+        ("ql_steam_size_server_connect_failure_raw", "ql_steam_server_connect_failure_raw_t", "QL_STEAM_CALLBACK_SIZE_SERVER_CONNECT_FAILURE"),
+        ("ql_steam_size_servers_disconnected_raw", "ql_steam_servers_disconnected_raw_t", "QL_STEAM_CALLBACK_SIZE_SERVERS_DISCONNECTED"),
+        ("ql_steam_size_validate_auth_ticket_response_raw", "ql_steam_validate_auth_ticket_response_raw_t", "QL_STEAM_CALLBACK_SIZE_VALIDATE_AUTH_TICKET_RESPONSE"),
+        ("ql_steam_size_gs_stats_received_raw", "ql_steam_gs_stats_received_raw_t", "QL_STEAM_CALLBACK_SIZE_GS_STATS_RECEIVED"),
+        ("ql_steam_size_gs_stats_stored_raw", "ql_steam_gs_stats_stored_raw_t", "QL_STEAM_CALLBACK_SIZE_GS_STATS_STORED"),
+    )
+    for assert_name, type_name, macro in static_assert_pairs:
+        assert f"QL_STEAMWORKS_STATIC_ASSERT_SIZE( {assert_name}, {type_name}, {macro} );" in steamworks
+
+    def assert_prepared(block: str, member_name: str, callback_id: str, size_macro: str) -> None:
+        assert re.search(
+            rf"QL_Steamworks_PrepareCallbackObject\(\s*&callbackState->{member_name},\s*{callback_id},\s*{size_macro},",
+            block,
+        )
+
+    for member_name, callback_id, size_macro in (
+        ("webApiTicketResponse", "QL_STEAM_CALLBACK_GET_TICKET_FOR_WEB_API_RESPONSE", "QL_STEAM_CALLBACK_SIZE_GET_TICKET_FOR_WEB_API_RESPONSE"),
+    ):
+        assert_prepared(register_webapi_block, member_name, callback_id, size_macro)
+
+    for member_name, callback_id, size_macro in (
+        ("richPresenceJoinRequested", "QL_STEAM_CALLBACK_RICH_PRESENCE_JOIN_REQUESTED", "QL_STEAM_CALLBACK_SIZE_GAME_RICH_PRESENCE_JOIN_REQUESTED"),
+        ("userStatsReceived", "QL_STEAM_CALLBACK_USER_STATS_RECEIVED", "QL_STEAM_CALLBACK_SIZE_USER_STATS_RECEIVED"),
+        ("personaStateChange", "QL_STEAM_CALLBACK_PERSONA_STATE_CHANGE", "QL_STEAM_CALLBACK_SIZE_PERSONA_STATE_CHANGE"),
+        ("p2pSessionRequest", "QL_STEAM_CALLBACK_P2P_SESSION_REQUEST", "QL_STEAM_CALLBACK_SIZE_P2P_SESSION_REQUEST"),
+        ("gameServerChangeRequested", "QL_STEAM_CALLBACK_GAME_SERVER_CHANGE_REQUESTED", "QL_STEAM_CALLBACK_SIZE_GAME_SERVER_CHANGE_REQUESTED"),
+        ("friendRichPresenceUpdate", "QL_STEAM_CALLBACK_FRIEND_RICH_PRESENCE_UPDATE", "QL_STEAM_CALLBACK_SIZE_FRIEND_RICH_PRESENCE_UPDATE"),
+        ("ugcQueryCompleted", "QL_STEAM_CALLBACK_UGC_QUERY_COMPLETED", "QL_STEAM_CALLBACK_SIZE_UGC_QUERY_COMPLETED"),
+    ):
+        assert_prepared(register_client_block, member_name, callback_id, size_macro)
+
+    assert_prepared(register_avatar_block, "avatarImageLoaded", "QL_STEAM_CALLBACK_AVATAR_IMAGE_LOADED", "QL_STEAM_CALLBACK_SIZE_AVATAR_IMAGE_LOADED")
+
+    for member_name, callback_id, size_macro in (
+        ("serversConnected", "QL_STEAM_CALLBACK_STEAM_SERVERS_CONNECTED", "QL_STEAM_CALLBACK_SIZE_SERVERS_CONNECTED"),
+        ("connectFailure", "QL_STEAM_CALLBACK_STEAM_SERVER_CONNECT_FAILURE", "QL_STEAM_CALLBACK_SIZE_SERVER_CONNECT_FAILURE"),
+        ("serversDisconnected", "QL_STEAM_CALLBACK_STEAM_SERVERS_DISCONNECTED", "QL_STEAM_CALLBACK_SIZE_SERVERS_DISCONNECTED"),
+        ("validateAuthTicketResponse", "QL_STEAM_CALLBACK_VALIDATE_AUTH_TICKET_RESPONSE", "QL_STEAM_CALLBACK_SIZE_VALIDATE_AUTH_TICKET_RESPONSE"),
+        ("p2pSessionRequest", "QL_STEAM_CALLBACK_P2P_SESSION_REQUEST", "QL_STEAM_CALLBACK_SIZE_P2P_SESSION_REQUEST"),
+        ("gsStatsReceived", "QL_STEAM_CALLBACK_GS_STATS_RECEIVED", "QL_STEAM_CALLBACK_SIZE_GS_STATS_RECEIVED"),
+        ("gsStatsStored", "QL_STEAM_CALLBACK_GS_STATS_STORED", "QL_STEAM_CALLBACK_SIZE_GS_STATS_STORED"),
+    ):
+        assert_prepared(register_server_block, member_name, callback_id, size_macro)
+
+    for member_name, callback_id, size_macro in (
+        ("lobbyCreated", "QL_STEAM_CALLBACK_LOBBY_CREATED", "QL_STEAM_CALLBACK_SIZE_LOBBY_CREATED"),
+        ("lobbyEnter", "QL_STEAM_CALLBACK_LOBBY_ENTER", "QL_STEAM_CALLBACK_SIZE_LOBBY_ENTER"),
+        ("lobbyChatUpdate", "QL_STEAM_CALLBACK_LOBBY_CHAT_UPDATE", "QL_STEAM_CALLBACK_SIZE_LOBBY_CHAT_UPDATE"),
+        ("lobbyChatMessage", "QL_STEAM_CALLBACK_LOBBY_CHAT_MESSAGE", "QL_STEAM_CALLBACK_SIZE_LOBBY_CHAT_MESSAGE"),
+        ("lobbyDataUpdate", "QL_STEAM_CALLBACK_LOBBY_DATA_UPDATE", "QL_STEAM_CALLBACK_SIZE_LOBBY_DATA_UPDATE"),
+        ("lobbyGameCreated", "QL_STEAM_CALLBACK_LOBBY_GAME_CREATED", "QL_STEAM_CALLBACK_SIZE_LOBBY_GAME_CREATED"),
+        ("lobbyKicked", "QL_STEAM_CALLBACK_LOBBY_KICKED", "QL_STEAM_CALLBACK_SIZE_LOBBY_KICKED"),
+        ("gameLobbyJoinRequested", "QL_STEAM_CALLBACK_GAME_LOBBY_JOIN_REQUESTED", "QL_STEAM_CALLBACK_SIZE_GAME_LOBBY_JOIN_REQUESTED"),
+    ):
+        assert_prepared(register_lobby_block, member_name, callback_id, size_macro)
+
+    assert_prepared(
+        register_micro_block,
+        "authorizationResponse",
+        "QL_STEAM_CALLBACK_MICROTXN_AUTHORIZATION_RESPONSE",
+        "QL_STEAM_CALLBACK_SIZE_MICROTXN_AUTHORIZATION_RESPONSE",
+    )
+
+    for member_name, callback_id, size_macro in (
+        ("itemInstalled", "QL_STEAM_CALLBACK_ITEM_INSTALLED", "QL_STEAM_CALLBACK_SIZE_ITEM_INSTALLED"),
+        ("downloadItemResult", "QL_STEAM_CALLBACK_DOWNLOAD_ITEM_RESULT", "QL_STEAM_CALLBACK_SIZE_DOWNLOAD_ITEM_RESULT"),
+    ):
+        assert_prepared(register_workshop_block, member_name, callback_id, size_macro)
+
+    for register_block in (
+        register_webapi_block,
+        register_client_block,
+        register_avatar_block,
+        register_server_block,
+        register_lobby_block,
+        register_micro_block,
+        register_workshop_block,
+    ):
+        assert "sizeof( ql_steam_" not in register_block
+
+    assert "QL_STEAMWORKS_STATIC_ASSERT_SIZE( ql_steam_size_game_rich_presence_join_requested_raw, ql_steam_game_rich_presence_join_requested_raw_t, 0x108 );" not in steamworks
+    assert "QL_STEAMWORKS_STATIC_ASSERT_SIZE( ql_steam_size_lobby_chat_update_raw, ql_steam_lobby_chat_update_raw_t, 0x20 );" not in steamworks
+
+    for doc_anchor in (
+        "# Quake Live Steam Mapping Round 702: Steam Callback Payload Size Constants",
+        "`SteamCallback_GetPayloadSize264`",
+        "`CCallback<class SteamCallbacks, struct GameRichPresenceJoinRequested_t, 0>`",
+        "`QL_STEAM_CALLBACK_SIZE_LOBBY_CHAT_UPDATE`",
+        "Focused parity estimate: **before 90% -> after 99%**",
+        "Overall Steam launch/runtime integration mapping confidence moves from **93.86% -> 93.88%**",
+        "does not enable live Steam behavior by default",
+    ):
+        assert doc_anchor in mapping_round
+
+    assert "Task A604: Pin Steam callback payload size constants [COMPLETED]" in implementation_plan
+    assert "Steam callback payload-size source-shape confidence" in implementation_plan
+
+
+def test_steam_ugc_details_layout_constants_round_703_is_pinned() -> None:
+    aliases = json.loads(
+        (REPO_ROOT / "references/analysis/quakelive_symbol_aliases.json").read_text(encoding="utf-8")
+    )["quakelive_steam_srp"]
+    functions_csv = (
+        REPO_ROOT / "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+    ).read_text(encoding="utf-8")
+    imports_txt = (
+        REPO_ROOT / "references/reverse-engineering/ghidra/quakelive_steam/imports.txt"
+    ).read_text(encoding="utf-8")
+    analysis_symbols = (
+        REPO_ROOT / "references/reverse-engineering/ghidra/quakelive_steam/analysis_symbols.txt"
+    ).read_text(encoding="utf-8")
+    hlil_part02 = (
+        REPO_ROOT
+        / "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part02.txt"
+    ).read_text(encoding="utf-8")
+    hlil_part06 = (
+        REPO_ROOT
+        / "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part06.txt"
+    ).read_text(encoding="utf-8")
+    steamworks = (REPO_ROOT / "src/common/platform/platform_steamworks.c").read_text(encoding="utf-8")
+    cl_main = (REPO_ROOT / "src/code/client/cl_main.c").read_text(encoding="utf-8")
+    harness_c = (REPO_ROOT / "tests/steamworks_harness.c").read_text(encoding="utf-8")
+    mapping_round = (
+        REPO_ROOT / "docs/reverse-engineering/quakelive_steam_mapping_round_703.md"
+    ).read_text(encoding="utf-8")
+    implementation_plan = (REPO_ROOT / "IMPLEMENTATION_PLAN.md").read_text(encoding="utf-8")
+
+    request_query_block = _extract_function_block(
+        steamworks, "qboolean QL_Steamworks_RequestAllUGCQuery( uint32_t filter )"
+    )
+    result_query_block = _extract_function_block(
+        steamworks,
+        "qboolean QL_Steamworks_GetQueryUGCResult( uint64_t queryHandle, uint32_t index, uint64_t *outPublishedFileId, char *title, size_t titleSize, char *description, size_t descriptionSize )",
+    )
+    preview_query_block = _extract_function_block(
+        steamworks,
+        "qboolean QL_Steamworks_GetQueryUGCPreviewURL( uint64_t queryHandle, uint32_t index, char *buffer, size_t bufferSize )",
+    )
+    build_results_block = _extract_function_block(
+        cl_main, "static void CL_Steam_BuildUGCQueryResultsJson( uint64_t queryHandle, uint32_t numResultsReturned, char *buffer, size_t bufferSize )"
+    )
+    harness_result_block = _extract_function_block(
+        harness_c,
+        "static qboolean QLR_FASTCALL QLR_SteamUGC_GetQueryUGCResult( void *self, void *unused, uint32_t queryLow, uint32_t queryHigh, uint32_t index, void *details )",
+    )
+
+    expected_aliases = {
+        "FUN_0045fd00": "SteamCallbacks_OnGetAllUGCQueryCompleted",
+        "sub_45FD00": "SteamCallbacks_OnGetAllUGCQueryCompleted",
+        "sub_45fd00": "SteamCallbacks_OnGetAllUGCQueryCompleted",
+        "FUN_004606b0": "SteamCallbacks_RunUGCQueryCompleted",
+        "sub_4606b0": "SteamCallbacks_RunUGCQueryCompleted",
+        "FUN_004606d0": "SteamCallbacks_RunUGCQueryCompletedCallResult",
+        "sub_4606d0": "SteamCallbacks_RunUGCQueryCompletedCallResult",
+        "FUN_00460dc0": "SteamWorkshop_GetAllUGC",
+        "sub_460dc0": "SteamWorkshop_GetAllUGC",
+    }
+    for retail_name, source_name in expected_aliases.items():
+        assert aliases[retail_name] == source_name
+
+    for function_row in (
+        "FUN_0045fd00,0045fd00,484,0,unknown",
+        "FUN_004606b0,004606b0,30,0,unknown",
+        "FUN_004606d0,004606d0,49,0,unknown",
+        "FUN_00460dc0,00460dc0,158,0,unknown",
+    ):
+        assert function_row in functions_csv
+
+    for import_row in (
+        "STEAM_API.DLL!SteamUGC @ 001591ae",
+        "STEAM_API.DLL!SteamUtils @ 0015914c",
+        "STEAM_API.DLL!SteamAPI_RegisterCallResult @ 001591ec",
+        "STEAM_API.DLL!SteamAPI_UnregisterCallResult @ 0015920a",
+    ):
+        assert import_row in imports_txt
+
+    for symbol in (
+        "005327c0 IMPORTED CCallResult<class_SteamCallbacks,struct_SteamUGCQueryCompleted_t>::vftable",
+        "00551c34 IMPORTED CCallResult<class_SteamCallbacks,struct_SteamUGCQueryCompleted_t>::RTTI_Complete_Object_Locator",
+    ):
+        assert symbol in analysis_symbols
+
+    for hlil_anchor in (
+        "0045fd00    int32_t __stdcall sub_45fd00(int32_t* arg1, char arg2)",
+        "0045fd7e      if (arg1[3] u> 0)",
+        "0045fd88              int32_t edx_4 = *(*SteamUGC(eax_2) + 0x10)",
+        "0045fda0              int32_t var_2a44",
+        "0045fda0              if (edx_4(*arg1, arg1[1], i, &var_2a44) != 0)",
+        "0045fdaa                  int32_t edx_6 = *(*SteamUGC() + 0x14)",
+        "0045fdc3                  void var_414",
+        "0045fdc3                  edx_6(*arg1, arg1[1], i, &var_414, 0x400)",
+        "0045fdef                  void var_2a2c",
+        '0045fdef                  sub_429440(sub_42a110(&var_2a54, "title"), &var_2a2c)',
+        "0045fe0d                  void var_29ab",
+        '0045fe0d                  sub_429440(sub_42a110(&var_2a54, "description"), &var_29ab)',
+        "0045fe1e                  int32_t var_2a40",
+        '0045fe25                  int32_t eax_10 = sub_4d9220("%llu")',
+        "0045fe40                  sub_429440(sub_42a110(&var_2a54, \"id\"), eax_10)",
+        "0045fe5e                  sub_429440(sub_42a110(&var_2a54, \"image\"), &var_414)",
+        "0045feb2      (*(*eax_13 + 0x34))(*arg1, arg1[1])",
+        "00460dc0    int32_t sub_460dc0(int32_t arg1)",
+        "00460dd6  int32_t eax_2 = (*(*SteamUtils() + 0x24))()",
+        "00460df3  eax_4, edx_3 = (*(*SteamUGC() + 4))(1, 0, eax_2, eax_2, arg1)",
+        "00460e04  eax_7, result = (*(*SteamUGC() + 0xc))(eax_4, edx_3)",
+    ):
+        assert hlil_anchor in hlil_part02
+
+    for hlil_anchor in (
+        '0052c808  char const data_52c808[0xa] = "GetAllUGC", 0',
+        '005326b4  char const data_5326b4[0x10] = "web.ugc.results", 0',
+        '005326cc  char const data_5326cc[0xf] = "web.ugc.failed", 0',
+        "005327c0  struct CCallbackBase::CCallResult<class SteamCallbacks, struct SteamUGCQueryCompleted_t>::VTable CCallResult<class SteamCallbacks, struct SteamUGCQueryCompleted_t>::`vftable'{for `CCallbackBase'} = ",
+        "005327c8      int32_t (* const vFunc_2)() __pure = sub_465680",
+    ):
+        assert hlil_anchor in hlil_part06
+
+    for source_anchor in (
+        "#define QL_STEAM_UGC_DETAILS_BUFFER_SIZE 12288",
+        "#define QL_STEAM_UGC_DETAILS_PUBLISHED_FILE_ID_OFFSET 0x00",
+        "#define QL_STEAM_UGC_DETAILS_PUBLISHED_FILE_ID_SIZE 0x08",
+        "#define QL_STEAM_UGC_DETAILS_TITLE_OFFSET 0x18",
+        "#define QL_STEAM_UGC_DETAILS_DESCRIPTION_OFFSET 0x99",
+        "#define QL_STEAM_UGC_GET_ALL_QUERY_TYPE 1",
+        "#define QL_STEAM_UGC_GET_ALL_MATCHING_TYPE 0",
+    ):
+        assert source_anchor in steamworks
+
+    request_order = (
+        "appId = QL_Steamworks_GetAppID();",
+        "ugc = QL_Steamworks_GetUGCInterface();",
+        "createQueryFn = (QL_SteamUGC_CreateQueryAllUGCRequestFn)vtable[QL_STEAM_UGC_CREATE_QUERY_ALL_UGC_REQUEST_SLOT];",
+        "sendQueryFn = (QL_SteamUGC_SendQueryUGCRequestFn)vtable[QL_STEAM_UGC_SEND_QUERY_UGC_REQUEST_SLOT];",
+        "queryHandle = createQueryFn( ugc, NULL, QL_STEAM_UGC_GET_ALL_QUERY_TYPE, QL_STEAM_UGC_GET_ALL_MATCHING_TYPE, appId, appId, filter );",
+        "callHandle = sendQueryFn( ugc, NULL, queryHandleLow, queryHandleHigh );",
+    )
+    last_index = -1
+    for anchor in request_order:
+        index = request_query_block.find(anchor, last_index + 1)
+        assert index > last_index
+        last_index = index
+    assert "createQueryFn( ugc, NULL, 1, 0" not in request_query_block
+
+    assert "unsigned char details[QL_STEAM_UGC_DETAILS_BUFFER_SIZE];" in result_query_block
+    assert "memset( details, 0, sizeof( details ) );" in result_query_block
+    assert "fn( ugc, NULL, queryHandleLow, queryHandleHigh, index, details )" in result_query_block
+    assert "memcpy( outPublishedFileId, details + QL_STEAM_UGC_DETAILS_PUBLISHED_FILE_ID_OFFSET, QL_STEAM_UGC_DETAILS_PUBLISHED_FILE_ID_SIZE );" in result_query_block
+    assert "QL_Steamworks_CopySteamString( title, titleSize, (const char *)( details + QL_STEAM_UGC_DETAILS_TITLE_OFFSET ) );" in result_query_block
+    assert "QL_Steamworks_CopySteamString( description, descriptionSize, (const char *)( details + QL_STEAM_UGC_DETAILS_DESCRIPTION_OFFSET ) );" in result_query_block
+    assert "memcpy( outPublishedFileId, details, sizeof( *outPublishedFileId ) );" not in result_query_block
+
+    assert "#define CL_STEAM_UGC_TITLE_LENGTH 256" in cl_main
+    assert "#define CL_STEAM_UGC_DESCRIPTION_LENGTH 8192" in cl_main
+    assert "#define CL_STEAM_UGC_PREVIEW_URL_LENGTH 1024" in cl_main
+    assert "char image[CL_STEAM_UGC_PREVIEW_URL_LENGTH];" in build_results_block
+    assert "QL_Steamworks_GetQueryUGCPreviewURL( queryHandle, i, image, sizeof( image ) );" in build_results_block
+    assert "fn( ugc, NULL, queryHandleLow, queryHandleHigh, index, buffer, (uint32_t)bufferSize )" in preview_query_block
+
+    for harness_anchor in (
+        "#define QLR_STEAM_UGC_DETAILS_PUBLISHED_FILE_ID_OFFSET 0x00",
+        "#define QLR_STEAM_UGC_DETAILS_PUBLISHED_FILE_ID_SIZE 0x08",
+        "#define QLR_STEAM_UGC_DETAILS_TITLE_OFFSET 0x18",
+        "#define QLR_STEAM_UGC_DETAILS_DESCRIPTION_OFFSET 0x99",
+        "memcpy( (char *)details + QLR_STEAM_UGC_DETAILS_PUBLISHED_FILE_ID_OFFSET, &qlr_mock_state.ugc_result_published_file_id, QLR_STEAM_UGC_DETAILS_PUBLISHED_FILE_ID_SIZE );",
+        "Q_strncpyz( (char *)details + QLR_STEAM_UGC_DETAILS_TITLE_OFFSET, qlr_mock_state.ugc_result_title, QLR_STEAM_UGC_DETAILS_DESCRIPTION_OFFSET - QLR_STEAM_UGC_DETAILS_TITLE_OFFSET );",
+        "Q_strncpyz( (char *)details + QLR_STEAM_UGC_DETAILS_DESCRIPTION_OFFSET, qlr_mock_state.ugc_result_description, sizeof( qlr_mock_state.ugc_result_description ) );",
+    ):
+        assert harness_anchor in harness_c
+        assert harness_anchor in harness_result_block or harness_anchor.startswith("#define ")
+
+    for doc_anchor in (
+        "# Quake Live Steam Mapping Round 703: UGC Details Layout Constants",
+        "`SteamCallbacks_OnGetAllUGCQueryCompleted`",
+        "`QL_STEAM_UGC_DETAILS_PUBLISHED_FILE_ID_OFFSET`",
+        "`QL_STEAM_UGC_GET_ALL_QUERY_TYPE`",
+        "Focused parity estimate: **before 92% -> after 99%**",
+        "Overall Steam launch/runtime integration mapping confidence moves from **93.88% -> 93.90%**",
+        "does not enable live Steam behavior by default",
+    ):
+        assert doc_anchor in mapping_round
+
+    assert "Task A605: Pin Steam UGC details layout constants [COMPLETED]" in implementation_plan
+    assert "Steam UGC detail-record source-shape confidence" in implementation_plan
+
+
+def test_steam_stats_descriptor_count_constants_round_704_is_pinned() -> None:
+    aliases = json.loads(
+        (REPO_ROOT / "references/analysis/quakelive_symbol_aliases.json").read_text(encoding="utf-8")
+    )["quakelive_steam_srp"]
+    functions_csv = (
+        REPO_ROOT / "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+    ).read_text(encoding="utf-8")
+    imports_txt = (
+        REPO_ROOT / "references/reverse-engineering/ghidra/quakelive_steam/imports.txt"
+    ).read_text(encoding="utf-8")
+    analysis_symbols = (
+        REPO_ROOT / "references/reverse-engineering/ghidra/quakelive_steam/analysis_symbols.txt"
+    ).read_text(encoding="utf-8")
+    hlil_part02 = (
+        REPO_ROOT
+        / "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part02.txt"
+    ).read_text(encoding="utf-8")
+    hlil_part06 = (
+        REPO_ROOT
+        / "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part06.txt"
+    ).read_text(encoding="utf-8")
+    hlil_part07 = (
+        REPO_ROOT
+        / "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part07.txt"
+    ).read_text(encoding="utf-8")
+    cl_main = (REPO_ROOT / "src/code/client/cl_main.c").read_text(encoding="utf-8")
+    mapping_round = (
+        REPO_ROOT / "docs/reverse-engineering/quakelive_steam_mapping_round_704.md"
+    ).read_text(encoding="utf-8")
+    implementation_plan = (REPO_ROOT / "IMPLEMENTATION_PLAN.md").read_text(encoding="utf-8")
+
+    stats_json_block = _extract_function_block(
+        cl_main, "static void CL_Steam_AppendUserStatsJson( uint32_t idLow, uint32_t idHigh, int result, char *buffer, size_t bufferSize )"
+    )
+    achievement_json_block = _extract_function_block(
+        cl_main, "static void CL_Steam_AppendUserAchievementsJson( uint32_t idLow, uint32_t idHigh, int result, char *buffer, size_t bufferSize )"
+    )
+
+    bytes_by_addr: Dict[int, int] = {}
+    names_by_addr: Dict[int, str] = {}
+    for line in hlil_part07.splitlines():
+        line_match = re.match(r"^(0055[0-9a-f]{4})\s+(.+)$", line)
+        if not line_match:
+            continue
+
+        addr = int(line_match.group(1), 16)
+        rest = line_match.group(2)
+        name_match = re.search(r'char const \(\* data_[0-9a-f]+\)\[[^\]]+\] = data_[0-9a-f]+ \{"([^"]*)"\}', rest)
+        if name_match:
+            names_by_addr[addr] = name_match.group(1)
+            continue
+
+        for index, token in enumerate(re.findall(r"\b[0-9a-f]{2}\b", rest)):
+            bytes_by_addr[addr + index] = int(token, 16)
+
+    def read_word(addr: int) -> int:
+        return sum(bytes_by_addr[addr + index] << (8 * index) for index in range(4))
+
+    stat_table_base = 0x0055DA94
+    stat_table_count = 0x58
+    stat_row_stride = 0x1C
+    stat_rows = [
+        (names_by_addr[stat_table_base + index * stat_row_stride + 4], read_word(stat_table_base + index * stat_row_stride))
+        for index in range(stat_table_count)
+    ]
+    achievement_table_base = 0x0055E630
+    achievement_table_end = 0x0055E71C
+    achievement_names = [
+        names_by_addr[achievement_table_base + index * 4]
+        for index in range((achievement_table_end - achievement_table_base) // 4)
+    ]
+
+    assert aliases["FUN_0045ffd0"] == "SteamCallbacks_OnUserStatsReceived"
+    assert aliases["sub_45FFD0"] == "SteamCallbacks_OnUserStatsReceived"
+    assert aliases["sub_45ffd0"] == "SteamCallbacks_OnUserStatsReceived"
+    assert aliases["FUN_004613a0"] == "SteamCallbacks_Init"
+    assert "FUN_0045ffd0,0045ffd0,783,0,unknown" in functions_csv
+    assert "FUN_004613a0,004613a0,344,0,unknown" in functions_csv
+    for import_row in (
+        "STEAM_API.DLL!SteamAPI_RegisterCallback @ 00159248",
+        "STEAM_API.DLL!SteamAPI_UnregisterCallback @ 0015922a",
+        "STEAM_API.DLL!SteamFriends @ 0015915a",
+        "STEAM_API.DLL!SteamUserStats @ 0015919c",
+    ):
+        assert import_row in imports_txt
+    assert "0055e7e0 IMPORTED CCallback<class_SteamCallbacks,struct_UserStatsReceived_t,0>::RTTI_Type_Descriptor" in analysis_symbols
+
+    for hlil_anchor in (
+        "0045ffd0    int32_t sub_45ffd0()",
+        "00460065  if (data_55da8c s> 0)",
+        "0046006b      char const (** esi_1)[0x8] = &data_55da98",
+        "00460149          esi_1 = &esi_1[7]",
+        "00460152      while (i s< data_55da8c)",
+        "00460158  i_2 = &data_55e630",
+        "00460294  while (i_1 s< &class CCallbackBase `RTTI Type Descriptor')",
+        '004602b4  sub_4f3260(esi_2, edi, sub_4d9220("users.stats.%llu.received"), &var_30)',
+        "00461413  arg1[0x11] = sub_45ffd0",
+        "00461423  arg1[0x11] = sub_45ffd0",
+    ):
+        assert hlil_anchor in hlil_part02
+
+    for hlil_anchor in (
+        '00532220  char const data_532220[0xf] = "medal_accuracy", 0',
+        '005326f4  char const data_5326f4[0x1a] = "users.stats.%llu.received", 0',
+        '00533634  char const data_533634[0x2c] = "Received stats and achievements from Steam\\n", 0',
+    ):
+        assert hlil_anchor in hlil_part06
+
+    for hlil_anchor in (
+        "0055da8c  int32_t data_55da8c = 0x58",
+        '0055da98  char const (* data_55da98)[0x8] = data_52ca38 {"version"}',
+        '0055e358  char const (* data_55e358)[0xf] = data_532220 {"medal_accuracy"}',
+        '0055e41c  char const (* data_55e41c)[0xd] = data_5321d8 {"total_deaths"}',
+        '0055e630  char const (* data_55e630)[0xa] = data_531fec {"AW_MIDAIR"}',
+        '0055e718  char const (* data_55e718)[0x7] = data_531ca4 {"AW_MAX"}',
+        "0055e71c  struct class CCallbackBase `RTTI Type Descriptor' = ",
+    ):
+        assert hlil_anchor in hlil_part07
+
+    assert len(stat_rows) == 0x58
+    assert stat_rows[0] == ("version", 0)
+    assert stat_rows[80] == ("medal_accuracy", 0)
+    assert stat_rows[-1] == ("total_deaths", 0)
+    assert all(flag == 0 for _, flag in stat_rows)
+    assert len(achievement_names) == 0x3b
+    assert achievement_names[0] == "AW_MIDAIR"
+    assert achievement_names[-1] == "AW_MAX"
+
+    for source_anchor in (
+        "#define CL_STEAM_STATS_FIELD_COUNT 0x58",
+        "#define CL_STEAM_ACHIEVEMENT_COUNT 0x3b",
+        "static const clSteamStatDescriptor_t s_clSteamStatDescriptors[CL_STEAM_STATS_FIELD_COUNT] = {",
+        'static const char *s_clSteamAchievementNames[CL_STEAM_ACHIEVEMENT_COUNT] = {',
+        "CL_STEAM_STATIC_ASSERT_ARRAY_LEN( cl_steam_stats_field_count_matches_descriptor_table, s_clSteamStatDescriptors, CL_STEAM_STATS_FIELD_COUNT );",
+        "CL_STEAM_STATIC_ASSERT_ARRAY_LEN( cl_steam_achievement_count_matches_name_table, s_clSteamAchievementNames, CL_STEAM_ACHIEVEMENT_COUNT );",
+        "#undef CL_STEAM_STATIC_ASSERT_ARRAY_LEN",
+    ):
+        assert source_anchor in cl_main
+    assert "#define CL_STEAM_STATS_FIELD_COUNT 88" not in cl_main
+    assert "#define CL_STEAM_ACHIEVEMENT_COUNT 59" not in cl_main
+    assert "for ( i = 0; i < ARRAY_LEN( s_clSteamStatDescriptors ); ++i )" in stats_json_block
+    assert "for ( i = 0; i < ARRAY_LEN( s_clSteamAchievementNames ); ++i )" in achievement_json_block
+
+    for doc_anchor in (
+        "# Quake Live Steam Mapping Round 704: Stats Descriptor Count Guards",
+        "`SteamCallbacks_OnUserStatsReceived`",
+        "`data_55da8c = 0x58`",
+        "`0x0055E630..0x0055E71C`",
+        "`CL_STEAM_STATIC_ASSERT_ARRAY_LEN`",
+        "Focused parity estimate: **before 91% -> after 99%**",
+        "Overall Steam launch/runtime integration mapping confidence moves from **93.90% -> 93.92%**",
+        "does not enable live Steam behavior by default",
+    ):
+        assert doc_anchor in mapping_round
+
+    assert "Task A606: Pin Steam stats descriptor count guards [COMPLETED]" in implementation_plan
+    assert "Steam stats descriptor-count source-shape confidence" in implementation_plan
+
+
+def test_steam_server_browser_gameserveritem_layout_round_705_is_pinned() -> None:
+    aliases = json.loads(
+        (REPO_ROOT / "references/analysis/quakelive_symbol_aliases.json").read_text(encoding="utf-8")
+    )["quakelive_steam_srp"]
+    functions_csv = (
+        REPO_ROOT / "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+    ).read_text(encoding="utf-8")
+    imports_txt = (
+        REPO_ROOT / "references/reverse-engineering/ghidra/quakelive_steam/imports.txt"
+    ).read_text(encoding="utf-8")
+    hlil_part02 = (
+        REPO_ROOT
+        / "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part02.txt"
+    ).read_text(encoding="utf-8")
+    hlil_part06 = (
+        REPO_ROOT
+        / "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part06.txt"
+    ).read_text(encoding="utf-8")
+    steamworks = (REPO_ROOT / "src/common/platform/platform_steamworks.c").read_text(encoding="utf-8")
+    harness_c = (REPO_ROOT / "tests/steamworks_harness.c").read_text(encoding="utf-8")
+    mapping_round = (
+        REPO_ROOT / "docs/reverse-engineering/quakelive_steam_mapping_round_705.md"
+    ).read_text(encoding="utf-8")
+    implementation_plan = (REPO_ROOT / "IMPLEMENTATION_PLAN.md").read_text(encoding="utf-8")
+
+    copy_details_block = _extract_function_block(
+        steamworks,
+        "static void QL_Steamworks_CopyServerListDetails( ql_steam_server_item_t *outServer, const ql_steam_gameserveritem_raw_t *raw )",
+    )
+
+    expected_aliases = {
+        "FUN_00461f10": "SteamBrowser_FormatServerListFallbackName",
+        "sub_461F10": "SteamBrowser_FormatServerListFallbackName",
+        "sub_461f10": "SteamBrowser_FormatServerListFallbackName",
+        "FUN_00461fe0": "JSBrowserDetails_OnServerResponded",
+        "sub_461FE0": "JSBrowserDetails_OnServerResponded",
+        "sub_461fe0": "JSBrowserDetails_OnServerResponded",
+        "FUN_00462a50": "JSBrowser_OnServerResponded",
+        "sub_462A50": "JSBrowser_OnServerResponded",
+        "sub_462a50": "JSBrowser_OnServerResponded",
+    }
+    for symbol, alias in expected_aliases.items():
+        assert aliases[symbol] == alias
+
+    for row in (
+        "FUN_00461f10,00461f10,92,0,unknown",
+        "FUN_00461fe0,00461fe0,863,0,unknown",
+        "FUN_00462a50,00462a50,860,0,unknown",
+    ):
+        assert row in functions_csv
+
+    for imported_symbol in (
+        "STEAM_API.DLL!SteamMatchmakingServers @ 0015928c",
+        "STEAM_API.DLL!SteamUtils @ 0015914c",
+    ):
+        assert imported_symbol in imports_txt
+
+    for hlil_anchor in (
+        "00461f10    int32_t __fastcall sub_461f10(int16_t* arg1)",
+        '_snprintf((data_e30330 << 6) + 0xe30230, 0x40, "%u.%u.%u.%u:%i"',
+        "0046202c      if (*(arg2 + 0x90) == result)",
+        "0046203b          void* eax_5 = &arg2[0x56]",
+        "0046206e          void var_30",
+        "0046208a          sub_4296c0(sub_42a110(&var_20, \"numPlayers\"), &var_30)",
+        "004620c0          sub_4296c0(sub_42a110(&var_20, \"maxPlayers\"), &var_30)",
+        "00462116          sub_429440(sub_42a110(&var_20, \"map\"), &arg2[0x17])",
+        "00462141          sub_4296c0(sub_42a110(&var_20, \"botPlayers\"), &var_30)",
+        "0046215c          sub_4294a0(&var_30, arg2[0x50].b)",
+        "00462193          sub_4294a0(&var_30, *(arg2 + 0xa1))",
+        "0046225b          int32_t var_44_21 = *(arg2 + 0x170)",
+        "0046225c          int32_t var_48_2 = *(arg2 + 0x16c)",
+        "00462a50    int32_t __stdcall sub_462a50(int32_t arg1, int32_t arg2)",
+        "00462a8c      (*(*SteamMatchmakingServers(data_584520 ^ &__saved_ebp) + 0x1c))(arg1, arg2)",
+        "00462aaf      if (*(result_1 + 0x90) == result)",
+        "00462cde          int32_t var_40_21 = *(result_1 + 0x170)",
+        "00462cdf          int32_t var_44_2 = *(result_1 + 0x16c)",
+    ):
+        assert hlil_anchor in hlil_part02
+
+    for hlil_anchor in (
+        '0053293c  char const data_53293c[0xf] = "%u.%u.%u.%u:%i", 0',
+        '00532954  char const data_532954[0x1f] = "servers.details.%u_%u.response", 0',
+        '0053298c  char const data_53298c[0x9] = "steam_id", 0',
+        '00532998  char const data_532998[0x6] = "%u_%u", 0',
+        "005329a0  data_5329a0:",
+        '005329a4  char const data_5329a4[0xb] = "botPlayers", 0',
+        '005329b8  char const data_5329b8[0xb] = "maxPlayers", 0',
+        '005329c4  char const data_5329c4[0xb] = "numPlayers", 0',
+    ):
+        assert hlil_anchor in hlil_part06
+
+    layout_macros = {
+        "CONNECTION_PORT": "0x00",
+        "QUERY_PORT": "0x02",
+        "IP": "0x04",
+        "PING": "0x08",
+        "HAD_SUCCESSFUL_RESPONSE": "0x0c",
+        "DO_NOT_REFRESH": "0x0d",
+        "GAME_DIR": "0x0e",
+        "MAP": "0x2e",
+        "GAME_DESCRIPTION": "0x4e",
+        "APP_ID": "0x90",
+        "PLAYERS": "0x94",
+        "MAX_PLAYERS": "0x98",
+        "BOT_PLAYERS": "0x9c",
+        "PASSWORD": "0xa0",
+        "SECURE": "0xa1",
+        "LAST_PLAYED": "0xa4",
+        "SERVER_VERSION": "0xa8",
+        "SERVER_NAME": "0xac",
+        "GAME_TAGS": "0xec",
+        "STEAM_ID_LOW": "0x16c",
+        "STEAM_ID_HIGH": "0x170",
+    }
+    for name, value in layout_macros.items():
+        assert f"#define QL_STEAM_GAMESERVERITEM_{name}_OFFSET {value}" in steamworks
+    assert "#define QL_STEAM_GAMESERVERITEM_SIZE 0x174" in steamworks
+
+    for assert_name, field, macro in (
+        ("connection_port", "connectionPort", "CONNECTION_PORT"),
+        ("query_port", "queryPort", "QUERY_PORT"),
+        ("ip", "ip", "IP"),
+        ("ping", "ping", "PING"),
+        ("had_successful_response", "hadSuccessfulResponse", "HAD_SUCCESSFUL_RESPONSE"),
+        ("do_not_refresh", "doNotRefresh", "DO_NOT_REFRESH"),
+        ("game_dir", "gameDir", "GAME_DIR"),
+        ("map", "map", "MAP"),
+        ("game_description", "gameDescription", "GAME_DESCRIPTION"),
+        ("app_id", "appId", "APP_ID"),
+        ("players", "players", "PLAYERS"),
+        ("max_players", "maxPlayers", "MAX_PLAYERS"),
+        ("bot_players", "botPlayers", "BOT_PLAYERS"),
+        ("password", "password", "PASSWORD"),
+        ("secure", "secure", "SECURE"),
+        ("last_played", "lastPlayed", "LAST_PLAYED"),
+        ("server_version", "serverVersion", "SERVER_VERSION"),
+        ("server_name", "serverName", "SERVER_NAME"),
+        ("game_tags", "gameTags", "GAME_TAGS"),
+        ("steam_id_low", "steamIdLow", "STEAM_ID_LOW"),
+        ("steam_id_high", "steamIdHigh", "STEAM_ID_HIGH"),
+    ):
+        assert (
+            f"QL_STEAMWORKS_STATIC_ASSERT_OFFSET( ql_steam_gameserveritem_{assert_name}_offset, "
+            f"ql_steam_gameserveritem_raw_t, {field}, QL_STEAM_GAMESERVERITEM_{macro}_OFFSET );"
+        ) in steamworks
+    assert "QL_STEAMWORKS_STATIC_ASSERT_RAW_SIZE( ql_steam_gameserveritem_size, ql_steam_gameserveritem_raw_t, QL_STEAM_GAMESERVERITEM_SIZE );" in steamworks
+    assert "uint32_t steamIdLow;\n\tuint32_t steamIdHigh;\n} ql_steam_gameserveritem_raw_t;" in steamworks
+    assert "CSteamID steamId;\n} ql_steam_gameserveritem_raw_t;" not in steamworks
+    assert "outServer->steamId.value = ( (uint64_t)raw->steamIdHigh << 32 ) | raw->steamIdLow;" in copy_details_block
+    assert "raw->steamId;" not in copy_details_block
+
+    assert "uint32_t steamIdLow;\n\tuint32_t steamIdHigh;\n} qlr_steam_gameserveritem_raw_t;" in harness_c
+    assert ".steamIdLow = 0x89ABCDEFu,\n\t\t.steamIdHigh = 0x01234567u" in harness_c
+    assert "qlr_mock_state.server_browser_details.steamIdLow = 0x89ABCDEFu;" in harness_c
+    assert "qlr_mock_state.server_browser_details.steamIdHigh = 0x01234567u;" in harness_c
+    assert ".steamId = { .value = 0x0123456789ABCDEFULL }" not in harness_c
+    assert "qlr_mock_state.server_browser_details.steamId.value = 0x0123456789ABCDEFULL;" not in harness_c
+
+    for doc_anchor in (
+        "# Quake Live Steam Mapping Round 705: Server Browser Row Layout Guards",
+        "`JSBrowser_OnServerResponded`",
+        "`JSBrowserDetails_OnServerResponded`",
+        "`QL_STEAM_GAMESERVERITEM_STEAM_ID_LOW_OFFSET`",
+        "`QL_STEAM_GAMESERVERITEM_SIZE 0x174`",
+        "Focused parity estimate: **before 90% -> after 99%**",
+        "Overall Steam launch/runtime integration mapping confidence moves from **93.92% -> 93.94%**",
+        "does not enable live Steam behavior by default",
+    ):
+        assert doc_anchor in mapping_round
+
+    assert "Task A607: Pin Steam server-browser row layout guards [COMPLETED]" in implementation_plan
+    assert "Steam server-browser row layout source-shape confidence" in implementation_plan
+
+
+def test_legacy_steam_p2p_voice_packet_slot_constants_round_670_is_pinned() -> None:
+    aliases = json.loads(
+        (REPO_ROOT / "references/analysis/quakelive_symbol_aliases.json").read_text(encoding="utf-8")
+    )["quakelive_steam_srp"]
+    functions_csv = (
+        REPO_ROOT / "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+    ).read_text(encoding="utf-8")
+    imports_txt = (
+        REPO_ROOT / "references/reverse-engineering/ghidra/quakelive_steam/imports.txt"
+    ).read_text(encoding="utf-8")
+    hlil_part02 = (
+        REPO_ROOT
+        / "references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part02.txt"
+    ).read_text(encoding="utf-8")
+    steamworks = (REPO_ROOT / "src/common/platform/platform_steamworks.c").read_text(encoding="utf-8")
+    mapping_round = (
+        REPO_ROOT / "docs/reverse-engineering/quakelive_steam_mapping_round_670.md"
+    ).read_text(encoding="utf-8")
+    implementation_plan = (REPO_ROOT / "IMPLEMENTATION_PLAN.md").read_text(encoding="utf-8")
+
+    expected_aliases = {
+        "FUN_00460d10": "SteamVoice_SendCapturedPacket",
+        "sub_460d10": "SteamVoice_SendCapturedPacket",
+        "FUN_00461a60": "SteamVoice_ProcessIncomingPackets",
+        "sub_461a60": "SteamVoice_ProcessIncomingPackets",
+        "FUN_00465b70": "SteamServerCallbacks_OnP2PSessionRequest",
+        "sub_465b70": "SteamServerCallbacks_OnP2PSessionRequest",
+        "FUN_00465d50": "SteamServer_HandleIncomingPacket",
+        "sub_465d50": "SteamServer_HandleIncomingPacket",
+        "FUN_00466850": "SteamServer_Frame",
+        "sub_466850": "SteamServer_Frame",
+    }
+
+    for symbol, alias in expected_aliases.items():
+        assert aliases[symbol] == alias
+
+    for row in (
+        "FUN_00460d10,00460d10,170,0,unknown",
+        "FUN_00461a60,00461a60,400,0,unknown",
+        "FUN_00465b70,00465b70,146,0,unknown",
+        "FUN_00465d50,00465d50,94,0,unknown",
+        "FUN_00466850,00466850,827,0,unknown",
+        "FUN_004605c0,004605c0,43,0,unknown",
+        "FUN_004605f0,004605f0,27,0,unknown",
+        "FUN_00465fd0,00465fd0,230,0,unknown",
+        "FUN_004661e0,004661e0,126,0,unknown",
+    ):
+        assert row in functions_csv
+
+    for imported_symbol in (
+        "STEAM_API.DLL!SteamUser @ 0015916a",
+        "STEAM_API.DLL!SteamGameServer @ 0015918a",
+        "STEAM_API.DLL!SteamNetworking @ 001591ba",
+        "STEAM_API.DLL!SteamGameServerNetworking @ 001592a6",
+    ):
+        assert imported_symbol in imports_txt
+
+    for retail_anchor in (
+        "004605df  data_e2c208 = (*(*SteamUser(result) + 0x34))(arg4, arg5, &result)",
+        "00460608  return (*(*result + 0x40))(data_e2c208)",
+        "00460d4b          (*(*SteamUser() + 0x28))(1, 0xe2c218, 0x4000, &data_e2c210, 0, 0, 0, 0, 0)",
+        "00460db4              (**eax_4)(var_c, eax, 0xe2c218, data_e2c210, 1, 1)",
+        "00461a9d  for (i = (*(*SteamNetworking() + 4))(&var_806c, 1); i != 0;",
+        "00461ad8      int32_t edx_3 = *(*SteamNetworking() + 8)",
+        "00461b07          int32_t edx_5 = *(*SteamUser() + 0x2c)",
+        "00465bff              return (*(*eax_4 + 0xc))(*arg1, arg1[1])",
+        "00465dad  return zx.d((*(*eax_2 + 0x94))",
+        "0046606d  int32_t eax_5 = (*(*SteamGameServer() + 0x74))(arg1, arg2, ebx, arg4)",
+        "00466cdd              (*(*SteamGameServer() + 0x78))(edi_4, ebx_2)",
+        "00466928          if ((*(*SteamGameServerNetworking() + 4))(&var_424, 1) != 0)",
+        "00466961                  int32_t edx_6 = *(*SteamGameServerNetworking() + 8)",
+        "00466acb          for (i_2 = (*(*SteamGameServer() + 0x98))(&var_408, 0x400, &var_42c, &var_420);",
+    ):
+        assert retail_anchor in hlil_part02
+
+    client_send_block = _extract_function_block(
+        steamworks,
+        "qboolean QL_Steamworks_SendP2PPacket( const CSteamID *steamId, const void *data, uint32_t length, int sendType, int channel )",
+    )
+    client_available_block = _extract_function_block(
+        steamworks, "qboolean QL_Steamworks_IsP2PPacketAvailable( uint32_t *outSize, int channel )"
+    )
+    client_read_block = _extract_function_block(
+        steamworks,
+        "qboolean QL_Steamworks_ReadP2PPacket( void *data, uint32_t dataSize, uint32_t *outSize, CSteamID *outSteamId, int channel )",
+    )
+    client_accept_block = _extract_function_block(
+        steamworks, "qboolean QL_Steamworks_AcceptP2PSession( const CSteamID *steamId )"
+    )
+    server_send_block = _extract_function_block(
+        steamworks,
+        "qboolean QL_Steamworks_ServerSendP2PPacket( const CSteamID *steamId, const void *data, uint32_t length, int sendType, int channel )",
+    )
+    server_available_block = _extract_function_block(
+        steamworks, "qboolean QL_Steamworks_ServerIsP2PPacketAvailable( uint32_t *outSize, int channel )"
+    )
+    server_read_block = _extract_function_block(
+        steamworks,
+        "qboolean QL_Steamworks_ServerReadP2PPacket( void *data, uint32_t dataSize, uint32_t *outSize, CSteamID *outSteamId, int channel )",
+    )
+    server_accept_block = _extract_function_block(
+        steamworks, "qboolean QL_Steamworks_ServerAcceptP2PSession( const CSteamID *steamId )"
+    )
+    voice_blocks = {
+        "QL_STEAM_USER_START_VOICE_RECORDING_SLOT": _extract_function_block(
+            steamworks, "qboolean QL_Steamworks_StartVoiceRecording( void )"
+        ),
+        "QL_STEAM_USER_STOP_VOICE_RECORDING_SLOT": _extract_function_block(
+            steamworks, "qboolean QL_Steamworks_StopVoiceRecording( void )"
+        ),
+        "QL_STEAM_USER_GET_VOICE_SLOT": _extract_function_block(
+            steamworks, "qboolean QL_Steamworks_GetCompressedVoice( void *data, uint32_t dataSize, uint32_t *outSize )"
+        ),
+        "QL_STEAM_USER_DECOMPRESS_VOICE_SLOT": _extract_function_block(
+            steamworks,
+            "qboolean QL_Steamworks_DecompressVoice( const void *compressedData, uint32_t compressedSize, void *data, uint32_t dataSize, uint32_t *outSize, uint32_t sampleRate )",
+        ),
+        "QL_STEAM_USER_GET_VOICE_OPTIMAL_SAMPLE_RATE_SLOT": _extract_function_block(
+            steamworks, "uint32_t QL_Steamworks_GetVoiceOptimalSampleRate( void )"
+        ),
+    }
+    handle_incoming_block = _extract_function_block(
+        steamworks, "qboolean QL_Steamworks_ServerHandleIncomingPacket( const void *data, int dataSize, uint32_t ip, uint16_t port )"
+    )
+    outgoing_packet_block = _extract_function_block(
+        steamworks, "int QL_Steamworks_ServerGetNextOutgoingPacket( void *data, int dataSize, uint32_t *outIp, uint16_t *outPort )"
+    )
+
+    for macro in (
+        "#define QL_STEAM_NETWORKING_SEND_P2P_PACKET_SLOT 0",
+        "#define QL_STEAM_NETWORKING_IS_P2P_PACKET_AVAILABLE_SLOT 1",
+        "#define QL_STEAM_NETWORKING_READ_P2P_PACKET_SLOT 2",
+        "#define QL_STEAM_NETWORKING_ACCEPT_P2P_SESSION_SLOT (0x0c / 4)",
+        "#define QL_STEAM_USER_START_VOICE_RECORDING_SLOT (0x1c / 4)",
+        "#define QL_STEAM_USER_STOP_VOICE_RECORDING_SLOT (0x20 / 4)",
+        "#define QL_STEAM_USER_GET_VOICE_SLOT (0x28 / 4)",
+        "#define QL_STEAM_USER_DECOMPRESS_VOICE_SLOT (0x2c / 4)",
+        "#define QL_STEAM_USER_GET_VOICE_OPTIMAL_SAMPLE_RATE_SLOT (0x30 / 4)",
+        "#define QL_STEAM_GAMESERVER_HANDLE_INCOMING_PACKET_SLOT (0x94 / 4)",
+        "#define QL_STEAM_GAMESERVER_GET_NEXT_OUTGOING_PACKET_SLOT (0x98 / 4)",
+    ):
+        assert macro in steamworks
+
+    for block in (client_send_block, server_send_block):
+        assert "vtable[QL_STEAM_NETWORKING_SEND_P2P_PACKET_SLOT]" in block
+    for block in (client_available_block, server_available_block):
+        assert "vtable[QL_STEAM_NETWORKING_IS_P2P_PACKET_AVAILABLE_SLOT]" in block
+    for block in (client_read_block, server_read_block):
+        assert "vtable[QL_STEAM_NETWORKING_READ_P2P_PACKET_SLOT]" in block
+    for block in (client_accept_block, server_accept_block):
+        assert "vtable[QL_STEAM_NETWORKING_ACCEPT_P2P_SESSION_SLOT]" in block
+    for macro, block in voice_blocks.items():
+        assert f"vtable[{macro}]" in block
+    assert "vtable[QL_STEAM_GAMESERVER_HANDLE_INCOMING_PACKET_SLOT]" in handle_incoming_block
+    assert "vtable[QL_STEAM_GAMESERVER_GET_NEXT_OUTGOING_PACKET_SLOT]" in outgoing_packet_block
+
+    for doc_anchor in (
+        "# Quake Live Steam Mapping Round 670: Legacy Steam P2P, Voice, And Packet Slot Constants",
+        "`FUN_00460d10` / `sub_460d10`",
+        "`FUN_00466850` / `sub_466850`",
+        "Focused parity estimate: **before 90% -> after 99%**",
+        "Overall Steam launch/runtime integration mapping\nconfidence moves from **93.64% -> 93.66%**",
+        "No live service fallback was added",
+    ):
+        assert doc_anchor in mapping_round
+
+    assert "Task A572: Pin legacy Steam P2P, voice, and packet slot constants [COMPLETED]" in implementation_plan
+    assert "overall\nSteam launch/runtime integration mapping confidence" in implementation_plan
+
+
 def test_zmq_dependency_boundary_stays_out_of_src_code_library_space() -> None:
     sv_zmq = (REPO_ROOT / "src/code/server/sv_zmq.c").read_text(encoding="utf-8")
     vcxproj = (REPO_ROOT / "src/code/quakelive_steam.vcxproj").read_text(encoding="utf-8")
+    gitignore = (REPO_ROOT / ".gitignore").read_text(encoding="utf-8")
     readme = (REPO_ROOT / "README.md").read_text(encoding="utf-8")
+    build_guide = (REPO_ROOT / "BUILD.md").read_text(encoding="utf-8")
+    libzmq_readme = (REPO_ROOT / "src/libs/libzmq/README.md").read_text(encoding="utf-8")
     ownership_note = (
         REPO_ROOT / "docs/reverse-engineering/zmq-dependency-ownership-2026-06-06.md"
     ).read_text(encoding="utf-8")
 
-    source_suffixes = {".c", ".cc", ".cpp", ".cxx", ".h", ".hpp"}
+    source_suffixes = {".c", ".cc", ".cpp", ".cxx", ".h", ".hh", ".hpp", ".hxx"}
     zmq_source_files = sorted(
         source.relative_to(REPO_ROOT).as_posix()
         for source in (REPO_ROOT / "src/code").rglob("*")
@@ -15975,13 +27179,19 @@ def test_zmq_dependency_boundary_stays_out_of_src_code_library_space() -> None:
         and source.suffix.lower() in source_suffixes
         and any(token in source.name.lower() for token in ("zmq", "zeromq", "libzmq"))
     )
+    libzmq_source_files = sorted(
+        source.relative_to(REPO_ROOT).as_posix()
+        for source in (REPO_ROOT / "src/libs/libzmq").rglob("*")
+        if source.is_file() and source.suffix.lower() in source_suffixes
+    )
 
     assert zmq_source_files == ["src/code/server/sv_zmq.c"]
     assert not (REPO_ROOT / "src/libs/zmq").exists()
-    assert not (REPO_ROOT / "src/libs/libzmq").exists()
+    assert (REPO_ROOT / "src/libs/libzmq/README.md").exists()
+    assert libzmq_source_files == []
     assert '<ClCompile Include="server\\sv_zmq.c">' in vcxproj
     assert "src\\libs\\zmq" not in vcxproj
-    assert "src\\libs\\libzmq" not in vcxproj
+    assert "src\\libs\\libzmq\\bin\\Win32\\libzmq.dll" in vcxproj
 
     assert '#define QL_ZMQ_LIB_PRIMARY "libzmq.dll"' in sv_zmq
     assert '#define QL_ZMQ_LIB_PRIMARY "libzmq.so.5"' in sv_zmq
@@ -15989,13 +27199,33 @@ def test_zmq_dependency_boundary_stays_out_of_src_code_library_space() -> None:
     assert "#define QL_ZMQ_SYM( name ) GetProcAddress( (HMODULE)s_zmq.library, name )" in sv_zmq
     assert "static qboolean idZMQ_LoadLibrary( void )" in sv_zmq
     assert "#if !QL_PLATFORM_HAS_ONLINE_SERVICES" in sv_zmq
-    assert 'Com_Printf( "ZMQ runtime disabled by build policy (QL_BUILD_ONLINE_SERVICES=0); keeping retained fallback paths.\\n" );' in sv_zmq
-    assert 'idZMQ_LoadSymbol( (void **)&s_zmq.zmq_ctx_new, "zmq_ctx_new" )' in sv_zmq
-    assert 'idZMQ_LoadSymbol( (void **)&s_zmq.zmq_socket, "zmq_socket" )' in sv_zmq
+    assert '#define QL_ZMQ_RUNTIME_DISABLED_MESSAGE "ZMQ runtime disabled by build policy (QL_BUILD_ONLINE_SERVICES=0); keeping retained fallback paths.\\n"' in sv_zmq
+    assert "Com_Printf( QL_ZMQ_RUNTIME_DISABLED_MESSAGE );" in sv_zmq
+    assert '#define QL_ZMQ_EXPORT_CTX_NEW "zmq_ctx_new"' in sv_zmq
+    assert '#define QL_ZMQ_EXPORT_SOCKET "zmq_socket"' in sv_zmq
+    assert "idZMQ_LoadSymbol( (void **)&s_zmq.zmq_ctx_new, QL_ZMQ_EXPORT_CTX_NEW )" in sv_zmq
+    assert "idZMQ_LoadSymbol( (void **)&s_zmq.zmq_socket, QL_ZMQ_EXPORT_SOCKET )" in sv_zmq
     assert "#include <zmq.h>" not in sv_zmq
+    assert "#include <zmq.h>" not in vcxproj
+    assert "libzmq.lib" not in vcxproj
+    assert "<QLRequireZmqRuntime Condition=\"'$(QLRequireZmqRuntime)'==''\">0</QLRequireZmqRuntime>" in vcxproj
+    assert "<PropertyGroup Label=\"ZmqRuntime\">" in vcxproj
+    assert "ZMQ_RUNTIME_DIR" in vcxproj
+    assert "<Target Name=\"ValidateZmqRuntime\"" in vcxproj
+    assert "<Target Name=\"CopyZmqRuntime\"" in vcxproj
+    assert "libzmq remains external and is not vendored" in vcxproj
 
-    assert "The repo does not vendor libzmq" in readme
-    assert "Do not install or vendor libzmq under `src/libs/` in this pass" in ownership_note
+    assert "src/libs/libzmq/*" in gitignore
+    assert "!src/libs/libzmq/README.md" in gitignore
+    assert "This directory is a local runtime-install location" in libzmq_readme
+    assert "It is not a source reconstruction area" in libzmq_readme
+    assert "src/libs/libzmq/bin/Win32/libzmq.dll" in libzmq_readme
+    assert "Do not commit libzmq/CZMQ source files under this directory" in libzmq_readme
+
+    assert "The repo does not vendor libzmq source" in readme
+    assert "ZMQ is a runtime-only online-service dependency" in build_guide
+    assert "Do not install or vendor libzmq implementation source under `src/libs/`" in ownership_note
+    assert "runtime-drop directory" in ownership_note
     assert "hand-rolling that library under `src/code`" in ownership_note
     assert "Keep `sv_zmq.c` in `src/code/server/` as Quake Live server integration code" in ownership_note
 
@@ -16058,11 +27288,13 @@ def test_zmq_option_switch_tables_round_419_pin_source_constants() -> None:
     assert "#define QL_ZMQ_ROUTER_MANDATORY 33" in sv_zmq
     assert "#define QL_ZMQ_PLAIN_SERVER 44" in sv_zmq
     assert "#define QL_ZMQ_ZAP_DOMAIN 55" in sv_zmq
-    assert 'idZMQ_TrySetSocketString( socket, QL_ZMQ_ZAP_DOMAIN, "rcon" );' in sv_zmq
-    assert 'idZMQ_TrySetSocketString( socket, QL_ZMQ_ZAP_DOMAIN, "stats" );' in sv_zmq
-    assert "idZMQ_TrySetSocketInt( socket, QL_ZMQ_ROUTER_MANDATORY, 1 );" in sv_zmq
-    assert "idZMQ_TrySetSocketInt( socket, QL_ZMQ_PLAIN_SERVER, s_zmq.rconPassword[0] ? 1 : 0 );" in sv_zmq
-    assert "idZMQ_TrySetSocketInt( socket, QL_ZMQ_PLAIN_SERVER, s_zmq.statsPassword[0] ? 1 : 0 );" in sv_zmq
+    assert "#define QL_ZMQ_SOCKET_OPTION_DISABLED 0" in sv_zmq
+    assert "#define QL_ZMQ_SOCKET_OPTION_ENABLED 1" in sv_zmq
+    assert "idZMQ_TrySetSocketString( socket, QL_ZMQ_ZAP_DOMAIN, QL_ZMQ_DOMAIN_RCON );" in sv_zmq
+    assert "idZMQ_TrySetSocketString( socket, QL_ZMQ_ZAP_DOMAIN, QL_ZMQ_DOMAIN_STATS );" in sv_zmq
+    assert "idZMQ_TrySetSocketInt( socket, QL_ZMQ_ROUTER_MANDATORY, QL_ZMQ_SOCKET_OPTION_ENABLED );" in sv_zmq
+    assert "idZMQ_TrySetSocketInt( socket, QL_ZMQ_PLAIN_SERVER, s_zmq.rconPassword[0] ? QL_ZMQ_SOCKET_OPTION_ENABLED : QL_ZMQ_SOCKET_OPTION_DISABLED );" in sv_zmq
+    assert "idZMQ_TrySetSocketInt( socket, QL_ZMQ_PLAIN_SERVER, s_zmq.statsPassword[0] ? QL_ZMQ_SOCKET_OPTION_ENABLED : QL_ZMQ_SOCKET_OPTION_DISABLED );" in sv_zmq
 
     assert "This pass re-pinned 2 existing aliases" in mapping_round
     assert "ROUTER mandatory delivery, PLAIN server mode, and ZAP domain strings" in mapping_round
@@ -19033,8 +30265,8 @@ def test_zmq_pub_sub_pipeline_round_400_aliases_are_pinned() -> None:
 
     assert "#define QL_ZMQ_PUB 1" in sv_zmq
     assert "socket = s_zmq.zmq_socket( s_zmq.context, QL_ZMQ_PUB );" in sv_zmq
-    assert 'idZMQ_Publish( "MATCH_REPORT", (const char *)report );' in sv_zmq
-    assert 'idZMQ_Publish( eventName && eventName[0] ? eventName : "UNKNOWN_EVENT", (const char *)payload );' in sv_zmq
+    assert "idZMQ_Publish( QL_ZMQ_MATCH_REPORT_TYPE, (const char *)report );" in sv_zmq
+    assert 'idZMQ_Publish( eventName, (const char *)payload );' in sv_zmq
 
     assert "00550204 IMPORTED zmq::pub_t::vftable" in analysis_symbols
     assert "005502c4 IMPORTED zmq::sub_t::vftable" in analysis_symbols
@@ -20735,9 +31967,9 @@ def test_workshop_mount_startup_reconstructs_retail_subscribed_item_import_path(
     assert "uint32_t QL_Steamworks_GetSubscribedItems( uint64_t *outItemIds, uint32_t maxItems );" in steamworks_h
     assert "qboolean QL_Steamworks_GetItemInstallInfo( uint32_t idLow, uint32_t idHigh, uint64_t *outSizeOnDisk, char *folder, size_t folderSize, uint32_t *outTimestamp );" in steamworks_h
     assert "return QL_Steamworks_GetUGCInterface() != NULL ? qtrue : qfalse;" in has_ugc_block
-    assert "vtable[0xc8 / 4]" in count_block
-    assert "vtable[0xcc / 4]" in list_block
-    assert "vtable[0xd4 / 4]" in install_block
+    assert "vtable[QL_STEAM_UGC_GET_NUM_SUBSCRIBED_ITEMS_SLOT]" in count_block
+    assert "vtable[QL_STEAM_UGC_GET_SUBSCRIBED_ITEMS_SLOT]" in list_block
+    assert "vtable[QL_STEAM_UGC_GET_ITEM_INSTALL_INFO_SLOT]" in install_block
 
 
 def test_lobby_social_wrappers_reconstruct_mapped_matchmaking_slots() -> None:
@@ -20916,50 +32148,50 @@ def test_lobby_social_wrappers_reconstruct_mapped_matchmaking_slots() -> None:
     assert "qboolean QL_Steamworks_GetUserStatInt( uint32_t idLow, uint32_t idHigh, const char *name, int *outValue );" in steamworks_h
     assert "qboolean QL_Steamworks_GetUserAchievement( uint32_t idLow, uint32_t idHigh, const char *name, qboolean *outAchieved, int *outUnlockTime );" in steamworks_h
     assert 'const char *QL_Steamworks_GetAchievementDisplayAttribute( const char *name, const char *key );' in steamworks_h
-    assert "vtable[0x1c / 4]" in friend_name_block
+    assert "vtable[QL_STEAM_FRIENDS_GET_FRIEND_PERSONA_NAME_SLOT]" in friend_name_block
     assert "QL_Steamworks_CopySteamString( buffer, bufferSize, fn( friends, NULL, QL_Steamworks_CombineIdentityWords( idLow, idHigh ) ) );" in friend_name_block
-    assert "vtable[0x34 / 4]" in create_block
+    assert "vtable[QL_STEAM_MATCHMAKING_CREATE_LOBBY_SLOT]" in create_block
     assert "return fn( matchmaking, NULL, 2, maxMembers ) != 0 ? qtrue : qfalse;" in create_block
-    assert "vtable[0x3c / 4]" in leave_block
+    assert "vtable[QL_STEAM_MATCHMAKING_LEAVE_LOBBY_SLOT]" in leave_block
     assert "fn( matchmaking, NULL, idLow, idHigh );" in leave_block
-    assert "vtable[0x38 / 4]" in join_block
+    assert "vtable[QL_STEAM_MATCHMAKING_JOIN_LOBBY_SLOT]" in join_block
     assert "return fn( matchmaking, NULL, idLow, idHigh ) != 0 ? qtrue : qfalse;" in join_block
-    assert "vtable[0x8c / 4]" in owner_block
+    assert "vtable[QL_STEAM_MATCHMAKING_GET_LOBBY_OWNER_SLOT]" in owner_block
     assert "fn( matchmaking, NULL, &lobbyOwnerId, idLow, idHigh );" in owner_block
-    assert "vtable[0x54 / 4]" in data_count_block
+    assert "vtable[QL_STEAM_MATCHMAKING_GET_LOBBY_DATA_COUNT_SLOT]" in data_count_block
     assert "return fn( matchmaking, NULL, idLow, idHigh );" in data_count_block
-    assert "vtable[0x50 / 4]" in set_lobby_data_block
+    assert "vtable[QL_STEAM_MATCHMAKING_SET_LOBBY_DATA_SLOT]" in set_lobby_data_block
     assert "return fn( matchmaking, NULL, idLow, idHigh, key, value ) ? qtrue : qfalse;" in set_lobby_data_block
-    assert "vtable[0x58 / 4]" in data_index_block
+    assert "vtable[QL_STEAM_MATCHMAKING_GET_LOBBY_DATA_BY_INDEX_SLOT]" in data_index_block
     assert "fn( matchmaking, NULL, idLow, idHigh, index, key, (int)keySize, value, (int)valueSize );" in data_index_block
-    assert "vtable[0x44 / 4]" in member_count_block
+    assert "vtable[QL_STEAM_MATCHMAKING_GET_NUM_LOBBY_MEMBERS_SLOT]" in member_count_block
     assert "return fn( matchmaking, NULL, idLow, idHigh );" in member_count_block
-    assert "vtable[0x80 / 4]" in member_limit_block
+    assert "vtable[QL_STEAM_MATCHMAKING_GET_LOBBY_MEMBER_LIMIT_SLOT]" in member_limit_block
     assert "return fn( matchmaking, NULL, idLow, idHigh );" in member_limit_block
-    assert "vtable[0x48 / 4]" in member_index_block
+    assert "vtable[QL_STEAM_MATCHMAKING_GET_LOBBY_MEMBER_BY_INDEX_SLOT]" in member_index_block
     assert "fn( matchmaking, NULL, &memberId, idLow, idHigh, index );" in member_index_block
-    assert "userVTable[0x08 / 4]" in set_server_block
-    assert "matchmakingVTable[0x8c / 4]" in set_server_block
-    assert "matchmakingVTable[0x74 / 4]" in set_server_block
+    assert "userVTable[QL_STEAM_USER_GET_STEAM_ID_SLOT]" in set_server_block
+    assert "matchmakingVTable[QL_STEAM_MATCHMAKING_GET_LOBBY_OWNER_SLOT]" in set_server_block
+    assert "matchmakingVTable[QL_STEAM_MATCHMAKING_SET_LOBBY_GAME_SERVER_SLOT]" in set_server_block
     assert "if ( lobbyOwnerId.value != localSteamId.value ) {" in set_server_block
     assert "setLobbyServerFn( matchmaking, NULL, idLow, idHigh, serverIp, serverPort, idLow, idHigh );" in set_server_block
-    assert "vtable[0x84 / 4]" in invite_block
+    assert "vtable[QL_STEAM_FRIENDS_ACTIVATE_GAME_OVERLAY_INVITE_DIALOG_SLOT]" in invite_block
     assert "fn( friends, NULL, idLow, idHigh );" in invite_block
-    assert "vtable[0x40 / 4]" in invite_lobby_block
+    assert "vtable[QL_STEAM_MATCHMAKING_INVITE_USER_TO_LOBBY_SLOT]" in invite_lobby_block
     assert "return fn( matchmaking, NULL, lobbyIdLow, lobbyIdHigh, userIdLow, userIdHigh ) ? qtrue : qfalse;" in invite_lobby_block
-    assert "vtable[0xc4 / 4]" in invite_game_block
+    assert "vtable[QL_STEAM_FRIENDS_INVITE_USER_TO_GAME_SLOT]" in invite_game_block
     assert "return fn( friends, NULL, idLow, idHigh, connectString ) ? qtrue : qfalse;" in invite_game_block
-    assert "vtable[0x68 / 4]" in say_block
+    assert "vtable[QL_STEAM_MATCHMAKING_SEND_LOBBY_CHAT_MSG_SLOT]" in say_block
     assert "messageLength = (int)strlen( message ) + 1;" in say_block
-    assert "vtable[0x40 / 4]" in stats_block
+    assert "vtable[QL_STEAM_USERSTATS_REQUEST_USER_STATS_SLOT]" in stats_block
     assert "return fn( userStats, NULL, idLow, idHigh ) != 0 ? qtrue : qfalse;" in stats_block
-    assert "vtable[0x48 / 4]" in user_stat_block
+    assert "vtable[QL_STEAM_USERSTATS_GET_USER_STAT_INT_SLOT]" in user_stat_block
     assert "return fn( userStats, NULL, idLow, idHigh, name, outValue ) ? qtrue : qfalse;" in user_stat_block
-    assert "vtable[0x50 / 4]" in user_achievement_block
+    assert "vtable[QL_STEAM_USERSTATS_GET_USER_ACHIEVEMENT_SLOT]" in user_achievement_block
     assert "if ( outUnlockTime ) {" in user_achievement_block
     assert "*outUnlockTime = unlockTime;" in user_achievement_block
     assert "*outAchieved = achieved ? qtrue : qfalse;" in user_achievement_block
-    assert "vtable[0x30 / 4]" in achievement_attr_block
+    assert "vtable[QL_STEAM_USERSTATS_GET_ACHIEVEMENT_DISPLAY_ATTRIBUTE_SLOT]" in achievement_attr_block
     assert 'value = fn( userStats, NULL, name, key );' in achievement_attr_block
     assert 'return value ? value : "";' in achievement_attr_block
 
@@ -21101,16 +32333,28 @@ def test_steam_callback_payload_size_thunks_and_server_max_players_track_retail_
     assert "005336d8      int32_t (* const vFunc_2)() __pure = sub_467480" in hlil_part06
     assert "00533874      int32_t (* const vFunc_2)() __pure = sub_465680" in hlil_part06
 
-    assert "static const ql_steam_callback_vtable_t ql_steam_callback_vtable = {\n\tQL_Steamworks_CallbackRun,\n\tQL_Steamworks_CallbackRunCallResult,\n\tQL_Steamworks_CallbackGetSize\n};" in steamworks
+    assert "static const ql_steam_callback_vtable_t ql_steam_callback_vtable = {\n\t(ql_steam_callback_vfunc_t)QL_Steamworks_CallbackRun,\n\t(ql_steam_callback_vfunc_t)QL_Steamworks_CallbackRunAdapter,\n\t(ql_steam_callback_vfunc_t)QL_Steamworks_CallbackGetSize\n};" in steamworks
+    assert "static const ql_steam_callback_vtable_t ql_steam_call_result_vtable = {\n\t(ql_steam_callback_vfunc_t)QL_Steamworks_CallbackRunCallResult,\n\t(ql_steam_callback_vfunc_t)QL_Steamworks_CallbackRunCallResultAdapter,\n\t(ql_steam_callback_vfunc_t)QL_Steamworks_CallbackGetSize\n};" in steamworks
+    assert "int callbackId;\n\tql_steam_callback_base_t *owner;\n\tunion {\n\t\tql_steam_callback_member_fn memberFunction;\n\t\tuint32_t callResultHandleLow;\n\t};\n\tuint32_t callResultHandleHigh;\n\tql_steam_callback_base_t *callResultOwner;\n\tql_steam_call_result_member_fn callResultMemberFunction;\n\tint payloadSize;" in steamworks
+    assert "object->owner = object;" in prepare_callback_block
+    assert "object->memberFunction = QL_Steamworks_CallbackMemberRun;" in prepare_callback_block
+    assert "object->callResultOwner = object;" in prepare_callback_block
+    assert "object->callResultMemberFunction = QL_Steamworks_CallbackCallResultMemberRun;" in prepare_callback_block
+    assert prepare_callback_block.index("object->callbackId = callbackId;") < prepare_callback_block.index(
+        "object->owner = object;"
+    )
+    assert prepare_callback_block.index("object->memberFunction = QL_Steamworks_CallbackMemberRun;") < prepare_callback_block.index(
+        "object->payloadSize = payloadSize;"
+    )
     assert "return self->payloadSize;" in callback_size_block
     assert "object->payloadSize = payloadSize;" in prepare_callback_block
-    assert "QL_STEAMWORKS_STATIC_ASSERT_SIZE( ql_steam_size_game_rich_presence_join_requested_raw, ql_steam_game_rich_presence_join_requested_raw_t, 0x108 );" in steamworks
-    assert "QL_STEAMWORKS_STATIC_ASSERT_SIZE( ql_steam_size_friend_rich_presence_update_raw, ql_steam_friend_rich_presence_update_raw_t, 0x0c );" in steamworks
-    assert "QL_STEAMWORKS_STATIC_ASSERT_SIZE( ql_steam_size_avatar_image_loaded_raw, ql_steam_avatar_image_loaded_raw_t, 0x14 );" in steamworks
-    assert "QL_STEAMWORKS_STATIC_ASSERT_SIZE( ql_steam_size_ugc_query_completed_raw, ql_steam_ugc_query_completed_raw_t, 0x18 );" in steamworks
-    assert "QL_STEAMWORKS_STATIC_ASSERT_SIZE( ql_steam_size_download_item_result_raw, ql_steam_download_item_result_raw_t, 0x18 );" in steamworks
-    assert "QL_STEAMWORKS_STATIC_ASSERT_SIZE( ql_steam_size_validate_auth_ticket_response_raw, ql_steam_validate_auth_ticket_response_raw_t, 0x14 );" in steamworks
-    assert "QL_STEAMWORKS_STATIC_ASSERT_SIZE( ql_steam_size_gs_stats_received_raw, ql_steam_gs_stats_received_raw_t, 0x0c );" in steamworks
+    assert "QL_STEAMWORKS_STATIC_ASSERT_SIZE( ql_steam_size_game_rich_presence_join_requested_raw, ql_steam_game_rich_presence_join_requested_raw_t, QL_STEAM_CALLBACK_SIZE_GAME_RICH_PRESENCE_JOIN_REQUESTED );" in steamworks
+    assert "QL_STEAMWORKS_STATIC_ASSERT_SIZE( ql_steam_size_friend_rich_presence_update_raw, ql_steam_friend_rich_presence_update_raw_t, QL_STEAM_CALLBACK_SIZE_FRIEND_RICH_PRESENCE_UPDATE );" in steamworks
+    assert "QL_STEAMWORKS_STATIC_ASSERT_SIZE( ql_steam_size_avatar_image_loaded_raw, ql_steam_avatar_image_loaded_raw_t, QL_STEAM_CALLBACK_SIZE_AVATAR_IMAGE_LOADED );" in steamworks
+    assert "QL_STEAMWORKS_STATIC_ASSERT_SIZE( ql_steam_size_ugc_query_completed_raw, ql_steam_ugc_query_completed_raw_t, QL_STEAM_CALLBACK_SIZE_UGC_QUERY_COMPLETED );" in steamworks
+    assert "QL_STEAMWORKS_STATIC_ASSERT_SIZE( ql_steam_size_download_item_result_raw, ql_steam_download_item_result_raw_t, QL_STEAM_CALLBACK_SIZE_DOWNLOAD_ITEM_RESULT );" in steamworks
+    assert "QL_STEAMWORKS_STATIC_ASSERT_SIZE( ql_steam_size_validate_auth_ticket_response_raw, ql_steam_validate_auth_ticket_response_raw_t, QL_STEAM_CALLBACK_SIZE_VALIDATE_AUTH_TICKET_RESPONSE );" in steamworks
+    assert "QL_STEAMWORKS_STATIC_ASSERT_SIZE( ql_steam_size_gs_stats_received_raw, ql_steam_gs_stats_received_raw_t, QL_STEAM_CALLBACK_SIZE_GS_STATS_RECEIVED );" in steamworks
     assert "uint32_t steamIDFriendLow;\n\tuint32_t steamIDFriendHigh;\n\tuint32_t appId;\n} ql_steam_friend_rich_presence_update_raw_t;" in steamworks
     assert "uint32_t steamIDLow;\n\tuint32_t steamIDHigh;\n\tint image;\n\tint wide;\n\tint tall;\n} ql_steam_avatar_image_loaded_raw_t;" in steamworks
     assert "char nextCursor[256]" not in steamworks
@@ -21118,14 +32362,14 @@ def test_steam_callback_payload_size_thunks_and_server_max_players_track_retail_
     assert "event.steamId = QL_Steamworks_CombineIdentityWords( raw->steamIDLow, raw->steamIDHigh );" in steamworks
     assert "event.ownerSteamId = QL_Steamworks_CombineIdentityWords( raw->ownerSteamIdLow, raw->ownerSteamIdHigh );" in steamworks
     assert "event.steamId = QL_Steamworks_CombineIdentityWords( raw->steamIdLow, raw->steamIdHigh );" in steamworks
-    assert "QL_Steamworks_PrepareCallbackObject( &callbackState->lobbyChatUpdate, QL_STEAM_CALLBACK_LOBBY_CHAT_UPDATE, sizeof( ql_steam_lobby_chat_update_raw_t ), qfalse, callbackState, QL_Steamworks_DispatchLobbyChatUpdate, NULL );" in register_lobby_block
-    assert "QL_Steamworks_PrepareCallbackObject( &callbackState->lobbyChatMessage, QL_STEAM_CALLBACK_LOBBY_CHAT_MESSAGE, sizeof( ql_steam_lobby_chat_message_raw_t ), qfalse, callbackState, QL_Steamworks_DispatchLobbyChatMessage, NULL );" in register_lobby_block
+    assert "QL_Steamworks_PrepareCallbackObject( &callbackState->lobbyChatUpdate, QL_STEAM_CALLBACK_LOBBY_CHAT_UPDATE, QL_STEAM_CALLBACK_SIZE_LOBBY_CHAT_UPDATE, qfalse, callbackState, QL_Steamworks_DispatchLobbyChatUpdate, NULL );" in register_lobby_block
+    assert "QL_Steamworks_PrepareCallbackObject( &callbackState->lobbyChatMessage, QL_STEAM_CALLBACK_LOBBY_CHAT_MESSAGE, QL_STEAM_CALLBACK_SIZE_LOBBY_CHAT_MESSAGE, qfalse, callbackState, QL_Steamworks_DispatchLobbyChatMessage, NULL );" in register_lobby_block
     assert "typedef struct {\n\tint result;\n} ql_steam_server_connect_failure_raw_t;" in steamworks
-    assert "QL_Steamworks_PrepareCallbackObject( &callbackState->connectFailure, QL_STEAM_CALLBACK_STEAM_SERVER_CONNECT_FAILURE, sizeof( ql_steam_server_connect_failure_raw_t ), qtrue, callbackState, QL_Steamworks_DispatchServerConnectFailure, NULL );" in register_server_block
-    assert "QL_Steamworks_PrepareCallbackObject( &callbackState->serversDisconnected, QL_STEAM_CALLBACK_STEAM_SERVERS_DISCONNECTED, sizeof( ql_steam_servers_disconnected_raw_t ), qtrue, callbackState, QL_Steamworks_DispatchServersDisconnected, NULL );" in register_server_block
+    assert "QL_Steamworks_PrepareCallbackObject( &callbackState->connectFailure, QL_STEAM_CALLBACK_STEAM_SERVER_CONNECT_FAILURE, QL_STEAM_CALLBACK_SIZE_SERVER_CONNECT_FAILURE, qtrue, callbackState, QL_Steamworks_DispatchServerConnectFailure, NULL );" in register_server_block
+    assert "QL_Steamworks_PrepareCallbackObject( &callbackState->serversDisconnected, QL_STEAM_CALLBACK_STEAM_SERVERS_DISCONNECTED, QL_STEAM_CALLBACK_SIZE_SERVERS_DISCONNECTED, qtrue, callbackState, QL_Steamworks_DispatchServersDisconnected, NULL );" in register_server_block
     assert "event.stillRetrying = qfalse;" in dispatch_failure_block
     assert "raw->stillRetrying" not in dispatch_failure_block
-    assert "vtable[0x30 / 4]" in max_players_block
+    assert "vtable[QL_STEAM_GAMESERVER_SET_MAX_PLAYER_COUNT_SLOT]" in max_players_block
     assert "fn( gameServer, NULL, maxPlayers );" in max_players_block
     assert 'if ( !QL_Steamworks_ServerSetMaxPlayerCount( sv_maxclients ? sv_maxclients->integer : 0 ) ) {' in publish_block
 
@@ -21192,12 +32436,12 @@ def test_operator_workshop_commands_reconstruct_retail_ugc_surface() -> None:
     assert 'Cmd_AddCommand ("steam_downloadugc", SV_SteamCmd_DownloadUGC_f);' in add_block
     assert 'Cmd_AddCommand ("steam_subscribeugc", SV_SteamCmd_SubscribeUGC_f);' in add_block
     assert 'Cmd_AddCommand ("steam_unsubscribeugc", SV_SteamCmd_UnsubscribeUGC_f);' in add_block
-    assert "vtable[0xd0 / 4]" in item_state_block
-    assert "vtable[0xc0 / 4]" in subscribe_platform_block
+    assert "vtable[QL_STEAM_UGC_GET_ITEM_STATE_SLOT]" in item_state_block
+    assert "vtable[QL_STEAM_UGC_SUBSCRIBE_ITEM_SLOT]" in subscribe_platform_block
     assert "itemState = QL_Steamworks_GetItemState( idLow, idHigh );" in subscribe_platform_block
     assert "return itemState != 0u ? qtrue : qfalse;" in subscribe_platform_block
-    assert "vtable[0xc4 / 4]" in unsubscribe_platform_block
-    assert "vtable[0xdc / 4]" in download_platform_block
+    assert "vtable[QL_STEAM_UGC_UNSUBSCRIBE_ITEM_SLOT]" in unsubscribe_platform_block
+    assert "vtable[QL_STEAM_UGC_DOWNLOAD_ITEM_SLOT]" in download_platform_block
 
 
 def test_server_steam_command_and_vm_bridge_aliases_track_ghidra_hlil_rows() -> None:
@@ -21634,9 +32878,9 @@ def test_steam_stats_callback_lifecycle_helpers_track_retail_reference_rows() ->
     assert "ql_steam_callback_base_t serversConnected;" in steamworks
     assert "ql_steam_callback_base_t gsStatsReceived;" in steamworks
     assert "ql_steam_callback_base_t gsStatsStored;" in steamworks
-    assert "QL_Steamworks_PrepareCallbackObject( &callbackState->serversConnected, QL_STEAM_CALLBACK_STEAM_SERVERS_CONNECTED, sizeof( ql_steam_servers_connected_raw_t ), qtrue" in register_callbacks_block
-    assert "QL_Steamworks_PrepareCallbackObject( &callbackState->gsStatsReceived, QL_STEAM_CALLBACK_GS_STATS_RECEIVED, sizeof( ql_steam_gs_stats_received_raw_t ), qtrue" in register_callbacks_block
-    assert "QL_Steamworks_PrepareCallbackObject( &callbackState->gsStatsStored, QL_STEAM_CALLBACK_GS_STATS_STORED, sizeof( ql_steam_gs_stats_stored_raw_t ), qtrue" in register_callbacks_block
+    assert "QL_Steamworks_PrepareCallbackObject( &callbackState->serversConnected, QL_STEAM_CALLBACK_STEAM_SERVERS_CONNECTED, QL_STEAM_CALLBACK_SIZE_SERVERS_CONNECTED, qtrue" in register_callbacks_block
+    assert "QL_Steamworks_PrepareCallbackObject( &callbackState->gsStatsReceived, QL_STEAM_CALLBACK_GS_STATS_RECEIVED, QL_STEAM_CALLBACK_SIZE_GS_STATS_RECEIVED, qtrue" in register_callbacks_block
+    assert "QL_Steamworks_PrepareCallbackObject( &callbackState->gsStatsStored, QL_STEAM_CALLBACK_GS_STATS_STORED, QL_STEAM_CALLBACK_SIZE_GS_STATS_STORED, qtrue" in register_callbacks_block
     assert "QL_Steamworks_RegisterCallbackObject( &callbackState->gsStatsReceived )" in register_callbacks_block
     assert "QL_Steamworks_RegisterCallbackObject( &callbackState->gsStatsStored )" in register_callbacks_block
     assert "QL_Steamworks_UnregisterCallbackObject( &callbackState->gsStatsStored );" in unregister_callbacks_block
@@ -21799,6 +33043,6 @@ def test_steam_workshop_queue_helpers_track_retail_reference_rows() -> None:
     assert "FS_Restart( clc.checksumFeed );" in frame_block
     assert 'Com_Printf( "Steamworks downloads complete\\n" );' in frame_block
     assert "CL_DownloadsComplete();" in frame_block
-    assert "vtable[0xd0 / 4]" in get_item_state_block
-    assert "vtable[0xdc / 4]" in download_item_block
+    assert "vtable[QL_STEAM_UGC_GET_ITEM_STATE_SLOT]" in get_item_state_block
+    assert "vtable[QL_STEAM_UGC_DOWNLOAD_ITEM_SLOT]" in download_item_block
     assert "return fn( ugc, NULL, idLow, idHigh, highPriority ? 1 : 0 ) ? qtrue : qfalse;" in download_item_block

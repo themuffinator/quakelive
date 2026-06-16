@@ -106,6 +106,7 @@
     <QLRequireSteamworksSdk Condition="'$(QLRequireSteamworksSdk)'==''">0</QLRequireSteamworksSdk>
     <QLUseAwesomiumSdk Condition="'$(QLUseAwesomiumSdk)'==''">0</QLUseAwesomiumSdk>
     <QLRequireAwesomiumSdk Condition="'$(QLRequireAwesomiumSdk)'==''">0</QLRequireAwesomiumSdk>
+    <QLRequireZmqRuntime Condition="'$(QLRequireZmqRuntime)'==''">0</QLRequireZmqRuntime>
     <QLEnableOgg Condition="'$(QLEnableOgg)'==''">1</QLEnableOgg>
     <QLEnablePng Condition="'$(QLEnablePng)'=='' and Exists('$(ProjectDir)..\libs\libpng\include\png.h') and ((Exists('$(ProjectDir)..\libs\libpng\lib\Win32\libpng16_static.lib') and Exists('$(ProjectDir)..\libs\libpng\lib\Win32\zlibstatic.lib')) or (Exists('$(ProjectDir)..\libs\libpng\lib\Win32\libpng16_staticd.lib') and Exists('$(ProjectDir)..\libs\libpng\lib\Win32\zlibstaticd.lib')))">1</QLEnablePng>
     <QLEnablePng Condition="'$(QLEnablePng)'==''">0</QLEnablePng>
@@ -129,6 +130,13 @@
     <AwesomiumRuntimeDir Condition="'$(AwesomiumRuntimeDir)'==''"></AwesomiumRuntimeDir>
     <AwesomiumRuntimeDll Condition="'$(AwesomiumRuntimeDir)'!=''">$(AwesomiumRuntimeDir)\awesomium.dll</AwesomiumRuntimeDll>
     <AwesomiumRuntimeDll Condition="'$(AwesomiumRuntimeDir)'==''"></AwesomiumRuntimeDll>
+  </PropertyGroup>
+  <PropertyGroup Label="ZmqRuntime">
+    <ZmqRuntimeDir Condition="'$(ZmqRuntimeDir)'=='' and '$(ZMQ_RUNTIME_DIR)'!=''">$(ZMQ_RUNTIME_DIR)</ZmqRuntimeDir>
+    <ZmqRuntimeDir Condition="'$(ZmqRuntimeDir)'=='' and Exists('$(ProjectDir)..\libs\libzmq\bin\Win32\libzmq.dll')">$(ProjectDir)..\libs\libzmq\bin\Win32</ZmqRuntimeDir>
+    <ZmqRuntimeDir Condition="'$(ZmqRuntimeDir)'==''"></ZmqRuntimeDir>
+    <ZmqRuntimeDll Condition="'$(ZmqRuntimeDir)'!=''">$(ZmqRuntimeDir)\libzmq.dll</ZmqRuntimeDll>
+    <ZmqRuntimeDll Condition="'$(ZmqRuntimeDir)'==''"></ZmqRuntimeDll>
   </PropertyGroup>
   <PropertyGroup Label="VorbisSdk">
     <VorbisSdkDir>$(ProjectDir)..\libs\vorbis</VorbisSdkDir>
@@ -260,6 +268,13 @@
     <Error Condition="'$(AwesomiumSdkDir)'!='' and !Exists('$(AwesomiumRuntimeDir)\libGLESv2.dll')" Text="The Awesomium runtime sidecar '$(AwesomiumRuntimeDir)\libGLESv2.dll' was not found. Set AwesomiumSdkDir to a complete external Awesomium runtime folder." />
     <Message Condition="'$(AwesomiumSdkDir)'!=''" Text="Awesomium support enabled with external SDK (headers: $(AwesomiumIncludeDir), runtime: $(AwesomiumRuntimeDll)). The SDK remains external and is not vendored." Importance="High" />
   </Target>
+  <Target Name="ValidateZmqRuntime" BeforeTargets="ClCompile" Condition="'$(QLBuildOnlineServices)'!='0'">
+    <Error Condition="'$(QLRequireZmqRuntime)'!='0' and '$(ZmqRuntimeDir)'==''" Text="ZMQ transport is enabled and QLRequireZmqRuntime=1, but no external libzmq runtime path was provided. Set ZmqRuntimeDir or ZMQ_RUNTIME_DIR, or place a local untracked runtime at src\libs\libzmq\bin\Win32\libzmq.dll; do not commit libzmq source or binaries." />
+    <Message Condition="'$(QLRequireZmqRuntime)'=='0' and '$(ZmqRuntimeDir)'==''" Text="ZMQ transport is enabled without ZmqRuntimeDir/ZMQ_RUNTIME_DIR. sv_zmq.c will compile the dynamic loader, but libzmq.dll must be supplied beside the executable or on PATH at runtime." Importance="High" />
+    <Error Condition="'$(ZmqRuntimeDir)'!='' and !Exists('$(ZmqRuntimeDir)')" Text="ZmqRuntimeDir '$(ZmqRuntimeDir)' was not found. Set it to a local directory containing libzmq.dll or build with QLBuildOnlineServices=0." />
+    <Error Condition="'$(ZmqRuntimeDir)'!='' and !Exists('$(ZmqRuntimeDll)')" Text="The libzmq runtime was not found at '$(ZmqRuntimeDll)'. Set ZmqRuntimeDir to a directory containing libzmq.dll." />
+    <Message Condition="'$(ZmqRuntimeDir)'!=''" Text="ZMQ transport enabled with external libzmq runtime: $(ZmqRuntimeDll). libzmq remains external and is not vendored." Importance="High" />
+  </Target>
   <Target Name="ValidateVorbis" BeforeTargets="ClCompile" Condition="'$(QLEnableOgg)'=='1'">
     <Error Condition="!Exists('$(VorbisIncludeDir)')" Text="Repo-managed Vorbis include path '$(VorbisIncludeDir)' was not found. Bootstrap the internal codec dependencies or set QLEnableOgg=0 for dedicated-only builds." />
     <Error Condition="!Exists('$(VorbisIncludeDir)\\vorbis\\vorbisfile.h')" Text="Repo-managed Vorbis headers are missing under $(VorbisIncludeDir). Bootstrap the internal codec dependencies or set QLEnableOgg=0." />
@@ -287,6 +302,9 @@
   <Target Name="CopyAwesomiumRuntime" AfterTargets="Build" Condition="'$(QLBuildOnlineServices)'!='0' and '$(AwesomiumRuntimeDir)'!=''">
     <Copy SourceFiles="@(AwesomiumRuntimeRootFile)" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" Condition="'@(AwesomiumRuntimeRootFile)'!=''" />
     <Copy SourceFiles="@(AwesomiumRuntimeLocaleFile)" DestinationFiles="@(AwesomiumRuntimeLocaleFile->'$(OutDir)locales\%(RecursiveDir)%(Filename)%(Extension)')" SkipUnchangedFiles="true" Condition="'@(AwesomiumRuntimeLocaleFile)'!=''" />
+  </Target>
+  <Target Name="CopyZmqRuntime" AfterTargets="Build" Condition="'$(QLBuildOnlineServices)'!='0' and '$(ZmqRuntimeDll)'!='' and Exists('$(ZmqRuntimeDll)')">
+    <Copy SourceFiles="$(ZmqRuntimeDll)" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" />
   </Target>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release TA|Win32'">
     <ClCompile>

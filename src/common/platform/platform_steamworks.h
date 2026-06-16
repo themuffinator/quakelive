@@ -75,6 +75,10 @@ typedef struct {
 #define QL_STEAM_SERVER_BROWSER_RULE_VALUE_LENGTH 256
 #define QL_STEAM_SERVER_BROWSER_PLAYER_NAME_LENGTH 64
 #define QL_STEAM_SERVER_BROWSER_DETAIL_COMPLETION_TARGET 3
+#define QL_STEAM_SERVER_BROWSER_DETAIL_TERMINAL_PING 0x01u
+#define QL_STEAM_SERVER_BROWSER_DETAIL_TERMINAL_RULES 0x02u
+#define QL_STEAM_SERVER_BROWSER_DETAIL_TERMINAL_PLAYERS 0x04u
+#define QL_STEAM_SERVER_BROWSER_DETAIL_TERMINAL_ALL (QL_STEAM_SERVER_BROWSER_DETAIL_TERMINAL_PING | QL_STEAM_SERVER_BROWSER_DETAIL_TERMINAL_RULES | QL_STEAM_SERVER_BROWSER_DETAIL_TERMINAL_PLAYERS)
 #define QL_STEAM_SERVER_BROWSER_DETAIL_RULES_RESPONSE_OFFSET 0
 #define QL_STEAM_SERVER_BROWSER_DETAIL_PLAYERS_RESPONSE_OFFSET 4
 #define QL_STEAM_SERVER_BROWSER_DETAIL_PING_RESPONSE_OFFSET 8
@@ -157,6 +161,7 @@ typedef struct {
 typedef struct {
 	ql_steam_server_browser_detail_identity_t identity;
 	int completedCallbacks;
+	uint32_t completedTerminalChannels;
 	qboolean releaseReady;
 } ql_steam_server_browser_detail_lifecycle_t;
 
@@ -688,6 +693,8 @@ qboolean QL_Steamworks_InitServerBrowserDetailLifecycle( uint32_t serverIp, uint
 
 qboolean QL_Steamworks_CompleteServerBrowserDetailCallback( ql_steam_server_browser_detail_lifecycle_t *lifecycle, qboolean *outReleaseReady );
 
+qboolean QL_Steamworks_CompleteServerBrowserDetailTerminal( ql_steam_server_browser_detail_lifecycle_t *lifecycle, uint32_t terminalChannel, qboolean *outReleaseReady );
+
 qboolean QL_Steamworks_BuildServerBrowserDetailResponseViews( void *detailObjectBase, ql_steam_server_browser_detail_response_views_t *outViews );
 
 void QL_Steamworks_InitServerBrowserDetailRequest( ql_steam_server_browser_detail_request_t *request );
@@ -695,6 +702,8 @@ void QL_Steamworks_InitServerBrowserDetailRequest( ql_steam_server_browser_detai
 qboolean QL_Steamworks_BeginServerBrowserDetailRequest( ql_steam_server_browser_detail_request_t *request, uint32_t serverIp, uint16_t serverPort, void *detailObjectBase );
 
 qboolean QL_Steamworks_CompleteServerBrowserDetailRequestCallback( ql_steam_server_browser_detail_request_t *request, qboolean *outReleaseReady );
+
+qboolean QL_Steamworks_CompleteServerBrowserDetailRequestTerminal( ql_steam_server_browser_detail_request_t *request, uint32_t terminalChannel, qboolean *outReleaseReady );
 
 void QL_Steamworks_ReleaseServerListRequest( ql_steam_server_list_request_t request );
 
@@ -2351,6 +2360,22 @@ static inline qboolean QL_Steamworks_CompleteServerBrowserDetailCallback( ql_ste
 
 /*
 =============
+QL_Steamworks_CompleteServerBrowserDetailTerminal
+=============
+*/
+static inline qboolean QL_Steamworks_CompleteServerBrowserDetailTerminal( ql_steam_server_browser_detail_lifecycle_t *lifecycle, uint32_t terminalChannel, qboolean *outReleaseReady ) {
+	(void)terminalChannel;
+	if ( lifecycle ) {
+		memset( lifecycle, 0, sizeof( *lifecycle ) );
+	}
+	if ( outReleaseReady ) {
+		*outReleaseReady = qfalse;
+	}
+	return qfalse;
+}
+
+/*
+=============
 QL_Steamworks_BuildServerBrowserDetailResponseViews
 =============
 */
@@ -2394,6 +2419,22 @@ QL_Steamworks_CompleteServerBrowserDetailRequestCallback
 =============
 */
 static inline qboolean QL_Steamworks_CompleteServerBrowserDetailRequestCallback( ql_steam_server_browser_detail_request_t *request, qboolean *outReleaseReady ) {
+	if ( request ) {
+		memset( request, 0, sizeof( *request ) );
+	}
+	if ( outReleaseReady ) {
+		*outReleaseReady = qfalse;
+	}
+	return qfalse;
+}
+
+/*
+=============
+QL_Steamworks_CompleteServerBrowserDetailRequestTerminal
+=============
+*/
+static inline qboolean QL_Steamworks_CompleteServerBrowserDetailRequestTerminal( ql_steam_server_browser_detail_request_t *request, uint32_t terminalChannel, qboolean *outReleaseReady ) {
+	(void)terminalChannel;
 	if ( request ) {
 		memset( request, 0, sizeof( *request ) );
 	}

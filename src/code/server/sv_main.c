@@ -309,6 +309,10 @@ void SV_SteamServerNetworkingFrame( void ) {
 		return;
 	}
 
+	if ( !com_sv_running || !com_sv_running->integer ) {
+		return;
+	}
+
 	QL_Steamworks_RunServerCallbacks();
 	SV_SteamServerUpdatePublishedState( qfalse );
 
@@ -1091,43 +1095,49 @@ void SV_SteamServerUpdatePublishedState( qboolean fullUpdate ) {
 
 	botCount = 0;
 
-	for ( i = 0, cl = svs.clients; i < sv_maxclients->integer; i++, cl++ ) {
-		CSteamID		steamId;
-		const char		*rawName;
-		char			playerName[MAX_NAME_LENGTH + 8];
-		playerState_t	*playerState;
+	if ( svs.clients && sv_maxclients ) {
+		for ( i = 0, cl = svs.clients; i < sv_maxclients->integer; i++, cl++ ) {
+			CSteamID		steamId;
+			const char		*rawName;
+			char			playerName[MAX_NAME_LENGTH + 8];
+			playerState_t	*playerState;
 
-		if ( cl->state < CS_CONNECTED ) {
-			continue;
-		}
+			if ( cl->state < CS_CONNECTED ) {
+				continue;
+			}
 
-		if ( SV_ClientIsBot( cl ) ) {
-			botCount++;
-		}
+			if ( SV_ClientIsBot( cl ) ) {
+				botCount++;
+			}
 
-		if ( !SV_GetClientSteamId( cl, &steamId ) ) {
-			continue;
-		}
+			if ( !SV_GetClientSteamId( cl, &steamId ) ) {
+				continue;
+			}
 
-		rawName = Info_ValueForKey( cl->userinfo, "name" );
-		if ( !rawName || !rawName[0] ) {
-			rawName = cl->name;
-		}
+			rawName = Info_ValueForKey( cl->userinfo, "name" );
+			if ( !rawName || !rawName[0] ) {
+				rawName = cl->name;
+			}
 
-		if ( SV_ClientIsBot( cl ) ) {
-			Com_sprintf( playerName, sizeof( playerName ), "(Bot) %s", rawName );
-		} else {
-			Q_strncpyz( playerName, rawName, sizeof( playerName ) );
-		}
+			if ( SV_ClientIsBot( cl ) ) {
+				Com_sprintf( playerName, sizeof( playerName ), "(Bot) %s", rawName );
+			} else {
+				Q_strncpyz( playerName, rawName, sizeof( playerName ) );
+			}
 
-		playerState = SV_GameClientNum( i );
-		if ( !playerState ) {
-			continue;
-		}
+			if ( !sv.gameClients || sv.gameClientSize <= 0 ) {
+				continue;
+			}
 
-		if ( !QL_Steamworks_ServerUpdateUserData( &steamId, playerName, (uint32_t)playerState->persistant[PERS_SCORE] ) ) {
-			Com_sprintf( detail, sizeof( detail ), "publish failed for client %d (%s)", i, playerName );
-			SV_LogSteamServerPublishedState( &steamId, "user-data", detail );
+			playerState = SV_GameClientNum( i );
+			if ( !playerState ) {
+				continue;
+			}
+
+			if ( !QL_Steamworks_ServerUpdateUserData( &steamId, playerName, (uint32_t)playerState->persistant[PERS_SCORE] ) ) {
+				Com_sprintf( detail, sizeof( detail ), "publish failed for client %d (%s)", i, playerName );
+				SV_LogSteamServerPublishedState( &steamId, "user-data", detail );
+			}
 		}
 	}
 

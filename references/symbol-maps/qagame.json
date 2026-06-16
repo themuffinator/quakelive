@@ -8947,7 +8947,7 @@
         "0x10087F74"
       ],
       "relocation_refs": [],
-      "comment": "Descriptive retail-only deferred `info_tour_point` finisher. It optionally hides overlapping ET_ITEM entities except persistant-powerup and team items, reapplies that hide path to matching tutorial targets, resolves `tourPointTarget` through `G_Find(..., FOFS(targetname), ...)`, preserves the missing tour-point diagnostic, and only then links the live entity."
+      "comment": "Source-backed deferred `info_tour_point` finisher from g_misc.c::FinishSpawningTourPoint. It optionally hides overlapping ET_ITEM entities except persistant-powerup and team items, reapplies that hide path to matching tutorial targets, resolves `tourPointTarget` through `G_Find(..., FOFS(targetname), ...)`, preserves the missing tour-point diagnostic, and only then links the live entity."
     },
     {
       "address": "0x1005A1F0",
@@ -8955,9 +8955,12 @@
       "normalized_name": "SP_info_tour_point",
       "status": "matched",
       "signature": "void SP_info_tour_point(gentity_t *ent)",
-      "string_refs": [],
+      "string_refs": [
+        "0x10087F74",
+        "0x10087FA4"
+      ],
       "relocation_refs": [],
-      "comment": "Exact QL-only G_CallSpawn dispatch-table constructor anchored by the preserved `info_tour_point with no tourPointTarget...` diagnostics and the retail `radius`, `cvarValue`, `printChatTextTime`, `ignorePlayerLocation`, and `noise` spawnvars."
+      "comment": "Source-backed QL-only G_CallSpawn dispatch-table constructor from g_misc.c::SP_info_tour_point. It preserves the missing `tourPointTargetName` free path for non-start points, copies `tourPointTargetName` / `tourPointTarget`, reads the retail `radius`, `cvarValue`, `printChatTextTime`, `ignorePlayerLocation`, and `noise` spawnvars, initializes the general entity bounds, and defers to `FinishSpawningTourPoint`."
     },
     {
       "address": "0x1005A420",

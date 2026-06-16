@@ -33,13 +33,182 @@
 #define QLR_THISCALL
 #endif
 
+#define QLR_STEAMWORKS_EXPORT_STEAM_API_INIT "SteamAPI_Init"
+#define QLR_STEAMWORKS_EXPORT_STEAM_API_SHUTDOWN "SteamAPI_Shutdown"
+#define QLR_STEAMWORKS_EXPORT_STEAM_API_RUN_CALLBACKS "SteamAPI_RunCallbacks"
+#define QLR_STEAMWORKS_EXPORT_STEAM_API_REGISTER_CALLBACK "SteamAPI_RegisterCallback"
+#define QLR_STEAMWORKS_EXPORT_STEAM_API_UNREGISTER_CALLBACK "SteamAPI_UnregisterCallback"
+#define QLR_STEAMWORKS_EXPORT_STEAM_API_REGISTER_CALL_RESULT "SteamAPI_RegisterCallResult"
+#define QLR_STEAMWORKS_EXPORT_STEAM_API_UNREGISTER_CALL_RESULT "SteamAPI_UnregisterCallResult"
+#define QLR_STEAMWORKS_EXPORT_STEAM_USER "SteamUser"
+#define QLR_STEAMWORKS_EXPORT_STEAM_API_STEAM_USER "SteamAPI_SteamUser"
+#define QLR_STEAMWORKS_EXPORT_STEAM_FRIENDS "SteamFriends"
+#define QLR_STEAMWORKS_EXPORT_STEAM_API_STEAM_FRIENDS "SteamAPI_SteamFriends"
+#define QLR_STEAMWORKS_EXPORT_STEAM_NETWORKING "SteamNetworking"
+#define QLR_STEAMWORKS_EXPORT_STEAM_API_STEAM_NETWORKING "SteamAPI_SteamNetworking"
+#define QLR_STEAMWORKS_EXPORT_STEAM_UTILS "SteamUtils"
+#define QLR_STEAMWORKS_EXPORT_STEAM_API_STEAM_UTILS "SteamAPI_SteamUtils"
+#define QLR_STEAMWORKS_EXPORT_STEAM_USER_STATS "SteamUserStats"
+#define QLR_STEAMWORKS_EXPORT_STEAM_API_STEAM_USER_STATS "SteamAPI_SteamUserStats"
+#define QLR_STEAMWORKS_EXPORT_STEAM_MATCHMAKING "SteamMatchmaking"
+#define QLR_STEAMWORKS_EXPORT_STEAM_API_STEAM_MATCHMAKING "SteamAPI_SteamMatchmaking"
+#define QLR_STEAMWORKS_EXPORT_STEAM_MATCHMAKING_SERVERS "SteamMatchmakingServers"
+#define QLR_STEAMWORKS_EXPORT_STEAM_API_STEAM_MATCHMAKING_SERVERS "SteamAPI_SteamMatchmakingServers"
+#define QLR_STEAMWORKS_EXPORT_STEAM_APPS "SteamApps"
+#define QLR_STEAMWORKS_EXPORT_STEAM_API_STEAM_APPS "SteamAPI_SteamApps"
+#define QLR_STEAMWORKS_EXPORT_STEAM_UGC "SteamUGC"
+#define QLR_STEAMWORKS_EXPORT_STEAM_API_STEAM_UGC "SteamAPI_SteamUGC"
+#define QLR_STEAMWORKS_EXPORT_STEAM_API_ISTEAMUSER_GET_AUTH_SESSION_TICKET "SteamAPI_ISteamUser_GetAuthSessionTicket"
+#define QLR_STEAMWORKS_EXPORT_STEAM_API_ISTEAMUSER_GET_AUTH_TICKET_FOR_WEB_API "SteamAPI_ISteamUser_GetAuthTicketForWebApi"
+#define QLR_STEAMWORKS_EXPORT_STEAM_API_ISTEAMUSER_BEGIN_AUTH_SESSION "SteamAPI_ISteamUser_BeginAuthSession"
+#define QLR_STEAMWORKS_EXPORT_STEAM_API_ISTEAMUSER_CANCEL_AUTH_TICKET "SteamAPI_ISteamUser_CancelAuthTicket"
+#define QLR_STEAMWORKS_EXPORT_STEAM_API_ISTEAMUSER_END_AUTH_SESSION "SteamAPI_ISteamUser_EndAuthSession"
+#define QLR_STEAMWORKS_EXPORT_STEAM_API_ISTEAMUSER_GET_STEAM_ID "SteamAPI_ISteamUser_GetSteamID"
+#define QLR_STEAMWORKS_EXPORT_STEAM_GAME_SERVER "SteamGameServer"
+#define QLR_STEAMWORKS_EXPORT_STEAM_GAME_SERVER_STATS "SteamGameServerStats"
+#define QLR_STEAMWORKS_EXPORT_STEAM_GAME_SERVER_UTILS "SteamGameServerUtils"
+#define QLR_STEAMWORKS_EXPORT_STEAM_GAME_SERVER_UGC "SteamGameServerUGC"
+#define QLR_STEAMWORKS_EXPORT_STEAM_GAME_SERVER_INIT "SteamGameServer_Init"
+#define QLR_STEAMWORKS_EXPORT_STEAM_GAME_SERVER_SHUTDOWN "SteamGameServer_Shutdown"
+#define QLR_STEAMWORKS_EXPORT_STEAM_GAME_SERVER_RUN_CALLBACKS "SteamGameServer_RunCallbacks"
+#define QLR_STEAMWORKS_EXPORT_STEAM_GAME_SERVER_NETWORKING "SteamGameServerNetworking"
+
 #define QLR_MAX_CALLBACK_REGISTRATIONS 32
 #define QLR_MAX_PENDING_CALLBACKS 32
 #define QLR_MAX_SUBSCRIBED_ITEMS 32
 #define QLR_STEAM_CALLBACK_FLAG_GAMESERVER 0x02
 #define QLR_STEAM_CALLBACK_GET_TICKET_FOR_WEB_API_RESPONSE 0xa8
+#define QLR_STEAM_ERESULT_OK 1
+#define QLR_STEAM_UGC_DETAILS_PUBLISHED_FILE_ID_OFFSET 0x00
+#define QLR_STEAM_UGC_DETAILS_PUBLISHED_FILE_ID_SIZE 0x08
 #define QLR_STEAM_UGC_DETAILS_TITLE_OFFSET 0x18
 #define QLR_STEAM_UGC_DETAILS_DESCRIPTION_OFFSET 0x99
+#define QLR_STEAM_NETWORKING_SEND_P2P_PACKET_SLOT 0
+#define QLR_STEAM_NETWORKING_IS_P2P_PACKET_AVAILABLE_SLOT 1
+#define QLR_STEAM_NETWORKING_READ_P2P_PACKET_SLOT 2
+#define QLR_STEAM_NETWORKING_ACCEPT_P2P_SESSION_SLOT (0x0c / 4)
+#define QLR_STEAM_NETWORKING_VTABLE_SLOT_COUNT (QLR_STEAM_NETWORKING_ACCEPT_P2P_SESSION_SLOT + 1)
+#define QLR_STEAM_MATCHMAKING_ADD_FAVORITE_GAME_SLOT (0x08 / 4)
+#define QLR_STEAM_MATCHMAKING_REMOVE_FAVORITE_GAME_SLOT (0x0c / 4)
+#define QLR_STEAM_MATCHMAKING_CREATE_LOBBY_SLOT (0x34 / 4)
+#define QLR_STEAM_MATCHMAKING_JOIN_LOBBY_SLOT (0x38 / 4)
+#define QLR_STEAM_MATCHMAKING_LEAVE_LOBBY_SLOT (0x3c / 4)
+#define QLR_STEAM_MATCHMAKING_INVITE_USER_TO_LOBBY_SLOT (0x40 / 4)
+#define QLR_STEAM_MATCHMAKING_GET_NUM_LOBBY_MEMBERS_SLOT (0x44 / 4)
+#define QLR_STEAM_MATCHMAKING_GET_LOBBY_MEMBER_BY_INDEX_SLOT (0x48 / 4)
+#define QLR_STEAM_MATCHMAKING_SET_LOBBY_DATA_SLOT (0x50 / 4)
+#define QLR_STEAM_MATCHMAKING_GET_LOBBY_DATA_COUNT_SLOT (0x54 / 4)
+#define QLR_STEAM_MATCHMAKING_GET_LOBBY_DATA_BY_INDEX_SLOT (0x58 / 4)
+#define QLR_STEAM_MATCHMAKING_SEND_LOBBY_CHAT_MSG_SLOT (0x68 / 4)
+#define QLR_STEAM_MATCHMAKING_GET_LOBBY_CHAT_ENTRY_SLOT (0x6c / 4)
+#define QLR_STEAM_MATCHMAKING_SET_LOBBY_GAME_SERVER_SLOT (0x74 / 4)
+#define QLR_STEAM_MATCHMAKING_GET_LOBBY_MEMBER_LIMIT_SLOT (0x80 / 4)
+#define QLR_STEAM_MATCHMAKING_GET_LOBBY_OWNER_SLOT (0x8c / 4)
+#define QLR_STEAM_MATCHMAKING_VTABLE_SLOT_COUNT (QLR_STEAM_MATCHMAKING_GET_LOBBY_OWNER_SLOT + 1)
+#define QLR_STEAM_MATCHMAKING_SERVERS_REQUEST_INTERNET_SERVER_LIST_SLOT 0
+#define QLR_STEAM_MATCHMAKING_SERVERS_REQUEST_LAN_SERVER_LIST_SLOT (0x04 / 4)
+#define QLR_STEAM_MATCHMAKING_SERVERS_REQUEST_FRIENDS_SERVER_LIST_SLOT (0x08 / 4)
+#define QLR_STEAM_MATCHMAKING_SERVERS_REQUEST_FAVORITES_SERVER_LIST_SLOT (0x0c / 4)
+#define QLR_STEAM_MATCHMAKING_SERVERS_REQUEST_HISTORY_SERVER_LIST_SLOT (0x10 / 4)
+#define QLR_STEAM_MATCHMAKING_SERVERS_RELEASE_REQUEST_SLOT (0x18 / 4)
+#define QLR_STEAM_MATCHMAKING_SERVERS_GET_SERVER_DETAILS_SLOT (0x1c / 4)
+#define QLR_STEAM_MATCHMAKING_SERVERS_REFRESH_QUERY_SLOT (0x24 / 4)
+#define QLR_STEAM_MATCHMAKING_SERVERS_PING_SERVER_SLOT (0x34 / 4)
+#define QLR_STEAM_MATCHMAKING_SERVERS_PLAYER_DETAILS_SLOT (0x38 / 4)
+#define QLR_STEAM_MATCHMAKING_SERVERS_SERVER_RULES_SLOT (0x3c / 4)
+#define QLR_STEAM_MATCHMAKING_SERVERS_CANCEL_SERVER_QUERY_SLOT (0x40 / 4)
+#define QLR_STEAM_MATCHMAKING_SERVERS_VTABLE_SLOT_COUNT (QLR_STEAM_MATCHMAKING_SERVERS_CANCEL_SERVER_QUERY_SLOT + 1)
+#define QLR_STEAM_GAMESERVER_SET_PRODUCT_SLOT (0x04 / 4)
+#define QLR_STEAM_GAMESERVER_SET_GAME_DESCRIPTION_SLOT (0x08 / 4)
+#define QLR_STEAM_GAMESERVER_SET_GAME_DIR_SLOT (0x0c / 4)
+#define QLR_STEAM_GAMESERVER_SET_DEDICATED_SLOT (0x10 / 4)
+#define QLR_STEAM_GAMESERVER_LOG_ON_SLOT (0x14 / 4)
+#define QLR_STEAM_GAMESERVER_LOG_ON_ANONYMOUS_SLOT (0x18 / 4)
+#define QLR_STEAM_GAMESERVER_BLOGGED_ON_SLOT (0x20 / 4)
+#define QLR_STEAM_GAMESERVER_GET_STEAM_ID_SLOT (0x28 / 4)
+#define QLR_STEAM_GAMESERVER_SET_MAX_PLAYER_COUNT_SLOT (0x30 / 4)
+#define QLR_STEAM_GAMESERVER_SET_BOT_PLAYER_COUNT_SLOT (0x34 / 4)
+#define QLR_STEAM_GAMESERVER_SET_SERVER_NAME_SLOT (0x38 / 4)
+#define QLR_STEAM_GAMESERVER_SET_MAP_NAME_SLOT (0x3c / 4)
+#define QLR_STEAM_GAMESERVER_SET_PASSWORD_PROTECTED_SLOT (0x40 / 4)
+#define QLR_STEAM_GAMESERVER_SET_KEY_VALUE_SLOT (0x50 / 4)
+#define QLR_STEAM_GAMESERVER_SET_GAME_TAGS_SLOT (0x54 / 4)
+#define QLR_STEAM_GAMESERVER_CREATE_UNAUTHENTICATED_USER_SLOT (0x64 / 4)
+#define QLR_STEAM_GAMESERVER_UPDATE_USER_DATA_SLOT (0x6c / 4)
+#define QLR_STEAM_GAMESERVER_BEGIN_AUTH_SESSION_SLOT (0x74 / 4)
+#define QLR_STEAM_GAMESERVER_END_AUTH_SESSION_SLOT (0x78 / 4)
+#define QLR_STEAM_GAMESERVER_GET_PUBLIC_IP_SLOT (0x90 / 4)
+#define QLR_STEAM_GAMESERVER_HANDLE_INCOMING_PACKET_SLOT (0x94 / 4)
+#define QLR_STEAM_GAMESERVER_GET_NEXT_OUTGOING_PACKET_SLOT (0x98 / 4)
+#define QLR_STEAM_GAMESERVER_ENABLE_HEARTBEATS_SLOT (0x9c / 4)
+#define QLR_STEAM_GAMESERVER_VTABLE_SLOT_COUNT (QLR_STEAM_GAMESERVER_ENABLE_HEARTBEATS_SLOT + 1)
+#define QLR_STEAM_GAMESERVER_UTILS_GET_APP_ID_SLOT (0x24 / 4)
+#define QLR_STEAM_GAMESERVER_UTILS_VTABLE_SLOT_COUNT (QLR_STEAM_GAMESERVER_UTILS_GET_APP_ID_SLOT + 1)
+#define QLR_STEAM_APPS_BIS_SUBSCRIBED_APP_SLOT (0x1c / 4)
+#define QLR_STEAM_APPS_VTABLE_SLOT_COUNT (QLR_STEAM_APPS_BIS_SUBSCRIBED_APP_SLOT + 1)
+#define QLR_STEAM_GAMESERVERSTATS_REQUEST_USER_STATS_SLOT 0
+#define QLR_STEAM_GAMESERVERSTATS_GET_USER_STAT_FLOAT_SLOT (0x04 / 4)
+#define QLR_STEAM_GAMESERVERSTATS_GET_USER_STAT_INT_SLOT (0x08 / 4)
+#define QLR_STEAM_GAMESERVERSTATS_GET_USER_ACHIEVEMENT_SLOT (0x0c / 4)
+#define QLR_STEAM_GAMESERVERSTATS_SET_USER_STAT_FLOAT_SLOT (0x10 / 4)
+#define QLR_STEAM_GAMESERVERSTATS_SET_USER_STAT_INT_SLOT (0x14 / 4)
+#define QLR_STEAM_GAMESERVERSTATS_UPDATE_AVG_RATE_STAT_SLOT (0x18 / 4)
+#define QLR_STEAM_GAMESERVERSTATS_SET_USER_ACHIEVEMENT_SLOT (0x1c / 4)
+#define QLR_STEAM_GAMESERVERSTATS_STORE_USER_STATS_SLOT (0x24 / 4)
+#define QLR_STEAM_GAMESERVERSTATS_VTABLE_SLOT_COUNT (QLR_STEAM_GAMESERVERSTATS_STORE_USER_STATS_SLOT + 1)
+#define QLR_STEAM_UGC_CREATE_QUERY_ALL_UGC_REQUEST_SLOT (0x04 / 4)
+#define QLR_STEAM_UGC_SEND_QUERY_UGC_REQUEST_SLOT (0x0c / 4)
+#define QLR_STEAM_UGC_GET_QUERY_UGC_RESULT_SLOT (0x10 / 4)
+#define QLR_STEAM_UGC_GET_QUERY_UGC_PREVIEW_URL_SLOT (0x14 / 4)
+#define QLR_STEAM_UGC_RELEASE_QUERY_UGC_REQUEST_SLOT (0x34 / 4)
+#define QLR_STEAM_UGC_SUBSCRIBE_ITEM_SLOT (0xc0 / 4)
+#define QLR_STEAM_UGC_UNSUBSCRIBE_ITEM_SLOT (0xc4 / 4)
+#define QLR_STEAM_UGC_GET_NUM_SUBSCRIBED_ITEMS_SLOT (0xc8 / 4)
+#define QLR_STEAM_UGC_GET_SUBSCRIBED_ITEMS_SLOT (0xcc / 4)
+#define QLR_STEAM_UGC_GET_ITEM_STATE_SLOT (0xd0 / 4)
+#define QLR_STEAM_UGC_GET_ITEM_INSTALL_INFO_SLOT (0xd4 / 4)
+#define QLR_STEAM_UGC_GET_ITEM_DOWNLOAD_INFO_SLOT (0xd8 / 4)
+#define QLR_STEAM_UGC_DOWNLOAD_ITEM_SLOT (0xdc / 4)
+#define QLR_STEAM_UGC_VTABLE_SLOT_COUNT (QLR_STEAM_UGC_DOWNLOAD_ITEM_SLOT + 1)
+#define QLR_STEAM_USER_BLOGGED_ON_SLOT (0x04 / 4)
+#define QLR_STEAM_USER_GET_STEAM_ID_SLOT (0x08 / 4)
+#define QLR_STEAM_USER_START_VOICE_RECORDING_SLOT (0x1c / 4)
+#define QLR_STEAM_USER_STOP_VOICE_RECORDING_SLOT (0x20 / 4)
+#define QLR_STEAM_USER_GET_VOICE_SLOT (0x28 / 4)
+#define QLR_STEAM_USER_DECOMPRESS_VOICE_SLOT (0x2c / 4)
+#define QLR_STEAM_USER_GET_VOICE_OPTIMAL_SAMPLE_RATE_SLOT (0x30 / 4)
+#define QLR_STEAM_USER_VTABLE_SLOT_COUNT (QLR_STEAM_USER_GET_VOICE_OPTIMAL_SAMPLE_RATE_SLOT + 1)
+#define QLR_STEAM_FRIENDS_GET_PERSONA_NAME_SLOT 0
+#define QLR_STEAM_FRIENDS_GET_FRIEND_COUNT_SLOT (0x0c / 4)
+#define QLR_STEAM_FRIENDS_GET_FRIEND_BY_INDEX_SLOT (0x10 / 4)
+#define QLR_STEAM_FRIENDS_GET_FRIEND_RELATIONSHIP_SLOT (0x14 / 4)
+#define QLR_STEAM_FRIENDS_GET_FRIEND_PERSONA_STATE_SLOT (0x18 / 4)
+#define QLR_STEAM_FRIENDS_GET_FRIEND_PERSONA_NAME_SLOT (0x1c / 4)
+#define QLR_STEAM_FRIENDS_GET_FRIEND_GAME_PLAYED_SLOT (0x20 / 4)
+#define QLR_STEAM_FRIENDS_GET_PLAYER_NICKNAME_SLOT (0x2c / 4)
+#define QLR_STEAM_FRIENDS_SET_IN_GAME_VOICE_SPEAKING_SLOT (0x6c / 4)
+#define QLR_STEAM_FRIENDS_ACTIVATE_GAME_OVERLAY_TO_USER_SLOT (0x74 / 4)
+#define QLR_STEAM_FRIENDS_ACTIVATE_GAME_OVERLAY_TO_WEB_PAGE_SLOT (0x78 / 4)
+#define QLR_STEAM_FRIENDS_ACTIVATE_GAME_OVERLAY_INVITE_DIALOG_SLOT (0x84 / 4)
+#define QLR_STEAM_FRIENDS_GET_SMALL_FRIEND_AVATAR_SLOT (0x88 / 4)
+#define QLR_STEAM_FRIENDS_GET_MEDIUM_FRIEND_AVATAR_SLOT (0x8c / 4)
+#define QLR_STEAM_FRIENDS_GET_LARGE_FRIEND_AVATAR_SLOT (0x90 / 4)
+#define QLR_STEAM_FRIENDS_SET_RICH_PRESENCE_SLOT (0xac / 4)
+#define QLR_STEAM_FRIENDS_GET_FRIEND_RICH_PRESENCE_SLOT (0xb4 / 4)
+#define QLR_STEAM_FRIENDS_INVITE_USER_TO_GAME_SLOT (0xc4 / 4)
+#define QLR_STEAM_FRIENDS_VTABLE_SLOT_COUNT (QLR_STEAM_FRIENDS_INVITE_USER_TO_GAME_SLOT + 1)
+#define QLR_STEAM_UTILS_GET_IP_COUNTRY_SLOT (0x10 / 4)
+#define QLR_STEAM_UTILS_GET_IMAGE_SIZE_SLOT (0x14 / 4)
+#define QLR_STEAM_UTILS_GET_IMAGE_RGBA_SLOT (0x18 / 4)
+#define QLR_STEAM_UTILS_GET_APP_ID_SLOT (0x24 / 4)
+#define QLR_STEAM_UTILS_VTABLE_SLOT_COUNT (QLR_STEAM_UTILS_GET_APP_ID_SLOT + 1)
+#define QLR_STEAM_USERSTATS_GET_ACHIEVEMENT_DISPLAY_ATTRIBUTE_SLOT (0x30 / 4)
+#define QLR_STEAM_USERSTATS_REQUEST_USER_STATS_SLOT (0x40 / 4)
+#define QLR_STEAM_USERSTATS_GET_USER_STAT_FLOAT_SLOT (0x44 / 4)
+#define QLR_STEAM_USERSTATS_GET_USER_STAT_INT_SLOT (0x48 / 4)
+#define QLR_STEAM_USERSTATS_GET_USER_ACHIEVEMENT_SLOT (0x50 / 4)
+#define QLR_STEAM_USERSTATS_RESET_ALL_STATS_SLOT (0x54 / 4)
+#define QLR_STEAM_USERSTATS_VTABLE_SLOT_COUNT (QLR_STEAM_USERSTATS_RESET_ALL_STATS_SLOT + 1)
 
 typedef struct qlr_callback_base_s qlr_callback_base_t;
 
@@ -106,12 +275,37 @@ typedef struct {
 	int32_t serverVersion;
 	char serverName[QL_STEAM_SERVER_BROWSER_NAME_LENGTH];
 	char gameTags[QL_STEAM_SERVER_BROWSER_TAGS_LENGTH];
-	CSteamID steamId;
+	uint32_t steamIdLow;
+	uint32_t steamIdHigh;
 } qlr_steam_gameserveritem_raw_t;
 
 typedef struct {
 	qboolean library_available;
 	qboolean init_result;
+	qboolean steam_api_init_export_available;
+	qboolean steam_api_shutdown_export_available;
+	qboolean steam_api_run_callbacks_export_available;
+	qboolean steam_api_register_callback_export_available;
+	qboolean steam_api_unregister_callback_export_available;
+	qboolean steam_api_register_call_result_export_available;
+	qboolean steam_api_unregister_call_result_export_available;
+	qboolean steam_user_export_available;
+	qboolean steam_friends_export_available;
+	qboolean steam_utils_export_available;
+	qboolean steam_user_stats_export_available;
+	qboolean steam_networking_export_available;
+	qboolean steam_matchmaking_export_available;
+	qboolean steam_matchmaking_servers_export_available;
+	qboolean steam_apps_export_available;
+	qboolean steam_ugc_export_available;
+	qboolean steam_game_server_export_available;
+	qboolean steam_game_server_stats_export_available;
+	qboolean steam_game_server_utils_export_available;
+	qboolean steam_game_server_ugc_export_available;
+	qboolean steam_game_server_init_export_available;
+	qboolean steam_game_server_shutdown_export_available;
+	qboolean steam_game_server_run_callbacks_export_available;
+	qboolean steam_game_server_networking_export_available;
 	qboolean user_available;
 	qboolean user_logged_on_result;
 	int user_logged_on_calls;
@@ -119,9 +313,18 @@ typedef struct {
 	uint8_t ticket[QLR_TICKET_BUFFER];
 	uint32_t ticket_length;
 	HAuthTicket ticket_handle;
+	qboolean auth_session_ticket_export_available;
+	qboolean begin_auth_session_export_available;
+	qboolean cancel_auth_ticket_export_available;
+	qboolean end_auth_session_export_available;
+	qboolean get_steam_id_export_available;
 	uint8_t web_api_ticket[QLR_WEB_API_TICKET_BUFFER];
 	uint32_t web_api_ticket_length;
 	HAuthTicket web_api_ticket_handle;
+	HAuthTicket web_api_ticket_callback_handle;
+	uint32_t web_api_ticket_callback_length;
+	qboolean web_api_ticket_queue_callback;
+	qboolean web_api_ticket_export_available;
 	int web_api_ticket_result;
 	int web_api_ticket_calls;
 	char web_api_ticket_identity[128];
@@ -133,6 +336,9 @@ typedef struct {
 	int user_steam_id_calls;
 	int ip_country_calls;
 	int app_id_calls;
+	int steam_apps_interface_calls;
+	int steam_apps_subscribed_result;
+	uint32_t steam_apps_last_app_id;
 	int friend_count;
 	uint64_t friend_by_index_id;
 	int friend_count_calls;
@@ -479,6 +685,30 @@ typedef struct {
 static qlr_steamworks_mock_state_t qlr_mock_state = {
 	.library_available = qtrue,
 	.init_result = qtrue,
+	.steam_api_init_export_available = qtrue,
+	.steam_api_shutdown_export_available = qtrue,
+	.steam_api_run_callbacks_export_available = qtrue,
+	.steam_api_register_callback_export_available = qtrue,
+	.steam_api_unregister_callback_export_available = qtrue,
+	.steam_api_register_call_result_export_available = qtrue,
+	.steam_api_unregister_call_result_export_available = qtrue,
+	.steam_user_export_available = qtrue,
+	.steam_friends_export_available = qtrue,
+	.steam_utils_export_available = qtrue,
+	.steam_user_stats_export_available = qtrue,
+	.steam_networking_export_available = qtrue,
+	.steam_matchmaking_export_available = qtrue,
+	.steam_matchmaking_servers_export_available = qtrue,
+	.steam_apps_export_available = qtrue,
+	.steam_ugc_export_available = qtrue,
+	.steam_game_server_export_available = qtrue,
+	.steam_game_server_stats_export_available = qtrue,
+	.steam_game_server_utils_export_available = qtrue,
+	.steam_game_server_ugc_export_available = qtrue,
+	.steam_game_server_init_export_available = qtrue,
+	.steam_game_server_shutdown_export_available = qtrue,
+	.steam_game_server_run_callbacks_export_available = qtrue,
+	.steam_game_server_networking_export_available = qtrue,
 	.user_available = qtrue,
 	.user_logged_on_result = qtrue,
 	.user_logged_on_calls = 0,
@@ -486,10 +716,19 @@ static qlr_steamworks_mock_state_t qlr_mock_state = {
 	.ticket = { 0x12, 0x34, 0x56, 0x78 },
 	.ticket_length = 4,
 	.ticket_handle = 1,
+	.auth_session_ticket_export_available = qtrue,
+	.begin_auth_session_export_available = qtrue,
+	.cancel_auth_ticket_export_available = qtrue,
+	.end_auth_session_export_available = qtrue,
+	.get_steam_id_export_available = qtrue,
 	.web_api_ticket = { 0xAB, 0xCD, 0xEF },
 	.web_api_ticket_length = 3,
 	.web_api_ticket_handle = 41,
-	.web_api_ticket_result = 1,
+	.web_api_ticket_callback_handle = 41,
+	.web_api_ticket_callback_length = 3,
+	.web_api_ticket_queue_callback = qtrue,
+	.web_api_ticket_export_available = qtrue,
+	.web_api_ticket_result = QLR_STEAM_ERESULT_OK,
 	.web_api_ticket_calls = 0,
 	.web_api_ticket_identity = "",
 	.cancelled_ticket_handle = 0,
@@ -500,6 +739,9 @@ static qlr_steamworks_mock_state_t qlr_mock_state = {
 	.user_steam_id_calls = 0,
 	.ip_country_calls = 0,
 	.app_id_calls = 0,
+	.steam_apps_interface_calls = 0,
+	.steam_apps_subscribed_result = qtrue,
+	.steam_apps_last_app_id = 0u,
 	.friend_count = 1,
 	.friend_by_index_id = 0x0123456789ABCDEFULL,
 	.friend_count_calls = 0,
@@ -779,7 +1021,8 @@ static qlr_steamworks_mock_state_t qlr_mock_state = {
 		.serverVersion = 1069,
 		.serverName = "QLR Test Server",
 		.gameTags = "duel,instagib",
-		.steamId = { .value = 0x0123456789ABCDEFULL }
+		.steamIdLow = 0x89ABCDEFu,
+		.steamIdHigh = 0x01234567u
 	},
 	.server_browser_ping_query_result = 11,
 	.server_browser_players_query_result = 12,
@@ -864,6 +1107,8 @@ void *QLR_SteamAPI_SteamFriends( void );
 
 void *QLR_SteamAPI_SteamUtils( void );
 
+void *QLR_SteamAPI_SteamApps( void );
+
 void *QLR_SteamAPI_SteamUserStats( void );
 
 void *QLR_SteamAPI_SteamNetworking( void );
@@ -892,6 +1137,10 @@ void *QLR_SteamAPI_SteamGameServerNetworking( void );
 
 static CSteamID *QLR_FASTCALL QLR_SteamUser_GetSteamID( void *self, void *unused, CSteamID *outSteamId );
 
+static EBeginAuthSessionResult QLR_FASTCALL QLR_SteamGameServer_BeginAuthSession( void *self, void *unused, const void *ticket, int length, CSteamID steamId );
+
+static void QLR_FASTCALL QLR_SteamGameServer_EndAuthSession( void *self, void *unused, CSteamID steamId );
+
 static qboolean QLR_FASTCALL QLR_SteamUser_BLoggedOn( void *self, void *unused );
 
 static void QLR_FASTCALL QLR_SteamUser_StartVoiceRecording( void *self, void *unused );
@@ -903,6 +1152,8 @@ static int QLR_FASTCALL QLR_SteamUser_GetVoice( void *self, void *unused, qboole
 static int QLR_FASTCALL QLR_SteamUser_DecompressVoice( void *self, void *unused, const void *compressedData, uint32_t compressedSize, void *destBuffer, uint32_t destBufferSize, uint32_t *outBytesWritten, uint32_t sampleRate );
 
 static uint32_t QLR_FASTCALL QLR_SteamUser_GetVoiceOptimalSampleRate( void *self, void *unused );
+
+static int QLR_FASTCALL QLR_SteamApps_BIsSubscribedApp( void *self, void *unused, uint32_t appId );
 
 HAuthTicket QLR_SteamAPI_GetAuthSessionTicket( void *user, void *ticket, int ticket_size, uint32_t *length );
 
@@ -980,7 +1231,8 @@ static void QLR_SteamworksMock_ResetServerBrowserDetails( void ) {
 	qlr_mock_state.server_browser_details.serverVersion = 1069;
 	Q_strncpyz( qlr_mock_state.server_browser_details.serverName, "QLR Test Server", sizeof( qlr_mock_state.server_browser_details.serverName ) );
 	Q_strncpyz( qlr_mock_state.server_browser_details.gameTags, "duel,instagib", sizeof( qlr_mock_state.server_browser_details.gameTags ) );
-	qlr_mock_state.server_browser_details.steamId.value = 0x0123456789ABCDEFULL;
+	qlr_mock_state.server_browser_details.steamIdLow = 0x89ABCDEFu;
+	qlr_mock_state.server_browser_details.steamIdHigh = 0x01234567u;
 }
 
 /*
@@ -993,6 +1245,30 @@ Restore default mock state for Steamworks entry points.
 QLR_EXPORT void QLR_SteamworksMock_Reset( void ) {
 	qlr_mock_state.library_available = qtrue;
 	qlr_mock_state.init_result = qtrue;
+	qlr_mock_state.steam_api_init_export_available = qtrue;
+	qlr_mock_state.steam_api_shutdown_export_available = qtrue;
+	qlr_mock_state.steam_api_run_callbacks_export_available = qtrue;
+	qlr_mock_state.steam_api_register_callback_export_available = qtrue;
+	qlr_mock_state.steam_api_unregister_callback_export_available = qtrue;
+	qlr_mock_state.steam_api_register_call_result_export_available = qtrue;
+	qlr_mock_state.steam_api_unregister_call_result_export_available = qtrue;
+	qlr_mock_state.steam_user_export_available = qtrue;
+	qlr_mock_state.steam_friends_export_available = qtrue;
+	qlr_mock_state.steam_utils_export_available = qtrue;
+	qlr_mock_state.steam_user_stats_export_available = qtrue;
+	qlr_mock_state.steam_networking_export_available = qtrue;
+	qlr_mock_state.steam_matchmaking_export_available = qtrue;
+	qlr_mock_state.steam_matchmaking_servers_export_available = qtrue;
+	qlr_mock_state.steam_apps_export_available = qtrue;
+	qlr_mock_state.steam_ugc_export_available = qtrue;
+	qlr_mock_state.steam_game_server_export_available = qtrue;
+	qlr_mock_state.steam_game_server_stats_export_available = qtrue;
+	qlr_mock_state.steam_game_server_utils_export_available = qtrue;
+	qlr_mock_state.steam_game_server_ugc_export_available = qtrue;
+	qlr_mock_state.steam_game_server_init_export_available = qtrue;
+	qlr_mock_state.steam_game_server_shutdown_export_available = qtrue;
+	qlr_mock_state.steam_game_server_run_callbacks_export_available = qtrue;
+	qlr_mock_state.steam_game_server_networking_export_available = qtrue;
 	qlr_mock_state.user_available = qtrue;
 	qlr_mock_state.user_logged_on_result = qtrue;
 	qlr_mock_state.user_logged_on_calls = 0;
@@ -1000,10 +1276,19 @@ QLR_EXPORT void QLR_SteamworksMock_Reset( void ) {
 	memcpy( qlr_mock_state.ticket, (uint8_t[]){ 0x12, 0x34, 0x56, 0x78 }, 4 );
 	qlr_mock_state.ticket_length = 4;
 	qlr_mock_state.ticket_handle = 1;
+	qlr_mock_state.auth_session_ticket_export_available = qtrue;
+	qlr_mock_state.begin_auth_session_export_available = qtrue;
+	qlr_mock_state.cancel_auth_ticket_export_available = qtrue;
+	qlr_mock_state.end_auth_session_export_available = qtrue;
+	qlr_mock_state.get_steam_id_export_available = qtrue;
 	memcpy( qlr_mock_state.web_api_ticket, (uint8_t[]){ 0xAB, 0xCD, 0xEF }, 3 );
 	qlr_mock_state.web_api_ticket_length = 3;
 	qlr_mock_state.web_api_ticket_handle = 41;
-	qlr_mock_state.web_api_ticket_result = 1;
+	qlr_mock_state.web_api_ticket_callback_handle = 41;
+	qlr_mock_state.web_api_ticket_callback_length = 3;
+	qlr_mock_state.web_api_ticket_queue_callback = qtrue;
+	qlr_mock_state.web_api_ticket_export_available = qtrue;
+	qlr_mock_state.web_api_ticket_result = QLR_STEAM_ERESULT_OK;
 	qlr_mock_state.web_api_ticket_calls = 0;
 	qlr_mock_state.web_api_ticket_identity[0] = '\0';
 	qlr_mock_state.cancelled_ticket_handle = 0;
@@ -1014,6 +1299,9 @@ QLR_EXPORT void QLR_SteamworksMock_Reset( void ) {
 	qlr_mock_state.user_steam_id_calls = 0;
 	qlr_mock_state.ip_country_calls = 0;
 	qlr_mock_state.app_id_calls = 0;
+	qlr_mock_state.steam_apps_interface_calls = 0;
+	qlr_mock_state.steam_apps_subscribed_result = qtrue;
+	qlr_mock_state.steam_apps_last_app_id = 0u;
 	qlr_mock_state.friend_count = 1;
 	qlr_mock_state.friend_by_index_id = 0x0123456789ABCDEFULL;
 	qlr_mock_state.friend_count_calls = 0;
@@ -1363,6 +1651,270 @@ QLR_EXPORT void QLR_SteamworksMock_SetInitResult( qboolean result ) {
 
 /*
 =============
+QLR_SteamworksMock_SetSteamAPIInitExportAvailable
+
+Toggle whether the mock Steam runtime exposes SteamAPI_Init.
+=============
+*/
+QLR_EXPORT void QLR_SteamworksMock_SetSteamAPIInitExportAvailable( qboolean available ) {
+	qlr_mock_state.steam_api_init_export_available = available ? qtrue : qfalse;
+}
+
+/*
+=============
+QLR_SteamworksMock_SetSteamAPIShutdownExportAvailable
+
+Toggle whether the mock Steam runtime exposes SteamAPI_Shutdown.
+=============
+*/
+QLR_EXPORT void QLR_SteamworksMock_SetSteamAPIShutdownExportAvailable( qboolean available ) {
+	qlr_mock_state.steam_api_shutdown_export_available = available ? qtrue : qfalse;
+}
+
+/*
+=============
+QLR_SteamworksMock_SetSteamAPIRunCallbacksExportAvailable
+
+Toggle whether the mock Steam runtime exposes SteamAPI_RunCallbacks.
+=============
+*/
+QLR_EXPORT void QLR_SteamworksMock_SetSteamAPIRunCallbacksExportAvailable( qboolean available ) {
+	qlr_mock_state.steam_api_run_callbacks_export_available = available ? qtrue : qfalse;
+}
+
+/*
+=============
+QLR_SteamworksMock_SetSteamAPIRegisterCallbackExportAvailable
+
+Toggle whether the mock Steam runtime exposes SteamAPI_RegisterCallback.
+=============
+*/
+QLR_EXPORT void QLR_SteamworksMock_SetSteamAPIRegisterCallbackExportAvailable( qboolean available ) {
+	qlr_mock_state.steam_api_register_callback_export_available = available ? qtrue : qfalse;
+}
+
+/*
+=============
+QLR_SteamworksMock_SetSteamAPIUnregisterCallbackExportAvailable
+
+Toggle whether the mock Steam runtime exposes SteamAPI_UnregisterCallback.
+=============
+*/
+QLR_EXPORT void QLR_SteamworksMock_SetSteamAPIUnregisterCallbackExportAvailable( qboolean available ) {
+	qlr_mock_state.steam_api_unregister_callback_export_available = available ? qtrue : qfalse;
+}
+
+/*
+=============
+QLR_SteamworksMock_SetSteamAPIRegisterCallResultExportAvailable
+
+Toggle whether the mock Steam runtime exposes SteamAPI_RegisterCallResult.
+=============
+*/
+QLR_EXPORT void QLR_SteamworksMock_SetSteamAPIRegisterCallResultExportAvailable( qboolean available ) {
+	qlr_mock_state.steam_api_register_call_result_export_available = available ? qtrue : qfalse;
+}
+
+/*
+=============
+QLR_SteamworksMock_SetSteamAPIUnregisterCallResultExportAvailable
+
+Toggle whether the mock Steam runtime exposes SteamAPI_UnregisterCallResult.
+=============
+*/
+QLR_EXPORT void QLR_SteamworksMock_SetSteamAPIUnregisterCallResultExportAvailable( qboolean available ) {
+	qlr_mock_state.steam_api_unregister_call_result_export_available = available ? qtrue : qfalse;
+}
+
+/*
+=============
+QLR_SteamworksMock_SetSteamUserExportAvailable
+
+Toggle whether the mock Steam runtime exposes SteamUser.
+=============
+*/
+QLR_EXPORT void QLR_SteamworksMock_SetSteamUserExportAvailable( qboolean available ) {
+	qlr_mock_state.steam_user_export_available = available ? qtrue : qfalse;
+}
+
+/*
+=============
+QLR_SteamworksMock_SetSteamFriendsExportAvailable
+
+Toggle whether the mock Steam runtime exposes SteamFriends.
+=============
+*/
+QLR_EXPORT void QLR_SteamworksMock_SetSteamFriendsExportAvailable( qboolean available ) {
+	qlr_mock_state.steam_friends_export_available = available ? qtrue : qfalse;
+}
+
+/*
+=============
+QLR_SteamworksMock_SetSteamUtilsExportAvailable
+
+Toggle whether the mock Steam runtime exposes SteamUtils.
+=============
+*/
+QLR_EXPORT void QLR_SteamworksMock_SetSteamUtilsExportAvailable( qboolean available ) {
+	qlr_mock_state.steam_utils_export_available = available ? qtrue : qfalse;
+}
+
+/*
+=============
+QLR_SteamworksMock_SetSteamUserStatsExportAvailable
+
+Toggle whether the mock Steam runtime exposes SteamUserStats.
+=============
+*/
+QLR_EXPORT void QLR_SteamworksMock_SetSteamUserStatsExportAvailable( qboolean available ) {
+	qlr_mock_state.steam_user_stats_export_available = available ? qtrue : qfalse;
+}
+
+/*
+=============
+QLR_SteamworksMock_SetSteamNetworkingExportAvailable
+
+Toggle whether the mock Steam runtime exposes SteamNetworking.
+=============
+*/
+QLR_EXPORT void QLR_SteamworksMock_SetSteamNetworkingExportAvailable( qboolean available ) {
+	qlr_mock_state.steam_networking_export_available = available ? qtrue : qfalse;
+}
+
+/*
+=============
+QLR_SteamworksMock_SetSteamMatchmakingExportAvailable
+
+Toggle whether the mock Steam runtime exposes SteamMatchmaking.
+=============
+*/
+QLR_EXPORT void QLR_SteamworksMock_SetSteamMatchmakingExportAvailable( qboolean available ) {
+	qlr_mock_state.steam_matchmaking_export_available = available ? qtrue : qfalse;
+}
+
+/*
+=============
+QLR_SteamworksMock_SetSteamMatchmakingServersExportAvailable
+
+Toggle whether the mock Steam runtime exposes SteamMatchmakingServers.
+=============
+*/
+QLR_EXPORT void QLR_SteamworksMock_SetSteamMatchmakingServersExportAvailable( qboolean available ) {
+	qlr_mock_state.steam_matchmaking_servers_export_available = available ? qtrue : qfalse;
+}
+
+/*
+=============
+QLR_SteamworksMock_SetSteamAppsExportAvailable
+
+Toggle whether the mock Steam runtime exposes SteamApps.
+=============
+*/
+QLR_EXPORT void QLR_SteamworksMock_SetSteamAppsExportAvailable( qboolean available ) {
+	qlr_mock_state.steam_apps_export_available = available ? qtrue : qfalse;
+}
+
+/*
+=============
+QLR_SteamworksMock_SetSteamUGCExportAvailable
+
+Toggle whether the mock Steam runtime exposes SteamUGC.
+=============
+*/
+QLR_EXPORT void QLR_SteamworksMock_SetSteamUGCExportAvailable( qboolean available ) {
+	qlr_mock_state.steam_ugc_export_available = available ? qtrue : qfalse;
+}
+
+/*
+=============
+QLR_SteamworksMock_SetSteamGameServerExportAvailable
+
+Toggle whether the mock Steam runtime exposes SteamGameServer.
+=============
+*/
+QLR_EXPORT void QLR_SteamworksMock_SetSteamGameServerExportAvailable( qboolean available ) {
+	qlr_mock_state.steam_game_server_export_available = available ? qtrue : qfalse;
+}
+
+/*
+=============
+QLR_SteamworksMock_SetSteamGameServerStatsExportAvailable
+
+Toggle whether the mock Steam runtime exposes SteamGameServerStats.
+=============
+*/
+QLR_EXPORT void QLR_SteamworksMock_SetSteamGameServerStatsExportAvailable( qboolean available ) {
+	qlr_mock_state.steam_game_server_stats_export_available = available ? qtrue : qfalse;
+}
+
+/*
+=============
+QLR_SteamworksMock_SetSteamGameServerUtilsExportAvailable
+
+Toggle whether the mock Steam runtime exposes SteamGameServerUtils.
+=============
+*/
+QLR_EXPORT void QLR_SteamworksMock_SetSteamGameServerUtilsExportAvailable( qboolean available ) {
+	qlr_mock_state.steam_game_server_utils_export_available = available ? qtrue : qfalse;
+}
+
+/*
+=============
+QLR_SteamworksMock_SetSteamGameServerUGCExportAvailable
+
+Toggle whether the mock Steam runtime exposes SteamGameServerUGC.
+=============
+*/
+QLR_EXPORT void QLR_SteamworksMock_SetSteamGameServerUGCExportAvailable( qboolean available ) {
+	qlr_mock_state.steam_game_server_ugc_export_available = available ? qtrue : qfalse;
+}
+
+/*
+=============
+QLR_SteamworksMock_SetSteamGameServerInitExportAvailable
+
+Toggle whether the mock Steam runtime exposes SteamGameServer_Init.
+=============
+*/
+QLR_EXPORT void QLR_SteamworksMock_SetSteamGameServerInitExportAvailable( qboolean available ) {
+	qlr_mock_state.steam_game_server_init_export_available = available ? qtrue : qfalse;
+}
+
+/*
+=============
+QLR_SteamworksMock_SetSteamGameServerShutdownExportAvailable
+
+Toggle whether the mock Steam runtime exposes SteamGameServer_Shutdown.
+=============
+*/
+QLR_EXPORT void QLR_SteamworksMock_SetSteamGameServerShutdownExportAvailable( qboolean available ) {
+	qlr_mock_state.steam_game_server_shutdown_export_available = available ? qtrue : qfalse;
+}
+
+/*
+=============
+QLR_SteamworksMock_SetSteamGameServerRunCallbacksExportAvailable
+
+Toggle whether the mock Steam runtime exposes SteamGameServer_RunCallbacks.
+=============
+*/
+QLR_EXPORT void QLR_SteamworksMock_SetSteamGameServerRunCallbacksExportAvailable( qboolean available ) {
+	qlr_mock_state.steam_game_server_run_callbacks_export_available = available ? qtrue : qfalse;
+}
+
+/*
+=============
+QLR_SteamworksMock_SetSteamGameServerNetworkingExportAvailable
+
+Toggle whether the mock Steam runtime exposes SteamGameServerNetworking.
+=============
+*/
+QLR_EXPORT void QLR_SteamworksMock_SetSteamGameServerNetworkingExportAvailable( qboolean available ) {
+	qlr_mock_state.steam_game_server_networking_export_available = available ? qtrue : qfalse;
+}
+
+/*
+=============
 QLR_SteamworksMock_SetSteamGameServerInitResult
 =============
 */
@@ -1410,6 +1962,61 @@ QLR_EXPORT void QLR_SteamworksMock_SetTicket( const uint8_t *ticket, uint32_t le
 
 /*
 =============
+QLR_SteamworksMock_SetAuthSessionTicketExportAvailable
+
+Toggle whether the mock Steam runtime exposes GetAuthSessionTicket.
+=============
+*/
+QLR_EXPORT void QLR_SteamworksMock_SetAuthSessionTicketExportAvailable( qboolean available ) {
+	qlr_mock_state.auth_session_ticket_export_available = available ? qtrue : qfalse;
+}
+
+/*
+=============
+QLR_SteamworksMock_SetBeginAuthSessionExportAvailable
+
+Toggle whether the mock Steam runtime exposes BeginAuthSession.
+=============
+*/
+QLR_EXPORT void QLR_SteamworksMock_SetBeginAuthSessionExportAvailable( qboolean available ) {
+	qlr_mock_state.begin_auth_session_export_available = available ? qtrue : qfalse;
+}
+
+/*
+=============
+QLR_SteamworksMock_SetCancelAuthTicketExportAvailable
+
+Toggle whether the mock Steam runtime exposes CancelAuthTicket.
+=============
+*/
+QLR_EXPORT void QLR_SteamworksMock_SetCancelAuthTicketExportAvailable( qboolean available ) {
+	qlr_mock_state.cancel_auth_ticket_export_available = available ? qtrue : qfalse;
+}
+
+/*
+=============
+QLR_SteamworksMock_SetEndAuthSessionExportAvailable
+
+Toggle whether the mock Steam runtime exposes EndAuthSession.
+=============
+*/
+QLR_EXPORT void QLR_SteamworksMock_SetEndAuthSessionExportAvailable( qboolean available ) {
+	qlr_mock_state.end_auth_session_export_available = available ? qtrue : qfalse;
+}
+
+/*
+=============
+QLR_SteamworksMock_SetGetSteamIDExportAvailable
+
+Toggle whether the mock Steam runtime exposes GetSteamID.
+=============
+*/
+QLR_EXPORT void QLR_SteamworksMock_SetGetSteamIDExportAvailable( qboolean available ) {
+	qlr_mock_state.get_steam_id_export_available = available ? qtrue : qfalse;
+}
+
+/*
+=============
 QLR_SteamworksMock_SetWebApiTicket
 
 Override the callback ticket returned by GetAuthTicketForWebApi.
@@ -1422,7 +2029,33 @@ QLR_EXPORT void QLR_SteamworksMock_SetWebApiTicket( const uint8_t *ticket, uint3
 	}
 
 	qlr_mock_state.web_api_ticket_handle = handle;
+	qlr_mock_state.web_api_ticket_callback_handle = handle;
+	qlr_mock_state.web_api_ticket_callback_length = length;
 	qlr_mock_state.web_api_ticket_result = result;
+}
+
+/*
+=============
+QLR_SteamworksMock_SetWebApiTicketCallbackBehavior
+
+Override how the mock GetTicketForWebApi callback is queued.
+=============
+*/
+QLR_EXPORT void QLR_SteamworksMock_SetWebApiTicketCallbackBehavior( qboolean queueCallback, HAuthTicket callbackHandle, uint32_t callbackLength ) {
+	qlr_mock_state.web_api_ticket_queue_callback = queueCallback ? qtrue : qfalse;
+	qlr_mock_state.web_api_ticket_callback_handle = callbackHandle;
+	qlr_mock_state.web_api_ticket_callback_length = callbackLength;
+}
+
+/*
+=============
+QLR_SteamworksMock_SetWebApiTicketExportAvailable
+
+Toggle whether the mock Steam runtime exposes GetAuthTicketForWebApi.
+=============
+*/
+QLR_EXPORT void QLR_SteamworksMock_SetWebApiTicketExportAvailable( qboolean available ) {
+	qlr_mock_state.web_api_ticket_export_available = available ? qtrue : qfalse;
 }
 
 /*
@@ -1454,6 +2087,15 @@ QLR_SteamworksMock_SetAppId
 */
 QLR_EXPORT void QLR_SteamworksMock_SetAppId( uint32_t appId ) {
 	qlr_mock_state.app_id = appId;
+}
+
+/*
+=============
+QLR_SteamworksMock_SetSteamAppsSubscribedResult
+=============
+*/
+QLR_EXPORT void QLR_SteamworksMock_SetSteamAppsSubscribedResult( int result ) {
+	qlr_mock_state.steam_apps_subscribed_result = result ? qtrue : qfalse;
 }
 
 /*
@@ -1903,6 +2545,24 @@ QLR_SteamworksMock_GetAppIdCalls
 */
 QLR_EXPORT int QLR_SteamworksMock_GetAppIdCalls( void ) {
 	return qlr_mock_state.app_id_calls;
+}
+
+/*
+=============
+QLR_SteamworksMock_GetSteamAppsInterfaceCalls
+=============
+*/
+QLR_EXPORT int QLR_SteamworksMock_GetSteamAppsInterfaceCalls( void ) {
+	return qlr_mock_state.steam_apps_interface_calls;
+}
+
+/*
+=============
+QLR_SteamworksMock_GetSteamAppsLastAppId
+=============
+*/
+QLR_EXPORT uint32_t QLR_SteamworksMock_GetSteamAppsLastAppId( void ) {
+	return qlr_mock_state.steam_apps_last_app_id;
 }
 
 /*
@@ -4126,108 +4786,124 @@ void *dlsym( void *handle, const char *symbol ) {
 		return NULL;
 	}
 
-	if ( strcmp( symbol, "SteamAPI_Init" ) == 0 ) {
-		return QLR_SteamAPI_Init;
+	if ( strcmp( symbol, QLR_STEAMWORKS_EXPORT_STEAM_API_INIT ) == 0 ) {
+		return qlr_mock_state.steam_api_init_export_available ? QLR_SteamAPI_Init : NULL;
 	}
 
-	if ( strcmp( symbol, "SteamAPI_Shutdown" ) == 0 ) {
-		return QLR_SteamAPI_Shutdown;
+	if ( strcmp( symbol, QLR_STEAMWORKS_EXPORT_STEAM_API_SHUTDOWN ) == 0 ) {
+		return qlr_mock_state.steam_api_shutdown_export_available ? QLR_SteamAPI_Shutdown : NULL;
 	}
 
-	if ( strcmp( symbol, "SteamAPI_RunCallbacks" ) == 0 ) {
-		return QLR_SteamAPI_RunCallbacks;
+	if ( strcmp( symbol, QLR_STEAMWORKS_EXPORT_STEAM_API_RUN_CALLBACKS ) == 0 ) {
+		return qlr_mock_state.steam_api_run_callbacks_export_available ? QLR_SteamAPI_RunCallbacks : NULL;
 	}
 
-	if ( strcmp( symbol, "SteamAPI_RegisterCallback" ) == 0 ) {
-		return QLR_SteamAPI_RegisterCallback;
+	if ( strcmp( symbol, QLR_STEAMWORKS_EXPORT_STEAM_API_REGISTER_CALLBACK ) == 0 ) {
+		return qlr_mock_state.steam_api_register_callback_export_available ? QLR_SteamAPI_RegisterCallback : NULL;
 	}
 
-	if ( strcmp( symbol, "SteamAPI_UnregisterCallback" ) == 0 ) {
-		return QLR_SteamAPI_UnregisterCallback;
+	if ( strcmp( symbol, QLR_STEAMWORKS_EXPORT_STEAM_API_UNREGISTER_CALLBACK ) == 0 ) {
+		return qlr_mock_state.steam_api_unregister_callback_export_available ? QLR_SteamAPI_UnregisterCallback : NULL;
 	}
 
-	if ( strcmp( symbol, "SteamAPI_RegisterCallResult" ) == 0 ) {
-		return QLR_SteamAPI_RegisterCallResult;
+	if ( strcmp( symbol, QLR_STEAMWORKS_EXPORT_STEAM_API_REGISTER_CALL_RESULT ) == 0 ) {
+		return qlr_mock_state.steam_api_register_call_result_export_available ? QLR_SteamAPI_RegisterCallResult : NULL;
 	}
 
-	if ( strcmp( symbol, "SteamAPI_UnregisterCallResult" ) == 0 ) {
-		return QLR_SteamAPI_UnregisterCallResult;
+	if ( strcmp( symbol, QLR_STEAMWORKS_EXPORT_STEAM_API_UNREGISTER_CALL_RESULT ) == 0 ) {
+		return qlr_mock_state.steam_api_unregister_call_result_export_available ? QLR_SteamAPI_UnregisterCallResult : NULL;
 	}
 
-	if ( strcmp( symbol, "SteamAPI_SteamUser" ) == 0 ) {
-		return QLR_SteamAPI_SteamUser;
+	if ( strcmp( symbol, QLR_STEAMWORKS_EXPORT_STEAM_USER ) == 0 || strcmp( symbol, QLR_STEAMWORKS_EXPORT_STEAM_API_STEAM_USER ) == 0 ) {
+		return qlr_mock_state.steam_user_export_available ? QLR_SteamAPI_SteamUser : NULL;
 	}
 
-	if ( strcmp( symbol, "SteamAPI_SteamFriends" ) == 0 ) {
-		return QLR_SteamAPI_SteamFriends;
+	if ( strcmp( symbol, QLR_STEAMWORKS_EXPORT_STEAM_FRIENDS ) == 0 || strcmp( symbol, QLR_STEAMWORKS_EXPORT_STEAM_API_STEAM_FRIENDS ) == 0 ) {
+		return qlr_mock_state.steam_friends_export_available ? QLR_SteamAPI_SteamFriends : NULL;
 	}
 
-	if ( strcmp( symbol, "SteamAPI_SteamUtils" ) == 0 ) {
-		return QLR_SteamAPI_SteamUtils;
+	if ( strcmp( symbol, QLR_STEAMWORKS_EXPORT_STEAM_UTILS ) == 0 || strcmp( symbol, QLR_STEAMWORKS_EXPORT_STEAM_API_STEAM_UTILS ) == 0 ) {
+		return qlr_mock_state.steam_utils_export_available ? QLR_SteamAPI_SteamUtils : NULL;
 	}
 
-	if ( strcmp( symbol, "SteamAPI_SteamUserStats" ) == 0 ) {
-		return QLR_SteamAPI_SteamUserStats;
+	if ( strcmp( symbol, QLR_STEAMWORKS_EXPORT_STEAM_APPS ) == 0 || strcmp( symbol, QLR_STEAMWORKS_EXPORT_STEAM_API_STEAM_APPS ) == 0 ) {
+		return qlr_mock_state.steam_apps_export_available ? QLR_SteamAPI_SteamApps : NULL;
 	}
 
-	if ( strcmp( symbol, "SteamAPI_SteamNetworking" ) == 0 ) {
-		return QLR_SteamAPI_SteamNetworking;
+	if ( strcmp( symbol, QLR_STEAMWORKS_EXPORT_STEAM_USER_STATS ) == 0 || strcmp( symbol, QLR_STEAMWORKS_EXPORT_STEAM_API_STEAM_USER_STATS ) == 0 ) {
+		return qlr_mock_state.steam_user_stats_export_available ? QLR_SteamAPI_SteamUserStats : NULL;
 	}
 
-	if ( strcmp( symbol, "SteamAPI_SteamMatchmaking" ) == 0 ) {
-		return QLR_SteamAPI_SteamMatchmaking;
+	if ( strcmp( symbol, QLR_STEAMWORKS_EXPORT_STEAM_NETWORKING ) == 0 || strcmp( symbol, QLR_STEAMWORKS_EXPORT_STEAM_API_STEAM_NETWORKING ) == 0 ) {
+		return qlr_mock_state.steam_networking_export_available ? QLR_SteamAPI_SteamNetworking : NULL;
 	}
 
-	if ( strcmp( symbol, "SteamMatchmakingServers" ) == 0 ) {
-		return QLR_SteamAPI_SteamMatchmakingServers;
+	if ( strcmp( symbol, QLR_STEAMWORKS_EXPORT_STEAM_MATCHMAKING ) == 0 || strcmp( symbol, QLR_STEAMWORKS_EXPORT_STEAM_API_STEAM_MATCHMAKING ) == 0 ) {
+		return qlr_mock_state.steam_matchmaking_export_available ? QLR_SteamAPI_SteamMatchmaking : NULL;
 	}
 
-	if ( strcmp( symbol, "SteamAPI_SteamUGC" ) == 0 ) {
-		return QLR_SteamAPI_SteamUGC;
+	if ( strcmp( symbol, QLR_STEAMWORKS_EXPORT_STEAM_MATCHMAKING_SERVERS ) == 0 || strcmp( symbol, QLR_STEAMWORKS_EXPORT_STEAM_API_STEAM_MATCHMAKING_SERVERS ) == 0 ) {
+		return qlr_mock_state.steam_matchmaking_servers_export_available ? QLR_SteamAPI_SteamMatchmakingServers : NULL;
 	}
 
-	if ( strcmp( symbol, "SteamGameServer" ) == 0 ) {
-		return QLR_SteamAPI_SteamGameServer;
+	if ( strcmp( symbol, QLR_STEAMWORKS_EXPORT_STEAM_UGC ) == 0 || strcmp( symbol, QLR_STEAMWORKS_EXPORT_STEAM_API_STEAM_UGC ) == 0 ) {
+		return qlr_mock_state.steam_ugc_export_available ? QLR_SteamAPI_SteamUGC : NULL;
 	}
 
-	if ( strcmp( symbol, "SteamGameServerUtils" ) == 0 ) {
-		return QLR_SteamAPI_SteamGameServerUtils;
+	if ( strcmp( symbol, QLR_STEAMWORKS_EXPORT_STEAM_GAME_SERVER ) == 0 ) {
+		return qlr_mock_state.steam_game_server_export_available ? QLR_SteamAPI_SteamGameServer : NULL;
 	}
 
-	if ( strcmp( symbol, "SteamGameServerStats" ) == 0 ) {
-		return QLR_SteamAPI_SteamGameServerStats;
+	if ( strcmp( symbol, QLR_STEAMWORKS_EXPORT_STEAM_GAME_SERVER_UTILS ) == 0 ) {
+		return qlr_mock_state.steam_game_server_utils_export_available ? QLR_SteamAPI_SteamGameServerUtils : NULL;
 	}
 
-	if ( strcmp( symbol, "SteamGameServer_RunCallbacks" ) == 0 ) {
-		return QLR_SteamAPI_SteamGameServerRunCallbacks;
+	if ( strcmp( symbol, QLR_STEAMWORKS_EXPORT_STEAM_GAME_SERVER_STATS ) == 0 ) {
+		return qlr_mock_state.steam_game_server_stats_export_available ? QLR_SteamAPI_SteamGameServerStats : NULL;
 	}
 
-	if ( strcmp( symbol, "SteamGameServerNetworking" ) == 0 ) {
-		return QLR_SteamAPI_SteamGameServerNetworking;
+	if ( strcmp( symbol, QLR_STEAMWORKS_EXPORT_STEAM_GAME_SERVER_UGC ) == 0 ) {
+		return qlr_mock_state.steam_game_server_ugc_export_available ? QLR_SteamAPI_SteamGameServerUGC : NULL;
 	}
 
-	if ( strcmp( symbol, "SteamAPI_ISteamUser_GetAuthSessionTicket" ) == 0 ) {
-		return QLR_SteamAPI_GetAuthSessionTicket;
+	if ( strcmp( symbol, QLR_STEAMWORKS_EXPORT_STEAM_GAME_SERVER_INIT ) == 0 ) {
+		return qlr_mock_state.steam_game_server_init_export_available ? QLR_SteamAPI_SteamGameServerInit : NULL;
 	}
 
-	if ( strcmp( symbol, "SteamAPI_ISteamUser_GetAuthTicketForWebApi" ) == 0 ) {
-		return QLR_SteamAPI_GetAuthTicketForWebApi;
+	if ( strcmp( symbol, QLR_STEAMWORKS_EXPORT_STEAM_GAME_SERVER_SHUTDOWN ) == 0 ) {
+		return qlr_mock_state.steam_game_server_shutdown_export_available ? QLR_SteamAPI_SteamGameServerShutdown : NULL;
 	}
 
-	if ( strcmp( symbol, "SteamAPI_ISteamUser_BeginAuthSession" ) == 0 ) {
-		return QLR_SteamAPI_BeginAuthSession;
+	if ( strcmp( symbol, QLR_STEAMWORKS_EXPORT_STEAM_GAME_SERVER_RUN_CALLBACKS ) == 0 ) {
+		return qlr_mock_state.steam_game_server_run_callbacks_export_available ? QLR_SteamAPI_SteamGameServerRunCallbacks : NULL;
 	}
 
-	if ( strcmp( symbol, "SteamAPI_ISteamUser_CancelAuthTicket" ) == 0 ) {
-		return QLR_SteamAPI_CancelAuthTicket;
+	if ( strcmp( symbol, QLR_STEAMWORKS_EXPORT_STEAM_GAME_SERVER_NETWORKING ) == 0 ) {
+		return qlr_mock_state.steam_game_server_networking_export_available ? QLR_SteamAPI_SteamGameServerNetworking : NULL;
 	}
 
-	if ( strcmp( symbol, "SteamAPI_ISteamUser_EndAuthSession" ) == 0 ) {
-		return QLR_SteamAPI_EndAuthSession;
+	if ( strcmp( symbol, QLR_STEAMWORKS_EXPORT_STEAM_API_ISTEAMUSER_GET_AUTH_SESSION_TICKET ) == 0 ) {
+		return qlr_mock_state.auth_session_ticket_export_available ? QLR_SteamAPI_GetAuthSessionTicket : NULL;
 	}
 
-	if ( strcmp( symbol, "SteamAPI_ISteamUser_GetSteamID" ) == 0 ) {
-		return QLR_SteamAPI_GetSteamID;
+	if ( strcmp( symbol, QLR_STEAMWORKS_EXPORT_STEAM_API_ISTEAMUSER_GET_AUTH_TICKET_FOR_WEB_API ) == 0 ) {
+		return qlr_mock_state.web_api_ticket_export_available ? QLR_SteamAPI_GetAuthTicketForWebApi : NULL;
+	}
+
+	if ( strcmp( symbol, QLR_STEAMWORKS_EXPORT_STEAM_API_ISTEAMUSER_BEGIN_AUTH_SESSION ) == 0 ) {
+		return qlr_mock_state.begin_auth_session_export_available ? QLR_SteamAPI_BeginAuthSession : NULL;
+	}
+
+	if ( strcmp( symbol, QLR_STEAMWORKS_EXPORT_STEAM_API_ISTEAMUSER_CANCEL_AUTH_TICKET ) == 0 ) {
+		return qlr_mock_state.cancel_auth_ticket_export_available ? QLR_SteamAPI_CancelAuthTicket : NULL;
+	}
+
+	if ( strcmp( symbol, QLR_STEAMWORKS_EXPORT_STEAM_API_ISTEAMUSER_END_AUTH_SESSION ) == 0 ) {
+		return qlr_mock_state.end_auth_session_export_available ? QLR_SteamAPI_EndAuthSession : NULL;
+	}
+
+	if ( strcmp( symbol, QLR_STEAMWORKS_EXPORT_STEAM_API_ISTEAMUSER_GET_STEAM_ID ) == 0 ) {
+		return qlr_mock_state.get_steam_id_export_available ? QLR_SteamAPI_GetSteamID : NULL;
 	}
 
 	return NULL;
@@ -4479,16 +5155,16 @@ QLR_SteamAPI_SteamUser
 =============
 */
 void *QLR_SteamAPI_SteamUser( void ) {
-	static void *vtable[0x30 / 4 + 1];
+	static void *vtable[QLR_STEAM_USER_VTABLE_SLOT_COUNT];
 	static qlr_steamworks_mock_interface_t iface = { vtable };
 
-	vtable[0x04 / 4] = QLR_SteamUser_BLoggedOn;
-	vtable[0x08 / 4] = QLR_SteamUser_GetSteamID;
-	vtable[0x1c / 4] = QLR_SteamUser_StartVoiceRecording;
-	vtable[0x20 / 4] = QLR_SteamUser_StopVoiceRecording;
-	vtable[0x28 / 4] = QLR_SteamUser_GetVoice;
-	vtable[0x2c / 4] = QLR_SteamUser_DecompressVoice;
-	vtable[0x30 / 4] = QLR_SteamUser_GetVoiceOptimalSampleRate;
+	vtable[QLR_STEAM_USER_BLOGGED_ON_SLOT] = QLR_SteamUser_BLoggedOn;
+	vtable[QLR_STEAM_USER_GET_STEAM_ID_SLOT] = QLR_SteamUser_GetSteamID;
+	vtable[QLR_STEAM_USER_START_VOICE_RECORDING_SLOT] = QLR_SteamUser_StartVoiceRecording;
+	vtable[QLR_STEAM_USER_STOP_VOICE_RECORDING_SLOT] = QLR_SteamUser_StopVoiceRecording;
+	vtable[QLR_STEAM_USER_GET_VOICE_SLOT] = QLR_SteamUser_GetVoice;
+	vtable[QLR_STEAM_USER_DECOMPRESS_VOICE_SLOT] = QLR_SteamUser_DecompressVoice;
+	vtable[QLR_STEAM_USER_GET_VOICE_OPTIMAL_SAMPLE_RATE_SLOT] = QLR_SteamUser_GetVoiceOptimalSampleRate;
 	return qlr_mock_state.user_available ? &iface : NULL;
 }
 
@@ -5145,6 +5821,26 @@ static int QLR_FASTCALL QLR_SteamGameServer_UpdateUserData( void *self, void *un
 	qlr_mock_state.steam_game_server_last_user_data_score = score;
 	Q_strncpyz( qlr_mock_state.steam_game_server_last_user_data_name, playerName ? playerName : "", sizeof( qlr_mock_state.steam_game_server_last_user_data_name ) );
 	return 1;
+}
+
+/*
+=============
+QLR_SteamGameServer_BeginAuthSession
+=============
+*/
+static EBeginAuthSessionResult QLR_FASTCALL QLR_SteamGameServer_BeginAuthSession( void *self, void *unused, const void *ticket, int length, CSteamID steamId ) {
+	(void)unused;
+	return QLR_SteamAPI_BeginAuthSession( self, ticket, length, steamId );
+}
+
+/*
+=============
+QLR_SteamGameServer_EndAuthSession
+=============
+*/
+static void QLR_FASTCALL QLR_SteamGameServer_EndAuthSession( void *self, void *unused, CSteamID steamId ) {
+	(void)unused;
+	QLR_SteamAPI_EndAuthSession( self, steamId );
 }
 
 /*
@@ -6257,7 +6953,7 @@ static qboolean QLR_FASTCALL QLR_SteamUGC_GetQueryUGCResult( void *self, void *u
 		return qfalse;
 	}
 
-	memcpy( details, &qlr_mock_state.ugc_result_published_file_id, sizeof( qlr_mock_state.ugc_result_published_file_id ) );
+	memcpy( (char *)details + QLR_STEAM_UGC_DETAILS_PUBLISHED_FILE_ID_OFFSET, &qlr_mock_state.ugc_result_published_file_id, QLR_STEAM_UGC_DETAILS_PUBLISHED_FILE_ID_SIZE );
 	Q_strncpyz( (char *)details + QLR_STEAM_UGC_DETAILS_TITLE_OFFSET, qlr_mock_state.ugc_result_title, QLR_STEAM_UGC_DETAILS_DESCRIPTION_OFFSET - QLR_STEAM_UGC_DETAILS_TITLE_OFFSET );
 	Q_strncpyz( (char *)details + QLR_STEAM_UGC_DETAILS_DESCRIPTION_OFFSET, qlr_mock_state.ugc_result_description, sizeof( qlr_mock_state.ugc_result_description ) );
 	return qtrue;
@@ -6540,27 +7236,27 @@ QLR_SteamAPI_SteamFriends
 =============
 */
 void *QLR_SteamAPI_SteamFriends( void ) {
-	static void *vtable[0xc4 / 4 + 1];
+	static void *vtable[QLR_STEAM_FRIENDS_VTABLE_SLOT_COUNT];
 	static qlr_steamworks_mock_interface_t iface = { vtable };
 
-	vtable[0] = QLR_SteamFriends_GetPersonaName;
-	vtable[0x0c / 4] = QLR_SteamFriends_GetFriendCount;
-	vtable[0x10 / 4] = QLR_SteamFriends_GetFriendByIndex;
-	vtable[0x14 / 4] = QLR_SteamFriends_GetFriendRelationship;
-	vtable[0x18 / 4] = QLR_SteamFriends_GetFriendPersonaState;
-	vtable[0x1c / 4] = QLR_SteamFriends_GetFriendPersonaName;
-	vtable[0x20 / 4] = QLR_SteamFriends_GetFriendGamePlayed;
-	vtable[0x2c / 4] = QLR_SteamFriends_GetPlayerNickname;
-	vtable[0x6c / 4] = QLR_SteamFriends_SetInGameVoiceSpeaking;
-	vtable[0x74 / 4] = QLR_SteamFriends_ActivateGameOverlayToUser;
-	vtable[0x78 / 4] = QLR_SteamFriends_ActivateGameOverlayToWebPage;
-	vtable[0x84 / 4] = QLR_SteamFriends_ActivateGameOverlayInviteDialog;
-	vtable[0x88 / 4] = QLR_SteamFriends_GetSmallFriendAvatar;
-	vtable[0x8c / 4] = QLR_SteamFriends_GetMediumFriendAvatar;
-	vtable[0x90 / 4] = QLR_SteamFriends_GetLargeFriendAvatar;
-	vtable[0xac / 4] = QLR_SteamFriends_SetRichPresence;
-	vtable[0xb4 / 4] = QLR_SteamFriends_GetFriendRichPresence;
-	vtable[0xc4 / 4] = QLR_SteamFriends_InviteUserToGame;
+	vtable[QLR_STEAM_FRIENDS_GET_PERSONA_NAME_SLOT] = QLR_SteamFriends_GetPersonaName;
+	vtable[QLR_STEAM_FRIENDS_GET_FRIEND_COUNT_SLOT] = QLR_SteamFriends_GetFriendCount;
+	vtable[QLR_STEAM_FRIENDS_GET_FRIEND_BY_INDEX_SLOT] = QLR_SteamFriends_GetFriendByIndex;
+	vtable[QLR_STEAM_FRIENDS_GET_FRIEND_RELATIONSHIP_SLOT] = QLR_SteamFriends_GetFriendRelationship;
+	vtable[QLR_STEAM_FRIENDS_GET_FRIEND_PERSONA_STATE_SLOT] = QLR_SteamFriends_GetFriendPersonaState;
+	vtable[QLR_STEAM_FRIENDS_GET_FRIEND_PERSONA_NAME_SLOT] = QLR_SteamFriends_GetFriendPersonaName;
+	vtable[QLR_STEAM_FRIENDS_GET_FRIEND_GAME_PLAYED_SLOT] = QLR_SteamFriends_GetFriendGamePlayed;
+	vtable[QLR_STEAM_FRIENDS_GET_PLAYER_NICKNAME_SLOT] = QLR_SteamFriends_GetPlayerNickname;
+	vtable[QLR_STEAM_FRIENDS_SET_IN_GAME_VOICE_SPEAKING_SLOT] = QLR_SteamFriends_SetInGameVoiceSpeaking;
+	vtable[QLR_STEAM_FRIENDS_ACTIVATE_GAME_OVERLAY_TO_USER_SLOT] = QLR_SteamFriends_ActivateGameOverlayToUser;
+	vtable[QLR_STEAM_FRIENDS_ACTIVATE_GAME_OVERLAY_TO_WEB_PAGE_SLOT] = QLR_SteamFriends_ActivateGameOverlayToWebPage;
+	vtable[QLR_STEAM_FRIENDS_ACTIVATE_GAME_OVERLAY_INVITE_DIALOG_SLOT] = QLR_SteamFriends_ActivateGameOverlayInviteDialog;
+	vtable[QLR_STEAM_FRIENDS_GET_SMALL_FRIEND_AVATAR_SLOT] = QLR_SteamFriends_GetSmallFriendAvatar;
+	vtable[QLR_STEAM_FRIENDS_GET_MEDIUM_FRIEND_AVATAR_SLOT] = QLR_SteamFriends_GetMediumFriendAvatar;
+	vtable[QLR_STEAM_FRIENDS_GET_LARGE_FRIEND_AVATAR_SLOT] = QLR_SteamFriends_GetLargeFriendAvatar;
+	vtable[QLR_STEAM_FRIENDS_SET_RICH_PRESENCE_SLOT] = QLR_SteamFriends_SetRichPresence;
+	vtable[QLR_STEAM_FRIENDS_GET_FRIEND_RICH_PRESENCE_SLOT] = QLR_SteamFriends_GetFriendRichPresence;
+	vtable[QLR_STEAM_FRIENDS_INVITE_USER_TO_GAME_SLOT] = QLR_SteamFriends_InviteUserToGame;
 	return &iface;
 }
 
@@ -6570,13 +7266,40 @@ QLR_SteamAPI_SteamUtils
 =============
 */
 void *QLR_SteamAPI_SteamUtils( void ) {
-	static void *vtable[0x24 / 4 + 1];
+	static void *vtable[QLR_STEAM_UTILS_VTABLE_SLOT_COUNT];
 	static qlr_steamworks_mock_interface_t iface = { vtable };
 
-	vtable[0x10 / 4] = QLR_SteamUtils_GetIPCountry;
-	vtable[0x14 / 4] = QLR_SteamUtils_GetImageSize;
-	vtable[0x18 / 4] = QLR_SteamUtils_GetImageRGBA;
-	vtable[0x24 / 4] = QLR_SteamUtils_GetAppID;
+	vtable[QLR_STEAM_UTILS_GET_IP_COUNTRY_SLOT] = QLR_SteamUtils_GetIPCountry;
+	vtable[QLR_STEAM_UTILS_GET_IMAGE_SIZE_SLOT] = QLR_SteamUtils_GetImageSize;
+	vtable[QLR_STEAM_UTILS_GET_IMAGE_RGBA_SLOT] = QLR_SteamUtils_GetImageRGBA;
+	vtable[QLR_STEAM_UTILS_GET_APP_ID_SLOT] = QLR_SteamUtils_GetAppID;
+	return &iface;
+}
+
+/*
+=============
+QLR_SteamApps_BIsSubscribedApp
+=============
+*/
+static int QLR_FASTCALL QLR_SteamApps_BIsSubscribedApp( void *self, void *unused, uint32_t appId ) {
+	(void)self;
+	(void)unused;
+
+	qlr_mock_state.steam_apps_last_app_id = appId;
+	return qlr_mock_state.steam_apps_subscribed_result;
+}
+
+/*
+=============
+QLR_SteamAPI_SteamApps
+=============
+*/
+void *QLR_SteamAPI_SteamApps( void ) {
+	static void *vtable[QLR_STEAM_APPS_VTABLE_SLOT_COUNT];
+	static qlr_steamworks_mock_interface_t iface = { vtable };
+
+	++qlr_mock_state.steam_apps_interface_calls;
+	vtable[QLR_STEAM_APPS_BIS_SUBSCRIBED_APP_SLOT] = QLR_SteamApps_BIsSubscribedApp;
 	return &iface;
 }
 
@@ -6586,15 +7309,15 @@ QLR_SteamAPI_SteamUserStats
 =============
 */
 void *QLR_SteamAPI_SteamUserStats( void ) {
-	static void *vtable[0x54 / 4 + 1];
+	static void *vtable[QLR_STEAM_USERSTATS_VTABLE_SLOT_COUNT];
 	static qlr_steamworks_mock_interface_t iface = { vtable };
 
-	vtable[0x30 / 4] = QLR_SteamUserStats_GetAchievementDisplayAttribute;
-	vtable[0x40 / 4] = QLR_SteamUserStats_RequestUserStats;
-	vtable[0x44 / 4] = QLR_SteamUserStats_GetUserStatFloat;
-	vtable[0x48 / 4] = QLR_SteamUserStats_GetUserStatInt;
-	vtable[0x50 / 4] = QLR_SteamUserStats_GetUserAchievement;
-	vtable[0x54 / 4] = QLR_SteamUserStats_ResetAllStats;
+	vtable[QLR_STEAM_USERSTATS_GET_ACHIEVEMENT_DISPLAY_ATTRIBUTE_SLOT] = QLR_SteamUserStats_GetAchievementDisplayAttribute;
+	vtable[QLR_STEAM_USERSTATS_REQUEST_USER_STATS_SLOT] = QLR_SteamUserStats_RequestUserStats;
+	vtable[QLR_STEAM_USERSTATS_GET_USER_STAT_FLOAT_SLOT] = QLR_SteamUserStats_GetUserStatFloat;
+	vtable[QLR_STEAM_USERSTATS_GET_USER_STAT_INT_SLOT] = QLR_SteamUserStats_GetUserStatInt;
+	vtable[QLR_STEAM_USERSTATS_GET_USER_ACHIEVEMENT_SLOT] = QLR_SteamUserStats_GetUserAchievement;
+	vtable[QLR_STEAM_USERSTATS_RESET_ALL_STATS_SLOT] = QLR_SteamUserStats_ResetAllStats;
 	return &iface;
 }
 
@@ -6604,13 +7327,13 @@ QLR_SteamAPI_SteamNetworking
 =============
 */
 void *QLR_SteamAPI_SteamNetworking( void ) {
-	static void *vtable[0x0c / 4 + 1];
+	static void *vtable[QLR_STEAM_NETWORKING_VTABLE_SLOT_COUNT];
 	static qlr_steamworks_mock_interface_t iface = { vtable };
 
-	vtable[0x00 / 4] = QLR_SteamNetworking_SendP2PPacket;
-	vtable[0x04 / 4] = QLR_SteamNetworking_IsP2PPacketAvailable;
-	vtable[0x08 / 4] = QLR_SteamNetworking_ReadP2PPacket;
-	vtable[0x0c / 4] = QLR_SteamNetworking_AcceptP2PSessionWithUser;
+	vtable[QLR_STEAM_NETWORKING_SEND_P2P_PACKET_SLOT] = QLR_SteamNetworking_SendP2PPacket;
+	vtable[QLR_STEAM_NETWORKING_IS_P2P_PACKET_AVAILABLE_SLOT] = QLR_SteamNetworking_IsP2PPacketAvailable;
+	vtable[QLR_STEAM_NETWORKING_READ_P2P_PACKET_SLOT] = QLR_SteamNetworking_ReadP2PPacket;
+	vtable[QLR_STEAM_NETWORKING_ACCEPT_P2P_SESSION_SLOT] = QLR_SteamNetworking_AcceptP2PSessionWithUser;
 	return &iface;
 }
 
@@ -6620,19 +7343,19 @@ QLR_SteamAPI_SteamMatchmaking
 =============
 */
 void *QLR_SteamAPI_SteamMatchmaking( void ) {
-	static void *vtable[0x8c / 4 + 1];
+	static void *vtable[QLR_STEAM_MATCHMAKING_VTABLE_SLOT_COUNT];
 	static qlr_steamworks_mock_interface_t iface = { vtable };
 
-	vtable[0x08 / 4] = QLR_SteamMatchmaking_AddFavoriteGame;
-	vtable[0x0c / 4] = QLR_SteamMatchmaking_RemoveFavoriteGame;
-	vtable[0x34 / 4] = QLR_SteamMatchmaking_CreateLobby;
-	vtable[0x3c / 4] = QLR_SteamMatchmaking_LeaveLobby;
-	vtable[0x38 / 4] = QLR_SteamMatchmaking_JoinLobby;
-	vtable[0x40 / 4] = QLR_SteamMatchmaking_InviteUserToLobby;
-	vtable[0x68 / 4] = QLR_SteamMatchmaking_SendLobbyChatMsg;
-	vtable[0x6c / 4] = QLR_SteamMatchmaking_GetLobbyChatEntry;
-	vtable[0x74 / 4] = QLR_SteamMatchmaking_SetLobbyGameServer;
-	vtable[0x8c / 4] = QLR_SteamMatchmaking_GetLobbyOwner;
+	vtable[QLR_STEAM_MATCHMAKING_ADD_FAVORITE_GAME_SLOT] = QLR_SteamMatchmaking_AddFavoriteGame;
+	vtable[QLR_STEAM_MATCHMAKING_REMOVE_FAVORITE_GAME_SLOT] = QLR_SteamMatchmaking_RemoveFavoriteGame;
+	vtable[QLR_STEAM_MATCHMAKING_CREATE_LOBBY_SLOT] = QLR_SteamMatchmaking_CreateLobby;
+	vtable[QLR_STEAM_MATCHMAKING_LEAVE_LOBBY_SLOT] = QLR_SteamMatchmaking_LeaveLobby;
+	vtable[QLR_STEAM_MATCHMAKING_JOIN_LOBBY_SLOT] = QLR_SteamMatchmaking_JoinLobby;
+	vtable[QLR_STEAM_MATCHMAKING_INVITE_USER_TO_LOBBY_SLOT] = QLR_SteamMatchmaking_InviteUserToLobby;
+	vtable[QLR_STEAM_MATCHMAKING_SEND_LOBBY_CHAT_MSG_SLOT] = QLR_SteamMatchmaking_SendLobbyChatMsg;
+	vtable[QLR_STEAM_MATCHMAKING_GET_LOBBY_CHAT_ENTRY_SLOT] = QLR_SteamMatchmaking_GetLobbyChatEntry;
+	vtable[QLR_STEAM_MATCHMAKING_SET_LOBBY_GAME_SERVER_SLOT] = QLR_SteamMatchmaking_SetLobbyGameServer;
+	vtable[QLR_STEAM_MATCHMAKING_GET_LOBBY_OWNER_SLOT] = QLR_SteamMatchmaking_GetLobbyOwner;
 	return &iface;
 }
 
@@ -6642,21 +7365,21 @@ QLR_SteamAPI_SteamMatchmakingServers
 =============
 */
 void *QLR_SteamAPI_SteamMatchmakingServers( void ) {
-	static void *vtable[0x40 / 4 + 1];
+	static void *vtable[QLR_STEAM_MATCHMAKING_SERVERS_VTABLE_SLOT_COUNT];
 	static qlr_steamworks_mock_interface_t iface = { vtable };
 
-	vtable[0x00 / 4] = QLR_SteamMatchmakingServers_RequestInternetServerList;
-	vtable[0x04 / 4] = QLR_SteamMatchmakingServers_RequestLANServerList;
-	vtable[0x08 / 4] = QLR_SteamMatchmakingServers_RequestFriendsServerList;
-	vtable[0x0c / 4] = QLR_SteamMatchmakingServers_RequestFavoritesServerList;
-	vtable[0x10 / 4] = QLR_SteamMatchmakingServers_RequestHistoryServerList;
-	vtable[0x18 / 4] = QLR_SteamMatchmakingServers_ReleaseRequest;
-	vtable[0x1c / 4] = QLR_SteamMatchmakingServers_GetServerDetails;
-	vtable[0x24 / 4] = QLR_SteamMatchmakingServers_RefreshQuery;
-	vtable[0x34 / 4] = QLR_SteamMatchmakingServers_PingServer;
-	vtable[0x38 / 4] = QLR_SteamMatchmakingServers_PlayerDetails;
-	vtable[0x3c / 4] = QLR_SteamMatchmakingServers_ServerRules;
-	vtable[0x40 / 4] = QLR_SteamMatchmakingServers_CancelServerQuery;
+	vtable[QLR_STEAM_MATCHMAKING_SERVERS_REQUEST_INTERNET_SERVER_LIST_SLOT] = QLR_SteamMatchmakingServers_RequestInternetServerList;
+	vtable[QLR_STEAM_MATCHMAKING_SERVERS_REQUEST_LAN_SERVER_LIST_SLOT] = QLR_SteamMatchmakingServers_RequestLANServerList;
+	vtable[QLR_STEAM_MATCHMAKING_SERVERS_REQUEST_FRIENDS_SERVER_LIST_SLOT] = QLR_SteamMatchmakingServers_RequestFriendsServerList;
+	vtable[QLR_STEAM_MATCHMAKING_SERVERS_REQUEST_FAVORITES_SERVER_LIST_SLOT] = QLR_SteamMatchmakingServers_RequestFavoritesServerList;
+	vtable[QLR_STEAM_MATCHMAKING_SERVERS_REQUEST_HISTORY_SERVER_LIST_SLOT] = QLR_SteamMatchmakingServers_RequestHistoryServerList;
+	vtable[QLR_STEAM_MATCHMAKING_SERVERS_RELEASE_REQUEST_SLOT] = QLR_SteamMatchmakingServers_ReleaseRequest;
+	vtable[QLR_STEAM_MATCHMAKING_SERVERS_GET_SERVER_DETAILS_SLOT] = QLR_SteamMatchmakingServers_GetServerDetails;
+	vtable[QLR_STEAM_MATCHMAKING_SERVERS_REFRESH_QUERY_SLOT] = QLR_SteamMatchmakingServers_RefreshQuery;
+	vtable[QLR_STEAM_MATCHMAKING_SERVERS_PING_SERVER_SLOT] = QLR_SteamMatchmakingServers_PingServer;
+	vtable[QLR_STEAM_MATCHMAKING_SERVERS_PLAYER_DETAILS_SLOT] = QLR_SteamMatchmakingServers_PlayerDetails;
+	vtable[QLR_STEAM_MATCHMAKING_SERVERS_SERVER_RULES_SLOT] = QLR_SteamMatchmakingServers_ServerRules;
+	vtable[QLR_STEAM_MATCHMAKING_SERVERS_CANCEL_SERVER_QUERY_SLOT] = QLR_SteamMatchmakingServers_CancelServerQuery;
 	return &iface;
 }
 
@@ -6666,30 +7389,32 @@ QLR_SteamAPI_SteamGameServer
 =============
 */
 void *QLR_SteamAPI_SteamGameServer( void ) {
-	static void *vtable[0x9c / 4 + 1];
+	static void *vtable[QLR_STEAM_GAMESERVER_VTABLE_SLOT_COUNT];
 	static qlr_steamworks_mock_interface_t iface = { vtable };
 
-	vtable[0x04 / 4] = QLR_SteamGameServer_SetProduct;
-	vtable[0x08 / 4] = QLR_SteamGameServer_SetGameDescription;
-	vtable[0x0c / 4] = QLR_SteamGameServer_SetGameDir;
-	vtable[0x10 / 4] = QLR_SteamGameServer_SetDedicated;
-	vtable[0x14 / 4] = QLR_SteamGameServer_LogOn;
-	vtable[0x18 / 4] = QLR_SteamGameServer_LogOnAnonymous;
-	vtable[0x20 / 4] = QLR_SteamGameServer_BLoggedOn;
-	vtable[0x28 / 4] = QLR_SteamGameServer_GetSteamID;
-	vtable[0x30 / 4] = QLR_SteamGameServer_SetMaxPlayerCount;
-	vtable[0x34 / 4] = QLR_SteamGameServer_SetBotPlayerCount;
-	vtable[0x38 / 4] = QLR_SteamGameServer_SetServerName;
-	vtable[0x3c / 4] = QLR_SteamGameServer_SetMapName;
-	vtable[0x40 / 4] = QLR_SteamGameServer_SetPasswordProtected;
-	vtable[0x54 / 4] = QLR_SteamGameServer_SetGameTags;
-	vtable[0x50 / 4] = QLR_SteamGameServer_SetKeyValue;
-	vtable[0x64 / 4] = QLR_SteamGameServer_CreateUnauthenticatedUserConnection;
-	vtable[0x6c / 4] = QLR_SteamGameServer_UpdateUserData;
-	vtable[0x90 / 4] = QLR_SteamGameServer_GetPublicIP;
-	vtable[0x94 / 4] = QLR_SteamGameServer_HandleIncomingPacket;
-	vtable[0x98 / 4] = QLR_SteamGameServer_GetNextOutgoingPacket;
-	vtable[0x9c / 4] = QLR_SteamGameServer_EnableHeartbeats;
+	vtable[QLR_STEAM_GAMESERVER_SET_PRODUCT_SLOT] = QLR_SteamGameServer_SetProduct;
+	vtable[QLR_STEAM_GAMESERVER_SET_GAME_DESCRIPTION_SLOT] = QLR_SteamGameServer_SetGameDescription;
+	vtable[QLR_STEAM_GAMESERVER_SET_GAME_DIR_SLOT] = QLR_SteamGameServer_SetGameDir;
+	vtable[QLR_STEAM_GAMESERVER_SET_DEDICATED_SLOT] = QLR_SteamGameServer_SetDedicated;
+	vtable[QLR_STEAM_GAMESERVER_LOG_ON_SLOT] = QLR_SteamGameServer_LogOn;
+	vtable[QLR_STEAM_GAMESERVER_LOG_ON_ANONYMOUS_SLOT] = QLR_SteamGameServer_LogOnAnonymous;
+	vtable[QLR_STEAM_GAMESERVER_BLOGGED_ON_SLOT] = QLR_SteamGameServer_BLoggedOn;
+	vtable[QLR_STEAM_GAMESERVER_GET_STEAM_ID_SLOT] = QLR_SteamGameServer_GetSteamID;
+	vtable[QLR_STEAM_GAMESERVER_SET_MAX_PLAYER_COUNT_SLOT] = QLR_SteamGameServer_SetMaxPlayerCount;
+	vtable[QLR_STEAM_GAMESERVER_SET_BOT_PLAYER_COUNT_SLOT] = QLR_SteamGameServer_SetBotPlayerCount;
+	vtable[QLR_STEAM_GAMESERVER_SET_SERVER_NAME_SLOT] = QLR_SteamGameServer_SetServerName;
+	vtable[QLR_STEAM_GAMESERVER_SET_MAP_NAME_SLOT] = QLR_SteamGameServer_SetMapName;
+	vtable[QLR_STEAM_GAMESERVER_SET_PASSWORD_PROTECTED_SLOT] = QLR_SteamGameServer_SetPasswordProtected;
+	vtable[QLR_STEAM_GAMESERVER_SET_GAME_TAGS_SLOT] = QLR_SteamGameServer_SetGameTags;
+	vtable[QLR_STEAM_GAMESERVER_SET_KEY_VALUE_SLOT] = QLR_SteamGameServer_SetKeyValue;
+	vtable[QLR_STEAM_GAMESERVER_CREATE_UNAUTHENTICATED_USER_SLOT] = QLR_SteamGameServer_CreateUnauthenticatedUserConnection;
+	vtable[QLR_STEAM_GAMESERVER_UPDATE_USER_DATA_SLOT] = QLR_SteamGameServer_UpdateUserData;
+	vtable[QLR_STEAM_GAMESERVER_BEGIN_AUTH_SESSION_SLOT] = QLR_SteamGameServer_BeginAuthSession;
+	vtable[QLR_STEAM_GAMESERVER_END_AUTH_SESSION_SLOT] = QLR_SteamGameServer_EndAuthSession;
+	vtable[QLR_STEAM_GAMESERVER_GET_PUBLIC_IP_SLOT] = QLR_SteamGameServer_GetPublicIP;
+	vtable[QLR_STEAM_GAMESERVER_HANDLE_INCOMING_PACKET_SLOT] = QLR_SteamGameServer_HandleIncomingPacket;
+	vtable[QLR_STEAM_GAMESERVER_GET_NEXT_OUTGOING_PACKET_SLOT] = QLR_SteamGameServer_GetNextOutgoingPacket;
+	vtable[QLR_STEAM_GAMESERVER_ENABLE_HEARTBEATS_SLOT] = QLR_SteamGameServer_EnableHeartbeats;
 	return &iface;
 }
 
@@ -6699,10 +7424,10 @@ QLR_SteamAPI_SteamGameServerUtils
 =============
 */
 void *QLR_SteamAPI_SteamGameServerUtils( void ) {
-	static void *vtable[0x24 / 4 + 1];
+	static void *vtable[QLR_STEAM_GAMESERVER_UTILS_VTABLE_SLOT_COUNT];
 	static qlr_steamworks_mock_interface_t iface = { vtable };
 
-	vtable[0x24 / 4] = QLR_SteamGameServerUtils_GetAppID;
+	vtable[QLR_STEAM_GAMESERVER_UTILS_GET_APP_ID_SLOT] = QLR_SteamGameServerUtils_GetAppID;
 	return &iface;
 }
 
@@ -6712,7 +7437,7 @@ QLR_SteamAPI_SteamGameServerStats
 =============
 */
 void *QLR_SteamAPI_SteamGameServerStats( void ) {
-	static void *vtable[0x24 / 4 + 1];
+	static void *vtable[QLR_STEAM_GAMESERVERSTATS_VTABLE_SLOT_COUNT];
 	static qlr_steamworks_mock_interface_t iface = { vtable };
 
 	++qlr_mock_state.steam_game_server_stats_interface_calls;
@@ -6720,15 +7445,15 @@ void *QLR_SteamAPI_SteamGameServerStats( void ) {
 		return NULL;
 	}
 
-	vtable[0x00 / 4] = QLR_SteamGameServerStats_RequestUserStats;
-	vtable[0x04 / 4] = QLR_SteamGameServerStats_GetUserStatFloat;
-	vtable[0x08 / 4] = QLR_SteamGameServerStats_GetUserStatInt;
-	vtable[0x0c / 4] = QLR_SteamGameServerStats_GetUserAchievement;
-	vtable[0x10 / 4] = QLR_SteamGameServerStats_SetUserStatFloat;
-	vtable[0x14 / 4] = QLR_SteamGameServerStats_SetUserStatInt;
-	vtable[0x18 / 4] = QLR_SteamGameServerStats_UpdateAvgRateStat;
-	vtable[0x1c / 4] = QLR_SteamGameServerStats_SetUserAchievement;
-	vtable[0x24 / 4] = QLR_SteamGameServerStats_StoreUserStats;
+	vtable[QLR_STEAM_GAMESERVERSTATS_REQUEST_USER_STATS_SLOT] = QLR_SteamGameServerStats_RequestUserStats;
+	vtable[QLR_STEAM_GAMESERVERSTATS_GET_USER_STAT_FLOAT_SLOT] = QLR_SteamGameServerStats_GetUserStatFloat;
+	vtable[QLR_STEAM_GAMESERVERSTATS_GET_USER_STAT_INT_SLOT] = QLR_SteamGameServerStats_GetUserStatInt;
+	vtable[QLR_STEAM_GAMESERVERSTATS_GET_USER_ACHIEVEMENT_SLOT] = QLR_SteamGameServerStats_GetUserAchievement;
+	vtable[QLR_STEAM_GAMESERVERSTATS_SET_USER_STAT_FLOAT_SLOT] = QLR_SteamGameServerStats_SetUserStatFloat;
+	vtable[QLR_STEAM_GAMESERVERSTATS_SET_USER_STAT_INT_SLOT] = QLR_SteamGameServerStats_SetUserStatInt;
+	vtable[QLR_STEAM_GAMESERVERSTATS_UPDATE_AVG_RATE_STAT_SLOT] = QLR_SteamGameServerStats_UpdateAvgRateStat;
+	vtable[QLR_STEAM_GAMESERVERSTATS_SET_USER_ACHIEVEMENT_SLOT] = QLR_SteamGameServerStats_SetUserAchievement;
+	vtable[QLR_STEAM_GAMESERVERSTATS_STORE_USER_STATS_SLOT] = QLR_SteamGameServerStats_StoreUserStats;
 	return &iface;
 }
 
@@ -6738,13 +7463,13 @@ QLR_SteamAPI_SteamGameServerNetworking
 =============
 */
 void *QLR_SteamAPI_SteamGameServerNetworking( void ) {
-	static void *vtable[0x0c / 4 + 1];
+	static void *vtable[QLR_STEAM_NETWORKING_VTABLE_SLOT_COUNT];
 	static qlr_steamworks_mock_interface_t iface = { vtable };
 
-	vtable[0x00 / 4] = QLR_SteamGameServerNetworking_SendP2PPacket;
-	vtable[0x04 / 4] = QLR_SteamGameServerNetworking_IsP2PPacketAvailable;
-	vtable[0x08 / 4] = QLR_SteamGameServerNetworking_ReadP2PPacket;
-	vtable[0x0c / 4] = QLR_SteamGameServerNetworking_AcceptP2PSessionWithUser;
+	vtable[QLR_STEAM_NETWORKING_SEND_P2P_PACKET_SLOT] = QLR_SteamGameServerNetworking_SendP2PPacket;
+	vtable[QLR_STEAM_NETWORKING_IS_P2P_PACKET_AVAILABLE_SLOT] = QLR_SteamGameServerNetworking_IsP2PPacketAvailable;
+	vtable[QLR_STEAM_NETWORKING_READ_P2P_PACKET_SLOT] = QLR_SteamGameServerNetworking_ReadP2PPacket;
+	vtable[QLR_STEAM_NETWORKING_ACCEPT_P2P_SESSION_SLOT] = QLR_SteamGameServerNetworking_AcceptP2PSessionWithUser;
 	return &iface;
 }
 
@@ -6754,22 +7479,22 @@ QLR_SteamAPI_SteamUGC
 =============
 */
 void *QLR_SteamAPI_SteamUGC( void ) {
-	static void *vtable[0xdc / 4 + 1];
+	static void *vtable[QLR_STEAM_UGC_VTABLE_SLOT_COUNT];
 	static qlr_steamworks_mock_interface_t iface = { vtable };
 
-	vtable[0x04 / 4] = QLR_SteamUGC_CreateQueryAllUGCRequest;
-	vtable[0x0c / 4] = QLR_SteamUGC_SendQueryUGCRequest;
-	vtable[0x10 / 4] = QLR_SteamUGC_GetQueryUGCResult;
-	vtable[0x14 / 4] = QLR_SteamUGC_GetQueryUGCPreviewURL;
-	vtable[0x34 / 4] = QLR_SteamUGC_ReleaseQueryUGCRequest;
-	vtable[0xc0 / 4] = QLR_SteamUGC_SubscribeItem;
-	vtable[0xc4 / 4] = QLR_SteamUGC_UnsubscribeItem;
-	vtable[0xc8 / 4] = QLR_SteamUGC_GetNumSubscribedItems;
-	vtable[0xcc / 4] = QLR_SteamUGC_GetSubscribedItems;
-	vtable[0xd0 / 4] = QLR_SteamUGC_GetItemState;
-	vtable[0xd4 / 4] = QLR_SteamUGC_GetItemInstallInfo;
-	vtable[0xd8 / 4] = QLR_SteamUGC_GetItemDownloadInfo;
-	vtable[0xdc / 4] = QLR_SteamUGC_DownloadItem;
+	vtable[QLR_STEAM_UGC_CREATE_QUERY_ALL_UGC_REQUEST_SLOT] = QLR_SteamUGC_CreateQueryAllUGCRequest;
+	vtable[QLR_STEAM_UGC_SEND_QUERY_UGC_REQUEST_SLOT] = QLR_SteamUGC_SendQueryUGCRequest;
+	vtable[QLR_STEAM_UGC_GET_QUERY_UGC_RESULT_SLOT] = QLR_SteamUGC_GetQueryUGCResult;
+	vtable[QLR_STEAM_UGC_GET_QUERY_UGC_PREVIEW_URL_SLOT] = QLR_SteamUGC_GetQueryUGCPreviewURL;
+	vtable[QLR_STEAM_UGC_RELEASE_QUERY_UGC_REQUEST_SLOT] = QLR_SteamUGC_ReleaseQueryUGCRequest;
+	vtable[QLR_STEAM_UGC_SUBSCRIBE_ITEM_SLOT] = QLR_SteamUGC_SubscribeItem;
+	vtable[QLR_STEAM_UGC_UNSUBSCRIBE_ITEM_SLOT] = QLR_SteamUGC_UnsubscribeItem;
+	vtable[QLR_STEAM_UGC_GET_NUM_SUBSCRIBED_ITEMS_SLOT] = QLR_SteamUGC_GetNumSubscribedItems;
+	vtable[QLR_STEAM_UGC_GET_SUBSCRIBED_ITEMS_SLOT] = QLR_SteamUGC_GetSubscribedItems;
+	vtable[QLR_STEAM_UGC_GET_ITEM_STATE_SLOT] = QLR_SteamUGC_GetItemState;
+	vtable[QLR_STEAM_UGC_GET_ITEM_INSTALL_INFO_SLOT] = QLR_SteamUGC_GetItemInstallInfo;
+	vtable[QLR_STEAM_UGC_GET_ITEM_DOWNLOAD_INFO_SLOT] = QLR_SteamUGC_GetItemDownloadInfo;
+	vtable[QLR_STEAM_UGC_DOWNLOAD_ITEM_SLOT] = QLR_SteamUGC_DownloadItem;
 	return &iface;
 }
 
@@ -6779,17 +7504,17 @@ QLR_SteamAPI_SteamGameServerUGC
 =============
 */
 void *QLR_SteamAPI_SteamGameServerUGC( void ) {
-	static void *vtable[0xdc / 4 + 1];
+	static void *vtable[QLR_STEAM_UGC_VTABLE_SLOT_COUNT];
 	static qlr_steamworks_mock_interface_t iface = { vtable };
 
-	vtable[0xc0 / 4] = QLR_SteamGameServerUGC_SubscribeItem;
-	vtable[0xc4 / 4] = QLR_SteamGameServerUGC_UnsubscribeItem;
-	vtable[0xc8 / 4] = QLR_SteamUGC_GetNumSubscribedItems;
-	vtable[0xcc / 4] = QLR_SteamUGC_GetSubscribedItems;
-	vtable[0xd0 / 4] = QLR_SteamGameServerUGC_GetItemState;
-	vtable[0xd4 / 4] = QLR_SteamUGC_GetItemInstallInfo;
-	vtable[0xd8 / 4] = QLR_SteamGameServerUGC_GetItemDownloadInfo;
-	vtable[0xdc / 4] = QLR_SteamGameServerUGC_DownloadItem;
+	vtable[QLR_STEAM_UGC_SUBSCRIBE_ITEM_SLOT] = QLR_SteamGameServerUGC_SubscribeItem;
+	vtable[QLR_STEAM_UGC_UNSUBSCRIBE_ITEM_SLOT] = QLR_SteamGameServerUGC_UnsubscribeItem;
+	vtable[QLR_STEAM_UGC_GET_NUM_SUBSCRIBED_ITEMS_SLOT] = QLR_SteamUGC_GetNumSubscribedItems;
+	vtable[QLR_STEAM_UGC_GET_SUBSCRIBED_ITEMS_SLOT] = QLR_SteamUGC_GetSubscribedItems;
+	vtable[QLR_STEAM_UGC_GET_ITEM_STATE_SLOT] = QLR_SteamGameServerUGC_GetItemState;
+	vtable[QLR_STEAM_UGC_GET_ITEM_INSTALL_INFO_SLOT] = QLR_SteamUGC_GetItemInstallInfo;
+	vtable[QLR_STEAM_UGC_GET_ITEM_DOWNLOAD_INFO_SLOT] = QLR_SteamGameServerUGC_GetItemDownloadInfo;
+	vtable[QLR_STEAM_UGC_DOWNLOAD_ITEM_SLOT] = QLR_SteamGameServerUGC_DownloadItem;
 	return &iface;
 }
 
@@ -6821,6 +7546,7 @@ QLR_SteamAPI_GetAuthTicketForWebApi
 */
 HAuthTicket QLR_SteamAPI_GetAuthTicketForWebApi( void *user, const char *identity ) {
 	qlr_steam_get_ticket_for_web_api_response_raw_t event;
+	uint32_t copyLength;
 
 	(void)user;
 
@@ -6831,11 +7557,25 @@ HAuthTicket QLR_SteamAPI_GetAuthTicketForWebApi( void *user, const char *identit
 		return 0;
 	}
 
+	if ( !qlr_mock_state.web_api_ticket_queue_callback ) {
+		return qlr_mock_state.web_api_ticket_handle;
+	}
+
 	memset( &event, 0, sizeof( event ) );
-	event.authTicket = qlr_mock_state.web_api_ticket_handle;
+	event.authTicket = qlr_mock_state.web_api_ticket_callback_handle;
 	event.result = qlr_mock_state.web_api_ticket_result;
-	event.ticketLength = qlr_mock_state.web_api_ticket_length;
-	memcpy( event.ticket, qlr_mock_state.web_api_ticket, qlr_mock_state.web_api_ticket_length );
+	event.ticketLength = qlr_mock_state.web_api_ticket_callback_length;
+
+	copyLength = qlr_mock_state.web_api_ticket_callback_length;
+	if ( copyLength > qlr_mock_state.web_api_ticket_length ) {
+		copyLength = qlr_mock_state.web_api_ticket_length;
+	}
+	if ( copyLength > sizeof( event.ticket ) ) {
+		copyLength = sizeof( event.ticket );
+	}
+	if ( copyLength > 0u ) {
+		memcpy( event.ticket, qlr_mock_state.web_api_ticket, copyLength );
+	}
 
 	QLR_SteamworksMock_QueueCallback( qfalse, qfalse, QLR_STEAM_CALLBACK_GET_TICKET_FOR_WEB_API_RESPONSE, 0ull, &event, sizeof( event ), qfalse );
 	return qlr_mock_state.web_api_ticket_handle;
@@ -6898,7 +7638,50 @@ platform_services.c in the engine build.
 void QL_ResetPlatformServices( void ) {
 }
 
+#ifdef _WIN32
+#include <windows.h>
+
+/*
+=============
+QLR_LoadLibraryA
+=============
+*/
+static HMODULE WINAPI QLR_LoadLibraryA( LPCSTR filename ) {
+	(void)filename;
+	return qlr_mock_state.library_available ? (HMODULE)(uintptr_t)0x1 : NULL;
+}
+
+/*
+=============
+QLR_GetProcAddress
+=============
+*/
+static FARPROC WINAPI QLR_GetProcAddress( HMODULE module, LPCSTR symbol ) {
+	return (FARPROC)dlsym( module, symbol );
+}
+
+/*
+=============
+QLR_FreeLibrary
+=============
+*/
+static BOOL WINAPI QLR_FreeLibrary( HMODULE module ) {
+	(void)module;
+	return TRUE;
+}
+
+#define LoadLibraryA QLR_LoadLibraryA
+#define GetProcAddress QLR_GetProcAddress
+#define FreeLibrary QLR_FreeLibrary
+#endif
+
 #include "../src/common/platform/platform_steamworks.c"
+
+#ifdef _WIN32
+#undef LoadLibraryA
+#undef GetProcAddress
+#undef FreeLibrary
+#endif
 
 /*
 =============
@@ -6912,35 +7695,36 @@ QLR_EXPORT void QLR_SteamworksMock_PrimeState( void ) {
 	state.initialised = qfalse;
 	state.gameServerInitialised = qfalse;
 	state.useGameServerUGC = qfalse;
-	state.SteamAPI_Init = QLR_SteamAPI_Init;
-	state.SteamAPI_Shutdown = QLR_SteamAPI_Shutdown;
-	state.SteamAPI_RunCallbacks = QLR_SteamAPI_RunCallbacks;
-	state.SteamAPI_RegisterCallback = QLR_SteamAPI_RegisterCallback;
-	state.SteamAPI_UnregisterCallback = QLR_SteamAPI_UnregisterCallback;
-	state.SteamAPI_RegisterCallResult = QLR_SteamAPI_RegisterCallResult;
-	state.SteamAPI_UnregisterCallResult = QLR_SteamAPI_UnregisterCallResult;
-	state.SteamUser = QLR_SteamAPI_SteamUser;
-	state.SteamFriends = QLR_SteamAPI_SteamFriends;
-	state.SteamUtils = QLR_SteamAPI_SteamUtils;
-	state.SteamUserStats = QLR_SteamAPI_SteamUserStats;
-	state.SteamNetworking = QLR_SteamAPI_SteamNetworking;
-	state.SteamMatchmaking = QLR_SteamAPI_SteamMatchmaking;
-	state.SteamMatchmakingServers = QLR_SteamAPI_SteamMatchmakingServers;
-	state.SteamUGC = QLR_SteamAPI_SteamUGC;
-	state.SteamGameServerUGC = QLR_SteamAPI_SteamGameServerUGC;
-	state.SteamGameServer_Init = QLR_SteamAPI_SteamGameServerInit;
-	state.SteamGameServer = QLR_SteamAPI_SteamGameServer;
-	state.SteamGameServerUtils = QLR_SteamAPI_SteamGameServerUtils;
-	state.SteamGameServerStats = QLR_SteamAPI_SteamGameServerStats;
-	state.SteamGameServer_Shutdown = QLR_SteamAPI_SteamGameServerShutdown;
-	state.SteamGameServer_RunCallbacks = QLR_SteamAPI_SteamGameServerRunCallbacks;
-	state.SteamGameServerNetworking = QLR_SteamAPI_SteamGameServerNetworking;
-	state.GetAuthSessionTicket = QLR_SteamAPI_GetAuthSessionTicket;
-	state.GetAuthTicketForWebApi = QLR_SteamAPI_GetAuthTicketForWebApi;
-	state.BeginAuthSession = QLR_SteamAPI_BeginAuthSession;
-	state.CancelAuthTicket = QLR_SteamAPI_CancelAuthTicket;
-	state.EndAuthSession = QLR_SteamAPI_EndAuthSession;
-	state.GetSteamID = QLR_SteamAPI_GetSteamID;
+	state.SteamAPI_Init = qlr_mock_state.steam_api_init_export_available ? QLR_SteamAPI_Init : NULL;
+	state.SteamAPI_Shutdown = qlr_mock_state.steam_api_shutdown_export_available ? QLR_SteamAPI_Shutdown : NULL;
+	state.SteamAPI_RunCallbacks = qlr_mock_state.steam_api_run_callbacks_export_available ? QLR_SteamAPI_RunCallbacks : NULL;
+	state.SteamAPI_RegisterCallback = qlr_mock_state.steam_api_register_callback_export_available ? QLR_SteamAPI_RegisterCallback : NULL;
+	state.SteamAPI_UnregisterCallback = qlr_mock_state.steam_api_unregister_callback_export_available ? QLR_SteamAPI_UnregisterCallback : NULL;
+	state.SteamAPI_RegisterCallResult = qlr_mock_state.steam_api_register_call_result_export_available ? QLR_SteamAPI_RegisterCallResult : NULL;
+	state.SteamAPI_UnregisterCallResult = qlr_mock_state.steam_api_unregister_call_result_export_available ? QLR_SteamAPI_UnregisterCallResult : NULL;
+	state.SteamUser = qlr_mock_state.steam_user_export_available ? QLR_SteamAPI_SteamUser : NULL;
+	state.SteamFriends = qlr_mock_state.steam_friends_export_available ? QLR_SteamAPI_SteamFriends : NULL;
+	state.SteamUtils = qlr_mock_state.steam_utils_export_available ? QLR_SteamAPI_SteamUtils : NULL;
+	state.SteamApps = qlr_mock_state.steam_apps_export_available ? QLR_SteamAPI_SteamApps : NULL;
+	state.SteamUserStats = qlr_mock_state.steam_user_stats_export_available ? QLR_SteamAPI_SteamUserStats : NULL;
+	state.SteamNetworking = qlr_mock_state.steam_networking_export_available ? QLR_SteamAPI_SteamNetworking : NULL;
+	state.SteamMatchmaking = qlr_mock_state.steam_matchmaking_export_available ? QLR_SteamAPI_SteamMatchmaking : NULL;
+	state.SteamMatchmakingServers = qlr_mock_state.steam_matchmaking_servers_export_available ? QLR_SteamAPI_SteamMatchmakingServers : NULL;
+	state.SteamUGC = qlr_mock_state.steam_ugc_export_available ? QLR_SteamAPI_SteamUGC : NULL;
+	state.SteamGameServerUGC = qlr_mock_state.steam_game_server_ugc_export_available ? QLR_SteamAPI_SteamGameServerUGC : NULL;
+	state.SteamGameServer_Init = qlr_mock_state.steam_game_server_init_export_available ? QLR_SteamAPI_SteamGameServerInit : NULL;
+	state.SteamGameServer = qlr_mock_state.steam_game_server_export_available ? QLR_SteamAPI_SteamGameServer : NULL;
+	state.SteamGameServerUtils = qlr_mock_state.steam_game_server_utils_export_available ? QLR_SteamAPI_SteamGameServerUtils : NULL;
+	state.SteamGameServerStats = qlr_mock_state.steam_game_server_stats_export_available ? QLR_SteamAPI_SteamGameServerStats : NULL;
+	state.SteamGameServer_Shutdown = qlr_mock_state.steam_game_server_shutdown_export_available ? QLR_SteamAPI_SteamGameServerShutdown : NULL;
+	state.SteamGameServer_RunCallbacks = qlr_mock_state.steam_game_server_run_callbacks_export_available ? QLR_SteamAPI_SteamGameServerRunCallbacks : NULL;
+	state.SteamGameServerNetworking = qlr_mock_state.steam_game_server_networking_export_available ? QLR_SteamAPI_SteamGameServerNetworking : NULL;
+	state.GetAuthSessionTicket = qlr_mock_state.auth_session_ticket_export_available ? QLR_SteamAPI_GetAuthSessionTicket : NULL;
+	state.GetAuthTicketForWebApi = qlr_mock_state.web_api_ticket_export_available ? QLR_SteamAPI_GetAuthTicketForWebApi : NULL;
+	state.BeginAuthSession = qlr_mock_state.begin_auth_session_export_available ? QLR_SteamAPI_BeginAuthSession : NULL;
+	state.CancelAuthTicket = qlr_mock_state.cancel_auth_ticket_export_available ? QLR_SteamAPI_CancelAuthTicket : NULL;
+	state.EndAuthSession = qlr_mock_state.end_auth_session_export_available ? QLR_SteamAPI_EndAuthSession : NULL;
+	state.GetSteamID = qlr_mock_state.get_steam_id_export_available ? QLR_SteamAPI_GetSteamID : NULL;
 	memset( &state.clientCallbacks, 0, sizeof( state.clientCallbacks ) );
 	QLR_SteamworksMock_ClearCallbackState();
 }
@@ -7502,6 +8286,24 @@ QLR_SteamworksMock_GetRichPresenceJoinRequestedCallbackRegistered
 */
 QLR_EXPORT qboolean QLR_SteamworksMock_GetRichPresenceJoinRequestedCallbackRegistered( void ) {
 	return ( state.clientCallbacks.richPresenceJoinRequested.callbackFlags & 0x01 ) ? qtrue : qfalse;
+}
+
+/*
+=============
+QLR_SteamworksMock_GetWebApiTicketCallbackRegistered
+=============
+*/
+QLR_EXPORT qboolean QLR_SteamworksMock_GetWebApiTicketCallbackRegistered( void ) {
+	return ( state.clientCallbacks.webApiTicketResponse.callbackFlags & 0x01 ) ? qtrue : qfalse;
+}
+
+/*
+=============
+QLR_SteamworksMock_GetRegisteredCallbackCount
+=============
+*/
+QLR_EXPORT int QLR_SteamworksMock_GetRegisteredCallbackCount( void ) {
+	return qlr_mock_state.registered_callback_count;
 }
 
 /*
@@ -8680,6 +9482,15 @@ QLR_EXPORT qboolean QLR_Steamworks_CompleteServerBrowserDetailCallback( ql_steam
 
 /*
 =============
+QLR_Steamworks_CompleteServerBrowserDetailTerminal
+=============
+*/
+QLR_EXPORT qboolean QLR_Steamworks_CompleteServerBrowserDetailTerminal( ql_steam_server_browser_detail_lifecycle_t *lifecycle, uint32_t terminalChannel, qboolean *outReleaseReady ) {
+	return QL_Steamworks_CompleteServerBrowserDetailTerminal( lifecycle, terminalChannel, outReleaseReady );
+}
+
+/*
+=============
 QLR_Steamworks_BuildServerBrowserDetailResponseViews
 =============
 */
@@ -8712,6 +9523,15 @@ QLR_Steamworks_CompleteServerBrowserDetailRequestCallback
 */
 QLR_EXPORT qboolean QLR_Steamworks_CompleteServerBrowserDetailRequestCallback( ql_steam_server_browser_detail_request_t *request, qboolean *outReleaseReady ) {
 	return QL_Steamworks_CompleteServerBrowserDetailRequestCallback( request, outReleaseReady );
+}
+
+/*
+=============
+QLR_Steamworks_CompleteServerBrowserDetailRequestTerminal
+=============
+*/
+QLR_EXPORT qboolean QLR_Steamworks_CompleteServerBrowserDetailRequestTerminal( ql_steam_server_browser_detail_request_t *request, uint32_t terminalChannel, qboolean *outReleaseReady ) {
+	return QL_Steamworks_CompleteServerBrowserDetailRequestTerminal( request, terminalChannel, outReleaseReady );
 }
 
 /*
@@ -8920,6 +9740,15 @@ QLR_Steamworks_GetAchievementDisplayAttribute
 */
 QLR_EXPORT const char *QLR_Steamworks_GetAchievementDisplayAttribute( const char *name, const char *key ) {
 	return QL_Steamworks_GetAchievementDisplayAttribute( name, key );
+}
+
+/*
+=============
+QLR_Steamworks_IsSubscribedApp
+=============
+*/
+QLR_EXPORT qboolean QLR_Steamworks_IsSubscribedApp( uint32_t appId ) {
+	return QL_Steamworks_IsSubscribedApp( appId );
 }
 
 /*
@@ -10036,6 +10865,15 @@ QLR_EXPORT qboolean QLR_Steamworks_CompleteServerBrowserDetailCallback( ql_steam
 
 /*
 =============
+QLR_Steamworks_CompleteServerBrowserDetailTerminal
+=============
+*/
+QLR_EXPORT qboolean QLR_Steamworks_CompleteServerBrowserDetailTerminal( ql_steam_server_browser_detail_lifecycle_t *lifecycle, uint32_t terminalChannel, qboolean *outReleaseReady ) {
+	return QL_Steamworks_CompleteServerBrowserDetailTerminal( lifecycle, terminalChannel, outReleaseReady );
+}
+
+/*
+=============
 QLR_Steamworks_BuildServerBrowserDetailResponseViews
 =============
 */
@@ -10068,6 +10906,15 @@ QLR_Steamworks_CompleteServerBrowserDetailRequestCallback
 */
 QLR_EXPORT qboolean QLR_Steamworks_CompleteServerBrowserDetailRequestCallback( ql_steam_server_browser_detail_request_t *request, qboolean *outReleaseReady ) {
 	return QL_Steamworks_CompleteServerBrowserDetailRequestCallback( request, outReleaseReady );
+}
+
+/*
+=============
+QLR_Steamworks_CompleteServerBrowserDetailRequestTerminal
+=============
+*/
+QLR_EXPORT qboolean QLR_Steamworks_CompleteServerBrowserDetailRequestTerminal( ql_steam_server_browser_detail_request_t *request, uint32_t terminalChannel, qboolean *outReleaseReady ) {
+	return QL_Steamworks_CompleteServerBrowserDetailRequestTerminal( request, terminalChannel, outReleaseReady );
 }
 
 /*
@@ -10316,6 +11163,16 @@ QLR_EXPORT const char *QLR_Steamworks_GetAchievementDisplayAttribute( const char
 	(void)name;
 	(void)key;
 	return "";
+}
+
+/*
+=============
+QLR_Steamworks_IsSubscribedApp
+=============
+*/
+QLR_EXPORT qboolean QLR_Steamworks_IsSubscribedApp( uint32_t appId ) {
+	(void)appId;
+	return qfalse;
 }
 
 /*

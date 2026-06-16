@@ -54,10 +54,11 @@ The shared `QL_Steamworks_GetGameServer` helper still carries its own
 guards. The new wrapper-level checks match the retail control-flow boundary
 more directly and keep these public wrappers self-contained.
 
-SRP still calls dynamically loaded `SteamAPI_ISteamUser_BeginAuthSession` and
-`SteamAPI_ISteamUser_EndAuthSession` entry points with the GameServer
-interface pointer. That is a source bridge over the retail vtable-slot evidence,
-not a claim that retail used the same import spellings.
+Follow-up Round 675 moves the public server auth wrappers from the older
+dynamic flat-symbol bridge to the retail GameServer vtable slots. The flat
+`SteamAPI_ISteamUser_BeginAuthSession` and
+`SteamAPI_ISteamUser_EndAuthSession` exports remain loaded for the separate
+client-side validation helper.
 
 ## Server Wiring
 
@@ -81,7 +82,7 @@ pin:
 - Ghidra function rows;
 - Binary Ninja initialized-guard-to-auth-dispatch ordering;
 - source wrapper guard ordering;
-- the source dynamic-symbol bridge for BeginAuthSession/EndAuthSession; and
+- the source GameServer vtable bridge for BeginAuthSession/EndAuthSession; and
 - server call sites that begin, finalize, and clean up Steam auth sessions.
 
 ## Parity Estimate

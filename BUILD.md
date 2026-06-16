@@ -86,6 +86,10 @@ Notes:
   the repo-managed bootstrap flow only. The retail DLL payload remains a
   runtime concern under `assets/quakelive/`; it is no longer part of the
   non-retail codec build detection story.
+- ZMQ is a runtime-only online-service dependency. The engine project does not
+  include `zmq.h` or link `libzmq.lib`; opted-in builds copy `libzmq.dll` only
+  when `ZMQ_RUNTIME_DIR`, `ZmqRuntimeDir`, or an untracked
+  `src\libs\libzmq\bin\Win32\libzmq.dll` drop is present.
 - Source-level online services still default to `0`, but Windows `Release`
   project configurations now opt into `QLBuildOnlineServices=1`,
   `QLBuildSteamworks=1`, and the WebUI/Awesomium helper path. Runtime WebUI and

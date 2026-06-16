@@ -45,22 +45,57 @@ static qboolean QL_StringRepresentsTrue( const char *value ) {
 
 /*
 =============
+QL_PlatformExternalEcosystemsDisableReason
+
+Returns the runtime policy flag currently disabling platform integrations.
+=============
+*/
+static const char *QL_PlatformExternalEcosystemsDisableReason( void ) {
+	const char *flag;
+
+	flag = getenv( "QL_DISABLE_EXTERNAL_ECOSYSTEMS" );
+	if ( QL_StringRepresentsTrue( flag ) ) {
+		return "QL_DISABLE_EXTERNAL_ECOSYSTEMS";
+	}
+
+	flag = getenv( "QL_DISABLE_STEAMWORKS" );
+	if ( QL_StringRepresentsTrue( flag ) ) {
+		return "QL_DISABLE_STEAMWORKS";
+	}
+
+	return NULL;
+}
+
+/*
+=============
 QL_PlatformExternalEcosystemsDisabled
 
 Checks whether runtime platform integrations should be disabled.
 =============
 */
 static qboolean QL_PlatformExternalEcosystemsDisabled( void ) {
-	const char *flag;
+	return QL_PlatformExternalEcosystemsDisableReason() != NULL ? qtrue : qfalse;
+}
 
-	flag = getenv( "QL_DISABLE_EXTERNAL_ECOSYSTEMS" );
-	if ( QL_StringRepresentsTrue( flag ) ) {
-		return qtrue;
+#if QL_PLATFORM_HAS_STEAMWORKS || QL_PLATFORM_HAS_OPEN_STEAM || QL_PLATFORM_BUILD_HYBRID
+/*
+=============
+QL_PlatformExternalEcosystemsDisableProviderLabel
+
+Returns the descriptor provider label for the active runtime disable policy.
+=============
+*/
+static const char *QL_PlatformExternalEcosystemsDisableProviderLabel( void ) {
+	const char *reason;
+
+	reason = QL_PlatformExternalEcosystemsDisableReason();
+	if ( reason && !strcmp( reason, "QL_DISABLE_STEAMWORKS" ) ) {
+		return "Disabled by QL_DISABLE_STEAMWORKS";
 	}
 
-	flag = getenv( "QL_DISABLE_STEAMWORKS" );
-	return QL_StringRepresentsTrue( flag );
+	return "Disabled by QL_DISABLE_EXTERNAL_ECOSYSTEMS";
 }
+#endif
 
 /*
 =============
@@ -108,6 +143,10 @@ const char *QL_DescribePlatformFeaturePolicy( const ql_platform_feature_descript
 		return "compatibility-disabled (QL_DISABLE_EXTERNAL_ECOSYSTEMS)";
 	}
 
+	if ( strstr( provider, "QL_DISABLE_STEAMWORKS" ) != NULL ) {
+		return "compatibility-disabled (QL_DISABLE_STEAMWORKS)";
+	}
+
 	if ( descriptor->compiled && !descriptor->initialised ) {
 		return "compatibility-only provider unavailable";
 	}
@@ -143,6 +182,10 @@ const char *QL_GetOnlineServicesModeLabel( void ) {
 
 	if ( strstr( provider, "QL_DISABLE_EXTERNAL_ECOSYSTEMS" ) != NULL ) {
 		return "Externally-disabled compatibility lane";
+	}
+
+	if ( strstr( provider, "QL_DISABLE_STEAMWORKS" ) != NULL ) {
+		return "Steamworks-disabled compatibility lane";
 	}
 
 #if QL_PLATFORM_BUILD_HYBRID
@@ -238,6 +281,10 @@ const char *QL_GetOnlineServicesParityReasonLabel( void ) {
 	const char *policyLabel = QL_GetOnlineServicesPolicyLabel();
 
 	if ( strstr( policyLabel ? policyLabel : "", "compatibility-disabled" ) != NULL ) {
+		if ( strstr( policyLabel, "QL_DISABLE_STEAMWORKS" ) != NULL ) {
+			return "runtime policy disables the opted-in Steamworks compatibility lane";
+		}
+
 		return "runtime policy disables the opted-in online-service compatibility lane";
 	}
 
@@ -307,6 +354,9 @@ Constructs a service descriptor table based on build flags and runtime state.
 static ql_platform_service_table QL_BuildServiceTable( void ) {
 	ql_platform_service_table table;
 	qboolean externalDisabled;
+#if QL_PLATFORM_HAS_STEAMWORKS || QL_PLATFORM_HAS_OPEN_STEAM || QL_PLATFORM_BUILD_HYBRID
+	const char *externalDisabledProvider;
+#endif
 
 	memset( &table, 0, sizeof( table ) );
 
@@ -329,25 +379,27 @@ static ql_platform_service_table QL_BuildServiceTable( void ) {
 
 	if ( externalDisabled ) {
 #if QL_PLATFORM_HAS_STEAMWORKS || QL_PLATFORM_HAS_OPEN_STEAM || QL_PLATFORM_BUILD_HYBRID
+		externalDisabledProvider = QL_PlatformExternalEcosystemsDisableProviderLabel();
+
 		table.auth.compiled = qtrue;
 		table.auth.initialised = qfalse;
-		table.auth.provider = "Disabled by QL_DISABLE_EXTERNAL_ECOSYSTEMS";
+		table.auth.provider = externalDisabledProvider;
 
 		table.matchmaking.compiled = qtrue;
 		table.matchmaking.initialised = qfalse;
-		table.matchmaking.provider = "Disabled by QL_DISABLE_EXTERNAL_ECOSYSTEMS";
+		table.matchmaking.provider = externalDisabledProvider;
 
 		table.workshop.compiled = qtrue;
 		table.workshop.initialised = qfalse;
-		table.workshop.provider = "Disabled by QL_DISABLE_EXTERNAL_ECOSYSTEMS";
+		table.workshop.provider = externalDisabledProvider;
 
 		table.overlay.compiled = qtrue;
 		table.overlay.initialised = qfalse;
-		table.overlay.provider = "Disabled by QL_DISABLE_EXTERNAL_ECOSYSTEMS";
+		table.overlay.provider = externalDisabledProvider;
 
 		table.stats.compiled = qtrue;
 		table.stats.initialised = qfalse;
-		table.stats.provider = "Disabled by QL_DISABLE_EXTERNAL_ECOSYSTEMS";
+		table.stats.provider = externalDisabledProvider;
 #endif
 
 		QL_FinaliseDescriptor( &table.auth, "Unavailable" );

@@ -1,6 +1,6 @@
 # Implementation Plan
 
-Last updated: 2026-06-12
+Last updated: 2026-06-16
 
 This file now tracks only active repo-level work. Detailed closure narratives
 live in the dedicated subsystem audits under `docs/reverse-engineering/`.
@@ -46,6 +46,2886 @@ disabled, until a documented open replacement path exists.
   pick and close remaining `src/ui/menudef.h` ownerdraw IDs.
 
 ## Active work
+
+### Task A654: Pin ZMQ receive frame-more flag boundary [COMPLETED]
+Priority: High
+Primary areas: `src/code/server/sv_zmq.c`,
+`tests/test_platform_services.py`, `tests/test_server_full_parity_gate.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_752.md`
+Parity estimate: **before 93% -> after 99%** for focused receive frame-more
+flag confidence, and **before 99.99% -> after 99.995%** for focused ZMQ
+wiring/source reconstruction confidence. Repo-wide parity remains **99%**
+because this pass names SRP's caller-visible receive `more` qboolean
+adaptation at the retained Quake Live-owned `idZMQ` boundary without
+reconstructing embedded libzmq/CZMQ internals or changing the strict-retail
+Windows replacement score.
+
+Completed work:
+
+1. Rechecked retail `zsock_rcvmore`, `zstr_recv`, and lower
+   `zmq_getsockopt`/`zmq_msg_*` helpers against Binary Ninja HLIL, Ghidra
+   function rows, aliases, and the prior receive mapping evidence.
+2. Confirmed SRP's caller-visible `more` qboolean is external-runtime receive
+   state owned by retained `idZMQ` wiring, not reconstructed libzmq/CZMQ
+   helper source.
+3. Named SRP's receive frame-more states as `QL_ZMQ_FRAME_MORE` and
+   `QL_ZMQ_FRAME_NO_MORE`, replacing raw caller-state assignments.
+4. Pinned the distinction with focused source/evidence tests and a server gate
+   detail while preserving `src/libs/libzmq` as a runtime-only placeholder.
+
+### Task A653: Pin ZMQ RCON broadcast reentrancy guard boundary [COMPLETED]
+Priority: High
+Primary areas: `src/code/server/sv_zmq.c`,
+`src/code/qcommon/common.c`, `tests/test_platform_services.py`,
+`tests/test_server_full_parity_gate.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_751.md`
+Parity estimate: **before 93% -> after 99%** for focused RCON broadcast
+reentrancy-guard confidence, and **before 99.98% -> after 99.99%** for
+focused ZMQ wiring/source reconstruction confidence. Repo-wide parity remains
+**99%** because this pass names an SRP broadcast recursion guard adaptation at
+the Quake Live-owned console-output/RCON broadcast boundary without
+reconstructing embedded libzmq/CZMQ internals or changing the strict-retail
+Windows replacement score.
+
+Completed work:
+
+1. Rechecked retail `idZMQ_BroadcastRconOutput`,
+   `Zmq_BroadcastRconOutput`, `idZMQ_EraseRconPeer`, `Com_Printf`,
+   `zstr_send`, and `zstr_sendm` against Binary Ninja HLIL, Ghidra function
+   rows, aliases, and the prior RCON broadcast mapping evidence.
+2. Confirmed retail logs RCON peer disconnects from inside the retained
+   broadcast owner while SRP's `Com_Printf` bridge forwards console output to
+   `Zmq_BroadcastRconOutput`.
+3. Named SRP's broadcast recursion guard states as
+   `QL_ZMQ_RCON_BROADCAST_ACTIVE` and `QL_ZMQ_RCON_BROADCAST_IDLE`, replacing
+   raw `qtrue`/`qfalse` guard assignments.
+4. Pinned the distinction with focused source/evidence tests and a server gate
+   detail while preserving `src/libs/libzmq` as a runtime-only placeholder.
+
+### Task A652: Pin Steam browser rules/players terminal event boundary [COMPLETED]
+Priority: High
+Primary areas: `src/common/platform/platform_steamworks.c`,
+`src/code/client/cl_main.c`, `tests/test_platform_services.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_750.md`
+Parity estimate: **before 87% -> after 99%** for focused native Steam
+browser rules/players terminal-event boundary confidence, and **before 94.42%
+-> after 94.44%** for overall Steam launch/runtime integration mapping
+confidence. Repo-wide parity remains **99%** because this pass pins the
+opt-in native `SteamMatchmakingServers` callback wiring without enabling live
+Steam behavior by default or changing the strict-retail Windows replacement
+score.
+overall Steam launch/runtime
+integration mapping confidence **94.42% -> 94.44%**.
+Focused lane: native Steam browser rules/players terminal-event boundary
+confidence.
+
+Completed work:
+
+1. Rechecked retail `JSBrowserDetails_OnRuleResponded`,
+   `JSBrowserDetails_OnRulesFailed`,
+   `JSBrowserDetails_OnRulesRefreshComplete`,
+   `JSBrowserDetails_OnPlayerResponded`,
+   `JSBrowserDetails_OnPlayersFailed`, and
+   `JSBrowserDetails_OnPlayersRefreshComplete` against Binary Ninja HLIL,
+   Ghidra imports, function rows, vtable rows, and symbol aliases.
+2. Confirmed retail rules/player streamed response callbacks publish response
+   events without advancing the shared `JSBrowserDetails` terminal counter.
+3. Confirmed retail rules/player failed and end callbacks publish their
+   terminal events before incrementing the retained counter and checking the
+   delete-on-third boundary.
+4. Added a focused static evidence gate and Round 750 mapping note so SRP
+   preserves non-terminal streamed responses and publish-before-complete
+   ordering for rules/player failed/end callbacks.
+
+### Task A651: Pin ZMQ stats transcript handle-clear boundary [COMPLETED]
+Priority: High
+Primary areas: `src/code/server/sv_zmq.c`,
+`tests/test_platform_services.py`, `tests/test_server_full_parity_gate.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_749.md`
+Parity estimate: **before 92% -> after 99%** for focused stats transcript
+handle-clear confidence, and **before 99.97% -> after 99.98%** for focused
+ZMQ wiring/source reconstruction confidence. Repo-wide parity remains **99%**
+because this pass names an SRP fallback transcript handle adaptation beside
+the Quake Live-owned stats PUB lifecycle boundary without reconstructing
+embedded libzmq/CZMQ internals or changing the strict-retail Windows
+replacement score.
+
+Completed work:
+
+1. Rechecked retail `Zmq_ShutdownStatsPublisher`,
+   `idZMQ_InitStatsPublisher`, `idZMQ_ReportPlayerEvent`,
+   `idZMQ_SubmitMatchReport`, `zsock_destroy_checked`, and `zstr_send`
+   against Binary Ninja HLIL, Ghidra function rows, aliases, and the prior
+   stats publisher/transcript mapping evidence.
+2. Confirmed retail stats shutdown owns only the retained stats PUB socket
+   slot, while SRP's local transcript handle is a fallback sidecar owned by
+   the same stats shutdown lane.
+3. Named SRP's transcript file-handle empty state as
+   `QL_ZMQ_STATS_TRANSCRIPT_HANDLE_EMPTY` and used it after
+   `FS_FCloseFile( s_zmq.statsTranscript )`.
+4. Pinned the distinction with focused source/evidence tests and a server gate
+   detail while preserving `src/libs/libzmq` as a runtime-only placeholder.
+
+### Task A650: Pin Steam browser ping response filtered completion [COMPLETED]
+Priority: High
+Primary areas: `src/code/client/cl_main.c`,
+`src/common/platform/platform_steamworks.c`,
+`tests/test_platform_services.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_748.md`
+Parity estimate: **before 86% -> after 99%** for focused native Steam
+browser ping response filtered-completion confidence, and **before 94.40% ->
+after 94.42%** for overall Steam launch/runtime integration mapping
+confidence. Repo-wide parity remains **99%** because this pass pins the
+opt-in native `SteamMatchmakingServers` compatibility wrapper without enabling
+live Steam behavior by default or changing the strict-retail Windows
+replacement score.
+overall Steam launch/runtime
+integration mapping confidence **94.40% -> 94.42%**.
+Focused lane: native Steam browser ping response filtered-completion
+confidence.
+
+Completed work:
+
+1. Rechecked retail `JSBrowserDetails_OnServerResponded`,
+   `JSBrowserDetails_OnServerFailedToRespond`, and
+   `JSBrowserDetails_RequestServerDetails` against Binary Ninja HLIL, Ghidra
+   imports, function rows, vtable rows, and symbol aliases.
+2. Confirmed retail app-filters ping `ServerResponded` payloads through
+   `SteamUtils + 0x24` before publishing `servers.details.%u_%u.response` and
+   incrementing the retained detail terminal counter.
+3. Confirmed retail ping `ServerFailedToRespond` increments the same retained
+   counter through a separate failed callback path with no response payload.
+4. Added a focused static evidence gate and Round 748 mapping note so SRP
+   keeps `CL_SteamBrowser_NativePingRespondedImpl` completion inside the
+   successful app-filter branch while leaving the failed-ping terminal path
+   unconditional.
+
+### Task A649: Pin ZMQ RCON peer-table slot-clear boundary [COMPLETED]
+Priority: High
+Primary areas: `src/code/server/sv_zmq.c`,
+`tests/test_platform_services.py`, `tests/test_server_full_parity_gate.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_747.md`
+Parity estimate: **before 94% -> after 99%** for focused RCON peer-table
+slot-clear confidence, and **before 99.96% -> after 99.97%** for focused ZMQ
+wiring/source reconstruction confidence. Repo-wide parity remains **99%**
+because this pass names an SRP portable peer-table slot adaptation around the
+Quake Live-owned `idZMQ` runtime boundary without reconstructing embedded
+libzmq/CZMQ internals, MSVC `std::tree` internals, or changing the
+strict-retail Windows replacement score.
+
+Completed work:
+
+1. Rechecked retail `idZMQ_EraseRconPeer`,
+   `idZMQ_InsertRconPeer`, `idZMQ_ClearRconPeers`,
+   `idZMQ_EraseRconPeerRange`, and `idZMQ_Destroy` against Binary Ninja HLIL,
+   Ghidra function rows, aliases, and the prior peer-table mapping evidence.
+2. Confirmed the retail full-range erase funnels into the peer-table clear path
+   when the range covers the container endpoints, and that the peer count is
+   reset through the same clear boundary.
+3. Named SRP's retained RCON peer-table empty state as
+   `QL_ZMQ_RCON_PEER_SLOT_EMPTY` for the list head, tree root, and list tail
+   slots while preserving the existing portable peer-table structure.
+4. Pinned the distinction with focused source/evidence tests and a server gate
+   detail while preserving `src/libs/libzmq` as a runtime-only placeholder.
+
+### Task A648: Pin ZMQ resolved RCON poll slot-clear boundary [COMPLETED]
+Priority: High
+Primary areas: `src/code/server/sv_zmq.c`,
+`tests/test_platform_services.py`, `tests/test_server_full_parity_gate.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_746.md`
+Parity estimate: **before 94% -> after 99%** for focused resolved RCON poll
+slot-clear confidence, and **before 99.95% -> after 99.96%** for focused ZMQ
+wiring/source reconstruction confidence. Repo-wide parity remains **99%**
+because this pass names and orders an SRP retained RCON poll slot adaptation
+around the Quake Live-owned `idZMQ` runtime boundary without reconstructing
+embedded libzmq/CZMQ internals or changing the strict-retail Windows
+replacement score.
+
+Completed work:
+
+1. Rechecked retail `Zmq_ShutdownRuntime`, `idZMQ_PumpRcon`,
+   `zsock_destroy_checked`, `zsock_resolve`, and `zmq_poll` against Binary
+   Ninja HLIL, Ghidra function rows, aliases, and the prior resolved-poll-slot
+   mapping evidence.
+2. Confirmed retail clears `data_57570c`, the resolved RCON poll slot, before
+   destroying the retained RCON socket wrapper at `data_575708`.
+3. Named SRP's retained resolved-poll empty state as
+   `QL_ZMQ_RCON_POLL_SLOT_EMPTY`, used it in RCON-disabled cleanup and runtime
+   shutdown, and ordered runtime shutdown so the poll slot clears before the
+   RCON socket is closed.
+4. Pinned the distinction with focused source/evidence tests and a server gate
+   detail while preserving `src/libs/libzmq` as a runtime-only placeholder.
+
+### Task A647: Pin Steam browser detail terminal channel ownership [COMPLETED]
+Priority: High
+Primary areas: `src/common/platform/platform_steamworks.h`,
+`src/common/platform/platform_steamworks.c`, `src/code/client/cl_main.c`,
+`tests/steamworks_harness.c`, `tests/test_steamworks_harness.py`,
+`tests/test_platform_services.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_745.md`
+Parity estimate: **before 84% -> after 99%** for focused native Steam
+browser detail terminal-channel ownership confidence, and **before 94.38% ->
+after 94.40%** for overall Steam launch/runtime integration mapping
+confidence. Repo-wide parity remains **99%** because this pass tightens the
+opt-in native `SteamMatchmakingServers` compatibility wrapper without enabling
+live Steam behavior by default or changing the strict-retail Windows
+replacement score.
+overall Steam launch/runtime
+integration mapping confidence **94.38% -> 94.40%**.
+Focused lane: native Steam browser detail terminal-channel ownership
+confidence.
+
+Completed work:
+
+1. Rechecked retail `JSBrowserDetails_RequestServerDetails`,
+   `SteamBrowser_RequestServerDetails`, and `JSBrowser_RequestServers` against
+   Binary Ninja HLIL, Ghidra imports, function rows, and symbol aliases.
+2. Confirmed retail issues ping, rules, and players detail queries through
+   separate `SteamMatchmakingServers` vtable slots and distinct callback-view
+   offsets from the retained detail object.
+3. Added named ping/rules/players terminal-channel bits to the retained detail
+   lifecycle, with canonical duplicate-channel rejection and legacy sequential
+   callback compatibility.
+4. Routed client native ping, rules, and players terminal callbacks through
+   the channel-aware request completion helper and pinned the behavior with
+   harness and static evidence tests.
+
+### Task A645: Pin ZMQ external runtime resolved-symbol slot-clear boundary [COMPLETED]
+Priority: High
+Primary areas: `src/code/server/sv_zmq.c`,
+`tests/test_platform_services.py`, `tests/test_server_full_parity_gate.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_743.md`
+Parity estimate: **before 94% -> after 99%** for focused external runtime
+resolved-symbol slot-clear confidence, and **before 99.94% -> after 99.95%**
+for focused ZMQ wiring/source reconstruction confidence. Repo-wide parity
+remains **99%** because this pass names an SRP dynamic export-table
+adaptation around the retained `idZMQ` loader boundary without reconstructing
+embedded libzmq/CZMQ internals or changing the strict-retail Windows
+replacement score.
+
+Completed work:
+
+1. Rechecked retail embedded libzmq public-wrapper aliases, Binary Ninja HLIL
+   anchors, and Ghidra function rows for the ZMQ API surface SRP resolves from
+   an external runtime.
+2. Confirmed `zmq_errno` and `zmq_strerror` remain SRP external-runtime
+   diagnostic exports, not retail source bodies reconstructed into this repo.
+3. Named the SRP dynamic resolved-export empty state as
+   `QL_ZMQ_SYMBOL_SLOT_EMPTY` and used it for all twelve resolved function
+   pointer fields in `idZMQ_ResetResolvedSymbols`.
+4. Pinned missing-export cleanup and runtime-unload ordering so the dynamic
+   library handle clears before the resolved export table is reset, while
+   `src/libs/libzmq` remains runtime-only.
+
+### Task A644: Pin ZMQ external runtime library slot-clear boundary [COMPLETED]
+Priority: High
+Primary areas: `src/code/server/sv_zmq.c`,
+`tests/test_platform_services.py`, `tests/test_server_full_parity_gate.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_742.md`
+Parity estimate: **before 94% -> after 99%** for focused external runtime
+library handle slot-clear confidence, and **before 99.92% -> after 99.94%**
+for focused ZMQ wiring/source reconstruction confidence. Repo-wide parity
+remains **99%** because this pass names an SRP dynamic library handle
+adaptation around the retained `idZMQ` host boundary without reconstructing
+embedded libzmq/CZMQ internals or changing the strict-retail Windows
+replacement score.
+
+Completed work:
+
+1. Rechecked retail `Zmq_ShutdownRuntime`, `zsock_destroy_checked`,
+   `zactor_destroy`, `zmq_ctx_term`, `zmq_term`, and `zsys_shutdown` against
+   Binary Ninja HLIL, Ghidra function rows, aliases, and existing loader/export
+   mapping evidence.
+2. Confirmed retail embeds libzmq/CZMQ lifecycle code in
+   `quakelive_steam.exe`, while SRP's source boundary is the external runtime
+   loader handle used by the retained `idZMQ` integration.
+3. Named the SRP dynamic library handle empty state as
+   `QL_ZMQ_LIBRARY_SLOT_EMPTY` and used it in both missing-export cleanup and
+   runtime unload paths.
+4. Pinned the distinction with focused source/evidence tests and a server gate
+   detail so `src/libs/libzmq` remains an external drop placeholder rather than
+   reconstructed libzmq/CZMQ source.
+
+### Task A643: Pin Steam browser owner completion guard [COMPLETED]
+Priority: High
+Primary areas: `src/common/platform/platform_steamworks.c`,
+`src/code/client/cl_main.c`, `tests/test_steamworks_harness.py`,
+`tests/test_platform_services.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_741.md`
+Parity estimate: **before 86% -> after 99%** for focused native Steam browser
+owner completion guard confidence, and **before 94.36% -> after 94.38%** for
+overall Steam launch/runtime integration mapping confidence. Repo-wide parity
+remains **99%** because this pass tightens the opt-in native
+`SteamMatchmakingServers` compatibility wrapper without enabling live Steam
+behavior by default or changing the strict-retail Windows replacement score.
+overall Steam launch/runtime
+integration mapping confidence **94.36% -> 94.38%**.
+Focused lane: native Steam browser owner completion guard confidence.
+
+Completed work:
+
+1. Rechecked retail `JSBrowser_OnRefreshComplete`,
+   `SteamBrowser_RefreshList`, `JSBrowser_RequestServers`, and
+   `SteamBrowser_RequestServers` against Binary Ninja HLIL, Ghidra import
+   rows, and symbol aliases.
+2. Confirmed retail keeps refresh completion tied to the active browser object
+   and retained request handle while publishing `servers.refresh.end` from the
+   completion path.
+3. Guarded `QL_Steamworks_CompleteServerBrowserOwnerRequest` so duplicate or
+   idle completions return false instead of re-clearing an already idle owner.
+4. Routed `CL_SteamBrowser_CompleteNativeRefresh` through that guard before
+   clearing client refresh state or publishing the browser refresh-end event,
+   and pinned the behavior with harness and static evidence tests.
+
+### Task A642: Pin ZMQ context shutdown slot-clear boundary [COMPLETED]
+Priority: High
+Primary areas: `src/code/server/sv_zmq.c`,
+`tests/test_platform_services.py`, `tests/test_server_full_parity_gate.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_740.md`
+Parity estimate: **before 94% -> after 99%** for focused context shutdown
+slot-clear confidence, and **before 99.90% -> after 99.92%** for focused ZMQ
+wiring/source reconstruction confidence. Repo-wide parity remains **99%**
+because this pass names an SRP dynamic `zmq_ctx_term` adaptation at the
+retained `idZMQ` runtime context boundary without reconstructing embedded
+libzmq/CZMQ internals, and without changing the strict-retail Windows
+replacement score.
+
+Completed work:
+
+1. Rechecked retail `Zmq_ShutdownRuntime`, `zsock_destroy_checked`,
+   `zactor_destroy`, `zmq_ctx_term`, `zmq_term`, and `zmq_ctx_t_term` against
+   Binary Ninja HLIL, Ghidra function rows, aliases, and the existing runtime
+   loader/export mapping evidence.
+2. Confirmed retail shutdown clears the retained RCON poll slot, destroys the
+   RCON zsock slot, and destroys the auth actor, while embedded libzmq owns
+   context termination internals.
+3. Named SRP's external-runtime context empty state with
+   `QL_ZMQ_CONTEXT_SLOT_EMPTY` and routed `Zmq_ShutdownRuntime` through it
+   after the dynamic `zmq_ctx_term` call.
+4. Added a focused Round 740 parity gate and wired the new detail into the
+   SV-G02 server parity report, while preserving the external libzmq/CZMQ
+   boundary.
+
+### Task A641: Pin Steamworks runtime disable reason wiring [COMPLETED]
+Priority: High
+Primary areas: `src/common/platform/platform_services.c`,
+`tests/test_platform_services.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_739.md`
+Parity estimate: **before 82% -> after 99%** for focused Steamworks
+runtime-disable reason wiring confidence, and **before 94.34% -> after
+94.36%** for overall Steam launch/runtime integration mapping confidence.
+Repo-wide parity remains **99%** because this pass clarifies a
+default-disabled SRP compatibility lane without enabling live Steam behavior by
+default or changing the strict-retail Windows replacement score.
+overall Steam launch/runtime
+integration mapping confidence **94.34% -> 94.36%**.
+Focused lane: Steamworks runtime-disable reason wiring confidence.
+
+Completed work:
+
+1. Rechecked retail Steam client startup/import anchors against Binary Ninja
+   HLIL, Ghidra imports, symbol aliases, and the existing platform-service
+   mapping evidence.
+2. Confirmed SRP already treated both `QL_DISABLE_EXTERNAL_ECOSYSTEMS` and
+   `QL_DISABLE_STEAMWORKS` as fail-closed runtime service-table gates.
+3. Split runtime-disable reason discovery from the boolean gate so
+   `QL_DISABLE_STEAMWORKS` publishes `Disabled by QL_DISABLE_STEAMWORKS`
+   instead of being collapsed into the generic external-ecosystem label.
+4. Extended the service descriptor policy, online-services mode label, parity
+   reason label, compiled C probes, and Round 739 static gate to preserve the
+   Steamworks-specific runtime disable reason.
+
+### Task A640: Pin ZMQ auth bind failure close-slot boundary [COMPLETED]
+Priority: High
+Primary areas: `src/code/server/sv_zmq.c`,
+`tests/test_platform_services.py`, `tests/test_server_full_parity_gate.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_738.md`
+Parity estimate: **before 94% -> after 99%** for focused auth bind failure
+close-slot confidence, and **before 99.88% -> after 99.90%** for focused ZMQ
+wiring/source reconstruction confidence. Repo-wide parity remains **99%**
+because this pass names an SRP manual ZAP bind failure cleanup at the retained
+`idZMQ` dynamic `zmq_close` boundary without reconstructing embedded
+libzmq/CZMQ internals, and without changing the strict-retail Windows
+replacement score.
+
+Completed work:
+
+1. Rechecked retail `zauth_self_new`, `zsock_bind`,
+   `zsock_destroy_checked`, and `zsys_close` against Binary Ninja HLIL,
+   Ghidra function rows, aliases, and the existing auth actor mapping
+   evidence.
+2. Confirmed retail binds the ZAP actor pipe to `inproc://zeromq.zap.01` and
+   destroys the ZAP socket slot through the checked zsock destroy path.
+3. Routed SRP's manual ZAP auth bind failure cleanup through
+   `idZMQ_CloseSocket( &socket )`, leaving the external libzmq runtime as the
+   only implementation source for `zmq_close`.
+4. Added a focused Round 738 parity gate and wired the new detail into the
+   SV-G02 server parity report, while preserving the external libzmq/CZMQ
+   boundary.
+
+### Task A639: Pin optional Steam GameServer export fallbacks [COMPLETED]
+Priority: High
+Primary areas: `tests/steamworks_harness.c`,
+`tests/test_steamworks_harness.py`,
+`tests/test_platform_services.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_737.md`
+Parity estimate: **before 88% -> after 99%** for focused optional GameServer
+export fallback confidence, and **before 94.32% -> after 94.34%** for overall
+Steam launch/runtime integration mapping confidence. Repo-wide parity remains
+**99%** because this pass strengthens the opt-in Steamworks harness lane
+without changing the strict-retail Windows replacement score or enabling live
+Steam behavior by default.
+Focused lane: optional GameServer export fallback confidence.
+
+Completed work:
+
+1. Rechecked retained import and HLIL evidence for `SteamGameServer`,
+   `SteamGameServerStats`, `SteamGameServerUtils`, `SteamGameServerUGC`,
+   `SteamGameServer_Init`, `SteamGameServer_Shutdown`,
+   `SteamGameServer_RunCallbacks`, and `SteamGameServerNetworking`.
+2. Reconfirmed SRP's deliberate dynamic-loader divergence: GameServer exports
+   stay optional, while the core Steam init and retail auth-ticket path remain
+   independent of absent server-only exports.
+3. Added Steamworks harness export-availability switches so the mock runtime
+   can hide each optional GameServer export through both dynamic loader and
+   direct prime-state paths.
+4. Added focused ctypes coverage proving missing GameServer exports disable
+   only server init, GameServer vtable helpers, shutdown, server callbacks,
+   server stats, server app-id lookup, server UGC ownership, or server P2P as
+   appropriate while preserving client auth-ticket acquisition.
+
+### Task A638: Pin ZMQ socket close-slot clear boundary [COMPLETED]
+Priority: High
+Primary areas: `src/code/server/sv_zmq.c`,
+`tests/test_platform_services.py`, `tests/test_server_full_parity_gate.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_736.md`
+Parity estimate: **before 94% -> after 99%** for focused socket close-slot
+clear source-boundary confidence, and **before 99.86% -> after 99.88%** for
+focused ZMQ wiring/source reconstruction confidence. Repo-wide parity remains
+**99%** because this pass names an SRP dynamic `zmq_close` adaptation at the
+retained `idZMQ` socket-slot boundary without reconstructing embedded
+libzmq/CZMQ internals, and without changing the strict-retail Windows
+replacement score.
+
+Completed work:
+
+1. Rechecked retail `zsock_destroy_checked` and `zsys_close` against Binary
+   Ninja HLIL, Ghidra function rows, aliases, and the existing checked-zsock
+   lifecycle mapping evidence.
+2. Confirmed retail stamps the zsock wrapper, calls `zsys_close`, frees wrapper
+   allocations, and clears the owning socket slot with `*arg1 = 0`.
+3. Named SRP's dynamic `zmq_close` socket-slot empty boundary and routed the
+   retained `idZMQ_CloseSocket` shim through it.
+4. Added a focused Round 736 parity gate and wired the new detail into the
+   SV-G02 server parity report, while preserving the external libzmq/CZMQ
+   boundary.
+
+### Task A636: Pin ZMQ socket-option string-size boundary [COMPLETED]
+Priority: High
+Primary areas: `src/code/server/sv_zmq.c`,
+`tests/test_platform_services.py`, `tests/test_server_full_parity_gate.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_734.md`
+Parity estimate: **before 94% -> after 99%** for focused socket-option
+string-size source-boundary confidence, and **before 99.84% -> after
+99.86%** for focused ZMQ wiring/source reconstruction confidence. Repo-wide
+parity remains **99%** because this pass names an SRP dynamic `zmq_setsockopt`
+adaptation at the retained `idZMQ` ZAP-domain option boundary without
+reconstructing embedded libzmq/CZMQ internals, and without changing the
+strict-retail Windows replacement score.
+
+Completed work:
+
+1. Rechecked retail `zsock_set_zap_domain` against Binary Ninja HLIL, Ghidra
+   function rows, aliases, and the existing ZAP-domain mapping evidence.
+2. Confirmed retail computes the domain string length and forwards that
+   non-terminating length to `zmq_setsockopt` with option `0x37`.
+3. Named SRP's dynamic `zmq_setsockopt` string option-size boundary and
+   routed the retained `idZMQ_TrySetSocketString` shim through it.
+4. Added a focused Round 734 parity gate and wired the new detail into the
+   SV-G02 server parity report, while preserving the external libzmq/CZMQ
+   boundary.
+
+### Task A635: Pin ZMQ socket-option int-size boundary [COMPLETED]
+Priority: High
+Primary areas: `src/code/server/sv_zmq.c`,
+`tests/test_platform_services.py`, `tests/test_server_full_parity_gate.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_733.md`
+Parity estimate: **before 94% -> after 99%** for focused socket-option
+int-size source-boundary confidence, and **before 99.82% -> after 99.84%**
+for focused ZMQ wiring/source reconstruction confidence. Repo-wide parity
+remains **99%** because this pass names an SRP dynamic `zmq_setsockopt`
+adaptation at the retained `idZMQ` socket-option boundary without
+reconstructing embedded libzmq/CZMQ internals, and without changing the
+strict-retail Windows replacement score.
+
+Completed work:
+
+1. Rechecked retail `zsock_set_plain_server` and
+   `zsock_set_router_mandatory` against Binary Ninja HLIL, Ghidra function
+   rows, aliases, and the existing socket-option mapping evidence.
+2. Confirmed retail forwards integer socket options to `zmq_setsockopt` with
+   a four-byte integer payload size for PLAIN server and ROUTER mandatory.
+3. Named SRP's dynamic `zmq_setsockopt` integer option-size boundary and
+   routed the retained `idZMQ_TrySetSocketInt` shim through it.
+4. Added a focused Round 733 parity gate and wired the new detail into the
+   SV-G02 server parity report, while preserving the external libzmq/CZMQ
+   boundary.
+
+### Task A634: Pin ZMQ RCVMORE getsockopt success boundary [COMPLETED]
+Priority: High
+Primary areas: `src/code/server/sv_zmq.c`,
+`tests/test_platform_services.py`, `tests/test_server_full_parity_gate.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_732.md`
+Parity estimate: **before 94% -> after 99%** for focused RCVMORE
+getsockopt source-boundary confidence, and **before 99.8% -> after
+99.82%** for focused ZMQ wiring/source reconstruction confidence. Repo-wide
+parity remains **99%** because this pass names an SRP dynamic
+`zmq_getsockopt` adaptation at the retained `idZMQ` receive boundary without
+reconstructing embedded libzmq/CZMQ internals, and without changing the
+strict-retail Windows replacement score.
+
+Completed work:
+
+1. Rechecked retail `zsock_rcvmore` against Binary Ninja HLIL, Ghidra
+   function rows, aliases, and the existing CZMQ helper mapping evidence.
+2. Confirmed retail queries option `0x0d` (`ZMQ_RCVMORE`) through
+   `zmq_getsockopt` and returns the resulting multipart indicator.
+3. Named SRP's dynamic `zmq_getsockopt` success boundary and made the
+   multipart state comparison explicit against `QL_ZMQ_RCVMORE_NONE`.
+4. Added a focused Round 732 parity gate and wired the new detail into the
+   SV-G02 server parity report, while preserving the external libzmq/CZMQ
+   boundary.
+
+### Task A633: Pin optional auxiliary Steam interface export fallbacks [COMPLETED]
+Priority: High
+Primary areas: `tests/steamworks_harness.c`,
+`tests/test_steamworks_harness.py`,
+`tests/test_platform_services.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_731.md`
+Parity estimate: **before 88% -> after 99%** for focused optional auxiliary
+interface export fallback confidence, and **before 94.30% -> after 94.32%**
+for overall Steam launch/runtime integration mapping confidence. Repo-wide
+parity remains **99%** because this pass strengthens the opt-in Steamworks
+harness lane without changing the strict-retail Windows replacement score or
+enabling live Steam behavior by default.
+Focused lane: optional auxiliary interface export fallback confidence.
+
+Completed work:
+
+1. Rechecked retained retail import and HLIL evidence for `SteamUtils`,
+   `SteamUserStats`, `SteamNetworking`, and `SteamMatchmakingServers`.
+2. Reconfirmed SRP's deliberate dynamic-loader divergence: these auxiliary
+   client interfaces stay optional aliases, while the core auth-ticket path
+   remains independent of them.
+3. Added Steamworks harness export-availability switches so the mock runtime
+   can hide each optional auxiliary interface through both dynamic loader and
+   direct prime-state paths.
+4. Added focused ctypes coverage proving missing auxiliary interfaces keep
+   `QLR_Steamworks_Init` and the retail auth-ticket path usable while disabling
+   only app/country helpers, client stats, legacy P2P, or native server-browser
+   surfaces owned by the absent interface.
+
+### Task A632: Pin ZMQ bind success-threshold boundary [COMPLETED]
+Priority: High
+Primary areas: `src/code/server/sv_zmq.c`,
+`tests/test_platform_services.py`, `tests/test_server_full_parity_gate.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_730.md`
+Parity estimate: **before 94% -> after 99%** for focused bind
+success-threshold source-boundary confidence, and **before 99.75% -> after
+99.8%** for focused ZMQ wiring/source reconstruction confidence. Repo-wide
+parity remains **99%** because this pass routes SRP's dynamic `zmq_bind`
+result checks through a named retained `idZMQ` bind boundary without
+reconstructing embedded libzmq/CZMQ internals, and without changing the
+strict-retail Windows replacement score.
+
+Completed work:
+
+1. Rechecked retail RCON and stats bind branches against Binary Ninja HLIL,
+   Ghidra function rows, aliases, and the existing bind-retention mapping
+   round.
+2. Confirmed retail `zsock_bind` selects error or success logging after socket
+   slot retention, while SRP uses the dynamically loaded `zmq_bind` export.
+3. Named SRP's bind success result and routed the manual ZAP REP bind, RCON
+   ROUTER bind, and stats PUB bind branches through it.
+4. Added a focused Round 730 parity gate and wired the new detail into the
+   SV-G02 server parity report, while preserving the external libzmq/CZMQ
+   boundary.
+
+### Task A631: Pin optional callback export fallbacks [COMPLETED]
+Priority: High
+Primary areas: `tests/steamworks_harness.c`,
+`tests/test_steamworks_harness.py`,
+`tests/test_platform_services.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_729.md`
+Parity estimate: **before 88% -> after 99%** for focused optional callback
+export fallback confidence, and **before 94.28% -> after 94.30%** for overall
+Steam launch/runtime integration mapping confidence. Repo-wide parity remains
+**99%** because this pass strengthens the opt-in Steamworks harness lane
+without changing the strict-retail Windows replacement score or enabling live
+Steam behavior by default.
+Focused lane: optional callback export fallback confidence.
+
+Completed work:
+
+1. Rechecked retained callback and call-result import evidence for
+   `SteamAPI_RegisterCallback`, `SteamAPI_UnregisterCallback`,
+   `SteamAPI_RegisterCallResult`, and `SteamAPI_UnregisterCallResult`.
+2. Reconfirmed SRP's deliberate dynamic-loader divergence: callback
+   registration exports stay optional, while callback-dependent adapters fail
+   closed when those exports are missing.
+3. Added Steamworks harness export-availability switches so the mock runtime
+   can hide each optional callback export through both dynamic loader and
+   direct prime-state paths.
+4. Added focused ctypes coverage proving missing callback exports keep
+   `QLR_Steamworks_Init` and the retail auth-ticket path usable, disable the
+   Web API adapter and callback bundles cleanly, and release or clear UGC
+   call-result state without stale registrations.
+
+### Task A630: Pin ZMQ frame-read failure threshold boundary [COMPLETED]
+Priority: High
+Primary areas: `src/code/server/sv_zmq.c`,
+`tests/test_platform_services.py`, `tests/test_server_full_parity_gate.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_728.md`
+Parity estimate: **before 94% -> after 99%** for focused frame-read failure
+threshold source-boundary confidence, and **before 99.7% -> after 99.75%**
+for focused ZMQ wiring/source reconstruction confidence. Repo-wide parity
+remains **99%** because this pass routes SRP's dynamic `zmq_recv` failure
+checks through the named retained `idZMQ` frame-read boundary without
+reconstructing embedded libzmq/CZMQ internals, and without changing the
+strict-retail Windows replacement score.
+
+Completed work:
+
+1. Rechecked retail RCON receive flow and CZMQ `zstr_recv` failure handling
+   against Binary Ninja HLIL, Ghidra function rows, aliases, and the existing
+   receive/drain mapping rounds.
+2. Confirmed retail RCON frame reads flow through two `zstr_recv` calls and
+   release paths, while SRP uses stack buffers and the dynamically loaded
+   `zmq_recv` export.
+3. Routed SRP's frame-read failure checks in `idZMQ_ReadFrameString`,
+   `idZMQ_DrainRemainingFrames`, and the manual ZAP auth pump through
+   `QL_ZMQ_FRAME_READ_SUCCESS_MIN`.
+4. Added a focused Round 728 parity gate and wired the new detail into the
+   SV-G02 server parity report, while preserving the external libzmq/CZMQ
+   boundary.
+
+### Task A629: Pin ZMQ poll ready-threshold boundary [COMPLETED]
+Priority: High
+Primary areas: `src/code/server/sv_zmq.c`,
+`tests/test_platform_services.py`, `tests/test_server_full_parity_gate.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_727.md`
+Parity estimate: **before 94% -> after 99%** for focused poll
+ready-threshold source-boundary confidence, and **before 99.65% -> after
+99.7%** for focused ZMQ wiring/source reconstruction confidence. Repo-wide
+parity remains **99%** because this pass names an SRP dynamic `zmq_poll`
+adaptation boundary in the retained server `idZMQ` integration without
+reconstructing embedded libzmq/CZMQ internals, and without changing the
+strict-retail Windows replacement score.
+
+Completed work:
+
+1. Rechecked retail RCON pump poll flow against Binary Ninja HLIL, Ghidra
+   function rows, aliases, and the existing ZMQ poll/receive mapping rounds.
+2. Confirmed retail reads RCON identity and command frames only after
+   `zmq_poll` returns a positive ready count.
+3. Named SRP's local poll-ready threshold and routed both the manual ZAP auth
+   pump loop and the RCON pump early-return gate through it.
+4. Added a focused Round 727 parity gate and wired the new detail into the
+   SV-G02 server parity report, while preserving the external libzmq/CZMQ
+   boundary.
+
+### Task A628: Pin ZMQ send success-threshold boundary [COMPLETED]
+Priority: High
+Primary areas: `src/code/server/sv_zmq.c`,
+`tests/test_platform_services.py`, `tests/test_server_full_parity_gate.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_726.md`
+Parity estimate: **before 94% -> after 99%** for focused send
+success-threshold source-boundary confidence, and **before 99.6% -> after
+99.65%** for focused ZMQ wiring/source reconstruction confidence. Repo-wide
+parity remains **99%** because this pass names an SRP dynamic `zmq_send`
+adaptation boundary in the retained server `idZMQ` integration without
+reconstructing embedded libzmq/CZMQ internals, and without changing the
+strict-retail Windows replacement score.
+
+Completed work:
+
+1. Rechecked retail RCON broadcast send flow against Binary Ninja HLIL,
+   Ghidra function rows, aliases, and the existing CZMQ helper mapping rounds.
+2. Confirmed retail branches on `zstr_sendm` non-negative success before
+   sending the payload frame through `zstr_send`, while SRP directly dispatches
+   to the dynamically loaded `zmq_send` export.
+3. Named SRP's local send success threshold and routed both the manual ZAP
+   auth response frame gates and the RCON ROUTER identity send through it.
+4. Added a focused Round 726 parity gate and wired the new detail into the
+   SV-G02 server parity report, while preserving the external libzmq/CZMQ
+   boundary.
+
+### Task A627: Pin required core Steam runtime export failures [COMPLETED]
+Priority: High
+Primary areas: `tests/steamworks_harness.c`,
+`tests/test_steamworks_harness.py`,
+`tests/test_platform_services.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_725.md`
+Parity estimate: **before 87% -> after 99%** for focused required core Steam runtime export confidence, and **before 94.26% -> after 94.28%** for overall Steam launch/runtime integration mapping confidence. Repo-wide parity remains **99%** because this pass strengthens the opt-in Steamworks harness lane without changing the strict-retail Windows replacement score or enabling live Steam behavior by default.
+
+Completed work:
+
+1. Rechecked retained core Steam runtime imports and HLIL call sites for
+   `SteamAPI_Init`, `SteamAPI_RunCallbacks`, `SteamAPI_Shutdown`, and the
+   required client interfaces.
+2. Reconfirmed that SRP's dynamic Steam runtime loader treats `SteamUser`,
+   `SteamFriends`, `SteamMatchmaking`, `SteamApps`, and `SteamUGC` as required
+   retail-first interface exports while leaving auxiliary interfaces optional.
+3. Added Steamworks harness export-availability switches so the mock runtime
+   can hide each required core runtime export through both dynamic loader and
+   direct prime-state paths.
+4. Added focused ctypes coverage proving each missing required core export
+   rejects `QLR_Steamworks_Init`, clears retail ticket outputs, keeps
+   validation/cancel cold, and leaves the Web API adapter disabled without
+   registering callbacks.
+
+### Task A626: Pin ZMQ RCON peer-count floor boundary [COMPLETED]
+Priority: High
+Primary areas: `src/code/server/sv_zmq.c`,
+`tests/test_platform_services.py`, `tests/test_server_full_parity_gate.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_724.md`
+Parity estimate: **before 94% -> after 99%** for focused RCON peer-count
+floor source-boundary confidence, and **before 99.55% -> after 99.6%** for
+focused ZMQ wiring/source reconstruction confidence. Repo-wide parity remains
+**99%** because this pass names an SRP portable peer-table count floor in the
+retained server `idZMQ` integration without reconstructing embedded libzmq/CZMQ
+or MSVC `std::tree` internals, and without changing the strict-retail Windows
+replacement score.
+
+Completed work:
+
+1. Rechecked retail RCON peer insertion, single-node erase, full clear, and
+   range erase against Binary Ninja HLIL, Ghidra function rows, aliases, and
+   the existing peer-tree mapping rounds.
+2. Confirmed retail increments the tree count on insert, decrements only when
+   the count is non-zero on single-node erase, and resets the count to zero in
+   the full-clear path.
+3. Named SRP's portable RCON peer-table empty-count boundary and routed the
+   erase floor plus full-range reset through it.
+4. Added a focused Round 724 parity gate and wired the new detail into the
+   SV-G02 server parity report, while preserving the external libzmq/CZMQ and
+   MSVC tree-internals boundaries.
+
+### Task A625: Pin required user-auth companion export failures [COMPLETED]
+Priority: High
+Primary areas: `tests/steamworks_harness.c`,
+`tests/test_steamworks_harness.py`,
+`tests/test_platform_services.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_723.md`
+Parity estimate: **before 87% -> after 99%** for focused required user-auth companion export confidence, and **before 94.24% -> after 94.26%** for overall Steam launch/runtime integration mapping confidence. Repo-wide parity remains **99%** because this pass strengthens the opt-in Steamworks harness lane without changing the strict-retail Windows replacement score or enabling live Steam behavior by default.
+
+Completed work:
+
+1. Rechecked the retained `SteamClient_GetSteamID` and
+   `SteamClient_CancelAuthTicket` wrapper evidence through aliases, Ghidra
+   rows/imports, and Binary Ninja HLIL call sites.
+2. Reconfirmed that SRP's dynamic Steam runtime loader treats
+   `SteamAPI_ISteamUser_BeginAuthSession`,
+   `SteamAPI_ISteamUser_CancelAuthTicket`,
+   `SteamAPI_ISteamUser_EndAuthSession`, and
+   `SteamAPI_ISteamUser_GetSteamID` as required exports.
+3. Added Steamworks harness export-availability switches so the mock runtime
+   can hide each required user-auth companion export through both dynamic
+   loader and direct prime-state paths.
+4. Added focused ctypes coverage proving each missing required companion export
+   rejects `QLR_Steamworks_Init`, clears retail ticket outputs, keeps
+   validation/cancel cold, and leaves the Web API adapter disabled without
+   registering callbacks.
+
+### Task A624: Pin ZMQ passfile record-buffer boundary [COMPLETED]
+Priority: High
+Primary areas: `src/code/server/sv_zmq.c`,
+`tests/test_platform_services.py`, `tests/test_server_full_parity_gate.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_722.md`
+Parity estimate: **before 94% -> after 99%** for focused passfile
+record-buffer source-boundary confidence, and **before 99.5% -> after
+99.55%** for focused ZMQ wiring/source reconstruction confidence. Repo-wide
+parity remains **99%** because this pass names an SRP passfile record line
+buffer in the retained server `idZMQ` integration without reconstructing
+embedded libzmq/CZMQ internals or changing the strict-retail Windows
+replacement score.
+
+Completed work:
+
+1. Rechecked retail `idZMQ_WritePasswordFile` against Binary Ninja HLIL,
+   Ghidra function rows, aliases, and the existing passfile/password mapping
+   rounds.
+2. Confirmed retail writes `stats_stats=%s\n` and `rcon_rcon=%s\n` records
+   through a local formatted record buffer before writing to `zmqpass.txt`.
+3. Named SRP's wider portable passfile record line buffer and routed the
+   password writer through it.
+4. Added a focused Round 722 parity gate and wired the new detail into the
+   SV-G02 server parity report, while preserving the external libzmq/CZMQ
+   runtime boundary.
+
+### Task A623: Pin ZMQ endpoint IP scratch-buffer boundary [COMPLETED]
+Priority: High
+Primary areas: `src/code/server/sv_zmq.c`,
+`tests/test_platform_services.py`, `tests/test_server_full_parity_gate.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_721.md`
+Parity estimate: **before 94% -> after 99%** for focused endpoint IP
+scratch-buffer source-boundary confidence, and **before 99.45% -> after
+99.5%** for focused ZMQ wiring/source reconstruction confidence. Repo-wide
+parity remains **99%** because this pass names an SRP portability buffer in
+the retained server `idZMQ` integration without reconstructing embedded
+libzmq/CZMQ internals or changing the strict-retail Windows replacement score.
+
+Completed work:
+
+1. Rechecked retail RCON and stats endpoint construction against Binary Ninja
+   HLIL, Ghidra function rows, aliases, and the existing endpoint/cvar ZMQ
+   mapping rounds.
+2. Confirmed retail builds endpoint strings through `va("tcp://%s:%i")` while
+   SRP's dynamic-runtime adaptation needs a local endpoint IP workspace for
+   bounded cvar/default/fallback copies.
+3. Named the SRP portable endpoint IP buffer size and routed both RCON and
+   stats endpoint builders through it.
+4. Added a focused Round 721 parity gate and wired the new detail into the
+   SV-G02 server parity report, while preserving the external libzmq/CZMQ
+   runtime boundary.
+
+### Task A622: Pin required auth-session-ticket export failure [COMPLETED]
+Priority: High
+Primary areas: `tests/steamworks_harness.c`,
+`tests/test_steamworks_harness.py`,
+`tests/test_platform_services.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_720.md`
+Parity estimate: **before 87% -> after 99%** for focused required auth-session-ticket export confidence, and **before 94.22% -> after 94.24%** for overall Steam launch/runtime integration mapping confidence. Repo-wide parity remains **99%** because this pass strengthens the opt-in Steamworks harness lane without changing the strict-retail Windows replacement score or enabling live Steam behavior by default.
+
+Completed work:
+
+1. Rechecked the retained `SteamClient_GetAuthSessionTicket` wrapper evidence
+   through aliases, Ghidra rows/imports, and Binary Ninja HLIL call sites.
+2. Reconfirmed that SRP's dynamic Steam runtime loader treats
+   `SteamAPI_ISteamUser_GetAuthSessionTicket` as a required export while the
+   newer Web API ticket adapter remains optional.
+3. Added a Steamworks harness export-availability switch so the mock runtime
+   can hide the required auth-session-ticket export through both dynamic loader
+   and direct prime-state paths.
+4. Added focused ctypes coverage proving the missing required export rejects
+   `QLR_Steamworks_Init`, clears retail ticket outputs, and keeps the Web API
+   adapter cold without registering callbacks.
+
+### Task A621: Pin optional Web API auth-ticket export fallback [COMPLETED]
+Priority: High
+Primary areas: `tests/steamworks_harness.c`,
+`tests/test_steamworks_harness.py`,
+`tests/test_platform_services.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_719.md`
+Parity estimate: **before 86% -> after 99%** for focused optional Web API auth-ticket export confidence, and **before 94.20% -> after 94.22%** for overall Steam launch/runtime integration mapping confidence. Repo-wide parity remains **99%** because this pass strengthens the opt-in Steamworks harness lane without changing the strict-retail Windows replacement score or enabling live Steam behavior by default.
+
+Completed work:
+
+1. Rechecked the `quakelive_steam.exe` Ghidra metadata/import corpus and Binary
+   Ninja HLIL extern rows for the retained callback/runtime evidence around
+   Steam auth-ticket callbacks.
+2. Reconfirmed that the retail `GetAuthSessionTicket` export remains required
+   while SRP's newer `GetAuthTicketForWebApi` adapter is explicitly optional.
+3. Added a Steamworks harness export-availability switch so the mock runtime
+   can hide `SteamAPI_ISteamUser_GetAuthTicketForWebApi` through both dynamic
+   loader and direct prime-state paths.
+4. Added focused ctypes coverage proving a missing Web API ticket export
+   disables only `QLR_Steamworks_RequestWebApi` while leaving the retail
+   `QLR_Steamworks_Request` ticket path usable.
+
+### Task A620: Pin Web API callback reuse across sequential requests [COMPLETED]
+Priority: High
+Primary areas: `tests/test_steamworks_harness.py`,
+`tests/test_platform_services.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_718.md`
+Parity estimate: **before 87% -> after 99%** for focused Web API callback sequential-reuse confidence, and **before 94.18% -> after 94.20%** for overall Steam launch/runtime integration mapping confidence. Repo-wide parity remains **99%** because this pass strengthens the opt-in Steamworks harness lane without changing the strict-retail Windows replacement score or enabling live Steam behavior by default.
+
+Completed work:
+
+1. Rechecked retained client callback registration evidence in Ghidra imports
+   and Binary Ninja HLIL.
+2. Reconfirmed the production early-return path in
+   `QL_Steamworks_RegisterWebApiAuthTicketCallback` that reuses an already
+   registered `webApiTicketResponse` callback object.
+3. Added focused ctypes coverage proving two sequential successful Web API
+   auth-ticket requests reuse one callback registration while returning fresh
+   ticket handles and payloads.
+4. Pinned that active request reset does not clear the retained callback object
+   and that final teardown unregisters the single retained Web API callback.
+
+### Task A619: Pin Web API callback lifecycle handoff [COMPLETED]
+Priority: High
+Primary areas: `tests/steamworks_harness.c`,
+`tests/test_steamworks_harness.py`,
+`tests/test_platform_services.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_717.md`
+Parity estimate: **before 86% -> after 99%** for focused Web API callback lifecycle-handoff confidence, and **before 94.16% -> after 94.18%** for overall Steam launch/runtime integration mapping confidence. Repo-wide parity remains **99%** because this pass strengthens the opt-in Steamworks harness lane without changing the strict-retail Windows replacement score or enabling live Steam behavior by default.
+
+Completed work:
+
+1. Rechecked retail `SteamAPI_RegisterCallback` and
+   `SteamAPI_UnregisterCallback` evidence in the Ghidra import table and
+   Binary Ninja HLIL callback registration/destruction rows.
+2. Reconfirmed the SRP source handoff where
+   `QL_Steamworks_RegisterClientCallbacks` unregisters a retained
+   `webApiTicketResponse` callback before rebuilding the normal client callback
+   bundle.
+3. Added read-only Steamworks harness probes for the Web API ticket callback
+   registration flag and live mock registration table count.
+4. Added focused ctypes coverage proving a successful Web API ticket request
+   registers one callback, the normal client callback bundle unregisters it,
+   the 18-callback harness bundle still dispatches rich-presence events, and
+   final teardown returns the mock registration table to zero.
+
+### Task A618: Pin Web API ticket callback failure wiring [COMPLETED]
+Priority: High
+Primary areas: `tests/steamworks_harness.c`,
+`tests/test_steamworks_harness.py`,
+`tests/test_platform_services.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_716.md`
+Parity estimate: **before 88% -> after 99%** for focused Web API ticket callback failure-path confidence, and **before 94.14% -> after 94.16%** for overall Steam launch/runtime integration mapping confidence. Repo-wide parity remains **99%** because this pass strengthens the opt-in Steamworks harness lane without changing the strict-retail Windows replacement score or enabling live Steam behavior by default.
+
+Completed work:
+
+1. Rechecked retained Steam callback pump evidence in Ghidra imports and Binary
+   Ninja HLIL, including `SteamAPI_RegisterCallback` and
+   `SteamAPI_RunCallbacks`.
+2. Reconfirmed that SRP's `GetAuthTicketForWebApi` adapter is an explicit
+   optional Steamworks divergence that uses the same retained callback object
+   machinery and remains behind `QL_BUILD_ONLINE_SERVICES`.
+3. Split the Steamworks harness Web API ticket mock state so returned handles,
+   callback handles, callback lengths, callback queueing, and Steam result
+   codes can be controlled independently.
+4. Added focused ctypes coverage for timeout, mismatched-handle,
+   non-OK-result, and oversized-callback-ticket cancellation behavior.
+
+### Task A617: Mirror Steamworks mock loader export constants [COMPLETED]
+Priority: High
+Primary areas: `tests/steamworks_harness.c`,
+`tests/test_steamworks_harness.py`,
+`tests/test_platform_services.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_715.md`
+Parity estimate: **before 90% -> after 99%** for focused Steamworks mock loader export-boundary confidence, and **before 94.12% -> after 94.14%** for overall Steam launch/runtime integration mapping confidence. Repo-wide parity remains **99%** because this pass clarifies test-harness dynamic loader wiring in the opt-in Steamworks lane without changing the strict-retail Windows replacement score.
+
+Completed work:
+
+1. Rechecked the retained Steamworks import-table exports, including
+   `SteamGameServer_Init`, `SteamGameServer_Shutdown`, and
+   `SteamGameServerUGC`, against the production export constants and Binary
+   Ninja HLIL call sites.
+2. Added harness-local `QLR_STEAMWORKS_EXPORT_*` constants that mirror the
+   production `QL_STEAMWORKS_EXPORT_*` runtime boundary vocabulary.
+3. Rebuilt the harness `dlsym` mock around those constants, resolving
+   retail-first interface names plus newer SDK aliases and adding the missing
+   GameServer init/shutdown/UGC export returns.
+4. Added a no-`PrimeState` ctypes regression that exercises the dynamic loader
+   path through `QL_Steamworks_Init`, SteamUtils app-id lookup, GameServer
+   startup, and GameServer shutdown without enabling live Steam behavior by
+   default.
+
+### Task A616: Mirror SteamApps subscription mock interface [COMPLETED]
+Priority: High
+Primary areas: `tests/steamworks_harness.c`,
+`tests/test_steamworks_harness.py`,
+`tests/test_platform_services.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_714.md`
+Parity estimate: **before 85% -> after 99%** for focused SteamApps harness subscription source-shape confidence, and **before 94.10% -> after 94.12%** for overall Steam launch/runtime integration mapping confidence. Repo-wide parity remains **99%** because this pass clarifies test-harness ABI wiring in the opt-in Steamworks lane without changing the strict-retail Windows replacement score.
+
+Completed work:
+
+1. Rechecked `SteamApps_BIsSubscribedApp` against the Ghidra row/import,
+   promoted aliases, and Binary Ninja HLIL `SteamApps + 0x1c` subscription
+   call.
+2. Added harness-local `QLR_STEAM_APPS_*` slot constants and a mock
+   `QLR_SteamAPI_SteamApps` interface that mirrors production's named
+   `QL_STEAM_APPS_BIS_SUBSCRIBED_APP_SLOT`.
+3. Wired both `SteamApps` and `SteamAPI_SteamApps` through the harness loader,
+   injected the mock into `QLR_SteamworksMock_PrimeState`, and added ctypes
+   regression coverage for true/false subscription results without enabling
+   live Steam behavior by default.
+
+### Task A615: Mirror SteamGameServerStats mock slot constants [COMPLETED]
+Priority: High
+Primary areas: `tests/steamworks_harness.c`,
+`tests/test_platform_services.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_713.md`
+Parity estimate: **before 88% -> after 99%** for focused SteamGameServerStats harness slot-mirroring source-shape confidence, and **before 94.08% -> after 94.10%** for overall Steam launch/runtime integration mapping confidence. Repo-wide parity remains **99%** because this pass clarifies test-harness ABI wiring in the opt-in Steamworks lane without changing the strict-retail Windows replacement score.
+
+Completed work:
+
+1. Rechecked `SteamStats_FlushPendingValues`,
+   `SteamStats_OnServersConnected`, `SteamStats_OnStatsReceived`,
+   `SteamStats_SetAchievement`, `SteamStats_OnStatsStored`,
+   `SteamStats_Shutdown`, and `SteamStats_Init` against Ghidra
+   rows/imports/symbols, aliases, and Binary Ninja HLIL.
+2. Added harness-local `QLR_STEAM_GAMESERVERSTATS_*` slot constants that
+   mirror the production `QL_STEAM_GAMESERVERSTATS_*` request, read, write,
+   average-rate, achievement, and store ABI vocabulary.
+3. Sized the mock SteamGameServerStats vtable from the terminal
+   store-user-stats slot and routed every implemented mock method install
+   through named constants instead of raw `0x?? / 4` indices, while leaving
+   live Steam behavior default-disabled.
+
+### Task A614: Mirror SteamGameServer mock slot constants [COMPLETED]
+Priority: High
+Primary areas: `tests/steamworks_harness.c`,
+`tests/test_platform_services.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_712.md`
+Parity estimate: **before 88% -> after 99%** for focused SteamGameServer harness slot-mirroring source-shape confidence, and **before 94.06% -> after 94.08%** for overall Steam launch/runtime integration mapping confidence. Repo-wide parity remains **99%** because this pass clarifies test-harness ABI wiring in the opt-in Steamworks lane without changing the strict-retail Windows replacement score.
+
+Completed work:
+
+1. Rechecked `SteamServer_IsInitialized`,
+   `SteamServer_SetMaxPlayerCount`,
+   `SteamServer_SetKeyValuesFromInfoString`,
+   `SteamServer_PublishSteamID`, `SteamServer_HandleIncomingPacket`,
+   `SteamServer_EnableHeartbeats`,
+   `SteamServer_CreateUnauthenticatedUserConnection`,
+   `SteamServer_GetPublicIP`, `SteamServer_BeginAuthSession`,
+   `SteamServer_EndAuthSession`, `SteamServer_UpdatePublishedState`,
+   `SteamServer_Frame`, `SteamServer_EndOrphanedAuthSessions`, and
+   `SteamServer_Init` against Ghidra rows/imports/symbols, aliases, and
+   Binary Ninja HLIL.
+2. Added harness-local `QLR_STEAM_GAMESERVER_*` slot constants that mirror the
+   production `QL_STEAM_GAMESERVER_*` packet, auth-session, lifecycle, and
+   published-state ABI vocabulary.
+3. Sized the mock SteamGameServer vtable from the terminal heartbeat slot and
+   routed every implemented mock method install through named constants instead
+   of raw `0x?? / 4` indices, while leaving live Steam behavior
+   default-disabled.
+
+### Task A613: Mirror SteamMatchmaking mock slot constants [COMPLETED]
+Priority: High
+Primary areas: `tests/steamworks_harness.c`,
+`tests/test_platform_services.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_711.md`
+Parity estimate: **before 88% -> after 99%** for focused SteamMatchmaking harness slot-mirroring source-shape confidence, and **before 94.04% -> after 94.06%** for overall Steam launch/runtime integration mapping confidence. Repo-wide parity remains **99%** because this pass clarifies test-harness ABI wiring in the opt-in Steamworks lane without changing the strict-retail Windows replacement score.
+
+Completed work:
+
+1. Rechecked `SteamLobbyCallbacks_OnLobbyChatMessage`,
+   `SteamLobby_CreateLobby`, `SteamLobby_LeaveLobby`,
+   `SteamLobby_SayLobby`, `SteamLobby_SetLobbyServer`,
+   `SteamLobbyCallbacks_OnLobbyCreated`, `SteamLobbyCallbacks_OnLobbyEnter`,
+   `SteamLobby_JoinLobby`, and `SteamLobby_Init` against Ghidra
+   rows/imports/symbols, aliases, and Binary Ninja HLIL.
+2. Added harness-local `QLR_STEAM_MATCHMAKING_*` slot constants that mirror the
+   production `QL_STEAM_MATCHMAKING_*` lobby and favorite ABI vocabulary.
+3. Sized the mock SteamMatchmaking vtable from the terminal owner slot and
+   routed its implemented mock method installs through named constants instead
+   of raw `0x?? / 4` indices, while leaving live Steam behavior
+   default-disabled.
+
+### Task A612: Mirror SteamNetworking mock slot constants [COMPLETED]
+Priority: High
+Primary areas: `tests/steamworks_harness.c`,
+`tests/test_platform_services.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_710.md`
+Parity estimate: **before 88% -> after 99%** for focused SteamNetworking harness slot-mirroring source-shape confidence, and **before 94.02% -> after 94.04%** for overall Steam launch/runtime integration mapping confidence. Repo-wide parity remains **99%** because this pass clarifies test-harness ABI wiring in the opt-in Steamworks lane without changing the strict-retail Windows replacement score.
+
+Completed work:
+
+1. Rechecked `SteamCallbacks_OnP2PSessionRequest`,
+   `SteamVoice_SendCapturedPacket`, `SteamVoice_ProcessIncomingPackets`,
+   `SteamServerCallbacks_OnP2PSessionRequest`, and `SteamServer_Frame`
+   against Ghidra rows/imports/symbols, aliases, and Binary Ninja HLIL.
+2. Added harness-local `QLR_STEAM_NETWORKING_*` slot constants that mirror the
+   production `QL_STEAM_NETWORKING_*` P2P send, availability, read, and accept
+   ABI vocabulary.
+3. Reused that shared vocabulary for both mock SteamNetworking and
+   SteamGameServerNetworking, matching the retained low-slot retail pattern.
+4. Sized the two mock networking vtables from the terminal accept-session slot
+   and routed their mock method installs through named constants instead of raw
+   `0x?? / 4` indices, while leaving live Steam behavior default-disabled.
+
+### Task A611: Mirror SteamUser and SteamUserStats mock slot constants [COMPLETED]
+Priority: High
+Primary areas: `tests/steamworks_harness.c`,
+`tests/test_platform_services.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_709.md`
+Parity estimate: **before 88% -> after 99%** for focused SteamUser/SteamUserStats harness slot-mirroring source-shape confidence, and **before 94.00% -> after 94.02%** for overall Steam launch/runtime integration mapping confidence. Repo-wide parity remains **99%** because this pass clarifies test-harness ABI wiring in the opt-in Steamworks lane without changing the strict-retail Windows replacement score.
+
+Completed work:
+
+1. Rechecked `SteamClient_GetSteamID`, `SteamVoice_SendCapturedPacket`,
+   `SteamVoice_ProcessIncomingPackets`, `SteamCallbacks_OnUserStatsReceived`,
+   `SteamCallbacks_Init`, and `CL_Steam_ClearStats_f` against Ghidra
+   rows/imports/symbols, aliases, and Binary Ninja HLIL.
+2. Added harness-local `QLR_STEAM_USER_*` slot constants that mirror the
+   production `QL_STEAM_USER_*` identity and voice ABI vocabulary.
+3. Added harness-local `QLR_STEAM_USERSTATS_*` slot constants that mirror the
+   production `QL_STEAM_USERSTATS_*` stats readback and clear ABI vocabulary.
+4. Sized the mock SteamUser and SteamUserStats vtables from their terminal
+   slots and routed their mock method installs through named constants instead
+   of raw `0x?? / 4` indices, while leaving live Steam behavior
+   default-disabled.
+
+### Task A610: Mirror SteamFriends and SteamUtils mock slot constants [COMPLETED]
+Priority: High
+Primary areas: `tests/steamworks_harness.c`,
+`tests/test_platform_services.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_708.md`
+Parity estimate: **before 88% -> after 99%** for focused SteamFriends/SteamUtils harness slot-mirroring source-shape confidence, and **before 93.98% -> after 94.00%** for overall Steam launch/runtime integration mapping confidence. Repo-wide parity remains **99%** because this pass clarifies test-harness ABI wiring in the opt-in Steamworks lane without changing the strict-retail Windows replacement score.
+
+Completed work:
+
+1. Rechecked `SteamClient_SyncPersonaNameCvar`, `SteamUtils_GetIPCountry`,
+   `SteamCallbacks_OnPersonaStateChange`, `CL_Steam_OverlayCommand_f`,
+   `SteamClient_GetAvatarImageHandle`, `SteamClient_Init`, and
+   `SteamLobby_ShowInviteOverlay` against Ghidra rows/imports/symbols,
+   aliases, and Binary Ninja HLIL.
+2. Added harness-local `QLR_STEAM_FRIENDS_*` slot constants that mirror the
+   production `QL_STEAM_FRIENDS_*` identity, social, overlay, rich-presence,
+   and avatar ABI vocabulary.
+3. Added harness-local `QLR_STEAM_UTILS_*` slot constants that mirror the
+   production country, app-id, image-size, and image-RGBA ABI vocabulary.
+4. Sized the mock SteamFriends and SteamUtils vtables from their terminal slots
+   and routed their mock method installs through named constants instead of raw
+   `0x?? / 4` indices, while leaving live Steam behavior default-disabled.
+
+### Task A609: Mirror SteamUGC mock slot constants [COMPLETED]
+Priority: High
+Primary areas: `tests/steamworks_harness.c`,
+`tests/test_platform_services.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_707.md`
+Parity estimate: **before 88% -> after 99%** for focused SteamUGC harness slot-mirroring source-shape confidence, and **before 93.96% -> after 93.98%** for overall Steam launch/runtime integration mapping confidence. Repo-wide parity remains **99%** because this pass clarifies test-harness ABI wiring in the opt-in Steamworks lane without changing the strict-retail Windows replacement score.
+
+Completed work:
+
+1. Rechecked `SteamUGC_GetItemDownloadInfo`, `SteamWorkshop_GetAllUGC`,
+   `SteamWorkshop_SubscribeItem`, `SteamWorkshop_UnsubscribeItem`,
+   `SteamWorkshop_AdvanceDownloadQueue`, `SteamWorkshop_FinalizeItem`,
+   `SteamWorkshop_Init`, and `SteamWorkshop_RequestDownload` against Ghidra
+   rows/imports/symbols, aliases, and Binary Ninja HLIL.
+2. Added harness-local `QLR_STEAM_UGC_*` slot constants that mirror the
+   production `QL_STEAM_UGC_*` ABI vocabulary.
+3. Sized the mock SteamUGC/GameServerUGC vtables from the terminal
+   download-item slot and routed both client and server mock UGC method
+   installs through named constants instead of raw `0x?? / 4` indices.
+4. Added harness-local GameServerUtils app-id slot constants and a focused
+   Round 707 parity gate for source, harness, docs, plan, and reference anchors
+   while leaving live Steam behavior default-disabled.
+
+### Task A608: Mirror SteamMatchmakingServers mock slot constants [COMPLETED]
+Priority: High
+Primary areas: `tests/steamworks_harness.c`,
+`tests/test_platform_services.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_706.md`
+Parity estimate: **before 88% -> after 99%** for focused SteamMatchmakingServers harness slot-mirroring source-shape confidence, and **before 93.94% -> after 93.96%** for overall Steam launch/runtime integration mapping confidence. Repo-wide parity remains **99%** because this pass clarifies test-harness ABI wiring in the opt-in Steamworks lane without changing the strict-retail Windows replacement score.
+
+Completed work:
+
+1. Rechecked `JSBrowserDetails_RequestServerDetails`,
+   `SteamBrowser_RefreshList`, `JSBrowser_RequestServers`,
+   `SteamBrowser_RequestServers`, and `SteamBrowser_RequestServerDetails`
+   against Ghidra rows/imports/symbols, aliases, and Binary Ninja HLIL.
+2. Added harness-local `QLR_STEAM_MATCHMAKING_SERVERS_*` slot constants that
+   mirror the production `QL_STEAM_MATCHMAKING_SERVERS_*` ABI vocabulary.
+3. Sized the mock `SteamMatchmakingServers` vtable from the terminal
+   cancel-query slot and installed every mock method through named constants
+   instead of raw `0x?? / 4` indices.
+4. Added a focused Round 706 parity gate for source, harness, docs, plan, and
+   reference anchors while leaving live Steam behavior default-disabled.
+
+### Task A607: Pin Steam server-browser row layout guards [COMPLETED]
+Priority: High
+Primary areas: `src/common/platform/platform_steamworks.c`,
+`tests/steamworks_harness.c`, `tests/test_platform_services.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_705.md`
+Parity estimate: **before 90% -> after 99%** for focused Steam server-browser row layout source-shape confidence, and **before 93.92% -> after 93.94%** for overall Steam launch/runtime integration mapping confidence. Repo-wide parity remains **99%** because this pass clarifies source ownership in the opt-in Steamworks lane without changing the strict-retail Windows replacement score.
+
+Completed work:
+
+1. Rechecked `SteamBrowser_FormatServerListFallbackName`,
+   `JSBrowserDetails_OnServerResponded`, and `JSBrowser_OnServerResponded`
+   against Ghidra rows/imports/symbols, aliases, Binary Ninja HLIL, and
+   data-section strings.
+2. Named the retained raw server-browser row offsets for address, app ID,
+   population fields, flags, strings, split Steam ID dwords, and full row size.
+3. Reconstructed the raw Steam ID field as explicit low/high dwords at `0x16c`
+   and `0x170`, then rebuilt the public `CSteamID` value during detail-copy
+   projection.
+4. Mirrored the split Steam ID layout in the Steamworks harness and added a
+   focused Round 705 parity gate for source, harness, docs, plan, and reference
+   anchors while leaving live Steam behavior default-disabled.
+
+### Task A606: Pin Steam stats descriptor count guards [COMPLETED]
+Priority: High
+Primary areas: `src/code/client/cl_main.c`,
+`tests/test_platform_services.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_704.md`
+Parity estimate: **before 91% -> after 99%** for focused Steam stats descriptor-count source-shape confidence, and **before 93.90% -> after 93.92%** for overall Steam launch/runtime integration mapping confidence. Repo-wide parity remains **99%** because this pass clarifies source ownership in the opt-in Steamworks lane without changing the strict-retail Windows replacement score.
+
+Completed work:
+
+1. Rechecked `SteamCallbacks_OnUserStatsReceived` and `SteamCallbacks_Init`
+   against Ghidra rows/imports/symbols, aliases, and Binary Ninja HLIL.
+2. Promoted the retained stat descriptor count to the observed `0x58` retail
+   table length and the achievement-name run to the observed `0x3b` pointer
+   count.
+3. Added client-side compile-time array-length guards for the reconstructed
+   stat descriptor and achievement-name catalogs.
+4. Added a focused Round 704 parity gate for source, docs, plan, and
+   reference anchors while leaving live Steam services default-disabled.
+
+### Task A605: Pin Steam UGC details layout constants [COMPLETED]
+Priority: High
+Primary areas: `src/common/platform/platform_steamworks.c`,
+`tests/steamworks_harness.c`, `tests/test_platform_services.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_703.md`
+Parity estimate: **before 92% -> after 99%** for focused Steam UGC detail-record source-shape confidence, and **before 93.88% -> after 93.90%** for overall Steam launch/runtime integration mapping confidence. Repo-wide parity remains **99%** because this pass clarifies source ownership in the opt-in Steamworks lane without changing the strict-retail Windows replacement score.
+
+Completed work:
+
+1. Rechecked `SteamCallbacks_OnGetAllUGCQueryCompleted`,
+   `SteamCallbacks_RunUGCQueryCompleted`,
+   `SteamCallbacks_RunUGCQueryCompletedCallResult`, and
+   `SteamWorkshop_GetAllUGC` against Ghidra rows/imports/symbols, aliases, and
+   Binary Ninja HLIL.
+2. Named the retained UGC detail-record published-file-id offset and size,
+   preserving the existing title and description offsets.
+3. Named the retained GetAllUGC query type and matching type handoff
+   constants while leaving the incoming filter semantic intentionally
+   unpromoted.
+4. Mirrored the published-file-id layout constants in the Steamworks harness
+   mock and added a focused Round 703 parity gate for source, harness, docs,
+   plan, and reference anchors.
+
+### Task A604: Pin Steam callback payload size constants [COMPLETED]
+Priority: High
+Primary areas: `src/common/platform/platform_steamworks.c`,
+`tests/test_platform_services.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_702.md`
+Parity estimate: **before 90% -> after 99%** for focused Steam callback payload-size source-shape confidence, and **before 93.86% -> after 93.88%** for overall Steam launch/runtime integration mapping confidence. Repo-wide parity remains **99%** because this pass clarifies source ownership in the opt-in Steamworks lane without changing the strict-retail Windows replacement score.
+
+Completed work:
+
+1. Rechecked the retail Steam callback payload-size thunks, call-result run
+   thunk, callback run thunk, Ghidra function rows, aliases, and vtable
+   consumers against the committed Binary Ninja HLIL corpus.
+2. Named the production callback payload-size constants for client, avatar,
+   server, lobby, microtransaction, workshop, UGC call-result, and optional
+   Web API auth-ticket callback payloads.
+3. Routed static raw payload assertions and retained callback-object
+   registrations through named constants instead of anonymous raw byte counts
+   or `sizeof` expressions while preserving default-disabled live-service
+   behavior.
+4. Added a focused Round 702 parity gate and updated existing Steam callback
+   tests to require the new payload-size vocabulary.
+
+### Task A603: Pin Steamworks runtime export boundary constants [COMPLETED]
+Priority: High
+Primary areas: `src/common/platform/platform_steamworks.c`,
+`tests/test_platform_services.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_701.md`
+Parity estimate: **before 88% -> after 99%** for focused Steamworks runtime export-boundary source-shape confidence, and **before 93.84% -> after 93.86%** for overall Steam launch/runtime integration mapping confidence. Repo-wide parity remains **99%** because this pass clarifies source ownership in the opt-in Steamworks lane without changing the strict-retail Windows replacement score.
+
+Completed work:
+
+1. Rechecked retail Steam API, interface, callback/call-result, and
+   GameServer runtime exports against the Ghidra import table, Binary Ninja
+   HLIL call sites, function rows, and aliases.
+2. Named the production Steamworks runtime export strings used by the dynamic
+   loader, including retail interface exports and newer SDK alias fallbacks.
+3. Routed `QL_Steamworks_LoadLibrary` through named constants while preserving
+   required/optional export boundaries, retail-name-first alias resolution,
+   absence of `SteamAPI_RestartAppIfNecessary`, and default-disabled
+   live-service behavior.
+4. Added a focused Round 701 parity gate and updated older startup, auth,
+   callback, modern-gap, and server bootstrap tests to require the new export
+   boundary vocabulary.
+
+### Task A602: Pin Steam avatar image slot constants [COMPLETED]
+Priority: High
+Primary areas: `src/common/platform/platform_steamworks.c`,
+`tests/test_platform_services.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_700.md`
+Parity estimate: **before 90% -> after 99%** for focused Steam avatar image ABI source-shape confidence, and **before 93.82% -> after 93.84%** for
+overall Steam launch/runtime integration mapping confidence. Repo-wide parity
+remains **99%** because this pass clarifies source ownership in the opt-in
+Steamworks lane without changing the strict-retail Windows replacement score.
+
+Completed work:
+
+1. Rechecked retail `SteamClient_GetAvatarImageHandle`, SteamDataSource
+   avatar URL handling, response-thread image emission, SteamFriends,
+   SteamUtils, Ghidra imports/functions/symbols, aliases, and the Steamworks
+   harness vtable layout.
+2. Named the production SteamFriends avatar selector slots and SteamUtils
+   image-size/RGBA slots used by avatar image loading.
+3. Routed production avatar wrappers through named constants while preserving
+   pending-handle behavior, size selection, image-dimension validation,
+   RGBA allocation/copy semantics, and default-disabled live-service behavior.
+4. Added a focused Round 700 parity gate and updated existing avatar resource
+   bridge and SteamDataSource lifecycle tests to require the new slot-name
+   vocabulary.
+
+### Task A601: Pin SteamApps and Workshop UGC slot constants [COMPLETED]
+Priority: High
+Primary areas: `src/common/platform/platform_steamworks.c`,
+`tests/test_platform_services.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_699.md`
+Parity estimate: **before 90% -> after 99%** for focused SteamApps/Workshop UGC ABI source-shape confidence, and **before 93.80% -> after 93.82%** for overall Steam launch/runtime integration mapping confidence. Repo-wide parity remains **99%** because this pass clarifies source ownership in the opt-in Steamworks lane without changing the strict-retail Windows replacement score.
+
+Completed work:
+
+1. Rechecked retail SteamApps subscription checks, SteamUGC query/results,
+   subscribed-item enumeration, install-info, item state, subscribe,
+   unsubscribe, download, download-progress, and SteamGameServerUtils app-id
+   owners against Binary Ninja HLIL, Ghidra functions/imports, aliases, and
+   the Steamworks harness vtable layout.
+2. Named the production SteamApps, SteamUGC, and SteamGameServerUtils vtable
+   slot constants used by workshop and app-id wrappers.
+3. Routed production wrappers through named constants while preserving guards,
+   app-id usage, 64-bit handle splitting, folder/result clearing, raw GetAllUGC
+   filter semantics, and default-disabled live-service behavior.
+4. Added a focused Round 699 parity gate and updated existing UGC/workshop/app
+   tests to require the new slot-name vocabulary.
+
+### Task A600: Pin ZMQ RCON positive-frame gate [COMPLETED]
+Priority: High
+Primary areas: `src/code/server/sv_zmq.c`,
+`tests/test_platform_services.py`, `tests/test_server_full_parity_gate.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_698.md`
+Parity estimate: **before 94% -> after 99%** for focused RCON positive-frame
+gate source-boundary confidence, and **before 99.4% -> after 99.45%** for
+focused ZMQ wiring/source reconstruction confidence. Repo-wide parity remains
+**99%** because this pass names a local server integration receive gate without
+changing the strict-retail Windows replacement score.
+
+Completed work:
+
+1. Rechecked retail `idZMQ_PumpRcon`, `zstr_recv`, `zstr_free`, and
+   `zmq_poll` evidence against Binary Ninja HLIL, Ghidra function rows,
+   aliases, and the existing receive-buffer and first-message gate rounds.
+2. Confirmed SRP's bounded stack-buffer adaptation should treat non-negative
+   read lengths as successful for multipart drain, while requiring positive
+   identity and command frame lengths before peer lookup, insertion, logging,
+   or command execution.
+3. Added named ZMQ RCON frame-gate constants and routed the read-command and
+   RCON pump checks through them.
+4. Added a focused Round 698 parity gate and wired the new detail into the
+   SV-G02 server parity report, while preserving the external libzmq/CZMQ
+   boundary.
+
+### Task A598: Pin client SteamMatchmakingServers slot constants [COMPLETED]
+Priority: High
+Primary areas: `src/common/platform/platform_steamworks.c`,
+`tests/test_platform_services.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_696.md`
+Parity estimate: **before 90% -> after 99%** for focused client SteamMatchmakingServers ABI source-shape confidence, and **before 93.78% ->
+after 93.80%** for overall Steam launch/runtime integration mapping
+confidence. Repo-wide parity remains **99%** because this pass clarifies
+source ownership in the opt-in Steamworks lane without changing the
+strict-retail Windows replacement score.
+
+Completed work:
+
+1. Rechecked retail SteamMatchmakingServers list, refresh, release,
+   list-detail, direct ping/player/rules, and cancel-query owners against
+   Binary Ninja HLIL, Ghidra functions/imports, aliases, and the Steamworks
+   harness vtable layout.
+2. Named the production SteamMatchmakingServers list, detail, refresh,
+   release, direct-query, and cancel-query vtable slot constants.
+3. Routed production wrappers through named constants while preserving guards,
+   app-id filtering, default outputs, status-query fallback behavior, and
+   default-disabled live-service behavior.
+4. Added a focused Round 696 parity gate and updated the existing client
+   browser server-shim test to require the new slot-name vocabulary.
+
+### Task A599: Pin ZMQ cvar flag boundary [COMPLETED]
+Priority: High
+Primary areas: `src/code/server/sv_zmq.c`,
+`tests/test_platform_services.py`, `tests/test_server_full_parity_gate.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_697.md`
+Parity estimate: **before 94% -> after 99%** for focused cvar flag
+source-boundary confidence, and **before 99.35% -> after 99.4%** for focused
+ZMQ wiring/source reconstruction confidence. Repo-wide parity remains **99%**
+because this pass names a local server integration flag boundary without
+changing the strict-retail Windows replacement score.
+
+Completed work:
+
+1. Rechecked retail ZMQ cvar registration and net fallback flag values against
+   Binary Ninja HLIL, Ghidra function rows, aliases, and the existing cvar
+   literal mapping round.
+2. Confirmed the six non-password `zmq_*` cvars use the init-only flag path,
+   the two password cvars use the archived flag path, and the net fallback
+   cvars use the latched flag path.
+3. Added named ZMQ cvar flag constants and routed the registration and stats
+   endpoint fallback call sites through them.
+4. Added a focused Round 697 parity gate and wired the new detail into the
+   SV-G02 server parity report, while preserving the external libzmq/CZMQ
+   boundary.
+
+### Task A595: Pin client SteamMatchmaking lobby slot constants [COMPLETED]
+Priority: High
+Primary areas: `src/common/platform/platform_steamworks.c`,
+`tests/test_platform_services.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_693.md`
+Parity estimate: **before 90% -> after 99%** for focused client SteamMatchmaking lobby ABI source-shape confidence, and **before 93.76% -> after 93.78%** for overall Steam launch/runtime integration mapping confidence. Repo-wide parity remains **99%** because this pass clarifies source ownership in the opt-in Steamworks lane without changing the strict-retail Windows replacement score.
+
+Completed work:
+
+1. Rechecked retail SteamMatchmaking lobby create/join/leave, lobby data,
+   lobby member, lobby server, invite, chat, and favorite-server owners against
+   Binary Ninja HLIL, Ghidra functions/imports, aliases, and the Steamworks
+   harness vtable layout.
+2. Named the production SteamMatchmaking favorite, lobby, lobby-data,
+   member-list, lobby-server, invite, and chat vtable slot constants.
+3. Routed production wrappers through named constants while preserving guards,
+   ID split, default outputs, favorite-server fallback semantics, and
+   default-disabled live-service behavior.
+4. Added a focused Round 693 parity gate and updated older lobby/social and
+   favorite-server tests to require the new slot-name vocabulary.
+
+### Task A594: Pin ZMQ external runtime export-name boundary [COMPLETED]
+Priority: High
+Primary areas: `src/code/server/sv_zmq.c`,
+`tests/test_platform_services.py`, `tests/test_server_full_parity_gate.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_692.md`
+Parity estimate: **before 94% -> after 99%** for focused external runtime
+export-name source-boundary confidence, and **before 99.3% -> after 99.35%**
+for focused ZMQ wiring/source reconstruction confidence. Repo-wide parity
+remains **99%** because this pass names SRP's external runtime loader contract
+without reconstructing retail embedded libzmq/CZMQ or changing the
+strict-retail Windows replacement score.
+
+Completed work:
+
+1. Rechecked retail embedded `zmq_ctx_*`, socket, bind, socket-option,
+   message, and poll wrappers against Ghidra function rows and the promoted
+   alias map.
+2. Confirmed those retail libzmq/CZMQ bodies remain evidence only, while SRP
+   owns a small dynamic-loader export contract for opted-in online-service
+   builds.
+3. Added named required and optional ZMQ export constants and routed
+   `idZMQ_LoadLibrary` through them.
+4. Added a focused Round 692 parity gate and wired it into the SV-G02 server
+   parity report, while preserving the runtime-only `src/libs/libzmq` install
+   boundary.
+
+### Task A593: Pin ZMQ endpoint empty-clear boundary [COMPLETED]
+Priority: High
+Primary areas: `src/code/server/sv_zmq.c`,
+`tests/test_platform_services.py`, `tests/test_server_full_parity_gate.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_691.md`
+Parity estimate: **before 92% -> after 98%** for focused endpoint
+empty-clear source-boundary confidence, and **before 99.25% -> after 99.3%**
+for focused ZMQ wiring/source reconstruction confidence. Repo-wide parity
+remains **99%** because this pass names a local retained endpoint-buffer reset
+boundary without changing the strict-retail Windows replacement score.
+
+Completed work:
+
+1. Rechecked retail `Zmq_ShutdownStatsPublisher`, `Zmq_ShutdownRuntime`,
+   `idZMQ_Destroy`, and `zsock_destroy_checked` evidence against Binary Ninja
+   HLIL, Ghidra function rows, aliases, and prior ZMQ shutdown mapping rounds.
+2. Confirmed the retail stats PUB and RCON/runtime shutdown lanes remain
+   separate, while SRP owns portable retained endpoint strings around those
+   lanes.
+3. Added `QL_ZMQ_ENDPOINT_EMPTY` and routed disabled stats/RCON cleanup plus
+   public stats/runtime shutdown endpoint clears through the named boundary.
+4. Added a focused Round 691 parity gate and wired it into the SV-G02 server
+   parity report, while preserving the external libzmq/CZMQ boundary.
+
+### Task A592: Pin client identity, friends, and utils slot constants [COMPLETED]
+Priority: High
+Primary areas: `src/common/platform/platform_steamworks.c`,
+`tests/test_platform_services.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_690.md`
+Parity estimate: **before 90% -> after 99%** for focused client identity/friends/utils ABI source-shape confidence, and **before 93.74% -> after 93.76%** for overall Steam launch/runtime integration mapping confidence. Repo-wide parity remains **99%** because this pass clarifies
+source ownership in the opt-in Steamworks lane without changing the
+strict-retail Windows replacement score.
+
+Completed work:
+
+1. Rechecked retail SteamUser/Friends/Utils identity, friend summary, rich
+   presence, overlay, and invite owners against Binary Ninja HLIL, Ghidra
+   functions/imports, aliases, and the Steamworks harness vtable layout.
+2. Named the production SteamUser, SteamFriends, and SteamUtils slot constants
+   used by client identity/social wrappers.
+3. Routed production wrappers through named constants while preserving guards,
+   ID split, default outputs, and default-disabled live-service behavior.
+4. Added a focused Round 690 parity gate and updated older
+   identity/friends/social tests to require the new slot-name vocabulary.
+
+### Task A591: Pin ZMQ ZAP request frame-buffer boundary [COMPLETED]
+Priority: High
+Primary areas: `src/code/server/sv_zmq.c`,
+`tests/test_platform_services.py`, `tests/test_server_full_parity_gate.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_689.md`
+Parity estimate: **before 92% -> after 98%** for focused ZAP request
+frame-buffer source-boundary confidence, and **before 99.2% -> after 99.25%**
+for focused ZMQ wiring/source reconstruction confidence. Repo-wide parity
+remains **99%** because this pass names a local bounded-frame receive boundary
+without changing the strict-retail Windows replacement score.
+
+Completed work:
+
+1. Rechecked retail `s_zap_request_new`, `s_zap_request_reply`,
+   `s_authenticate_plain`, `s_self_authenticate`, and `zauth` evidence against
+   Binary Ninja HLIL, Ghidra function rows, aliases, and prior ZAP mapping
+   rounds.
+2. Confirmed SRP's manual ZAP REP socket owns caller-side receive buffers for
+   version, request id, domain, address, identity, mechanism, username, and
+   password frames.
+3. Added named ZAP request frame-buffer constants and routed
+   `idZMQ_PumpAuthSocket` through them, including the named empty-field reset.
+4. Added a focused Round 689 parity gate and wired it into the SV-G02 server
+   parity report, while preserving the external libzmq/CZMQ boundary.
+
+### Task A588: Pin ZMQ RCON broadcast send-flag boundary [COMPLETED]
+Priority: High
+Primary areas: `src/code/server/sv_zmq.c`,
+`tests/test_platform_services.py`, `tests/test_server_full_parity_gate.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_686.md`
+Parity estimate: **before 92% -> after 98%** for focused RCON broadcast
+send-flag source-boundary confidence, and **before 99.15% -> after 99.2%**
+for focused ZMQ wiring/source reconstruction confidence. Repo-wide parity
+remains **99%** because this pass names a local ROUTER send-flag boundary
+without changing the strict-retail Windows replacement score.
+
+Completed work:
+
+1. Rechecked retail `idZMQ_BroadcastRconOutput`, `zstr_sendm`, `zstr_send`,
+   and `s_send_string` evidence against Binary Ninja HLIL, Ghidra function
+   rows, aliases, and prior broadcast mapping rounds.
+2. Confirmed retail sends RCON peer identities through the multipart helper
+   and console payloads through the final-send helper.
+3. Added `QL_ZMQ_SEND_DONTWAIT` and `QL_ZMQ_SEND_MORE_DONTWAIT`, then routed
+   `idZMQ_BroadcastRconOutput` through the named nonblocking final and
+   multipart send boundaries.
+4. Added a focused Round 686 parity gate and wired it into the SV-G02 server
+   parity report, while preserving the external libzmq/CZMQ boundary.
+
+### Task A587: Pin client SteamUserStats value slot constants [COMPLETED]
+Priority: High
+Primary areas: `src/common/platform/platform_steamworks.c`,
+`tests/test_platform_services.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_685.md`
+Parity estimate: **before 90% -> after 99%** for focused client SteamUserStats value ABI source-shape confidence, and **before 93.72% -> after 93.74%** for
+overall Steam launch/runtime integration mapping confidence. Repo-wide parity
+remains **99%** because this pass clarifies source ownership in the opt-in
+Steamworks lane without changing the strict-retail Windows replacement score.
+
+Completed work:
+
+1. Rechecked retail client user-stats callback, readback, achievement display,
+   and `stats_clear` owners against Binary Ninja HLIL, Ghidra
+   functions/imports, analysis symbols, aliases, and the Steamworks harness
+   vtable layout.
+2. Named the client `SteamUserStats` display-attribute, request, get-float,
+   get-int, get-achievement, and reset vtable slots.
+3. Routed the production client stats wrappers through the named slot
+   constants while preserving argument guards, SteamID word split, default
+   outputs, and default-disabled live-service behavior.
+4. Added a focused Round 685 parity gate and updated older client stats tests
+   to require the new slot-name vocabulary.
+
+### Task A586: Pin ZMQ receive string-terminator boundary [COMPLETED]
+Priority: High
+Primary areas: `src/code/server/sv_zmq.c`,
+`tests/test_platform_services.py`, `tests/test_server_full_parity_gate.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_684.md`
+Parity estimate: **before 92% -> after 98%** for focused receive
+string-terminator source-boundary confidence, and **before 99.1% -> after
+99.15%** for focused ZMQ wiring/source reconstruction confidence. Repo-wide
+parity remains **99%** because this pass names a local bounded-string receive
+boundary without changing the strict-retail Windows replacement score.
+
+Completed work:
+
+1. Rechecked retail `zstr_recv`, `zmq_msg_recv`, `zmq_msg_data`, and
+   `zmq_msg_size` evidence against Binary Ninja HLIL, Ghidra function rows, and
+   aliases.
+2. Confirmed retail receives a message, allocates `size + 1`, copies exactly
+   `size` payload bytes, and writes a trailing NUL byte.
+3. Added `QL_ZMQ_STRING_TERMINATOR_LENGTH`, `QL_ZMQ_STRING_TERMINATOR`, and
+   `QL_ZMQ_RCVMORE_NONE`, then routed `idZMQ_ReadFrameString` through the named
+   bounded-string receive mechanics.
+4. Added a focused Round 684 parity gate and wired it into the SV-G02 server
+   parity report, while preserving the external libzmq/CZMQ boundary.
+
+### Task A583: Pin ZMQ RCON receive-buffer boundary [COMPLETED]
+Priority: High
+Primary areas: `src/code/server/sv_zmq.c`,
+`tests/test_platform_services.py`, `tests/test_server_full_parity_gate.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_682.md`
+Parity estimate: **before 92% -> after 98%** for focused RCON receive-buffer
+source-boundary confidence, and **before 99.05% -> after 99.1%** for focused
+ZMQ wiring/source reconstruction confidence. Repo-wide parity remains **99%**
+because this pass names a local receive-buffer source boundary without
+changing the strict-retail Windows replacement score.
+
+Completed work:
+
+1. Rechecked retail `idZMQ_PumpRcon`, `zstr_recv`, and `zstr_free` evidence
+   against Binary Ninja HLIL, Ghidra function rows, and aliases.
+2. Confirmed retail receives two RCON string frames: peer identity first, then
+   command payload.
+3. Added `QL_ZMQ_RCON_IDENTITY_BUFFER_SIZE` and
+   `QL_ZMQ_RCON_COMMAND_BUFFER_SIZE`, then routed `idZMQ_PumpRcon` through the
+   named bounded buffers while preserving the existing stack-buffer
+   receive/drain replacement.
+4. Added a focused Round 682 parity gate and wired it into the SV-G02 server
+   parity report, while preserving the external libzmq/CZMQ boundary.
+
+### Task A582: Pin Steam GameServerStats value slot constants [COMPLETED]
+Priority: High
+Primary areas: `src/common/platform/platform_steamworks.c`,
+`tests/test_platform_services.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_681.md`
+Parity estimate: **before 90% -> after 99%** for focused GameServerStats value ABI source-shape confidence, and **before 93.70% -> after 93.72%** for
+overall Steam launch/runtime integration mapping confidence. Repo-wide parity
+remains **99%** because this pass clarifies source ownership in the opt-in
+Steamworks lane without changing the strict-retail Windows replacement score.
+
+Completed work:
+
+1. Rechecked retail SteamStats flush/request/received/achievement/init owners
+   against Binary Ninja HLIL, Ghidra function rows, imports, aliases, and the
+   existing Steamworks harness vtable layout.
+2. Named the GameServerStats request, get, set, average-rate, achievement, and
+   store vtable slots from `SteamGameServerStats + 0x00` through
+   `SteamGameServerStats + 0x24`.
+3. Routed the production server stats wrappers through the named slot
+   constants while preserving request gating, SteamID word split, argument
+   guards, and default-disabled live-service behavior.
+4. Added a focused Round 681 parity gate and updated older stats guard tests to
+   require the new slot-name vocabulary.
+
+### Task A581: Pin ZMQ poll-item zero-state boundary [COMPLETED]
+Priority: High
+Primary areas: `src/code/server/sv_zmq.c`,
+`tests/test_platform_services.py`, `tests/test_server_full_parity_gate.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_680.md`
+Parity estimate: **before 93% -> after 98%** for focused poll-item zero-state
+source-boundary confidence, and **before 99.0% -> after 99.05%** for focused
+ZMQ wiring/source reconstruction confidence. Repo-wide parity remains **99%**
+because this pass closes a local poll-item source-shape gap without changing
+the strict-retail Windows replacement score.
+
+Completed work:
+
+1. Rechecked the retained RCON pump stack poll item against Binary Ninja HLIL,
+   Ghidra function rows, and aliases for `idZMQ_PumpRcon` and `zmq_poll`.
+2. Confirmed retail zeroes the poll-item side fields before setting the
+   `ZMQ_POLLIN` events word and calling `zmq_poll` with one item.
+3. Added `QL_ZMQ_POLL_FD_NONE` and `QL_ZMQ_POLL_REVENTS_NONE`, then routed the
+   auth and RCON poll-item setup/reset paths through the named constants while
+   preserving the single-item/immediate-timeout boundary from Rounds 679 and
+   676.
+4. Added a focused Round 680 parity gate and wired it into the SV-G02 server
+   parity report, while preserving the external libzmq/CZMQ boundary.
+
+### Task A580: Pin ZMQ single-poll-item boundary [COMPLETED]
+Priority: High
+Primary areas: `src/code/server/sv_zmq.c`,
+`tests/test_platform_services.py`, `tests/test_server_full_parity_gate.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_679.md`
+Parity estimate: **before 92% -> after 98%** for focused single-poll-item
+source-boundary confidence, and **before 98.9% -> after 99.0%** for focused
+ZMQ wiring/source reconstruction confidence. Repo-wide parity remains **99%**
+because this pass closes a local poll-vector source-shape gap without changing
+the strict-retail Windows replacement score.
+
+Completed work:
+
+1. Rechecked the retained RCON pump against Binary Ninja HLIL, Ghidra function
+   rows, and aliases for `idZMQ_PumpRcon` and `zmq_poll`.
+2. Confirmed retail builds one poll item, sets the input event bit, and calls
+   `zmq_poll` with an item count of `1`.
+3. Added `QL_ZMQ_SINGLE_POLL_ITEM`, then routed the auth and RCON poll probes
+   through the named one-item count while preserving the immediate-timeout
+   boundary from Round 676.
+4. Added a focused Round 679 parity gate and wired it into the SV-G02 server
+   parity report, while preserving the external libzmq/CZMQ boundary.
+
+### Task A579: Pin Steam GameServer lifecycle and published-state slot constants [COMPLETED]
+Priority: High
+Primary areas: `src/common/platform/platform_steamworks.c`,
+`tests/test_platform_services.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_678.md`
+Parity estimate: **before 91% -> after 99%** for focused GameServer
+lifecycle/published-state ABI source-shape confidence, and **before 93.68% ->
+after 93.70%** for overall Steam launch/runtime integration mapping confidence.
+Repo-wide parity remains **99%** because this pass clarifies source ownership in
+the opt-in Steamworks lane without changing the strict-retail Windows
+replacement score.
+
+Completed work:
+
+1. Rechecked the retail GameServer lifecycle and published-state owners against
+   Binary Ninja HLIL, Ghidra function rows, imports, aliases, and the existing
+   Steamworks harness vtable layout.
+2. Named the remaining production GameServer lifecycle/published-state vtable
+   slots from `SteamGameServer + 0x04` through `SteamGameServer + 0x9c`.
+3. Routed the production wrappers through the named slot constants while
+   preserving existing guard order, fastcall signatures, and default-disabled
+   live-service behavior.
+4. Added a focused Round 678 parity gate and updated older GameServer guard
+   tests to require the new slot-name vocabulary.
+
+### Task A577: Pin ZMQ no-flags and immediate-poll boundary [COMPLETED]
+Priority: High
+Primary areas: `src/code/server/sv_zmq.c`,
+`tests/test_platform_services.py`, `tests/test_server_full_parity_gate.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_676.md`
+Parity estimate: **before 90% -> after 98%** for focused no-flags and
+immediate-poll source-boundary confidence, and **before 98.8% -> after 98.9%**
+for focused ZMQ wiring/source reconstruction confidence. Repo-wide parity
+remains **99%** because this pass closes a local send/poll source-shape gap
+without changing the strict-retail Windows replacement score.
+
+Completed work:
+
+1. Rechecked retail stats publication, RCON broadcast, RCON pump, `zstr_send`,
+   `zstr_sendm`, and `zmq_poll` evidence against Binary Ninja HLIL, Ghidra
+   function rows, and aliases.
+2. Confirmed final sends use no-more/no-flag semantics while multipart
+   identity frames use the existing SNDMORE path.
+3. Added `QL_ZMQ_NO_FLAGS` and `QL_ZMQ_POLL_TIMEOUT_IMMEDIATE`, then routed
+   auth final-frame sends, stats publication sends, and auth/RCON poll probes
+   through the named constants without changing behavior.
+4. Added a focused Round 676 parity gate and wired it into the SV-G02 server
+   parity report, while preserving the external libzmq/CZMQ boundary.
+
+### Task A576: Pin ZMQ socket option boolean boundary [COMPLETED]
+Priority: High
+Primary areas: `src/code/server/sv_zmq.c`,
+`tests/test_platform_services.py`, `tests/test_server_full_parity_gate.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_674.md`
+Parity estimate: **before 91% -> after 98%** for focused socket option
+boolean source-boundary confidence, and **before 98.7% -> after 98.8%** for
+focused ZMQ wiring/source reconstruction confidence. Repo-wide parity remains
+**99%** because this pass closes a local socket-option source-shape gap without
+changing the strict-retail Windows replacement score.
+
+Completed work:
+
+1. Rechecked the retail RCON/stats socket option setup against Binary Ninja
+   HLIL, Ghidra function rows, aliases, and prior option-switch evidence for
+   `zsock_set_plain_server`, `zsock_set_router_mandatory`, and
+   `zmq_setsockopt`.
+2. Confirmed the retained owner materializes PLAIN server mode as `0`/`1`
+   based on password presence and enables RCON ROUTER mandatory delivery as
+   `1`.
+3. Added `QL_ZMQ_SOCKET_OPTION_DISABLED` and
+   `QL_ZMQ_SOCKET_OPTION_ENABLED`, then routed the RCON and stats socket setup
+   calls through them without changing behavior.
+4. Added a focused Round 674 parity gate and wired it into the SV-G02 server
+   parity report, while preserving the external libzmq/CZMQ boundary.
+
+### Task A575: Pin Steam GameServer auth-session vtable slots [COMPLETED]
+Priority: High
+Primary areas: `src/common/platform/platform_steamworks.c`,
+`tests/steamworks_harness.c`, `tests/test_platform_services.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_675.md`
+Parity estimate: **before 90% -> after 99%** for focused GameServer
+BeginAuthSession/EndAuthSession ABI source-shape confidence, and **before
+93.66% -> after 93.68%** for overall Steam launch/runtime integration mapping
+confidence. Repo-wide parity remains **99%** because this pass closes a
+Steamworks source-shape gap inside the opt-in online-service lane without
+changing the strict-retail Windows replacement score.
+
+Completed work:
+
+1. Rechecked retail `SteamServer_BeginAuthSession`,
+   `SteamServer_EndAuthSession`, and orphaned-auth cleanup against Binary
+   Ninja HLIL, Ghidra function rows, aliases, and Steam GameServer import
+   evidence.
+2. Added named GameServer auth-session slot constants for the retail
+   `SteamGameServer + 0x74` and `SteamGameServer + 0x78` calls.
+3. Routed `QL_Steamworks_ServerBeginAuthSession` and
+   `QL_Steamworks_ServerEndAuthSession` through the GameServer vtable while
+   keeping the separate client-side flat-export validation helper intact.
+4. Updated the Steamworks harness GameServer mock vtable and added a focused
+   Round 675 parity gate.
+
+### Task A574: Pin ZMQ RCON empty payload constant boundary [COMPLETED]
+Priority: High
+Primary areas: `src/code/server/sv_zmq.c`,
+`tests/test_platform_services.py`, `tests/test_server_full_parity_gate.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_672.md`
+Parity estimate: **before 92% -> after 98%** for focused RCON empty payload
+source-boundary confidence, and **before 98.6% -> after 98.7%** for focused
+ZMQ wiring/source reconstruction confidence. Repo-wide parity remains **99%**
+because this pass closes a local RCON broadcast source-shape gap without
+changing the strict-retail Windows replacement score.
+
+Completed work:
+
+1. Rechecked retail `idZMQ_BroadcastRconOutput`, `Zmq_BroadcastRconOutput`,
+   `zstr_send`, and the lower `s_send_string` helper against Binary Ninja
+   HLIL, Ghidra function rows, aliases, and the shared empty-string storage
+   anchor at `data_54f9da`.
+2. Confirmed retail `zstr_send` substitutes shared empty-string storage when
+   the broadcast payload pointer is null.
+3. Added `QL_ZMQ_RCON_EMPTY_PAYLOAD` as an alias of `QL_ZMQ_DEFAULT_EMPTY` and
+   routed the retained RCON broadcast payload normalization through it without
+   changing behavior.
+4. Added a focused Round 672 parity gate and wired it into the SV-G02 server
+   parity report, while preserving the external libzmq/CZMQ boundary.
+
+### Task A573: Pin ZMQ stats default port format boundary [COMPLETED]
+Priority: High
+Primary areas: `src/code/server/sv_zmq.c`,
+`tests/test_platform_services.py`, `tests/test_server_full_parity_gate.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_671.md`
+Parity estimate: **before 91% -> after 98%** for focused stats default port
+format/source-boundary confidence, and **before 98.5% -> after 98.6%** for
+focused ZMQ wiring/source reconstruction confidence. Repo-wide parity remains
+**99%** because this pass closes a local endpoint-format source-shape gap
+without changing the strict-retail Windows replacement score.
+
+Completed work:
+
+1. Rechecked the retail stats PUB endpoint fallback branch against Binary Ninja
+   HLIL, Ghidra function rows, aliases, and string-table anchors for
+   `zmq_stats_port`, `net_port`, `%i`, and `tcp://%s:%i`.
+2. Confirmed the fallback default is derived from `PORT_SERVER` (`27960`) and
+   the latched `net_port` cvar when `zmq_stats_port` has no integer value.
+3. Added `QL_ZMQ_DEFAULT_NET_PORT_FORMAT` and routed the stats endpoint
+   fallback `va` call through it without changing behavior.
+4. Added a focused Round 671 parity gate and wired it into the SV-G02 server
+   parity report, while preserving the external libzmq/CZMQ boundary.
+
+### Task A572: Pin legacy Steam P2P, voice, and packet slot constants [COMPLETED]
+Priority: High
+Primary areas: `src/common/platform/platform_steamworks.c`,
+`tests/test_platform_services.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_670.md`
+Parity estimate: **before 90% -> after 99%** for focused legacy
+SteamNetworking, ISteamUser voice, and ISteamGameServer packet slot
+source-shape confidence, and **before 93.64% -> after 93.66%** for overall
+Steam launch/runtime integration mapping confidence. Repo-wide parity remains
+**99%** because this pass closes a source mapping gap inside the opt-in
+Steamworks lane without changing the strict-retail Windows replacement score.
+
+Completed work:
+
+1. Rechecked the retail Steam voice, legacy P2P, GameServer P2P callback, and
+   GameServer UDP packet bridge owners against Binary Ninja HLIL, Ghidra
+   function rows, aliases, and Steam import evidence.
+2. Added named slot constants for the legacy `ISteamNetworking`,
+   `ISteamGameServerNetworking`, `ISteamUser` voice, and `ISteamGameServer`
+   packet bridge calls reconstructed in `platform_steamworks.c`.
+3. Routed the client/server P2P send, available, read, accept, voice, and
+   GameServer incoming/outgoing packet wrappers through those constants while
+   preserving the existing `QL_BUILD_STEAMWORKS` and default-disabled
+   `QL_BUILD_ONLINE_SERVICES` service policy.
+4. Added a focused Round 670 mapping note and parity gate without changing the
+   existing auth-ticket exported API wrapper path.
+
+### Task A571: Pin ZMQ stats transcript line boundary [COMPLETED]
+Priority: High
+Primary areas: `src/code/server/sv_zmq.c`,
+`tests/test_platform_services.py`, `tests/test_server_full_parity_gate.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_669.md`
+Parity estimate: **before 90% -> after 98%** for focused stats transcript
+line/source-boundary confidence, and **before 98.4% -> after 98.5%** for
+focused ZMQ wiring/source reconstruction confidence. Repo-wide parity remains
+**99%** because this pass closes a local fallback transcript source-shape gap
+without changing the strict-retail Windows replacement score.
+
+Completed work:
+
+1. Rechecked the retail stats publication wrappers and `zstr_send` helper
+   against Binary Ninja HLIL, Ghidra function rows, aliases, and prior
+   publication-envelope evidence.
+2. Preserved the external libzmq/CZMQ boundary: retail helper bodies remain
+   mapped evidence only, and `src/libs/libzmq` remains a runtime drop location.
+3. Named the SRP fallback transcript record terminator and replaced the raw
+   newline write in `idZMQ_WriteStatsTranscript`.
+4. Added a focused Round 669 parity gate and wired it into the SV-G02 server
+   parity report.
+
+### Task A570: Pin ZMQ receive frame drain boundary [COMPLETED]
+Priority: High
+Primary areas: `src/code/server/sv_zmq.c`,
+`tests/test_platform_services.py`, `tests/test_server_full_parity_gate.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_668.md`
+Parity estimate: **before 91% -> after 98%** for focused receive frame
+drain/source-boundary confidence, and **before 98.3% -> after 98.4%** for
+focused ZMQ wiring/source reconstruction confidence. Repo-wide parity remains
+**99%** because this pass closes a local retained frame-drain source-shape gap
+without changing the strict-retail Windows replacement score.
+
+Completed work:
+
+1. Rechecked retail `zstr_recv`, `zstr_free`, and the lower `zmq_msg_recv`,
+   `zmq_msg_init`, `zmq_msg_close`, `zmq_msg_data`, and `zmq_msg_size` helpers
+   against Binary Ninja HLIL, Ghidra function rows, aliases, and prior CZMQ
+   evidence.
+2. Added `QL_ZMQ_DRAIN_SCRATCH_SIZE` to name SRP's stack-buffer drain capacity
+   for surplus multipart frames.
+3. Pinned `idZMQ_ReadFrameString` as SRP's stack-buffer receive equivalent:
+   nonblocking `zmq_recv`, reserved terminator byte, clamped NUL termination,
+   and optional `QL_ZMQ_RCVMORE` query through `zmq_getsockopt`.
+4. Added a focused Round 668 parity gate and wired it into the SV-G02 server
+   parity report, while preserving the external libzmq/CZMQ boundary.
+
+### Task A569: Pin ZMQ manual ZAP auth response frame boundary [COMPLETED]
+Priority: High
+Primary areas: `src/code/server/sv_zmq.c`,
+`tests/test_platform_services.py`, `tests/test_server_full_parity_gate.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_667.md`
+Parity estimate: **before 92% -> after 98%** for focused manual ZAP auth
+response/source-boundary confidence, and **before 98.2% -> after 98.3%** for
+focused ZMQ wiring/source reconstruction confidence. Repo-wide parity remains
+**99%** because this pass closes a local retained auth-response source-shape
+gap without changing the strict-retail Windows replacement score.
+
+Completed work:
+
+1. Rechecked retail `zauth_self_new`, `zauth_self_handle_pipe`,
+   `s_authenticate_plain`, and `zauth` against Binary Ninja HLIL, Ghidra
+   function rows, aliases, and retail strings for the ZAP endpoint,
+   NULL/PLAIN auth behavior, PLAIN `%s_%s` lookup, and ZAP reply logging.
+2. Added named constants for SRP's manual ZAP responder empty frame, empty user
+   id, and empty credential fallbacks.
+3. Routed `idZMQ_SendAuthFrame`, `idZMQ_SendAuthResponse`,
+   `idZMQ_GetPlainCredentials`, `idZMQ_ValidatePlainCredentials`, and
+   `idZMQ_PumpAuthSocket` through those constants while preserving response
+   frame order and emitted status text.
+4. Added a focused Round 667 parity gate and wired it into the SV-G02 server
+   parity report, while preserving the external libzmq/CZMQ boundary.
+
+### Task A568: Pin ZMQ external runtime loader boundary [COMPLETED]
+Priority: High
+Primary areas: `src/code/server/sv_zmq.c`,
+`tests/test_platform_services.py`, `tests/test_server_full_parity_gate.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_666.md`
+Parity estimate: **before 93% -> after 98%** for focused external runtime
+loader/source-boundary confidence, and **before 98.1% -> after 98.2%** for
+focused ZMQ wiring/source reconstruction confidence. Repo-wide parity remains
+**99%** because this pass closes a local dependency-boundary gap without
+changing the strict-retail Windows replacement score.
+
+Completed work:
+
+1. Rechecked the retained ZMQ source boundary against the dependency ownership
+   docs and prior retail ZMQ/CZMQ evidence: SRP reconstructs the Quake
+   Live-owned server integration but does not reconstruct libzmq/CZMQ source.
+2. Added named constants for SRP's external runtime loader/fallback strings,
+   including disabled-build policy, load failure, missing exports, unknown
+   error fallback, and context/auth/RCON/stats socket creation failures.
+3. Routed `idZMQ_LoadLibrary`, `idZMQ_LastErrorString`,
+   `idZMQ_LogRuntimeUnavailable`, and the runtime/socket ensure paths through
+   those constants without changing emitted text or socket behavior.
+4. Added a focused Round 666 parity gate and wired it into the SV-G02 server
+   parity report, including checks that `src/libs/libzmq` remains a
+   README-only runtime-drop area with no reconstructed libzmq/CZMQ source.
+
+### Task A567: Pin ZMQ password-file failed-open boundary [COMPLETED]
+Priority: High
+Primary areas: `src/code/server/sv_zmq.c`,
+`tests/test_platform_services.py`, `tests/test_server_full_parity_gate.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_665.md`
+Parity estimate: **before 94% -> after 98%** for focused password-file
+failed-open/source-boundary confidence, and **before 98.0% -> after 98.1%**
+for focused ZMQ wiring/source reconstruction confidence. Repo-wide parity
+remains **99%** because this pass closes a local retained ZMQ password-file
+source-shape gap without changing the strict-retail Windows replacement score.
+
+Completed work:
+
+1. Rechecked retail `idZMQ_WritePasswordFile` against Binary Ninja HLIL,
+   Ghidra function rows, aliases, and retail string anchors for
+   `zmqpass.txt`, `Failed to open %s\n`, `stats_stats=%s\n`, and
+   `rcon_rcon=%s\n`.
+2. Added `QL_ZMQ_PASSFILE_OPEN_FAILED_FORMAT` and routed the reconstructed
+   failed-open log through it while preserving emitted text.
+3. Added a focused Round 665 parity gate and wired it into the SV-G02 server
+   parity report.
+4. Preserved the external libzmq/CZMQ boundary: this pass documents the retail
+   auth actor acknowledgement path as evidence without reconstructing
+   `zstr_sendx`, `zsock_wait`, or CZMQ auth internals in SRP source.
+
+### Task A566: Pin ZMQ stats publication envelope boundary [COMPLETED]
+Priority: High
+Primary areas: `src/code/server/sv_zmq.c`,
+`tests/test_platform_services.py`, `tests/test_server_full_parity_gate.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_664.md`
+Parity estimate: **before 94% -> after 98%** for focused stats publication
+envelope/source-boundary confidence, and **before 97.9% -> after 98.0%** for
+focused ZMQ wiring/source reconstruction confidence. Repo-wide parity remains
+**99%** because this pass closes a local retained ZMQ stats publication
+source-shape gap without changing the strict-retail Windows replacement score.
+
+Completed work:
+
+1. Rechecked retail `idZMQ_ReportPlayerEvent` and `idZMQ_SubmitMatchReport`
+   against Binary Ninja HLIL, Ghidra function rows, aliases, and retail string
+   anchors for the `TYPE`, `DATA`, and `MATCH_REPORT` publication envelope.
+2. Added named source constants for the publication keys, the fixed
+   `MATCH_REPORT` type, and SRP's JSON envelope formats.
+3. Routed the reconstructed publication builder and match-report submitter
+   through those constants while preserving the existing event-name direct
+   forwarding behavior.
+4. Added a focused Round 664 parity gate and wired it into the SV-G02 server
+   parity report.
+5. Preserved the external libzmq/CZMQ boundary: this pass documents the retail
+   `zstr_send` evidence without reconstructing that helper implementation in
+   SRP source.
+
+### Task A565: Pin ZMQ RCON peer log-format boundary [COMPLETED]
+Priority: High
+Primary areas: `src/code/server/sv_zmq.c`,
+`tests/test_platform_services.py`, `tests/test_server_full_parity_gate.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_663.md`
+Parity estimate: **before 94% -> after 98%** for focused RCON peer
+log-format/source-boundary confidence, and **before 97.8% -> after 97.9%**
+for focused ZMQ wiring/source reconstruction confidence. Repo-wide parity
+remains **99%** because this pass closes a local retained ZMQ RCON peer
+logging source-shape gap without changing the strict-retail Windows
+replacement score.
+
+Completed work:
+
+1. Rechecked retail `idZMQ_BroadcastRconOutput` and `idZMQ_PumpRcon` against
+   Binary Ninja HLIL, Ghidra function rows, aliases, and retail string anchors
+   for the three RCON peer log formats.
+2. Routed the reconstructed RCON connect, command, and disconnect logging
+   through `QL_ZMQ_RCON_CLIENT_CONNECT_FORMAT`,
+   `QL_ZMQ_RCON_COMMAND_FORMAT`, and
+   `QL_ZMQ_RCON_CLIENT_DISCONNECT_FORMAT`.
+3. Added a focused Round 663 parity gate and wired it into the SV-G02 server
+   parity report.
+4. Preserved the external libzmq/CZMQ boundary: this pass documents the retail
+   `zstr_recv`, `zstr_send`, `zstr_sendm`, and `zstr_free` evidence without
+   reconstructing those helper implementations in SRP source.
+
+### Task A564: Pin ZMQ ZAP domain constant boundary [COMPLETED]
+Priority: High
+Primary areas: `src/code/server/sv_zmq.c`,
+`tests/test_platform_services.py`, `tests/test_server_full_parity_gate.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_662.md`
+Parity estimate: **before 94% -> after 98%** for focused ZAP domain
+constant/source-boundary confidence, and **before 97.7% -> after 97.8%** for
+focused ZMQ wiring/source reconstruction confidence. Repo-wide parity remains
+**99%** because this pass closes a local retained ZMQ ZAP-domain source-shape
+gap without changing the strict-retail Windows replacement score.
+
+Completed work:
+
+1. Rechecked retail `zsock_set_zap_domain` use in the RCON and stats setup
+   paths plus CZMQ `zauth` PLAIN `%s_%s` key construction against Binary Ninja
+   HLIL, Ghidra function rows, aliases, retail string anchors, and current
+   source.
+2. Routed RCON and stats socket ZAP-domain setup through
+   `QL_ZMQ_DOMAIN_RCON` and `QL_ZMQ_DOMAIN_STATS` so socket setup and manual
+   ZAP credential validation share the same constants.
+3. Added a focused Round 662 parity gate and wired it into the SV-G02 server
+   parity report.
+4. Preserved the external libzmq/CZMQ boundary: this pass does not reconstruct
+   `zsock_set_zap_domain`, `s_authenticate_plain`, or CZMQ password-table
+   implementation source.
+
+### Task A563: Pin ZMQ endpoint/cvar literal boundary [COMPLETED]
+Priority: High
+Primary areas: `src/code/server/sv_zmq.c`,
+`tests/test_platform_services.py`, `tests/test_server_full_parity_gate.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_661.md`
+Parity estimate: **before 94% -> after 98%** for focused ZMQ
+cvar/endpoint literal-boundary confidence, and **before 97.6% -> after
+97.7%** for focused ZMQ wiring/source reconstruction confidence. Repo-wide
+parity remains **99%** because this pass closes a local retained ZMQ
+literal-source-shape gap without changing the strict-retail Windows
+replacement score.
+
+Completed work:
+
+1. Rechecked the retail ZMQ cvar names, defaults, endpoint format strings,
+   stats net fallback path, and bind-result strings against Binary Ninja HLIL,
+   Ghidra function rows, aliases, retail string anchors, and current source.
+2. Added named source constants for the ZMQ cvar family, default cvar strings,
+   endpoint format, parsed IPv4 format, bind-result print formats, and
+   password-update message.
+3. Routed `idZMQ_RegisterCvarsAndInitRcon`, endpoint resolution, bind logging,
+   and password-update logging through those constants while preserving runtime
+   output.
+4. Added a focused Round 661 parity gate and wired it into the SV-G02 server
+   parity report.
+5. Preserved the external libzmq/CZMQ boundary: this pass names Quake
+   Live-owned integration literals and does not reconstruct or vendor
+   libzmq/CZMQ implementation source.
+
+### Task A562: Pin ZMQ password PLAIN notification boundary [COMPLETED]
+Priority: High
+Primary areas: `src/code/server/sv_zmq.c`,
+`tests/test_platform_services.py`, `tests/test_server_full_parity_gate.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_660.md`
+Parity estimate: **before 93% -> after 98%** for focused password PLAIN
+notification/source-boundary confidence, and **before 97.5% -> after 97.6%**
+for focused ZMQ wiring/source reconstruction confidence. Repo-wide parity
+remains **99%** because this pass closes a local retained ZMQ password/auth
+evidence gap without changing the strict-retail Windows replacement score.
+
+Completed work:
+
+1. Rechecked the retail password-file writer, password apply/update paths, and
+   `zauth` PLAIN authenticator against Binary Ninja HLIL, Ghidra function rows,
+   aliases, retail string anchors, and current source.
+2. Pinned the `stats_stats=%s\n`, `rcon_rcon=%s\n`, `PLAIN`, and `%s_%s`
+   constants that define the retail password-file and CZMQ `zauth` lookup
+   boundary.
+3. Added named source constants for the password-record formats and auth-key
+   format, then routed `idZMQ_WritePasswordFile` through those constants while
+   keeping emitted records unchanged.
+4. Added a focused Round 660 parity gate and wired it into the SV-G02 server
+   parity report.
+5. Preserved the external libzmq/CZMQ boundary: SRP does not reconstruct
+   `zstr_sendx`, `zsock_wait`, `s_authenticate_plain`, or CZMQ password-table
+   implementation source.
+
+### Task A561: Pin ZMQ auth actor VERBOSE handshake boundary [COMPLETED]
+Priority: High
+Primary areas: `src/code/server/sv_zmq.c`,
+`tests/test_platform_services.py`, `tests/test_server_full_parity_gate.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_659.md`
+Parity estimate: **before 92% -> after 98%** for focused auth actor
+handshake/source-boundary confidence, and **before 97.4% -> after 97.5%**
+for focused ZMQ wiring/source reconstruction confidence. Repo-wide parity
+remains **99%** because this pass closes a local retained ZMQ actor-handshake
+evidence gap without changing the strict-retail Windows replacement score.
+
+Completed work:
+
+1. Rechecked the retail shared auth actor setup in the RCON and stats init
+   paths against Binary Ninja HLIL, Ghidra function rows, aliases, and current
+   source.
+2. Pinned the `zactor_new(zauth, 0)` -> `VERBOSE` -> `zstr_sendx` ->
+   `zsock_wait` -> `idZMQ_ApplyPasswords` sequence as the retail actor
+   handshake boundary.
+3. Added source constants for the retail actor commands and `zactor.c`
+   provenance lines while preserving SRP's manual ZAP REP socket as the
+   external-libzmq stand-in.
+4. Added a focused Round 659 parity gate and wired it into the SV-G02 server
+   parity report.
+5. Preserved the external libzmq/CZMQ boundary: SRP does not reconstruct
+   `zactor`, `zauth`, `zstr_sendx`, or `zsock_wait` implementation source.
+
+### Task A560: Pin ZMQ checked zsock lifecycle provenance [COMPLETED]
+Priority: High
+Primary areas: `src/code/server/sv_zmq.c`,
+`tests/test_platform_services.py`, `tests/test_server_full_parity_gate.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_658.md`
+Parity estimate: **before 91% -> after 98%** for focused checked zsock
+lifecycle provenance confidence, and **before 97.3% -> after 97.4%** for
+focused ZMQ wiring/source reconstruction confidence. Repo-wide parity remains
+**99%** because this pass closes a local retained ZMQ socket-lifecycle
+provenance gap without changing the strict-retail Windows replacement score.
+
+Completed work:
+
+1. Rechecked the retail `zsock_new_checked` and `zsock_destroy_checked` call
+   sites around stats PUB and RCON ROUTER lifecycle ownership against Binary
+   Ninja HLIL, Ghidra function rows, aliases, and current source.
+2. Added explicit source constants for `zmq\\id_zmq.cpp` and the four retail
+   checked zsock source lines: stats create `0x5c`, stats destroy `0x73`,
+   RCON create `0xc7`, and RCON destroy `0xe2`.
+3. Added a focused Round 658 parity gate and wired it into the SV-G02 server
+   parity report.
+4. Preserved the external libzmq/CZMQ boundary: SRP keeps using dynamic libzmq
+   symbols and does not reconstruct `zsock_new_checked`,
+   `zsock_destroy_checked`, or CZMQ source.
+
+### Task A559: Pin retained idZMQ object layout boundary [COMPLETED]
+Priority: High
+Primary areas: `src/code/server/sv_zmq.c`,
+`tests/test_platform_services.py`, `tests/test_server_full_parity_gate.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_657.md`
+Parity estimate: **before 90% -> after 98%** for focused retained `idZMQ`
+layout/source-boundary confidence, and **before 97.2% -> after 97.3%** for
+focused ZMQ wiring/source reconstruction confidence. Repo-wide parity remains
+**99%** because this pass closes a local retained object-layout evidence gap
+without changing the strict-retail Windows replacement score.
+
+Completed work:
+
+1. Rechecked the retained `idZMQ` data object at `data_5756fc`, the
+   `idZMQ::vftable` row, and the slot band through `data_575714` against
+   Binary Ninja HLIL, Ghidra symbols, aliases, and current source.
+2. Documented the portable boundary between retail C++ object mechanics and
+   SRP's C representation: auth actor, stats PUB socket, RCON socket,
+   resolved RCON poll socket, and peer-table storage are represented as
+   `idZMQ_t` fields without reconstructing the C++ vtable or MSVC
+   `std::tree` ABI.
+3. Added a focused Round 657 parity gate and wired it into the SV-G02 server
+   parity report.
+4. Preserved the external libzmq runtime boundary; no libzmq/CZMQ source or
+   binary payload was added under `src/libs/libzmq`.
+
+### Task A558: Reconstruct ZMQ public wrapper method-owner split [COMPLETED]
+Priority: High
+Primary areas: `src/code/server/sv_zmq.c`,
+`tests/test_platform_services.py`, `tests/test_server_full_parity_gate.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_656.md`
+Parity estimate: **before 88% -> after 97%** for focused ZMQ public-wrapper
+method-owner source-shape confidence, and **before 97.0% -> after 97.2%**
+for focused ZMQ wiring/source reconstruction confidence. Repo-wide parity
+remains **99%** because this pass closes a local retained ZMQ source-shape gap
+without changing the strict-retail Windows replacement score.
+
+Completed work:
+
+1. Rechecked the retail public ZMQ wrappers around `sub_4F4130`,
+   `sub_4F4140`, `sub_4F43A0`, `sub_4F4E10`, `sub_4F4E40`,
+   `sub_4F4E60`, and `sub_4F4FD0` against Binary Ninja HLIL, Ghidra
+   function rows, aliases, and current source.
+2. Split the reconstructed source into retained static `idZMQ_*` method
+   owners plus thin public `Zmq_*` wrappers that preserve the stable
+   `server.h` API while matching the retail `&data_5756fc` receiver shape.
+3. Added a focused Round 656 parity gate and wired it into the SV-G02 server
+   parity report.
+4. Preserved the external libzmq runtime boundary: `src/libs/libzmq` remains a
+   README-only drop location and no libzmq/CZMQ source was reconstructed.
+
+### Task A557: Map ZMQ RCON peer tree iterator boundary [COMPLETED]
+Priority: High
+Primary areas: `tests/test_platform_services.py`,
+`tests/test_server_full_parity_gate.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_655.md`
+Parity estimate: **before 93% -> after 98%** for focused ZMQ RCON peer
+iterator/container-boundary confidence, and **before 96.9% -> after 97.0%**
+for focused ZMQ wiring/source reconstruction confidence. Repo-wide parity
+remains **99%** because this pass closes a local retained ZMQ
+mapping/source-boundary gap without changing the strict-retail Windows
+replacement score.
+
+Completed work:
+
+1. Rechecked the RCON peer `std::tree` support cluster around `sub_4F3E30`,
+   `sub_4F3E50`, `sub_4F3E70`, `sub_4F3EC0`, `sub_4F4150`, `sub_4F41B0`,
+   `sub_4F43B0`, and `sub_4F4410` against Binary Ninja HLIL, Ghidra function
+   rows, aliases, and current source.
+2. Pinned those helpers as MSVC container/iterator scaffolding around the
+   Quake Live-owned RCON peer table rather than libzmq/CZMQ implementation
+   code.
+3. Documented the portable SRP tree/list boundary: `idZMQ_InsertRconPeer`,
+   `idZMQ_LinkRconPeerInOrder`, `idZMQ_LeftmostRconPeer`,
+   `idZMQ_EraseRconPeer`, and `idZMQ_EraseRconPeerRange` preserve the peer
+   lookup/in-order traversal behavior without reconstructing `std::tree`.
+4. Added a focused Round 655 parity gate and wired it into the SV-G02 server
+   parity report while preserving the external libzmq runtime boundary.
+
+### Task A556: Reconstruct ZMQ peer destructor/runtime split [COMPLETED]
+Priority: High
+Primary areas: `src/code/server/sv_zmq.c`,
+`tests/test_platform_services.py`,
+`tests/test_server_full_parity_gate.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_654.md`
+Parity estimate: **before 90% -> after 98%** for focused ZMQ
+runtime-shutdown versus peer-table destructor confidence, and **before 96.8%
+-> after 96.9%** for focused ZMQ wiring/source reconstruction confidence.
+Repo-wide parity remains **99%** because this pass closes a local retained ZMQ
+lifecycle source-shape gap without changing the strict-retail Windows
+replacement score.
+
+Completed work:
+
+1. Rechecked `sub_4F3DF0`, `sub_4F4E80`, `sub_4F4FE0`, and `sub_4F5080`
+   against Binary Ninja HLIL, Ghidra function rows, aliases, existing mapping
+   notes, and current source.
+2. Separated the retail runtime shutdown owner from the peer-table
+   destructor/range-erasure owner: `Zmq_ShutdownRuntime` now closes only the
+   RCON/auth/context side and no longer clears retained RCON peers.
+3. Added a portable `idZMQ_Destroy` analogue for the already mapped
+   `sub_4F5080` destructor seam, routing explicit disabled-RCON peer cleanup
+   through the existing `idZMQ_ClearRconPeers` /
+   `idZMQ_EraseRconPeerRange` chain.
+4. Added a focused Round 654 parity gate and wired it into the SV-G02 server
+   parity report while preserving the external libzmq runtime boundary.
+
+### Task A555: Reconstruct ZMQ shutdown owner split [COMPLETED]
+Priority: High
+Primary areas: `src/code/server/sv_zmq.c`,
+`tests/test_platform_services.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_653.md`
+Parity estimate: **before 91% -> after 98%** for focused ZMQ shutdown-owner
+split confidence, and **before 96.7% -> after 96.8%** for focused ZMQ
+wiring/source reconstruction confidence. Repo-wide parity remains **99%**
+because this pass closes a local retained ZMQ shutdown ownership source-shape
+gap without changing the strict-retail Windows replacement score.
+
+Completed work:
+
+1. Rechecked stats/runtime shutdown around `sub_4F3DD0`, `sub_4F3DF0`,
+   `sub_4F5190`, and `sub_4F5B50` against Binary Ninja HLIL, Ghidra function
+   rows, aliases, retail strings, and current source.
+2. Mapped the retail split where stats PUB shutdown is isolated in
+   `sub_4F3DD0`, while runtime shutdown in `sub_4F3DF0` owns only the RCON
+   socket, resolved RCON poll slot, and auth actor.
+3. Removed the internal `Zmq_ShutdownStatsPublisher()` call from
+   `Zmq_ShutdownRuntime`, preserving caller ownership through `SV_Shutdown`
+   for stats and `Com_Shutdown` for runtime teardown.
+4. Added a focused parity gate and Round 653 mapping note while preserving the
+   external libzmq runtime boundary.
+
+### Task A554: Reconstruct ZMQ auth-gated password apply [COMPLETED]
+Priority: High
+Primary areas: `src/code/server/sv_zmq.c`,
+`tests/test_platform_services.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_652.md`
+Parity estimate: **before 92% -> after 98%** for focused ZMQ auth-gated
+password-file refresh confidence, and **before 96.6% -> after 96.7%** for
+focused ZMQ wiring/source reconstruction confidence. Repo-wide parity remains
+**99%** because this pass closes a local retained ZMQ auth/password lifecycle
+source-shape gap without changing the strict-retail Windows replacement score.
+
+Completed work:
+
+1. Rechecked the password apply/update path around `sub_4D2460`,
+   `sub_4F3D70`, `sub_4F3F20`, `sub_4F3F80`, and `sub_4F4210` against Binary
+   Ninja HLIL, Ghidra function rows, aliases, retail strings, and current
+   source.
+2. Mapped the retail branch where password cvar revision snapshots update
+   before the auth actor check, but password-file writes and `PLAIN` actor
+   notification occur only when the retained auth actor slot exists.
+3. Updated portable `idZMQ_ApplyPasswords` to require `authActorReady` before
+   writing `zmqpass.txt`, while preserving the post-bind apply call in
+   `idZMQ_EnsureAuthSocket`.
+4. Added a focused parity gate and Round 652 mapping note while preserving the
+   external libzmq runtime boundary.
+
+### Task A553: Reconstruct ZMQ auth actor ready shutdown wiring [COMPLETED]
+Priority: High
+Primary areas: `src/code/server/sv_zmq.c`,
+`tests/test_platform_services.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_651.md`
+Parity estimate: **before 90% -> after 98%** for focused ZMQ auth actor ready
+state and shutdown-order confidence, and **before 96.5% -> after 96.6%** for
+focused ZMQ wiring/source reconstruction confidence. Repo-wide parity remains
+**99%** because this pass closes a local ZMQ runtime ownership source-shape gap
+without changing the strict-retail Windows replacement score.
+
+Completed work:
+
+1. Rechecked the shared auth actor setup/shutdown path around `sub_4F3D70`,
+   `sub_4F3DF0`, `sub_4F3F80`, `sub_4F4210`, `sub_4F5630`, `sub_4F5A30`,
+   `sub_4F5B50`, and `sub_4F5DB0` against Binary Ninja HLIL, Ghidra function
+   rows, aliases, retail strings, and current source.
+2. Mapped the retail `this + 0x04` auth actor slot as a shared owner created by
+   both RCON and stats setup before socket creation.
+3. Added portable `authActorReady` state, applied passwords after the manual ZAP
+   socket is first bound, gated the auth pump on the ready state, and cleared
+   that state with auth shutdown.
+4. Reordered runtime shutdown so the RCON socket and resolved poll slot are
+   cleared before the shared auth owner, while preserving the external libzmq
+   runtime boundary.
+
+### Task A552: Reconstruct ZMQ RCON resolved poll slot [COMPLETED]
+Priority: High
+Primary areas: `src/code/server/sv_zmq.c`,
+`tests/test_platform_services.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_650.md`
+Parity estimate: **before 90% -> after 98%** for focused ZMQ RCON
+resolved-poll-slot confidence, and **before 96.4% -> after 96.5%** for focused
+ZMQ wiring/source reconstruction confidence. Repo-wide parity remains **99%**
+because this pass closes a local RCON pump source-shape gap without changing
+the strict-retail Windows replacement score.
+
+Completed work:
+
+1. Rechecked the RCON setup/pump split around `sub_4F3F80`, `sub_4F4ED0`,
+   `sub_4F4FD0`, `sub_4F56B0`, and `sub_401600` against Binary Ninja HLIL,
+   Ghidra function rows, aliases, retail strings, and current source.
+2. Mapped the retail `this + 0x0c` RCON wrapper slot and `this + 0x10`
+   resolved poll slot split after the bind-result log path.
+3. Added portable `rconPollSocket` state, populated it after RCON bind logging,
+   used it for the `Zmq_PumpRcon` poll gate/item, and kept frame reads on the
+   retained RCON socket.
+4. Added a focused parity gate and Round 650 mapping note while preserving the
+   external libzmq runtime boundary.
+
+### Task A551: Reconstruct ZMQ bind-failure socket retention [COMPLETED]
+Priority: High
+Primary areas: `src/code/server/sv_zmq.c`,
+`tests/test_platform_services.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_649.md`
+Parity estimate: **before 89% -> after 97%** for focused ZMQ bind-failure
+retained-slot confidence, and **before 96.3% -> after 96.4%** for focused ZMQ
+wiring/source reconstruction confidence. Repo-wide parity remains **99%**
+because this pass closes a local setup source-shape gap without changing the
+strict-retail Windows replacement score.
+
+Completed work:
+
+1. Rechecked the RCON and stats socket setup paths around `sub_4F3F80`,
+   `sub_4F4210`, `sub_4F5100`, `sub_4F5200`, and `sub_4F56B0` against Binary
+   Ninja HLIL, Ghidra function rows, aliases, retail strings, and current
+   source.
+2. Mapped the retail ordering where RCON and stats socket objects are stored in
+   their retained `idZMQ` slots before `zsock_bind` is called.
+3. Updated `idZMQ_EnsureRconSocket` and `idZMQ_EnsureStatsPublisher` so bind
+   failures log the retail error messages while retaining the created socket
+   slot instead of closing it inside the bind-error branch.
+4. Added a focused parity gate and Round 649 mapping note while preserving the
+   external libzmq runtime boundary.
+
+### Task A550: Reconstruct ZMQ stats endpoint net_ip fallback [COMPLETED]
+Priority: High
+Primary areas: `src/code/server/sv_zmq.c`,
+`tests/test_platform_services.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_648.md`
+Parity estimate: **before 88% -> after 97%** for focused ZMQ stats endpoint
+fallback-host confidence, and **before 96.2% -> after 96.3%** for focused ZMQ
+wiring/source reconstruction confidence. Repo-wide parity remains **99%**
+because this pass closes a local stats endpoint source-shape gap without
+changing the strict-retail Windows replacement score.
+
+Completed work:
+
+1. Rechecked the stats PUB endpoint host path around `sub_4F4210` and
+   `sub_4F43A0` against Binary Ninja HLIL, Ghidra function rows, aliases,
+   cvar flag definitions, and the existing Windows `NET_OpenIP` cvar pattern.
+2. Mapped the empty-`zmq_stats_ip` branch where retail reads `net_ip` with
+   default `"localhost"` and `CVAR_LATCH`, parses it through the engine address
+   parser, and formats the address bytes as a dotted host string.
+3. Updated `idZMQ_ResolveStatsHost` to preserve explicit `zmq_stats_ip` values
+   while replacing the old raw-string `net_ip` fallback with the retail
+   parse-and-format source shape.
+4. Added a focused parity gate and Round 648 mapping note while preserving the
+   external libzmq runtime boundary.
+
+### Task A549: Reconstruct ZMQ RCON broadcast null-payload behavior [COMPLETED]
+Priority: High
+Primary areas: `src/code/server/sv_zmq.c`,
+`tests/test_platform_services.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_647.md`
+Parity estimate: **before 93% -> after 98%** for focused ZMQ RCON broadcast
+payload-normalization confidence, and **before 96.1% -> after 96.2%** for
+focused ZMQ wiring/source reconstruction confidence. Repo-wide parity remains
+**99%** because this pass closes a local RCON broadcast source-shape gap
+without changing the strict-retail Windows replacement score.
+
+Completed work:
+
+1. Rechecked the RCON broadcast wrapper/payload path around `sub_4F4D40`,
+   `sub_4F4E60`, and `sub_4F5D60` against Binary Ninja HLIL, Ghidra function
+   rows, aliases, and current console-print wiring.
+2. Mapped the embedded `zstr_send` behavior where a null payload pointer is
+   substituted with the retail empty-string storage before send.
+3. Updated `Zmq_BroadcastRconOutput` to normalize null messages to an empty
+   payload and removed the non-retail empty-message early return while
+   preserving socket, peer, send-symbol, and recursion guards.
+4. Added a focused parity gate and Round 647 mapping note pinning the
+   null-to-empty broadcast behavior while preserving the external libzmq
+   runtime boundary.
+
+### Task A548: Reconstruct ZMQ RCON broadcast disconnect branch [COMPLETED]
+Priority: High
+Primary areas: `src/code/server/sv_zmq.c`,
+`tests/test_platform_services.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_646.md`
+Parity estimate: **before 91% -> after 98%** for focused ZMQ RCON broadcast
+branch confidence, and **before 95.9% -> after 96.1%** for focused ZMQ
+wiring/source reconstruction confidence. Repo-wide parity remains **99%**
+because this pass closes a local RCON broadcast ownership gap without changing
+the strict-retail Windows replacement score.
+
+Completed work:
+
+1. Rechecked retail `idZMQ_BroadcastRconOutput` at `sub_4F4D40` against
+   Binary Ninja HLIL, Ghidra function rows, aliases, retail strings, and the
+   current portable RCON broadcast source.
+2. Mapped the branch split where `zstr_sendm` sends the RCON peer identity as
+   the multipart prefix and controls peer disconnect/erase, while `zstr_send`
+   sends the console-output body after the prefix succeeds.
+3. Updated `Zmq_BroadcastRconOutput` so failed identity-prefix sends erase and
+   log disconnected peers, while the message-frame send no longer drives that
+   disconnect branch.
+4. Added a focused parity gate and Round 646 mapping note pinning the
+   broadcast send/erase branch while preserving the external libzmq runtime
+   boundary.
+
+### Task A547: Reconstruct ZMQ RCON frame pump as poll-only [COMPLETED]
+Priority: High
+Primary areas: `src/code/server/sv_zmq.c`,
+`tests/test_platform_services.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_645.md`
+Parity estimate: **before 92% -> after 98%** for focused ZMQ RCON frame-pump
+source-shape confidence, and **before 95.7% -> after 95.9%** for focused ZMQ
+wiring/source reconstruction confidence. Repo-wide parity remains **99%**
+because this pass closes a local lifecycle ownership gap without changing the
+strict-retail Windows replacement score.
+
+Completed work:
+
+1. Rechecked the RCON setup/pump split around `sub_4F3F80`, `sub_4F4140`,
+   `sub_4F4ED0`, and `sub_4F4FD0` against Binary Ninja HLIL, Ghidra function
+   rows, aliases, retail strings, and current server-frame wiring.
+2. Mapped startup RCON creation to `Zmq_RegisterCvarsAndInitRcon` /
+   `idZMQ_EnsureRconSocket`, while the frame wrapper only polls the retained
+   socket at the object-owned RCON slot.
+3. Updated `idZMQ_PumpAuthSocket` and `Zmq_PumpRcon` so the frame path no
+   longer creates auth/runtime/RCON sockets as a side effect.
+4. Added a focused parity gate and Round 645 mapping note pinning the
+   init-vs-frame lifecycle split while preserving the external libzmq runtime
+   boundary.
+
+### Task A546: Reconstruct ZMQ stats init idempotent wrapper [COMPLETED]
+Priority: High
+Primary areas: `src/code/server/sv_zmq.c`,
+`tests/test_platform_services.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_644.md`
+Parity estimate: **before 93% -> after 98%** for focused ZMQ stats init
+wrapper/source-shape confidence, and **before 95.5% -> after 95.7%** for
+focused ZMQ wiring/source reconstruction confidence. Repo-wide parity remains
+**99%** because this pass closes a local lifecycle ownership gap without
+changing the strict-retail Windows replacement score.
+
+Completed work:
+
+1. Rechecked the retail stats PUB init/shutdown path around `sub_4F4210`,
+   `sub_4F43A0`, and `sub_4F3DD0` against Binary Ninja HLIL, Ghidra function
+   rows, existing aliases, retail strings, and current server-spawn wiring.
+2. Mapped `Zmq_InitStatsPublisher` as a thin wrapper into the retained
+   initializer, while `idZMQ_InitStatsPublisher` creates the PUB socket only
+   when stats publication is enabled and the retained socket slot is empty.
+3. Removed the non-retail forced stats transcript close and PUB socket close
+   from `Zmq_InitStatsPublisher`; shutdown and disabled-mode handling remain
+   the close owners.
+4. Added a focused parity gate and Round 644 mapping note pinning the
+   idempotent init wrapper while preserving the external libzmq runtime
+   boundary.
+
+### Task A545: Reconstruct ZMQ password-refresh actor wiring [COMPLETED]
+Priority: High
+Primary areas: `src/code/server/sv_zmq.c`,
+`references/analysis/quakelive_symbol_aliases.json`,
+`tests/test_platform_services.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_643.md`
+Parity estimate: **before 91% -> after 98%** for focused ZMQ
+password-refresh actor/source-shape confidence, and **before 95.3% -> after
+95.5%** for focused ZMQ wiring/source reconstruction confidence. Repo-wide
+parity remains **99%** because this pass closes a local lifecycle ownership
+gap without changing the strict-retail Windows replacement score.
+
+Completed work:
+
+1. Rechecked the retail password-refresh path around `sub_4D2460`,
+   `sub_4F3D70`, `sub_4F3F20`, and `sub_4F4130` against Binary Ninja HLIL,
+   Ghidra function rows, existing aliases, retail strings, and the current
+   portable source.
+2. Added the `sub_4D2460 -> idZMQ_WritePasswordFile` alias for the retained
+   ZMQ password-file writer that emits `stats_stats=%s\n` and
+   `rcon_rcon=%s\n`.
+3. Reconstructed the portable password-refresh hook so it refreshes the
+   password file without closing/recreating RCON, PUB, or auth sockets; socket
+   lifecycle remains with the retail-aligned init/shutdown owners.
+4. Added a focused parity gate and Round 643 mapping note pinning the
+   password refresh vs socket lifecycle split while preserving the external
+   libzmq runtime boundary.
+
+### Task A544: Reconstruct ZMQ publication socket lifecycle ownership [COMPLETED]
+Priority: High
+Primary areas: `src/code/server/sv_zmq.c`,
+`tests/test_platform_services.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_642.md`
+Parity estimate: **before 90% -> after 97%** for focused ZMQ publication
+socket lifecycle confidence, and **before 95.1% -> after 95.3%** for focused
+ZMQ wiring/source reconstruction confidence. Repo-wide parity remains **99%**
+because this pass closes a local lifecycle ownership gap without changing the
+strict-retail Windows replacement score.
+
+Completed work:
+
+1. Rechecked the retail stats-publication lifecycle around `sub_4F4210`,
+   `sub_4F43A0`, `sub_4F4B20`, and `sub_4F4C30` against Binary Ninja HLIL,
+   Ghidra function rows, existing aliases, retail strings, and the current
+   portable source.
+2. Mapped the split where `idZMQ_InitStatsPublisher` creates the stats PUB
+   socket at `this + 8`, while `idZMQ_ReportPlayerEvent` and
+   `idZMQ_SubmitMatchReport` only publish when that existing socket is present.
+3. Removed the lazy `idZMQ_EnsureStatsPublisher()` call from `idZMQ_Publish`,
+   keeping socket creation in `Zmq_InitStatsPublisher` while preserving the
+   source fallback transcript write for policy-disabled or runtime-unavailable
+   builds.
+4. Added a focused parity gate and Round 642 mapping note pinning the
+   create-vs-send ownership split and the default-disabled live ZMQ policy.
+
+### Task A543: Reconstruct ZMQ player-event type forwarding [COMPLETED]
+Priority: High
+Primary areas: `src/code/server/sv_zmq.c`,
+`tests/test_platform_services.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_641.md`
+Parity estimate: **before 93% -> after 98%** for focused ZMQ player-event
+wrapper source-shape confidence, and **before 94.9% -> after 95.1%** for
+focused ZMQ wiring/source reconstruction confidence. Repo-wide parity remains
+**99%** because this pass closes a local publication wrapper gap without
+changing the strict-retail Windows replacement score.
+
+Completed work:
+
+1. Rechecked the retail `SV_ReportPlayerEvent -> Zmq_ReportPlayerEvent ->
+   idZMQ_ReportPlayerEvent` chain against Binary Ninja HLIL, Ghidra function
+   rows, existing aliases, retail string evidence, and the current portable
+   source.
+2. Mapped the `sub_4F4E10` wrapper that forwards `arg1` directly as the event
+   type and `arg2` as the event data into the retained `idZMQ` publisher.
+3. Updated `Zmq_ReportPlayerEvent` to pass `eventName` directly into
+   `idZMQ_Publish`, removing the non-retail `"UNKNOWN_EVENT"` substitution
+   while keeping a safe missing-type no-op inside the common C publisher.
+4. Added a focused parity gate and Round 641 mapping note pinning dynamic
+   player-event `TYPE` forwarding alongside the hardcoded `MATCH_REPORT`
+   companion path and the default-disabled live ZMQ policy.
+
+### Task A542: Reconstruct ZMQ RCON first-message connection gate [COMPLETED]
+Priority: High
+Primary areas: `src/code/server/sv_zmq.c`,
+`tests/test_platform_services.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_640.md`
+Parity estimate: **before 92% -> after 98%** for focused RCON first-message
+source-shape confidence, and **before 94.7% -> after 94.9%** for focused ZMQ
+wiring/source reconstruction confidence. Repo-wide parity remains **99%**
+because this pass closes a local ZMQ behavior gap without changing the
+strict-retail Windows replacement score.
+
+Completed work:
+
+1. Rechecked the owning retail `quakelive_steam.exe` RCON pump against Binary
+   Ninja HLIL, Ghidra function rows, existing aliases, retail strings, and the
+   current portable `sv_zmq.c` source.
+2. Mapped the `sub_4F4ED0` branch where a previously unseen ROUTER identity
+   logs `zmq RCON client connected: %s\n`, inserts the peer, frees the command
+   string, and returns before command execution.
+3. Updated `Zmq_PumpRcon` so first contact from a new RCON peer registers the
+   peer without executing that first payload; known peers still log and execute
+   commands through `Cmd_ExecuteString`.
+4. Added a focused parity gate and Round 640 mapping note pinning the
+   connection-vs-command split while preserving the external libzmq runtime
+   boundary and default-disabled live ZMQ policy.
+
+### Task A541: Pin libzmq as external runtime dependency [COMPLETED]
+Priority: High
+Primary areas: `src/code/quakelive_steam.vcxproj`, `src/libs/libzmq/README.md`,
+`.gitignore`, `README.md`, `BUILD.md`,
+`docs/reverse-engineering/zmq-dependency-ownership-2026-06-06.md`,
+`tests/test_platform_services.py`
+Parity estimate: **before 92% -> after 98%** for focused ZMQ dependency
+installation/source-boundary confidence, and **before 94.6% -> after 94.7%**
+for focused ZMQ wiring/source reconstruction confidence. Repo-wide parity
+remains **99%** because this pass clarifies dependency packaging and prevents
+third-party source drift without changing the strict-retail Windows replacement
+score.
+
+Completed work:
+
+1. Rechecked the retail `quakelive_steam.exe` evidence and current source
+   boundary: retail embeds a libzmq/CZMQ-derived implementation, while SRP
+   writable source should keep only the Quake Live-owned `idZMQ` integration.
+2. Added a README-only `src/libs/libzmq/` runtime-drop convention for local
+   `libzmq.dll` installs, with `.gitignore` keeping DLLs, import libraries,
+   symbols, and any source drops untracked.
+3. Added MSBuild `ZMQ_RUNTIME_DIR` / `ZmqRuntimeDir` handling, optional
+   `QLRequireZmqRuntime` validation, and copy-to-output support without adding
+   `zmq.h`, `libzmq.lib`, or vendored libzmq source to the project.
+4. Updated docs and the focused ZMQ dependency regression so future work keeps
+   embedded retail libzmq mappings as evidence rather than a directive to
+   reconstruct third-party library internals under `src/code`.
+
+### Task A540: Reconstruct ZMQ ZAP/PLAIN auth source shape [COMPLETED]
+Priority: High
+Primary areas: `src/code/server/sv_zmq.c`,
+`tests/test_platform_services.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_639.md`
+Parity estimate: **before 97% -> after 98%** for focused ZAP/PLAIN auth
+source-shape confidence, and **before 94.4% -> after 94.6%** for focused ZMQ
+wiring/source reconstruction confidence. Repo-wide parity remains **99%**
+because this pass closes a local ZMQ evidence/source-shape freshness gap
+without changing the strict-retail Windows replacement score.
+
+Completed work:
+
+1. Rechecked the owning retail `quakelive_steam.exe` ZMQ auth setup against
+   Binary Ninja HLIL, Ghidra function rows, existing aliases, string-table
+   evidence, and prior ZMQ/CZMQ mapping rounds.
+2. Named the portable source ZAP frame contract for version `1.0`,
+   `NULL`/`PLAIN` mechanisms, `200`/`400` status codes, and the retail
+   `No access` denial text.
+3. Added `idZMQ_GetPlainCredentials` so the manual ZAP REP socket maps RCON and
+   stats domains through the same retained password buckets as the retail
+   `rcon_rcon` and `stats_stats` auth keys.
+4. Added a focused parity gate and Round 639 mapping note pinning the retail
+   `zauth` actor evidence, the SRP manual ZAP REP socket boundary, and the
+   default-disabled live ZMQ policy.
+
+### Task A539: Reconstruct ZMQ RCON peer helper source shape [COMPLETED]
+Priority: High
+Primary areas: `src/code/server/sv_zmq.c`,
+`tests/test_platform_services.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_638.md`
+Parity estimate: **before 95% -> after 97%** for focused `idZMQ` RCON peer
+helper source-shape confidence, and **before 94.2% -> after 94.4%** for
+focused ZMQ wiring/source reconstruction confidence. Repo-wide parity remains
+**99%** because this pass closes a local source-shape freshness gap without
+changing the strict-retail Windows replacement score.
+
+Completed work:
+
+1. Rechecked the owning retail `quakelive_steam.exe` evidence for the retained
+   `idZMQ` RCON peer-table helper band against metadata, Ghidra function rows,
+   existing aliases, Binary Ninja HLIL, prior ZMQ mapping rounds, and the
+   current source.
+2. Added `idZMQ_AllocRconPeer` as the portable source analogue for the retail
+   `sub_4F4640` peer-node creation seam.
+3. Added `idZMQ_EraseRconPeerRange` and routed `idZMQ_ClearRconPeers` through
+   it, preserving the retail full-range fast path and narrowed erasure shape
+   while retaining SRP's portable tree/list representation.
+4. Added a focused parity gate and Round 638 mapping note pinning the helper
+   split, HLIL anchors, source reconstruction, and default-disabled live ZMQ
+   policy boundary.
+
+### Task A538: Pin qagame static and motion mover constructor mapping [COMPLETED]
+Priority: High
+Primary areas: `src/code/game/g_mover.c`, `src/code/game/g_spawn.c`,
+`references/analysis/quakelive_symbol_aliases.json`,
+`references/symbol-maps/qagame.json`,
+`tests/test_qagame_mover_static_motion_parity.py`,
+`docs/reverse-engineering/qagame-mover-static-motion-reconstruction-2026-06-15.md`
+Parity estimate: **before 86% -> after 99%** for focused `g_mover.c`
+`func_static`, `func_rotating`, `func_bobbing`, and `func_pendulum`
+constructor mapping coverage, and **before 97% -> after 99%** for focused
+source reconstruction confidence. Repo-wide parity remains **99%** because
+this pass tightens a local qagame mover evidence freshness gap without changing
+the strict-retail Windows replacement score.
+
+Completed work:
+
+1. Rechecked the owning retail `qagamex86.dll` evidence for the contiguous
+   `0x10060AA0` through `0x10060D50` static/motion mover constructor band
+   against metadata/import/export context, Ghidra function rows, Binary Ninja
+   HLIL, symbol-map rows, the spawn table, and the current source.
+2. Promoted the missing qagame aliases for `SP_func_static`,
+   `SP_func_rotating`, `SP_func_bobbing`, and `SP_func_pendulum`.
+3. Added a focused parity gate pinning static mover origin mirroring, rotating
+   axis selection, bobbing sine motion setup, pendulum frequency/duration
+   setup, committed Ghidra sizes where available, representative HLIL anchors,
+   and retail spawn-table ordering.
+4. Published the reconstruction note for the qagame static and motion mover
+   constructor band.
+
+### Task A537: Pin qagame mover plat, button, and train mapping [COMPLETED]
+Priority: High
+Primary areas: `src/code/game/g_mover.c`, `src/code/game/g_spawn.c`,
+`references/analysis/quakelive_symbol_aliases.json`,
+`references/symbol-maps/qagame.json`,
+`tests/test_qagame_mover_plat_button_train_parity.py`,
+`docs/reverse-engineering/qagame-mover-plat-button-train-reconstruction-2026-06-15.md`
+Parity estimate: **before 83% -> after 99%** for focused `g_mover.c`
+platform, button, path-corner, and train mapping coverage, and **before 97%
+-> after 99%** for focused source reconstruction confidence. Repo-wide parity
+remains **99%** because this pass tightens a local qagame mover evidence
+freshness gap without changing the strict-retail Windows replacement score.
+
+Completed work:
+
+1. Rechecked the owning retail `qagamex86.dll` evidence for the contiguous
+   `0x1005FD60` through `0x10060910` mover band against metadata/import/export
+   context, Ghidra function rows, Binary Ninja HLIL, symbol-map rows, the spawn
+   table, and the current source.
+2. Promoted the missing qagame aliases for `Touch_Plat`,
+   `Touch_PlatCenterTrigger`, `SpawnPlatTrigger`, `SP_func_plat`,
+   `Touch_ButtonKeyed`, `Touch_Button`, `SP_func_button`,
+   `Think_BeginMoving`, `Reached_Train`, `Think_SetupTrainTargets`,
+   `SP_path_corner`, and `SP_func_train`.
+3. Added a focused parity gate pinning plat trigger construction, keyed button
+   gates, button movement setup, train path linking, train wait/resume
+   behavior, committed Ghidra sizes, representative HLIL anchors, and retail
+   spawn-table ordering.
+4. Published the reconstruction note for the qagame mover plat/button/train
+   band.
+
+### Task A536: Pin qagame missile impact and proxmine core mapping [COMPLETED]
+Priority: High
+Primary areas: `src/code/game/g_missile.c`,
+`references/analysis/quakelive_symbol_aliases.json`,
+`references/symbol-maps/qagame.json`,
+`tests/test_qagame_missile_impact_proxmine_parity.py`,
+`docs/reverse-engineering/qagame-missile-impact-proxmine-reconstruction-2026-06-15.md`
+Parity estimate: **before 84% -> after 99%** for focused `g_missile.c`
+missile bounce/explosion, proxmine lifecycle, and missile impact mapping
+coverage, and **before 97% -> after 99%** for focused source reconstruction
+confidence. Repo-wide parity remains **99%** because this pass tightens a local
+qagame missile evidence freshness gap without changing the strict-retail
+Windows replacement score.
+
+Completed work:
+
+1. Rechecked the owning retail `qagamex86.dll` evidence for the contiguous
+   `0x1005B350` through `0x1005BBE0` missile impact/proxmine band against
+   metadata/import/export/function rows, Ghidra decompile hints, Binary Ninja
+   HLIL, symbol-map rows, and the current source.
+2. Promoted the missing qagame aliases for `G_BounceMissile`,
+   `G_ExplodeMissile`, `ProximityMine_Explode`, `ProximityMine_Die`,
+   `ProximityMine_Trigger`, `ProximityMine_Activate`,
+   `ProximityMine_ExplodeOnPlayer`, and `ProximityMine_Player`.
+3. Added a focused parity gate pinning bounce reflection, missile explosion,
+   proxmine trigger/activate/stick/detonation behavior, the large
+   `G_MissileImpact` branch family, committed Ghidra sizes, and representative
+   HLIL anchors.
+4. Published the reconstruction note for the qagame missile impact and
+   proxmine core.
+
+### Task A535: Pin qagame portal camera, shooter, and Portal holdable mapping [COMPLETED]
+Priority: High
+Primary areas: `src/code/game/g_misc.c`, `src/code/game/g_spawn.c`,
+`references/analysis/quakelive_symbol_aliases.json`,
+`references/symbol-maps/qagame.json`,
+`tests/test_qagame_misc_portal_shooter_parity.py`,
+`docs/reverse-engineering/qagame-g-misc-portal-shooter-reconstruction-2026-06-15.md`
+Parity estimate: **before 82% -> after 99%** for focused `g_misc.c`
+portal camera/surface, map shooter, and holdable Portal mapping coverage, and
+**before 96% -> after 99%** for focused source reconstruction confidence.
+Repo-wide parity remains **99%** because this pass tightens a local qagame
+evidence freshness gap without changing the strict-retail Windows replacement
+score.
+
+Completed work:
+
+1. Rechecked the owning retail `qagamex86.dll` evidence for the contiguous
+   `0x1005A6C0` through `0x1005B190` `g_misc.c` portal/shooter band against
+   metadata/import/export/function rows, Binary Ninja HLIL, symbol-map rows,
+   and the current source.
+2. Promoted the missing qagame aliases for `locateCamera`,
+   `SP_misc_portal_surface`, `SP_misc_portal_camera`, `Use_Shooter`,
+   `InitShooter_Finish`, `InitShooter`, the shooter spawn constructors,
+   `DropPortalDestination`, `PortalTouch`, `PortalEnable`, and
+   `DropPortalSource`.
+3. Added a focused parity gate pinning the portal surface/camera setup,
+   shooter aim/spread/weapon dispatch, holdable Portal destination/source
+   lifecycle, Ghidra sizes, HLIL anchors, and spawn-table ordering.
+4. Published the reconstruction note for the qagame portal and shooter band.
+
+### Task A534: Pin qagame tutorial tour-point spawn and finisher mapping [COMPLETED]
+Priority: High
+Primary areas: `src/code/game/g_misc.c`, `src/code/game/g_spawn.c`,
+`references/analysis/quakelive_symbol_aliases.json`,
+`references/symbol-maps/qagame.json`,
+`tests/test_qagame_tour_point_spawn_parity.py`,
+`docs/reverse-engineering/qagame-tour-point-spawn-reconstruction-2026-06-15.md`
+Parity estimate: **before 88% -> after 99%** for focused
+`info_tour_point` spawn/finish evidence coverage, and **before 96% -> after
+99%** for focused source reconstruction confidence. Repo-wide parity remains
+**99%** because this pass tightens a local qagame tutorial-entity evidence
+freshness gap without changing the strict-retail Windows replacement score.
+
+Completed work:
+
+1. Rechecked the owning retail `qagamex86.dll` evidence for
+   `FinishSpawningTourPoint` / `FUN_10059fd0` and `SP_info_tour_point` /
+   `sub_1005a1f0` against metadata/import/export/function rows, Binary Ninja
+   HLIL, symbol-map rows, and the current source.
+2. Promoted the missing qagame aliases for the tour-point finisher and
+   constructor, and corrected the symbol-map comments/string references to mark
+   both helpers source-backed.
+3. Added a focused parity gate pinning the retail overlap-hide, linked-target
+   hide, target resolution, spawnvar defaults, deferred think wiring, and
+   `info_tour_point` spawn-table dispatch.
+4. Published the reconstruction note for the tutorial tour-point spawn band.
 
 ### Task A533: Reconstruct all-gametype integration wiring [COMPLETED]
 Priority: High

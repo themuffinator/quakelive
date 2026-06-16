@@ -30,14 +30,27 @@ from `src/code/`?
 
 ## Conclusion
 
-Do not install or vendor libzmq under `src/libs/` in this pass, and do not move
-or remove `src/code/server/sv_zmq.c`.
+Do not install or vendor libzmq implementation source under `src/libs/`, and
+do not move or remove `src/code/server/sv_zmq.c`. A README-only
+`src/libs/libzmq/` runtime-drop directory is acceptable so local opted-in builds
+have a clear place for an ignored external `libzmq.dll`.
 
 The reverse-engineering corpus is reconstructing the retail embedded libzmq
 surface for naming and behavioral evidence.  The writable source is not
 hand-rolling that library under `src/code`; it is reconstructing Quake Live's
 server-owned `idZMQ` wiring and using external libzmq dynamically for opted-in
 online-service builds.
+
+The current install convention is runtime-only:
+
+- Prefer `ZMQ_RUNTIME_DIR` or the MSBuild property `ZmqRuntimeDir` when a local
+  libzmq runtime lives outside the repository.
+- For a repo-local developer drop, use
+  `src/libs/libzmq/bin/Win32/libzmq.dll`; `.gitignore` keeps that payload
+  untracked.
+- The Windows project copies `libzmq.dll` to the output directory when online
+  services are enabled and a runtime path exists, but it does not include
+  `zmq.h` or link `libzmq.lib`.
 
 ## Boundary For Future Work
 
@@ -51,6 +64,8 @@ Until then:
 
 - Keep `sv_zmq.c` in `src/code/server/` as Quake Live server integration code.
 - Do not add libzmq implementation files under `src/code/`.
+- Do not add libzmq or CZMQ source files under `src/libs/libzmq/`; that path is
+  for ignored runtime drops only.
 - Keep live transport behind `QL_BUILD_ONLINE_SERVICES`.
 - Treat the large `zmq::` alias map as retail dependency evidence, not as a
   directive to reconstruct third-party library internals in engine source.

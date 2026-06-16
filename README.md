@@ -34,7 +34,7 @@ Quake Live SRP is usable for reconstruction and compatibility testing, but it is
 | --- | --- | --- |
 | WebUI | 🟢 Implemented | Browser/UI bridge, runtime package comparison, and server-browser event paths are wired; default builds keep source-owned fallbacks where live services are disabled. |
 | Steamworks | 🟡 Partial | Native Steamworks-backed paths exist for opted-in builds, but Quake Live online services are disabled by default and do not claim live retail-service replacement. |
-| ZMQ | 🟡 Partial | Server-side publication/RCON socket-family wiring is reconstructed for opted-in builds. The repo does not vendor libzmq; opted-in live transport resolves an external runtime library, while default builds stay behind `QL_BUILD_ONLINE_SERVICES`. |
+| ZMQ | 🟡 Partial | Server-side publication/RCON socket-family wiring is reconstructed for opted-in builds. The repo does not vendor libzmq source; opted-in live transport resolves an external runtime library from `ZMQ_RUNTIME_DIR`/`ZmqRuntimeDir`, `src/libs/libzmq/bin/Win32/`, the executable folder, or `PATH`, while default builds stay behind `QL_BUILD_ONLINE_SERVICES`. |
 | Netcode | 🟢 Implemented | Challenge/connect handling, snapshots, usercmd transport, server browser protocol, and dedicated-server paths are covered by focused parity gates. |
 | Sound | 🟢 Implemented | Windows sound is active; non-Windows/null lanes are documented compatibility sinks where appropriate. |
 | Client | 🟢 Implemented | Client startup, module handoff, command routing, prediction, snapshot readback, and runtime probes are covered by current evidence. |

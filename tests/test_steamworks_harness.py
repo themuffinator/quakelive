@@ -35,9 +35,15 @@ AVATAR_SIZE_LARGE = 2
 
 PUBLIC_RETAIL_APP_ID = 282440
 REFERENCE_RETAIL_APP_ID = 0x54100
+STEAM_ERESULT_FAIL = 2
+DETAIL_TERMINAL_PING = 0x01
+DETAIL_TERMINAL_RULES = 0x02
+DETAIL_TERMINAL_PLAYERS = 0x04
+DETAIL_TERMINAL_ALL = DETAIL_TERMINAL_PING | DETAIL_TERMINAL_RULES | DETAIL_TERMINAL_PLAYERS
 
 TICKET_BUFFER = 256
 AVATAR_BUFFER = 256 * 256 * 4
+QL_STEAM_WEB_API_AUTH_TICKET_MAX_LENGTH = 2560
 QL_STEAM_NAME_LENGTH = 128
 QL_STEAM_STATUS_LENGTH = 256
 
@@ -153,6 +159,7 @@ class SteamServerBrowserDetailLifecycle(ctypes.Structure):
     _fields_ = [
         ("identity", SteamServerBrowserDetailIdentity),
         ("completedCallbacks", ctypes.c_int),
+        ("completedTerminalChannels", ctypes.c_uint32),
         ("releaseReady", ctypes.c_int),
     ]
 
@@ -469,6 +476,12 @@ def steamworks_harness(request: pytest.FixtureRequest, tmp_path_factory: pytest.
         ctypes.POINTER(ctypes.c_int),
     ]
     lib.QLR_Steamworks_CompleteServerBrowserDetailCallback.restype = ctypes.c_int
+    lib.QLR_Steamworks_CompleteServerBrowserDetailTerminal.argtypes = [
+        ctypes.POINTER(SteamServerBrowserDetailLifecycle),
+        ctypes.c_uint32,
+        ctypes.POINTER(ctypes.c_int),
+    ]
+    lib.QLR_Steamworks_CompleteServerBrowserDetailTerminal.restype = ctypes.c_int
     lib.QLR_Steamworks_BuildServerBrowserDetailResponseViews.argtypes = [
         ctypes.c_size_t,
         ctypes.POINTER(SteamServerBrowserDetailResponseViews),
@@ -490,6 +503,12 @@ def steamworks_harness(request: pytest.FixtureRequest, tmp_path_factory: pytest.
         ctypes.POINTER(ctypes.c_int),
     ]
     lib.QLR_Steamworks_CompleteServerBrowserDetailRequestCallback.restype = ctypes.c_int
+    lib.QLR_Steamworks_CompleteServerBrowserDetailRequestTerminal.argtypes = [
+        ctypes.POINTER(SteamServerBrowserDetailRequest),
+        ctypes.c_uint32,
+        ctypes.POINTER(ctypes.c_int),
+    ]
+    lib.QLR_Steamworks_CompleteServerBrowserDetailRequestTerminal.restype = ctypes.c_int
     lib.QLR_Steamworks_ReleaseServerListRequest.argtypes = [ctypes.c_size_t]
     lib.QLR_Steamworks_ReleaseServerListRequest.restype = None
     lib.QLR_Steamworks_RefreshServerListRequest.argtypes = [ctypes.c_size_t]
@@ -588,6 +607,9 @@ def steamworks_harness(request: pytest.FixtureRequest, tmp_path_factory: pytest.
         ctypes.c_char_p,
     ]
     lib.QLR_Steamworks_GetAchievementDisplayAttribute.restype = ctypes.c_char_p
+
+    lib.QLR_Steamworks_IsSubscribedApp.argtypes = [ctypes.c_uint32]
+    lib.QLR_Steamworks_IsSubscribedApp.restype = ctypes.c_int
 
     lib.QLR_Steamworks_GetNumSubscribedItems.argtypes = []
     lib.QLR_Steamworks_GetNumSubscribedItems.restype = ctypes.c_uint32
@@ -892,6 +914,55 @@ def steamworks_harness(request: pytest.FixtureRequest, tmp_path_factory: pytest.
         lib.QLR_SteamworksMock_SetInitResult.argtypes = [ctypes.c_int]
         lib.QLR_SteamworksMock_SetInitResult.restype = None
 
+        lib.QLR_SteamworksMock_SetSteamAPIInitExportAvailable.argtypes = [ctypes.c_int]
+        lib.QLR_SteamworksMock_SetSteamAPIInitExportAvailable.restype = None
+        lib.QLR_SteamworksMock_SetSteamAPIShutdownExportAvailable.argtypes = [ctypes.c_int]
+        lib.QLR_SteamworksMock_SetSteamAPIShutdownExportAvailable.restype = None
+        lib.QLR_SteamworksMock_SetSteamAPIRunCallbacksExportAvailable.argtypes = [ctypes.c_int]
+        lib.QLR_SteamworksMock_SetSteamAPIRunCallbacksExportAvailable.restype = None
+        lib.QLR_SteamworksMock_SetSteamAPIRegisterCallbackExportAvailable.argtypes = [ctypes.c_int]
+        lib.QLR_SteamworksMock_SetSteamAPIRegisterCallbackExportAvailable.restype = None
+        lib.QLR_SteamworksMock_SetSteamAPIUnregisterCallbackExportAvailable.argtypes = [ctypes.c_int]
+        lib.QLR_SteamworksMock_SetSteamAPIUnregisterCallbackExportAvailable.restype = None
+        lib.QLR_SteamworksMock_SetSteamAPIRegisterCallResultExportAvailable.argtypes = [ctypes.c_int]
+        lib.QLR_SteamworksMock_SetSteamAPIRegisterCallResultExportAvailable.restype = None
+        lib.QLR_SteamworksMock_SetSteamAPIUnregisterCallResultExportAvailable.argtypes = [ctypes.c_int]
+        lib.QLR_SteamworksMock_SetSteamAPIUnregisterCallResultExportAvailable.restype = None
+        lib.QLR_SteamworksMock_SetSteamUserExportAvailable.argtypes = [ctypes.c_int]
+        lib.QLR_SteamworksMock_SetSteamUserExportAvailable.restype = None
+        lib.QLR_SteamworksMock_SetSteamFriendsExportAvailable.argtypes = [ctypes.c_int]
+        lib.QLR_SteamworksMock_SetSteamFriendsExportAvailable.restype = None
+        lib.QLR_SteamworksMock_SetSteamUtilsExportAvailable.argtypes = [ctypes.c_int]
+        lib.QLR_SteamworksMock_SetSteamUtilsExportAvailable.restype = None
+        lib.QLR_SteamworksMock_SetSteamUserStatsExportAvailable.argtypes = [ctypes.c_int]
+        lib.QLR_SteamworksMock_SetSteamUserStatsExportAvailable.restype = None
+        lib.QLR_SteamworksMock_SetSteamNetworkingExportAvailable.argtypes = [ctypes.c_int]
+        lib.QLR_SteamworksMock_SetSteamNetworkingExportAvailable.restype = None
+        lib.QLR_SteamworksMock_SetSteamMatchmakingExportAvailable.argtypes = [ctypes.c_int]
+        lib.QLR_SteamworksMock_SetSteamMatchmakingExportAvailable.restype = None
+        lib.QLR_SteamworksMock_SetSteamMatchmakingServersExportAvailable.argtypes = [ctypes.c_int]
+        lib.QLR_SteamworksMock_SetSteamMatchmakingServersExportAvailable.restype = None
+        lib.QLR_SteamworksMock_SetSteamAppsExportAvailable.argtypes = [ctypes.c_int]
+        lib.QLR_SteamworksMock_SetSteamAppsExportAvailable.restype = None
+        lib.QLR_SteamworksMock_SetSteamUGCExportAvailable.argtypes = [ctypes.c_int]
+        lib.QLR_SteamworksMock_SetSteamUGCExportAvailable.restype = None
+        lib.QLR_SteamworksMock_SetSteamGameServerExportAvailable.argtypes = [ctypes.c_int]
+        lib.QLR_SteamworksMock_SetSteamGameServerExportAvailable.restype = None
+        lib.QLR_SteamworksMock_SetSteamGameServerStatsExportAvailable.argtypes = [ctypes.c_int]
+        lib.QLR_SteamworksMock_SetSteamGameServerStatsExportAvailable.restype = None
+        lib.QLR_SteamworksMock_SetSteamGameServerUtilsExportAvailable.argtypes = [ctypes.c_int]
+        lib.QLR_SteamworksMock_SetSteamGameServerUtilsExportAvailable.restype = None
+        lib.QLR_SteamworksMock_SetSteamGameServerUGCExportAvailable.argtypes = [ctypes.c_int]
+        lib.QLR_SteamworksMock_SetSteamGameServerUGCExportAvailable.restype = None
+        lib.QLR_SteamworksMock_SetSteamGameServerInitExportAvailable.argtypes = [ctypes.c_int]
+        lib.QLR_SteamworksMock_SetSteamGameServerInitExportAvailable.restype = None
+        lib.QLR_SteamworksMock_SetSteamGameServerShutdownExportAvailable.argtypes = [ctypes.c_int]
+        lib.QLR_SteamworksMock_SetSteamGameServerShutdownExportAvailable.restype = None
+        lib.QLR_SteamworksMock_SetSteamGameServerRunCallbacksExportAvailable.argtypes = [ctypes.c_int]
+        lib.QLR_SteamworksMock_SetSteamGameServerRunCallbacksExportAvailable.restype = None
+        lib.QLR_SteamworksMock_SetSteamGameServerNetworkingExportAvailable.argtypes = [ctypes.c_int]
+        lib.QLR_SteamworksMock_SetSteamGameServerNetworkingExportAvailable.restype = None
+
         lib.QLR_SteamworksMock_SetSteamGameServerInitResult.argtypes = [ctypes.c_int]
         lib.QLR_SteamworksMock_SetSteamGameServerInitResult.restype = None
 
@@ -906,6 +977,16 @@ def steamworks_harness(request: pytest.FixtureRequest, tmp_path_factory: pytest.
 
         lib.QLR_SteamworksMock_SetTicket.argtypes = [ctypes.c_char_p, ctypes.c_uint32, ctypes.c_uint32]
         lib.QLR_SteamworksMock_SetTicket.restype = None
+        lib.QLR_SteamworksMock_SetAuthSessionTicketExportAvailable.argtypes = [ctypes.c_int]
+        lib.QLR_SteamworksMock_SetAuthSessionTicketExportAvailable.restype = None
+        lib.QLR_SteamworksMock_SetBeginAuthSessionExportAvailable.argtypes = [ctypes.c_int]
+        lib.QLR_SteamworksMock_SetBeginAuthSessionExportAvailable.restype = None
+        lib.QLR_SteamworksMock_SetCancelAuthTicketExportAvailable.argtypes = [ctypes.c_int]
+        lib.QLR_SteamworksMock_SetCancelAuthTicketExportAvailable.restype = None
+        lib.QLR_SteamworksMock_SetEndAuthSessionExportAvailable.argtypes = [ctypes.c_int]
+        lib.QLR_SteamworksMock_SetEndAuthSessionExportAvailable.restype = None
+        lib.QLR_SteamworksMock_SetGetSteamIDExportAvailable.argtypes = [ctypes.c_int]
+        lib.QLR_SteamworksMock_SetGetSteamIDExportAvailable.restype = None
         lib.QLR_SteamworksMock_SetWebApiTicket.argtypes = [
             ctypes.c_char_p,
             ctypes.c_uint32,
@@ -913,6 +994,14 @@ def steamworks_harness(request: pytest.FixtureRequest, tmp_path_factory: pytest.
             ctypes.c_int,
         ]
         lib.QLR_SteamworksMock_SetWebApiTicket.restype = None
+        lib.QLR_SteamworksMock_SetWebApiTicketCallbackBehavior.argtypes = [
+            ctypes.c_int,
+            ctypes.c_uint32,
+            ctypes.c_uint32,
+        ]
+        lib.QLR_SteamworksMock_SetWebApiTicketCallbackBehavior.restype = None
+        lib.QLR_SteamworksMock_SetWebApiTicketExportAvailable.argtypes = [ctypes.c_int]
+        lib.QLR_SteamworksMock_SetWebApiTicketExportAvailable.restype = None
         lib.QLR_SteamworksMock_GetCancelledTicketHandle.argtypes = []
         lib.QLR_SteamworksMock_GetCancelledTicketHandle.restype = ctypes.c_uint32
         lib.QLR_SteamworksMock_GetCancelAuthTicketCalls.argtypes = []
@@ -1000,6 +1089,15 @@ def steamworks_harness(request: pytest.FixtureRequest, tmp_path_factory: pytest.
 
         lib.QLR_SteamworksMock_GetAppIdCalls.argtypes = []
         lib.QLR_SteamworksMock_GetAppIdCalls.restype = ctypes.c_int
+
+        lib.QLR_SteamworksMock_SetSteamAppsSubscribedResult.argtypes = [ctypes.c_int]
+        lib.QLR_SteamworksMock_SetSteamAppsSubscribedResult.restype = None
+
+        lib.QLR_SteamworksMock_GetSteamAppsInterfaceCalls.argtypes = []
+        lib.QLR_SteamworksMock_GetSteamAppsInterfaceCalls.restype = ctypes.c_int
+
+        lib.QLR_SteamworksMock_GetSteamAppsLastAppId.argtypes = []
+        lib.QLR_SteamworksMock_GetSteamAppsLastAppId.restype = ctypes.c_uint32
 
         lib.QLR_SteamworksMock_SetFriendEnumeration.argtypes = [ctypes.c_int, ctypes.c_uint64]
         lib.QLR_SteamworksMock_SetFriendEnumeration.restype = None
@@ -1657,6 +1755,12 @@ def steamworks_harness(request: pytest.FixtureRequest, tmp_path_factory: pytest.
         lib.QLR_SteamworksMock_GetRichPresenceJoinRequestedCallbackRegistered.argtypes = []
         lib.QLR_SteamworksMock_GetRichPresenceJoinRequestedCallbackRegistered.restype = ctypes.c_int
 
+        lib.QLR_SteamworksMock_GetWebApiTicketCallbackRegistered.argtypes = []
+        lib.QLR_SteamworksMock_GetWebApiTicketCallbackRegistered.restype = ctypes.c_int
+
+        lib.QLR_SteamworksMock_GetRegisteredCallbackCount.argtypes = []
+        lib.QLR_SteamworksMock_GetRegisteredCallbackCount.restype = ctypes.c_int
+
         lib.QLR_Steamworks_RegisterServerHarnessCallbacks.argtypes = []
         lib.QLR_Steamworks_RegisterServerHarnessCallbacks.restype = ctypes.c_int
 
@@ -1860,6 +1964,236 @@ def test_request_produces_expected_ticket(steamworks_harness: tuple[ctypes.CDLL,
     assert ticket_handle.value == 1
 
 
+def _assert_retail_auth_ticket_path_works(lib: ctypes.CDLL) -> None:
+    ticket_buffer = ctypes.create_string_buffer(TICKET_BUFFER)
+    ticket_length = ctypes.c_int(-1)
+    ticket_handle = ctypes.c_uint32(0xFFFFFFFF)
+
+    assert lib.QLR_Steamworks_Request(
+        ticket_buffer,
+        ctypes.sizeof(ticket_buffer),
+        ctypes.byref(ticket_length),
+        ctypes.byref(ticket_handle),
+    )
+    assert ticket_buffer.value == b"12345678"
+    assert ticket_length.value == 8
+    assert ticket_handle.value == 1
+
+
+@pytest.mark.parametrize(
+	("setter_name", "export_label"),
+	[
+        ("QLR_SteamworksMock_SetSteamAPIInitExportAvailable", "SteamAPI_Init"),
+        ("QLR_SteamworksMock_SetSteamAPIShutdownExportAvailable", "SteamAPI_Shutdown"),
+        ("QLR_SteamworksMock_SetSteamAPIRunCallbacksExportAvailable", "SteamAPI_RunCallbacks"),
+        ("QLR_SteamworksMock_SetSteamUserExportAvailable", "SteamUser"),
+        ("QLR_SteamworksMock_SetSteamFriendsExportAvailable", "SteamFriends"),
+        ("QLR_SteamworksMock_SetSteamMatchmakingExportAvailable", "SteamMatchmaking"),
+        ("QLR_SteamworksMock_SetSteamAppsExportAvailable", "SteamApps"),
+        ("QLR_SteamworksMock_SetSteamUGCExportAvailable", "SteamUGC"),
+    ],
+)
+def test_missing_required_core_runtime_exports_reject_steamworks_init(
+    steamworks_harness: tuple[ctypes.CDLL, bool],
+    setter_name: str,
+    export_label: str,
+) -> None:
+    lib, enabled = steamworks_harness
+    retail_buffer = ctypes.create_string_buffer(TICKET_BUFFER)
+    retail_length = ctypes.c_int(-1)
+    retail_handle = ctypes.c_uint32(0xFFFFFFFF)
+    web_buffer = ctypes.create_string_buffer(TICKET_BUFFER)
+    web_length = ctypes.c_int(-1)
+    web_handle = ctypes.c_uint32(0xFFFFFFFF)
+    web_result = ctypes.c_int(-1)
+    response = AuthResponse()
+
+    if not enabled:
+        assert not lib.QLR_Steamworks_Init()
+        return
+
+    lib.QLR_Steamworks_Shutdown()
+    lib.QLR_SteamworksMock_Reset()
+    getattr(lib, setter_name)(0)
+
+    assert not lib.QLR_Steamworks_Init(), export_label
+    assert not lib.QLR_Steamworks_Request(
+        retail_buffer,
+        ctypes.sizeof(retail_buffer),
+        ctypes.byref(retail_length),
+        ctypes.byref(retail_handle),
+    )
+    assert retail_buffer.value == b""
+    assert retail_length.value == 0
+    assert retail_handle.value == 0
+
+    assert lib.QLR_Steamworks_Validate(b"12345678", ctypes.byref(response))
+    assert response.result == QL_AUTH_RESULT_ERROR
+    assert response.outcome == QL_AUTH_OUTCOME_FAILURE
+    assert "runtime" in response.message.decode().lower()
+
+    assert not lib.QLR_Steamworks_CancelTicket(123)
+    assert lib.QLR_SteamworksMock_GetCancelAuthTicketCalls() == 0
+    assert not lib.QLR_Steamworks_HasWebApiAuthTicketAdapter()
+    assert not lib.QLR_Steamworks_RequestWebApi(
+        web_buffer,
+        ctypes.sizeof(web_buffer),
+        ctypes.byref(web_length),
+        ctypes.byref(web_handle),
+        ctypes.byref(web_result),
+    )
+    assert web_buffer.value == b""
+    assert web_length.value == 0
+    assert web_handle.value == 0
+    assert web_result.value == 0
+    assert lib.QLR_SteamworksMock_GetWebApiTicketCalls() == 0
+    assert lib.QLR_SteamworksMock_GetRegisterCallbackCalls() == 0
+    assert lib.QLR_SteamworksMock_GetRegisteredCallbackCount() == 0
+
+    lib.QLR_Steamworks_Shutdown()
+    lib.QLR_SteamworksMock_Reset()
+
+
+def test_missing_auth_session_ticket_export_rejects_steamworks_init(
+    steamworks_harness: tuple[ctypes.CDLL, bool],
+) -> None:
+    lib, enabled = steamworks_harness
+    retail_buffer = ctypes.create_string_buffer(TICKET_BUFFER)
+    retail_length = ctypes.c_int(-1)
+    retail_handle = ctypes.c_uint32(0xFFFFFFFF)
+    web_buffer = ctypes.create_string_buffer(TICKET_BUFFER)
+    web_length = ctypes.c_int(-1)
+    web_handle = ctypes.c_uint32(0xFFFFFFFF)
+    web_result = ctypes.c_int(-1)
+
+    if not enabled:
+        assert not lib.QLR_Steamworks_Init()
+        assert not lib.QLR_Steamworks_Request(
+            retail_buffer,
+            ctypes.sizeof(retail_buffer),
+            ctypes.byref(retail_length),
+            ctypes.byref(retail_handle),
+        )
+        assert not lib.QLR_Steamworks_RequestWebApi(
+            web_buffer,
+            ctypes.sizeof(web_buffer),
+            ctypes.byref(web_length),
+            ctypes.byref(web_handle),
+            ctypes.byref(web_result),
+        )
+        return
+
+    lib.QLR_Steamworks_Shutdown()
+    lib.QLR_SteamworksMock_Reset()
+    lib.QLR_SteamworksMock_SetAuthSessionTicketExportAvailable(0)
+
+    assert not lib.QLR_Steamworks_Init()
+    assert not lib.QLR_Steamworks_Request(
+        retail_buffer,
+        ctypes.sizeof(retail_buffer),
+        ctypes.byref(retail_length),
+        ctypes.byref(retail_handle),
+    )
+    assert retail_buffer.value == b""
+    assert retail_length.value == 0
+    assert retail_handle.value == 0
+
+    assert not lib.QLR_Steamworks_HasWebApiAuthTicketAdapter()
+    assert not lib.QLR_Steamworks_RequestWebApi(
+        web_buffer,
+        ctypes.sizeof(web_buffer),
+        ctypes.byref(web_length),
+        ctypes.byref(web_handle),
+        ctypes.byref(web_result),
+    )
+    assert web_buffer.value == b""
+    assert web_length.value == 0
+    assert web_handle.value == 0
+    assert web_result.value == 0
+    assert lib.QLR_SteamworksMock_GetWebApiTicketCalls() == 0
+    assert lib.QLR_SteamworksMock_GetRegisterCallbackCalls() == 0
+    assert lib.QLR_SteamworksMock_GetRegisteredCallbackCount() == 0
+
+    lib.QLR_Steamworks_Shutdown()
+    lib.QLR_SteamworksMock_Reset()
+
+
+@pytest.mark.parametrize(
+    ("setter_name", "export_label"),
+    [
+        ("QLR_SteamworksMock_SetBeginAuthSessionExportAvailable", "BeginAuthSession"),
+        ("QLR_SteamworksMock_SetCancelAuthTicketExportAvailable", "CancelAuthTicket"),
+        ("QLR_SteamworksMock_SetEndAuthSessionExportAvailable", "EndAuthSession"),
+        ("QLR_SteamworksMock_SetGetSteamIDExportAvailable", "GetSteamID"),
+    ],
+)
+def test_missing_required_user_auth_companion_exports_reject_steamworks_init(
+    steamworks_harness: tuple[ctypes.CDLL, bool],
+    setter_name: str,
+    export_label: str,
+) -> None:
+    lib, enabled = steamworks_harness
+    retail_buffer = ctypes.create_string_buffer(TICKET_BUFFER)
+    retail_length = ctypes.c_int(-1)
+    retail_handle = ctypes.c_uint32(0xFFFFFFFF)
+    web_buffer = ctypes.create_string_buffer(TICKET_BUFFER)
+    web_length = ctypes.c_int(-1)
+    web_handle = ctypes.c_uint32(0xFFFFFFFF)
+    web_result = ctypes.c_int(-1)
+    response = AuthResponse()
+
+    if not enabled:
+        assert not lib.QLR_Steamworks_Init()
+        assert not lib.QLR_Steamworks_Request(
+            retail_buffer,
+            ctypes.sizeof(retail_buffer),
+            ctypes.byref(retail_length),
+            ctypes.byref(retail_handle),
+        )
+        return
+
+    lib.QLR_Steamworks_Shutdown()
+    lib.QLR_SteamworksMock_Reset()
+    getattr(lib, setter_name)(0)
+
+    assert not lib.QLR_Steamworks_Init(), export_label
+    assert not lib.QLR_Steamworks_Request(
+        retail_buffer,
+        ctypes.sizeof(retail_buffer),
+        ctypes.byref(retail_length),
+        ctypes.byref(retail_handle),
+    )
+    assert retail_buffer.value == b""
+    assert retail_length.value == 0
+    assert retail_handle.value == 0
+
+    assert lib.QLR_Steamworks_Validate(b"12345678", ctypes.byref(response))
+    assert response.result == QL_AUTH_RESULT_ERROR
+    assert response.outcome == QL_AUTH_OUTCOME_FAILURE
+    assert "runtime" in response.message.decode().lower()
+
+    assert not lib.QLR_Steamworks_CancelTicket(123)
+    assert lib.QLR_SteamworksMock_GetCancelAuthTicketCalls() == 0
+    assert not lib.QLR_Steamworks_HasWebApiAuthTicketAdapter()
+    assert not lib.QLR_Steamworks_RequestWebApi(
+        web_buffer,
+        ctypes.sizeof(web_buffer),
+        ctypes.byref(web_length),
+        ctypes.byref(web_handle),
+        ctypes.byref(web_result),
+    )
+    assert web_buffer.value == b""
+    assert web_length.value == 0
+    assert web_handle.value == 0
+    assert web_result.value == 0
+    assert lib.QLR_SteamworksMock_GetWebApiTicketCalls() == 0
+    assert lib.QLR_SteamworksMock_GetRegisterCallbackCalls() == 0
+    assert lib.QLR_SteamworksMock_GetRegisteredCallbackCount() == 0
+
+    lib.QLR_Steamworks_Shutdown()
+    lib.QLR_SteamworksMock_Reset()
+
+
 def test_validate_maps_auth_results(steamworks_harness: tuple[ctypes.CDLL, bool]) -> None:
     lib, enabled = steamworks_harness
 
@@ -2021,6 +2355,746 @@ def test_web_api_auth_ticket_adapter_uses_callback_ticket_and_identity(
     assert ticket_length.value == 0
     assert ticket_handle.value == 0
     assert steam_result.value == 0
+
+
+def test_missing_web_api_ticket_export_keeps_retail_auth_session_ticket_path(
+	steamworks_harness: tuple[ctypes.CDLL, bool],
+) -> None:
+    lib, enabled = steamworks_harness
+    web_buffer = ctypes.create_string_buffer(TICKET_BUFFER)
+    web_length = ctypes.c_int(-1)
+    web_handle = ctypes.c_uint32(0xFFFFFFFF)
+    web_result = ctypes.c_int(-1)
+    retail_buffer = ctypes.create_string_buffer(TICKET_BUFFER)
+    retail_length = ctypes.c_int(-1)
+    retail_handle = ctypes.c_uint32(0xFFFFFFFF)
+
+    if not enabled:
+        assert not lib.QLR_Steamworks_HasWebApiAuthTicketAdapter()
+        assert not lib.QLR_Steamworks_RequestWebApi(
+            web_buffer,
+            ctypes.sizeof(web_buffer),
+            ctypes.byref(web_length),
+            ctypes.byref(web_handle),
+            ctypes.byref(web_result),
+        )
+        assert not lib.QLR_Steamworks_Request(
+            retail_buffer,
+            ctypes.sizeof(retail_buffer),
+            ctypes.byref(retail_length),
+            ctypes.byref(retail_handle),
+        )
+        return
+
+    lib.QLR_Steamworks_Shutdown()
+    lib.QLR_SteamworksMock_Reset()
+    lib.QLR_SteamworksMock_SetWebApiTicketExportAvailable(0)
+
+    assert not lib.QLR_Steamworks_HasWebApiAuthTicketAdapter()
+    assert not lib.QLR_Steamworks_RequestWebApi(
+        web_buffer,
+        ctypes.sizeof(web_buffer),
+        ctypes.byref(web_length),
+        ctypes.byref(web_handle),
+        ctypes.byref(web_result),
+    )
+    assert web_buffer.value == b""
+    assert web_length.value == 0
+    assert web_handle.value == 0
+    assert web_result.value == 0
+    assert lib.QLR_SteamworksMock_GetWebApiTicketCalls() == 0
+    assert lib.QLR_SteamworksMock_GetRegisterCallbackCalls() == 0
+    assert lib.QLR_SteamworksMock_GetRegisteredCallbackCount() == 0
+
+    assert lib.QLR_Steamworks_Request(
+        retail_buffer,
+        ctypes.sizeof(retail_buffer),
+        ctypes.byref(retail_length),
+        ctypes.byref(retail_handle),
+    )
+    assert retail_buffer.value == b"12345678"
+    assert retail_length.value == 8
+    assert retail_handle.value == 1
+    assert lib.QLR_SteamworksMock_GetWebApiTicketCalls() == 0
+
+    lib.QLR_Steamworks_Shutdown()
+    lib.QLR_SteamworksMock_Reset()
+
+
+def test_missing_optional_callback_registration_export_keeps_retail_auth_path(
+    steamworks_harness: tuple[ctypes.CDLL, bool],
+) -> None:
+    lib, enabled = steamworks_harness
+    web_buffer = ctypes.create_string_buffer(TICKET_BUFFER)
+    web_length = ctypes.c_int(-1)
+    web_handle = ctypes.c_uint32(0xFFFFFFFF)
+    web_result = ctypes.c_int(-1)
+    retail_buffer = ctypes.create_string_buffer(TICKET_BUFFER)
+    retail_length = ctypes.c_int(-1)
+    retail_handle = ctypes.c_uint32(0xFFFFFFFF)
+
+    if not enabled:
+        assert not lib.QLR_Steamworks_Init()
+        return
+
+    lib.QLR_Steamworks_Shutdown()
+    lib.QLR_SteamworksMock_Reset()
+    lib.QLR_SteamworksMock_SetSteamAPIRegisterCallbackExportAvailable(0)
+
+    assert lib.QLR_Steamworks_Init()
+    assert not lib.QLR_Steamworks_HasWebApiAuthTicketAdapter()
+    assert not lib.QLR_Steamworks_RequestWebApi(
+        web_buffer,
+        ctypes.sizeof(web_buffer),
+        ctypes.byref(web_length),
+        ctypes.byref(web_handle),
+        ctypes.byref(web_result),
+    )
+    assert web_buffer.value == b""
+    assert web_length.value == 0
+    assert web_handle.value == 0
+    assert web_result.value == 0
+    assert lib.QLR_SteamworksMock_GetWebApiTicketCalls() == 0
+    assert lib.QLR_SteamworksMock_GetRegisterCallbackCalls() == 0
+    assert lib.QLR_SteamworksMock_GetRegisteredCallbackCount() == 0
+    assert not lib.QLR_Steamworks_RegisterHarnessCallbacks()
+    assert not lib.QLR_Steamworks_RegisterServerHarnessCallbacks()
+    assert lib.QLR_SteamworksMock_GetRegisterCallbackCalls() == 0
+
+    assert lib.QLR_Steamworks_Request(
+        retail_buffer,
+        ctypes.sizeof(retail_buffer),
+        ctypes.byref(retail_length),
+        ctypes.byref(retail_handle),
+    )
+    assert retail_buffer.value == b"12345678"
+    assert retail_length.value == 8
+    assert retail_handle.value == 1
+
+    lib.QLR_Steamworks_Shutdown()
+    lib.QLR_SteamworksMock_Reset()
+
+
+def test_missing_optional_callback_unregister_export_clears_local_flags(
+    steamworks_harness: tuple[ctypes.CDLL, bool],
+) -> None:
+    lib, enabled = steamworks_harness
+
+    if not enabled:
+        return
+
+    lib.QLR_Steamworks_Shutdown()
+    lib.QLR_SteamworksMock_Reset()
+    lib.QLR_SteamworksMock_SetSteamAPIUnregisterCallbackExportAvailable(0)
+
+    assert lib.QLR_Steamworks_Init()
+    assert lib.QLR_Steamworks_RegisterHarnessCallbacks()
+    assert lib.QLR_SteamworksMock_GetRichPresenceJoinRequestedCallbackRegistered() == 1
+    assert lib.QLR_SteamworksMock_GetRegisteredCallbackCount() == 18
+
+    lib.QLR_Steamworks_UnregisterRichPresenceJoinRequestedCallback()
+
+    assert lib.QLR_SteamworksMock_GetUnregisterCallbackCalls() == 0
+    assert lib.QLR_SteamworksMock_GetRichPresenceJoinRequestedCallbackRegistered() == 0
+
+    lib.QLR_Steamworks_Shutdown()
+    lib.QLR_SteamworksMock_Reset()
+
+
+def test_missing_optional_call_result_registration_export_fails_ugc_binding_cleanly(
+    steamworks_harness: tuple[ctypes.CDLL, bool],
+) -> None:
+    lib, enabled = steamworks_harness
+
+    if not enabled:
+        assert not lib.QLR_Steamworks_RequestAllUGCQuery(1)
+        return
+
+    lib.QLR_Steamworks_Shutdown()
+    lib.QLR_SteamworksMock_Reset()
+    lib.QLR_SteamworksMock_SetSteamAPIRegisterCallResultExportAvailable(0)
+
+    assert lib.QLR_Steamworks_Init()
+    assert lib.QLR_Steamworks_RegisterHarnessCallbacks()
+    try:
+        assert not lib.QLR_Steamworks_BindUGCQueryCallResult(0xAABBCCDD)
+        assert not lib.QLR_Steamworks_RequestAllUGCQuery(1)
+        assert lib.QLR_SteamworksMock_GetUGCCreateQueryCalls() == 1
+        assert lib.QLR_SteamworksMock_GetUGCSendQueryCalls() == 1
+        assert lib.QLR_SteamworksMock_GetUGCReleaseQueryCalls() == 1
+        assert lib.QLR_SteamworksMock_GetRegisterCallResultCalls() == 0
+        assert lib.QLR_SteamworksMock_GetUGCQueryCallResultBound() == 0
+        assert lib.QLR_SteamworksMock_GetUGCQueryCallResultHandle() == 0
+    finally:
+        lib.QLR_Steamworks_Shutdown()
+        lib.QLR_SteamworksMock_Reset()
+
+
+def test_missing_optional_call_result_unregister_export_clears_local_binding(
+    steamworks_harness: tuple[ctypes.CDLL, bool],
+) -> None:
+    lib, enabled = steamworks_harness
+    call_handle = 0xAABBCCDD
+
+    if not enabled:
+        return
+
+    lib.QLR_Steamworks_Shutdown()
+    lib.QLR_SteamworksMock_Reset()
+    lib.QLR_SteamworksMock_SetSteamAPIUnregisterCallResultExportAvailable(0)
+
+    assert lib.QLR_Steamworks_Init()
+    assert lib.QLR_Steamworks_RegisterHarnessCallbacks()
+    assert lib.QLR_Steamworks_BindUGCQueryCallResult(call_handle)
+    assert lib.QLR_SteamworksMock_GetRegisterCallResultCalls() == 1
+    assert lib.QLR_SteamworksMock_GetUGCQueryCallResultBound() == 1
+    assert lib.QLR_SteamworksMock_GetUGCQueryCallResultHandle() == call_handle
+
+    lib.QLR_Steamworks_UnbindUGCQueryCallResult()
+
+    assert lib.QLR_SteamworksMock_GetUnregisterCallResultCalls() == 0
+    assert lib.QLR_SteamworksMock_GetUGCQueryCallResultBound() == 0
+    assert lib.QLR_SteamworksMock_GetUGCQueryCallResultHandle() == 0
+
+    lib.QLR_Steamworks_Shutdown()
+    lib.QLR_SteamworksMock_Reset()
+
+
+def test_missing_optional_steamutils_export_keeps_auth_path_and_disables_utils(
+    steamworks_harness: tuple[ctypes.CDLL, bool],
+) -> None:
+    lib, enabled = steamworks_harness
+    country = ctypes.create_string_buffer(b"stale", 16)
+
+    if not enabled:
+        assert not lib.QLR_Steamworks_Init()
+        return
+
+    lib.QLR_Steamworks_Shutdown()
+    lib.QLR_SteamworksMock_Reset()
+    lib.QLR_SteamworksMock_SetSteamUtilsExportAvailable(0)
+
+    assert lib.QLR_Steamworks_Init()
+    assert not lib.QLR_Steamworks_GetIPCountry(country, ctypes.sizeof(country))
+    assert country.value == b""
+    assert lib.QLR_Steamworks_GetAppID() == 0
+    assert lib.QLR_SteamworksMock_GetIPCountryCalls() == 0
+    assert lib.QLR_SteamworksMock_GetAppIdCalls() == 0
+    _assert_retail_auth_ticket_path_works(lib)
+
+    lib.QLR_Steamworks_Shutdown()
+    lib.QLR_SteamworksMock_Reset()
+
+
+def test_missing_optional_steamuserstats_export_keeps_auth_path_and_disables_stats(
+    steamworks_harness: tuple[ctypes.CDLL, bool],
+) -> None:
+    lib, enabled = steamworks_harness
+    stat_value = ctypes.c_int(99)
+
+    if not enabled:
+        assert not lib.QLR_Steamworks_Init()
+        return
+
+    lib.QLR_Steamworks_Shutdown()
+    lib.QLR_SteamworksMock_Reset()
+    lib.QLR_SteamworksMock_SetSteamUserStatsExportAvailable(0)
+
+    assert lib.QLR_Steamworks_Init()
+    assert not lib.QLR_Steamworks_ClearStats(1)
+    assert not lib.QLR_Steamworks_RequestUserStats(0x12345678, 0x9ABCDEF0)
+    assert not lib.QLR_Steamworks_GetUserStatInt(0x12345678, 0x9ABCDEF0, b"wins", ctypes.byref(stat_value))
+    assert stat_value.value == 0
+    assert lib.QLR_SteamworksMock_GetResetAllStatsCalls() == 0
+    assert lib.QLR_SteamworksMock_GetUserStatsRequestCalls() == 0
+    assert lib.QLR_SteamworksMock_GetUserStatsGetIntCalls() == 0
+    _assert_retail_auth_ticket_path_works(lib)
+
+    lib.QLR_Steamworks_Shutdown()
+    lib.QLR_SteamworksMock_Reset()
+
+
+def test_missing_optional_steamnetworking_export_keeps_auth_path_and_disables_p2p(
+    steamworks_harness: tuple[ctypes.CDLL, bool],
+) -> None:
+    lib, enabled = steamworks_harness
+    steam_id = 0x0110000102030405
+    payload = ctypes.create_string_buffer(b"voice")
+    packet_size = ctypes.c_uint32(123)
+    remote_id = ctypes.c_uint64(0xFFFFFFFFFFFFFFFF)
+    read_buffer = ctypes.create_string_buffer(32)
+
+    if not enabled:
+        assert not lib.QLR_Steamworks_Init()
+        return
+
+    lib.QLR_Steamworks_Shutdown()
+    lib.QLR_SteamworksMock_Reset()
+    lib.QLR_SteamworksMock_SetSteamNetworkingExportAvailable(0)
+
+    assert lib.QLR_Steamworks_Init()
+    assert not lib.QLR_Steamworks_SendP2PPacket(steam_id, payload, 5, 1, 16)
+    assert not lib.QLR_Steamworks_IsP2PPacketAvailable(ctypes.byref(packet_size), 16)
+    assert packet_size.value == 123
+    packet_size.value = 123
+    assert not lib.QLR_Steamworks_ReadP2PPacket(
+        read_buffer,
+        ctypes.sizeof(read_buffer),
+        ctypes.byref(packet_size),
+        ctypes.byref(remote_id),
+        16,
+    )
+    assert packet_size.value == 123
+    assert remote_id.value == 0
+    assert not lib.QLR_Steamworks_AcceptP2PSession(steam_id)
+    assert lib.QLR_SteamworksMock_GetP2PSendCalls() == 0
+    assert lib.QLR_SteamworksMock_GetP2PAvailableCalls() == 0
+    assert lib.QLR_SteamworksMock_GetP2PReadCalls() == 0
+    assert lib.QLR_SteamworksMock_GetP2PAcceptCalls() == 0
+    _assert_retail_auth_ticket_path_works(lib)
+
+    lib.QLR_Steamworks_Shutdown()
+    lib.QLR_SteamworksMock_Reset()
+
+
+def test_missing_optional_steammatchmakingservers_export_keeps_auth_path_and_disables_native_browser(
+    steamworks_harness: tuple[ctypes.CDLL, bool],
+) -> None:
+    lib, enabled = steamworks_harness
+    ping_query = ctypes.c_int(99)
+    players_query = ctypes.c_int(99)
+    rules_query = ctypes.c_int(99)
+
+    if not enabled:
+        assert not lib.QLR_Steamworks_Init()
+        return
+
+    lib.QLR_Steamworks_Shutdown()
+    lib.QLR_SteamworksMock_Reset()
+    lib.QLR_SteamworksMock_SetSteamMatchmakingServersExportAvailable(0)
+
+    assert lib.QLR_Steamworks_Init()
+    assert not lib.QLR_Steamworks_HasServerBrowserInterface()
+    assert lib.QLR_Steamworks_RequestServerList(0, 0xABCDEF) == 0
+    assert lib.QLR_Steamworks_RequestServerListForApp(0, PUBLIC_RETAIL_APP_ID, 0xABCDEF) == 0
+    assert not lib.QLR_Steamworks_RequestServerDetails(
+        0x01020304,
+        27960,
+        0xAAA0,
+        0xBBB0,
+        0xCCC0,
+        ctypes.byref(ping_query),
+        ctypes.byref(players_query),
+        ctypes.byref(rules_query),
+    )
+    assert ping_query.value == 0
+    assert players_query.value == 0
+    assert rules_query.value == 0
+    assert lib.QLR_SteamworksMock_GetServerBrowserInternetCalls() == 0
+    assert lib.QLR_SteamworksMock_GetServerBrowserLastResponse() == 0
+    _assert_retail_auth_ticket_path_works(lib)
+
+    lib.QLR_Steamworks_Shutdown()
+    lib.QLR_SteamworksMock_Reset()
+
+
+def test_missing_optional_gameserver_init_export_keeps_client_auth_path_and_rejects_server_init(
+    steamworks_harness: tuple[ctypes.CDLL, bool],
+) -> None:
+    lib, enabled = steamworks_harness
+
+    if not enabled:
+        assert not lib.QLR_Steamworks_Init()
+        return
+
+    lib.QLR_Steamworks_Shutdown()
+    lib.QLR_SteamworksMock_Reset()
+    lib.QLR_SteamworksMock_SetSteamGameServerInitExportAvailable(0)
+
+    assert lib.QLR_Steamworks_Init()
+    assert not lib.QLR_Steamworks_ServerInit(0x01020304, 27960, 1, 1)
+    assert not lib.QLR_Steamworks_ServerIsInitialised()
+    assert lib.QLR_SteamworksMock_GetSteamGameServerInitCalls() == 0
+
+    lib.QLR_Steamworks_RunServerCallbackPump()
+    assert lib.QLR_SteamworksMock_GetSteamGameServerCallbackCalls() == 0
+    _assert_retail_auth_ticket_path_works(lib)
+
+    lib.QLR_Steamworks_Shutdown()
+    lib.QLR_SteamworksMock_Reset()
+
+
+def test_missing_optional_gameserver_export_keeps_server_init_but_disables_gameserver_helpers(
+    steamworks_harness: tuple[ctypes.CDLL, bool],
+) -> None:
+    lib, enabled = steamworks_harness
+    steam_id_low = ctypes.c_uint32(0xFFFFFFFF)
+    steam_id_high = ctypes.c_uint32(0xFFFFFFFF)
+    incoming_packet = ctypes.create_string_buffer(b"\xff\xff\xff\xffgetinfo")
+
+    if not enabled:
+        assert not lib.QLR_Steamworks_ServerInit(0x01020304, 27960, 1, 1)
+        return
+
+    lib.QLR_Steamworks_Shutdown()
+    lib.QLR_SteamworksMock_Reset()
+    lib.QLR_SteamworksMock_SetSteamGameServerExportAvailable(0)
+
+    assert lib.QLR_Steamworks_Init()
+    assert lib.QLR_Steamworks_ServerInit(0x01020304, 27960, 1, 1)
+    assert lib.QLR_Steamworks_ServerIsInitialised()
+    assert lib.QLR_SteamworksMock_GetSteamGameServerInitCalls() == 1
+
+    assert not lib.QLR_Steamworks_ServerIsLoggedOn()
+    assert not lib.QLR_Steamworks_ServerSetProduct(b"Quake Live")
+    assert not lib.QLR_Steamworks_ServerGetSteamID(ctypes.byref(steam_id_low), ctypes.byref(steam_id_high))
+    assert steam_id_low.value == 0
+    assert steam_id_high.value == 0
+    assert lib.QLR_Steamworks_ServerGetPublicIP() == 0
+    assert not lib.QLR_Steamworks_ServerHandleIncomingPacket(
+        incoming_packet,
+        len(incoming_packet.raw),
+        0x01020304,
+        27960,
+    )
+    assert lib.QLR_SteamworksMock_GetSteamGameServerLoggedOnCalls() == 0
+    assert lib.QLR_SteamworksMock_GetSteamGameServerProductCalls() == 0
+    assert lib.QLR_SteamworksMock_GetServerIncomingPacketCalls() == 0
+    _assert_retail_auth_ticket_path_works(lib)
+
+    lib.QLR_Steamworks_Shutdown()
+    lib.QLR_SteamworksMock_Reset()
+
+
+def test_missing_optional_gameserver_shutdown_export_clears_server_state_without_runtime_shutdown(
+    steamworks_harness: tuple[ctypes.CDLL, bool],
+) -> None:
+    lib, enabled = steamworks_harness
+
+    if not enabled:
+        lib.QLR_Steamworks_ServerShutdown()
+        return
+
+    lib.QLR_Steamworks_Shutdown()
+    lib.QLR_SteamworksMock_Reset()
+    lib.QLR_SteamworksMock_SetSteamGameServerShutdownExportAvailable(0)
+
+    assert lib.QLR_Steamworks_Init()
+    assert lib.QLR_Steamworks_ServerInit(0x01020304, 27960, 1, 1)
+    assert lib.QLR_Steamworks_ServerIsInitialised()
+
+    lib.QLR_Steamworks_ServerShutdown()
+
+    assert not lib.QLR_Steamworks_ServerIsInitialised()
+    assert lib.QLR_SteamworksMock_GetSteamGameServerShutdownCalls() == 0
+    _assert_retail_auth_ticket_path_works(lib)
+
+    lib.QLR_Steamworks_Shutdown()
+    lib.QLR_SteamworksMock_Reset()
+
+
+def test_missing_optional_gameserver_run_callbacks_export_skips_server_callback_pump(
+    steamworks_harness: tuple[ctypes.CDLL, bool],
+) -> None:
+    lib, enabled = steamworks_harness
+
+    if not enabled:
+        return
+
+    lib.QLR_Steamworks_Shutdown()
+    lib.QLR_SteamworksMock_Reset()
+    lib.QLR_SteamworksMock_SetSteamGameServerRunCallbacksExportAvailable(0)
+
+    assert lib.QLR_Steamworks_Init()
+    assert lib.QLR_Steamworks_ServerInit(0x01020304, 27960, 1, 1)
+    assert lib.QLR_Steamworks_RegisterServerHarnessCallbacks()
+    assert lib.QLR_SteamworksMock_QueueServersConnected()
+
+    lib.QLR_Steamworks_RunServerCallbackPump()
+
+    assert lib.QLR_SteamworksMock_GetSteamGameServerCallbackCalls() == 0
+    assert lib.QLR_SteamworksMock_GetClientCallbackCaptureCount() == 0
+    _assert_retail_auth_ticket_path_works(lib)
+
+    lib.QLR_Steamworks_UnregisterServerHarnessCallbacks()
+    lib.QLR_Steamworks_Shutdown()
+    lib.QLR_SteamworksMock_Reset()
+
+
+def test_missing_optional_gameserver_stats_export_keeps_server_init_and_disables_server_stats(
+    steamworks_harness: tuple[ctypes.CDLL, bool],
+) -> None:
+    lib, enabled = steamworks_harness
+    steam_id = 0x0110000100ABCDEF
+    int_value = ctypes.c_int(99)
+
+    if not enabled:
+        assert not lib.QLR_Steamworks_ServerRequestUserStats(steam_id)
+        return
+
+    lib.QLR_Steamworks_Shutdown()
+    lib.QLR_SteamworksMock_Reset()
+    lib.QLR_SteamworksMock_SetSteamGameServerStatsExportAvailable(0)
+
+    assert lib.QLR_Steamworks_Init()
+    assert lib.QLR_Steamworks_ServerInit(0x01020304, 27960, 1, 1)
+    assert not lib.QLR_Steamworks_ServerRequestUserStats(steam_id)
+    assert not lib.QLR_Steamworks_ServerGetUserStatInt(steam_id, b"wins", ctypes.byref(int_value))
+    assert int_value.value == 0
+    assert lib.QLR_SteamworksMock_GetSteamGameServerStatsInterfaceCalls() == 0
+    assert lib.QLR_SteamworksMock_GetSteamGameServerLoggedOnCalls() == 0
+    assert lib.QLR_SteamworksMock_GetSteamGameServerStatsRequestCalls() == 0
+    assert lib.QLR_SteamworksMock_GetSteamGameServerStatsGetIntCalls() == 0
+    _assert_retail_auth_ticket_path_works(lib)
+
+    lib.QLR_Steamworks_Shutdown()
+    lib.QLR_SteamworksMock_Reset()
+
+
+def test_missing_optional_gameserver_utils_export_keeps_server_init_and_disables_server_app_id(
+    steamworks_harness: tuple[ctypes.CDLL, bool],
+) -> None:
+    lib, enabled = steamworks_harness
+
+    if not enabled:
+        assert lib.QLR_Steamworks_ServerGetAppID() == 0
+        return
+
+    lib.QLR_Steamworks_Shutdown()
+    lib.QLR_SteamworksMock_Reset()
+    lib.QLR_SteamworksMock_SetSteamGameServerUtilsExportAvailable(0)
+
+    assert lib.QLR_Steamworks_Init()
+    assert lib.QLR_Steamworks_ServerInit(0x01020304, 27960, 1, 1)
+    assert lib.QLR_Steamworks_ServerGetAppID() == 0
+    _assert_retail_auth_ticket_path_works(lib)
+
+    lib.QLR_Steamworks_Shutdown()
+    lib.QLR_SteamworksMock_Reset()
+
+
+def test_missing_optional_gameserver_ugc_export_falls_back_to_client_ugc_owner(
+    steamworks_harness: tuple[ctypes.CDLL, bool],
+) -> None:
+    lib, enabled = steamworks_harness
+
+    if not enabled:
+        return
+
+    lib.QLR_Steamworks_Shutdown()
+    lib.QLR_SteamworksMock_Reset()
+    lib.QLR_SteamworksMock_SetSteamGameServerUGCExportAvailable(0)
+    lib.QLR_SteamworksMock_SetUGCItemState(4)
+
+    assert lib.QLR_Steamworks_Init()
+    assert lib.QLR_Steamworks_ServerInit(0x01020304, 27960, 1, 1)
+    assert lib.QLR_Steamworks_SubscribeItem(0x89ABCDEF, 0x01234567)
+    assert lib.QLR_Steamworks_DownloadItem(0x89ABCDEF, 0x01234567, 1)
+    assert lib.QLR_SteamworksMock_GetUGCSubscribeCalls() == 1
+    assert lib.QLR_SteamworksMock_GetUGCDownloadCalls() == 1
+    assert lib.QLR_SteamworksMock_GetSteamGameServerUGCSubscribeCalls() == 0
+    assert lib.QLR_SteamworksMock_GetSteamGameServerUGCDownloadCalls() == 0
+    _assert_retail_auth_ticket_path_works(lib)
+
+    lib.QLR_Steamworks_Shutdown()
+    lib.QLR_SteamworksMock_Reset()
+
+
+def test_missing_optional_gameserver_networking_export_keeps_server_init_and_disables_server_p2p(
+    steamworks_harness: tuple[ctypes.CDLL, bool],
+) -> None:
+    lib, enabled = steamworks_harness
+    steam_id = 0x011000010A0B0C0D
+    payload = ctypes.create_string_buffer(b"relay")
+    packet_size = ctypes.c_uint32(123)
+    remote_id = ctypes.c_uint64(0xFFFFFFFFFFFFFFFF)
+    read_buffer = ctypes.create_string_buffer(32)
+
+    if not enabled:
+        assert not lib.QLR_Steamworks_ServerSendP2PPacket(steam_id, payload, 5, 2, 16)
+        return
+
+    lib.QLR_Steamworks_Shutdown()
+    lib.QLR_SteamworksMock_Reset()
+    lib.QLR_SteamworksMock_SetSteamGameServerNetworkingExportAvailable(0)
+
+    assert lib.QLR_Steamworks_Init()
+    assert lib.QLR_Steamworks_ServerInit(0x01020304, 27960, 1, 1)
+    assert not lib.QLR_Steamworks_ServerSendP2PPacket(steam_id, payload, 5, 2, 16)
+    assert not lib.QLR_Steamworks_ServerIsP2PPacketAvailable(ctypes.byref(packet_size), 16)
+    assert packet_size.value == 123
+    assert not lib.QLR_Steamworks_ServerReadP2PPacket(
+        read_buffer,
+        ctypes.sizeof(read_buffer),
+        ctypes.byref(packet_size),
+        ctypes.byref(remote_id),
+        16,
+    )
+    assert packet_size.value == 123
+    assert remote_id.value == 0
+    assert not lib.QLR_Steamworks_ServerAcceptP2PSession(steam_id)
+    assert lib.QLR_SteamworksMock_GetServerP2PSendCalls() == 0
+    assert lib.QLR_SteamworksMock_GetServerP2PAvailableCalls() == 0
+    assert lib.QLR_SteamworksMock_GetServerP2PReadCalls() == 0
+    assert lib.QLR_SteamworksMock_GetServerP2PAcceptCalls() == 0
+    _assert_retail_auth_ticket_path_works(lib)
+
+    lib.QLR_Steamworks_Shutdown()
+    lib.QLR_SteamworksMock_Reset()
+
+
+@pytest.mark.parametrize(
+	("mode", "queue_callback", "callback_handle", "callback_length", "steam_result_override", "expected_steam_result"),
+	[
+        ("missing_callback", 0, 41, 3, 1, 0),
+        ("mismatched_handle", 1, 42, 3, 1, 0),
+        ("steam_result_failure", 1, 41, 3, STEAM_ERESULT_FAIL, STEAM_ERESULT_FAIL),
+        ("oversized_callback_ticket", 1, 41, QL_STEAM_WEB_API_AUTH_TICKET_MAX_LENGTH + 1, 1, 1),
+    ],
+)
+def test_web_api_auth_ticket_adapter_cancels_unusable_callback_results(
+    steamworks_harness: tuple[ctypes.CDLL, bool],
+    mode: str,
+    queue_callback: int,
+    callback_handle: int,
+    callback_length: int,
+    steam_result_override: int,
+    expected_steam_result: int,
+) -> None:
+    lib, enabled = steamworks_harness
+    ticket_buffer = ctypes.create_string_buffer(TICKET_BUFFER)
+    ticket_length = ctypes.c_int(-1)
+    ticket_handle = ctypes.c_uint32(0xFFFFFFFF)
+    steam_result = ctypes.c_int(-1)
+
+    if not enabled:
+        return
+
+    lib.QLR_SteamworksMock_Reset()
+    lib.QLR_SteamworksMock_PrimeState()
+    lib.QLR_SteamworksMock_SetWebApiTicket(b"\xAB\xCD\xEF", 3, 41, steam_result_override)
+    lib.QLR_SteamworksMock_SetWebApiTicketCallbackBehavior(queue_callback, callback_handle, callback_length)
+
+    ticket_buffer.value = mode.encode("ascii")
+    assert not lib.QLR_Steamworks_RequestWebApi(
+        ticket_buffer,
+        ctypes.sizeof(ticket_buffer),
+        ctypes.byref(ticket_length),
+        ctypes.byref(ticket_handle),
+        ctypes.byref(steam_result),
+    )
+    assert ticket_buffer.value == b""
+    assert ticket_length.value == 0
+    assert ticket_handle.value == 0
+    assert steam_result.value == expected_steam_result
+    assert lib.QLR_SteamworksMock_GetWebApiTicketCalls() == 1
+    assert lib.QLR_SteamworksMock_GetCancelAuthTicketCalls() == 1
+    assert lib.QLR_SteamworksMock_GetCancelledTicketHandle() == 41
+
+
+def test_web_api_ticket_callback_yields_to_client_callback_bundle(
+    steamworks_harness: tuple[ctypes.CDLL, bool],
+) -> None:
+    lib, enabled = steamworks_harness
+    ticket_buffer = ctypes.create_string_buffer(TICKET_BUFFER)
+    ticket_length = ctypes.c_int(-1)
+    ticket_handle = ctypes.c_uint32(0xFFFFFFFF)
+    steam_result = ctypes.c_int(-1)
+
+    if not enabled:
+        return
+
+    lib.QLR_SteamworksMock_Reset()
+    lib.QLR_SteamworksMock_PrimeState()
+
+    assert lib.QLR_Steamworks_RequestWebApi(
+        ticket_buffer,
+        ctypes.sizeof(ticket_buffer),
+        ctypes.byref(ticket_length),
+        ctypes.byref(ticket_handle),
+        ctypes.byref(steam_result),
+    )
+    assert ticket_handle.value == 41
+    assert lib.QLR_SteamworksMock_GetRegisterCallbackCalls() == 1
+    assert lib.QLR_SteamworksMock_GetUnregisterCallbackCalls() == 0
+    assert lib.QLR_SteamworksMock_GetRegisteredCallbackCount() == 1
+    assert lib.QLR_SteamworksMock_GetWebApiTicketCallbackRegistered()
+    assert not lib.QLR_SteamworksMock_GetRichPresenceJoinRequestedCallbackRegistered()
+
+    assert lib.QLR_Steamworks_RegisterHarnessCallbacks()
+    assert lib.QLR_SteamworksMock_GetRegisterCallbackCalls() == 19
+    assert lib.QLR_SteamworksMock_GetUnregisterCallbackCalls() == 1
+    assert lib.QLR_SteamworksMock_GetRegisteredCallbackCount() == 18
+    assert not lib.QLR_SteamworksMock_GetWebApiTicketCallbackRegistered()
+    assert lib.QLR_SteamworksMock_GetRichPresenceJoinRequestedCallbackRegistered()
+
+    assert lib.QLR_SteamworksMock_QueueRichPresenceJoinRequested(0x0123456789ABCDEF, b"connect 127.0.0.1")
+    lib.QLR_Steamworks_RunCallbackPump()
+    assert lib.QLR_SteamworksMock_GetClientCallbackCaptureCount() == 1
+    assert lib.QLR_SteamworksMock_GetLastCallbackKind() == b"rich_presence"
+
+    lib.QLR_Steamworks_UnregisterHarnessCallbacks()
+    assert lib.QLR_SteamworksMock_GetUnregisterCallbackCalls() == 19
+    assert lib.QLR_SteamworksMock_GetRegisteredCallbackCount() == 0
+
+
+def test_web_api_ticket_callback_is_reused_across_sequential_requests(
+    steamworks_harness: tuple[ctypes.CDLL, bool],
+) -> None:
+    lib, enabled = steamworks_harness
+    ticket_buffer = ctypes.create_string_buffer(TICKET_BUFFER)
+    ticket_length = ctypes.c_int(-1)
+    ticket_handle = ctypes.c_uint32(0xFFFFFFFF)
+    steam_result = ctypes.c_int(-1)
+
+    if not enabled:
+        return
+
+    lib.QLR_SteamworksMock_Reset()
+    lib.QLR_SteamworksMock_PrimeState()
+
+    assert lib.QLR_Steamworks_RequestWebApi(
+        ticket_buffer,
+        ctypes.sizeof(ticket_buffer),
+        ctypes.byref(ticket_length),
+        ctypes.byref(ticket_handle),
+        ctypes.byref(steam_result),
+    )
+    assert ticket_buffer.value == b"abcdef"
+    assert ticket_length.value == 6
+    assert ticket_handle.value == 41
+    assert steam_result.value == 1
+    assert lib.QLR_SteamworksMock_GetRegisterCallbackCalls() == 1
+    assert lib.QLR_SteamworksMock_GetRegisteredCallbackCount() == 1
+    assert lib.QLR_SteamworksMock_GetWebApiTicketCallbackRegistered()
+    assert lib.QLR_SteamworksMock_GetWebApiTicketCalls() == 1
+
+    lib.QLR_SteamworksMock_SetWebApiTicket(b"\x01\x23\x45\x67", 4, 42, 1)
+    ticket_buffer.value = b"stale"
+    ticket_length.value = -1
+    ticket_handle.value = 0xFFFFFFFF
+    steam_result.value = -1
+
+    assert lib.QLR_Steamworks_RequestWebApi(
+        ticket_buffer,
+        ctypes.sizeof(ticket_buffer),
+        ctypes.byref(ticket_length),
+        ctypes.byref(ticket_handle),
+        ctypes.byref(steam_result),
+    )
+    assert ticket_buffer.value == b"01234567"
+    assert ticket_length.value == 8
+    assert ticket_handle.value == 42
+    assert steam_result.value == 1
+    assert lib.QLR_SteamworksMock_GetRegisterCallbackCalls() == 1
+    assert lib.QLR_SteamworksMock_GetRegisteredCallbackCount() == 1
+    assert lib.QLR_SteamworksMock_GetWebApiTicketCallbackRegistered()
+    assert lib.QLR_SteamworksMock_GetWebApiTicketCalls() == 2
+    assert lib.QLR_SteamworksMock_GetCancelAuthTicketCalls() == 0
+
+    lib.QLR_Steamworks_UnregisterHarnessCallbacks()
+    assert lib.QLR_SteamworksMock_GetUnregisterCallbackCalls() == 1
+    assert lib.QLR_SteamworksMock_GetRegisteredCallbackCount() == 0
 
 
 @pytest.mark.parametrize(
@@ -2816,6 +3890,10 @@ def test_server_browser_owner_reconstructs_retail_refresh_lifecycle(steamworks_h
     lib.QLR_SteamworksMock_Reset()
     lib.QLR_SteamworksMock_PrimeState()
 
+    assert not lib.QLR_Steamworks_CompleteServerBrowserOwnerRequest(ctypes.byref(owner))
+    assert owner.refreshActive == 0
+    assert owner.request == 0
+
     assert lib.QLR_Steamworks_BeginServerBrowserOwnerRequest(ctypes.byref(owner), 0, 0xABCDEF)
     assert owner.refreshActive == 1
     assert owner.request == 0x13572468
@@ -2833,6 +3911,9 @@ def test_server_browser_owner_reconstructs_retail_refresh_lifecycle(steamworks_h
     assert lib.QLR_SteamworksMock_GetServerBrowserLastRequest() == 0x13572468
 
     assert lib.QLR_Steamworks_CompleteServerBrowserOwnerRequest(ctypes.byref(owner))
+    assert owner.refreshActive == 0
+    assert owner.request == 0x13572468
+    assert not lib.QLR_Steamworks_CompleteServerBrowserOwnerRequest(ctypes.byref(owner))
     assert owner.refreshActive == 0
     assert owner.request == 0x13572468
 
@@ -3306,16 +4387,32 @@ def test_server_browser_detail_lifecycle_reconstructs_retail_three_callback_rele
     if not enabled:
         lifecycle.identity.serverIp = 0x01020304
         lifecycle.completedCallbacks = 2
+        lifecycle.completedTerminalChannels = DETAIL_TERMINAL_ALL
         lifecycle.releaseReady = 1
         assert not lib.QLR_Steamworks_InitServerBrowserDetailLifecycle(0x01020304, 27960, ctypes.byref(lifecycle))
         assert lifecycle.identity.serverIp == 0
         assert lifecycle.completedCallbacks == 0
+        assert lifecycle.completedTerminalChannels == 0
         assert lifecycle.releaseReady == 0
 
         lifecycle.completedCallbacks = 2
+        lifecycle.completedTerminalChannels = DETAIL_TERMINAL_ALL
         lifecycle.releaseReady = 1
         assert not lib.QLR_Steamworks_CompleteServerBrowserDetailCallback(ctypes.byref(lifecycle), ctypes.byref(release_ready))
         assert lifecycle.completedCallbacks == 0
+        assert lifecycle.completedTerminalChannels == 0
+        assert lifecycle.releaseReady == 0
+        assert release_ready.value == 0
+        lifecycle.completedCallbacks = 2
+        lifecycle.completedTerminalChannels = DETAIL_TERMINAL_ALL
+        lifecycle.releaseReady = 1
+        assert not lib.QLR_Steamworks_CompleteServerBrowserDetailTerminal(
+            ctypes.byref(lifecycle),
+            DETAIL_TERMINAL_RULES,
+            ctypes.byref(release_ready),
+        )
+        assert lifecycle.completedCallbacks == 0
+        assert lifecycle.completedTerminalChannels == 0
         assert lifecycle.releaseReady == 0
         assert release_ready.value == 0
         return
@@ -3325,31 +4422,109 @@ def test_server_browser_detail_lifecycle_reconstructs_retail_three_callback_rele
     assert lifecycle.identity.serverPort == 27960
     assert _c_string(lifecycle.identity.id) == b"16909060_27960"
     assert lifecycle.completedCallbacks == 0
+    assert lifecycle.completedTerminalChannels == 0
     assert lifecycle.releaseReady == 0
 
-    for expected_count in (1, 2):
+    for expected_count, expected_channels in (
+        (1, DETAIL_TERMINAL_PING),
+        (2, DETAIL_TERMINAL_PING | DETAIL_TERMINAL_RULES),
+    ):
         release_ready.value = 7
         assert lib.QLR_Steamworks_CompleteServerBrowserDetailCallback(ctypes.byref(lifecycle), ctypes.byref(release_ready))
         assert lifecycle.completedCallbacks == expected_count
+        assert lifecycle.completedTerminalChannels == expected_channels
         assert lifecycle.releaseReady == 0
         assert release_ready.value == 0
 
     release_ready.value = 0
     assert lib.QLR_Steamworks_CompleteServerBrowserDetailCallback(ctypes.byref(lifecycle), ctypes.byref(release_ready))
     assert lifecycle.completedCallbacks == 3
+    assert lifecycle.completedTerminalChannels == DETAIL_TERMINAL_ALL
     assert lifecycle.releaseReady == 1
     assert release_ready.value == 1
 
     release_ready.value = 0
     assert not lib.QLR_Steamworks_CompleteServerBrowserDetailCallback(ctypes.byref(lifecycle), ctypes.byref(release_ready))
     assert lifecycle.completedCallbacks == 3
+    assert lifecycle.completedTerminalChannels == DETAIL_TERMINAL_ALL
     assert lifecycle.releaseReady == 1
+    assert release_ready.value == 1
+
+    channel_lifecycle = SteamServerBrowserDetailLifecycle()
+    assert lib.QLR_Steamworks_InitServerBrowserDetailLifecycle(0x01020304, 27960, ctypes.byref(channel_lifecycle))
+
+    release_ready.value = 7
+    assert lib.QLR_Steamworks_CompleteServerBrowserDetailTerminal(
+        ctypes.byref(channel_lifecycle),
+        DETAIL_TERMINAL_RULES,
+        ctypes.byref(release_ready),
+    )
+    assert channel_lifecycle.completedCallbacks == 1
+    assert channel_lifecycle.completedTerminalChannels == DETAIL_TERMINAL_RULES
+    assert channel_lifecycle.releaseReady == 0
+    assert release_ready.value == 0
+
+    release_ready.value = 7
+    assert not lib.QLR_Steamworks_CompleteServerBrowserDetailTerminal(
+        ctypes.byref(channel_lifecycle),
+        DETAIL_TERMINAL_RULES,
+        ctypes.byref(release_ready),
+    )
+    assert channel_lifecycle.completedCallbacks == 1
+    assert channel_lifecycle.completedTerminalChannels == DETAIL_TERMINAL_RULES
+    assert channel_lifecycle.releaseReady == 0
+    assert release_ready.value == 0
+
+    release_ready.value = 7
+    assert not lib.QLR_Steamworks_CompleteServerBrowserDetailTerminal(
+        ctypes.byref(channel_lifecycle),
+        0,
+        ctypes.byref(release_ready),
+    )
+    assert channel_lifecycle.completedCallbacks == 1
+    assert channel_lifecycle.completedTerminalChannels == DETAIL_TERMINAL_RULES
+    assert channel_lifecycle.releaseReady == 0
+    assert release_ready.value == 0
+
+    release_ready.value = 7
+    assert lib.QLR_Steamworks_CompleteServerBrowserDetailTerminal(
+        ctypes.byref(channel_lifecycle),
+        DETAIL_TERMINAL_PING,
+        ctypes.byref(release_ready),
+    )
+    assert channel_lifecycle.completedCallbacks == 2
+    assert channel_lifecycle.completedTerminalChannels == DETAIL_TERMINAL_PING | DETAIL_TERMINAL_RULES
+    assert channel_lifecycle.releaseReady == 0
+    assert release_ready.value == 0
+
+    release_ready.value = 0
+    assert lib.QLR_Steamworks_CompleteServerBrowserDetailTerminal(
+        ctypes.byref(channel_lifecycle),
+        DETAIL_TERMINAL_PLAYERS,
+        ctypes.byref(release_ready),
+    )
+    assert channel_lifecycle.completedCallbacks == 3
+    assert channel_lifecycle.completedTerminalChannels == DETAIL_TERMINAL_ALL
+    assert channel_lifecycle.releaseReady == 1
+    assert release_ready.value == 1
+
+    release_ready.value = 0
+    assert not lib.QLR_Steamworks_CompleteServerBrowserDetailTerminal(
+        ctypes.byref(channel_lifecycle),
+        DETAIL_TERMINAL_PLAYERS,
+        ctypes.byref(release_ready),
+    )
+    assert channel_lifecycle.completedCallbacks == 3
+    assert channel_lifecycle.completedTerminalChannels == DETAIL_TERMINAL_ALL
+    assert channel_lifecycle.releaseReady == 1
     assert release_ready.value == 1
 
     invalid_lifecycle = SteamServerBrowserDetailLifecycle()
     invalid_lifecycle.completedCallbacks = 99
+    invalid_lifecycle.completedTerminalChannels = DETAIL_TERMINAL_ALL
     assert not lib.QLR_Steamworks_InitServerBrowserDetailLifecycle(0, 27960, ctypes.byref(invalid_lifecycle))
     assert invalid_lifecycle.completedCallbacks == 0
+    assert invalid_lifecycle.completedTerminalChannels == 0
     assert invalid_lifecycle.releaseReady == 0
 
     blank_lifecycle = SteamServerBrowserDetailLifecycle()
@@ -3397,6 +4572,20 @@ def test_server_browser_detail_request_owner_reconstructs_retail_response_views_
         assert not request.detailObjectBase
         assert request.queriesActive == 0
         assert release_ready.value == 0
+
+        request.detailObjectBase = detail_base
+        request.queriesActive = 1
+        request.lifecycle.completedTerminalChannels = DETAIL_TERMINAL_ALL
+        release_ready.value = 1
+        assert not lib.QLR_Steamworks_CompleteServerBrowserDetailRequestTerminal(
+            ctypes.byref(request),
+            DETAIL_TERMINAL_RULES,
+            ctypes.byref(release_ready),
+        )
+        assert not request.detailObjectBase
+        assert request.lifecycle.completedTerminalChannels == 0
+        assert request.queriesActive == 0
+        assert release_ready.value == 0
         return
 
     assert lib.QLR_Steamworks_BuildServerBrowserDetailResponseViews(detail_base, ctypes.byref(views))
@@ -3421,6 +4610,7 @@ def test_server_browser_detail_request_owner_reconstructs_retail_response_views_
     assert request.lifecycle.identity.serverIp == 0x01020304
     assert request.lifecycle.identity.serverPort == 27960
     assert _c_string(request.lifecycle.identity.id) == b"16909060_27960"
+    assert request.lifecycle.completedTerminalChannels == 0
     assert lib.QLR_SteamworksMock_GetServerBrowserPingCalls() == 1
     assert lib.QLR_SteamworksMock_GetServerBrowserRulesCalls() == 1
     assert lib.QLR_SteamworksMock_GetServerBrowserPlayersCalls() == 1
@@ -3436,10 +4626,14 @@ def test_server_browser_detail_request_owner_reconstructs_retail_response_views_
     assert request.queriesActive == 1
     assert lib.QLR_SteamworksMock_GetServerBrowserPingCalls() == 1
 
-    for expected_count in (1, 2):
+    for expected_count, expected_channels in (
+        (1, DETAIL_TERMINAL_PING),
+        (2, DETAIL_TERMINAL_PING | DETAIL_TERMINAL_RULES),
+    ):
         release_ready.value = 7
         assert lib.QLR_Steamworks_CompleteServerBrowserDetailRequestCallback(ctypes.byref(request), ctypes.byref(release_ready))
         assert request.lifecycle.completedCallbacks == expected_count
+        assert request.lifecycle.completedTerminalChannels == expected_channels
         assert request.queriesActive == 1
         assert request.pingQuery == 11
         assert release_ready.value == 0
@@ -3447,6 +4641,7 @@ def test_server_browser_detail_request_owner_reconstructs_retail_response_views_
     release_ready.value = 0
     assert lib.QLR_Steamworks_CompleteServerBrowserDetailRequestCallback(ctypes.byref(request), ctypes.byref(release_ready))
     assert request.lifecycle.completedCallbacks == 3
+    assert request.lifecycle.completedTerminalChannels == DETAIL_TERMINAL_ALL
     assert request.lifecycle.releaseReady == 1
     assert request.queriesActive == 0
     assert not request.detailObjectBase
@@ -3457,6 +4652,77 @@ def test_server_browser_detail_request_owner_reconstructs_retail_response_views_
 
     release_ready.value = 0
     assert not lib.QLR_Steamworks_CompleteServerBrowserDetailRequestCallback(ctypes.byref(request), ctypes.byref(release_ready))
+    assert release_ready.value == 1
+
+    lib.QLR_SteamworksMock_Reset()
+    lib.QLR_SteamworksMock_PrimeState()
+
+    channel_request = SteamServerBrowserDetailRequest()
+    assert lib.QLR_Steamworks_BeginServerBrowserDetailRequest(
+        ctypes.byref(channel_request),
+        0x01020304,
+        27960,
+        detail_base,
+    )
+    assert channel_request.detailObjectBase == detail_base
+    assert channel_request.queriesActive == 1
+    assert channel_request.lifecycle.completedTerminalChannels == 0
+
+    release_ready.value = 7
+    assert lib.QLR_Steamworks_CompleteServerBrowserDetailRequestTerminal(
+        ctypes.byref(channel_request),
+        DETAIL_TERMINAL_RULES,
+        ctypes.byref(release_ready),
+    )
+    assert channel_request.lifecycle.completedCallbacks == 1
+    assert channel_request.lifecycle.completedTerminalChannels == DETAIL_TERMINAL_RULES
+    assert channel_request.queriesActive == 1
+    assert release_ready.value == 0
+
+    release_ready.value = 7
+    assert not lib.QLR_Steamworks_CompleteServerBrowserDetailRequestTerminal(
+        ctypes.byref(channel_request),
+        DETAIL_TERMINAL_RULES,
+        ctypes.byref(release_ready),
+    )
+    assert channel_request.lifecycle.completedCallbacks == 1
+    assert channel_request.lifecycle.completedTerminalChannels == DETAIL_TERMINAL_RULES
+    assert channel_request.queriesActive == 1
+    assert release_ready.value == 0
+
+    release_ready.value = 7
+    assert lib.QLR_Steamworks_CompleteServerBrowserDetailRequestTerminal(
+        ctypes.byref(channel_request),
+        DETAIL_TERMINAL_PING,
+        ctypes.byref(release_ready),
+    )
+    assert channel_request.lifecycle.completedCallbacks == 2
+    assert channel_request.lifecycle.completedTerminalChannels == DETAIL_TERMINAL_PING | DETAIL_TERMINAL_RULES
+    assert channel_request.queriesActive == 1
+    assert release_ready.value == 0
+
+    release_ready.value = 0
+    assert lib.QLR_Steamworks_CompleteServerBrowserDetailRequestTerminal(
+        ctypes.byref(channel_request),
+        DETAIL_TERMINAL_PLAYERS,
+        ctypes.byref(release_ready),
+    )
+    assert channel_request.lifecycle.completedCallbacks == 3
+    assert channel_request.lifecycle.completedTerminalChannels == DETAIL_TERMINAL_ALL
+    assert channel_request.lifecycle.releaseReady == 1
+    assert channel_request.queriesActive == 0
+    assert not channel_request.detailObjectBase
+    assert channel_request.pingQuery == 0
+    assert channel_request.playersQuery == 0
+    assert channel_request.rulesQuery == 0
+    assert release_ready.value == 1
+
+    release_ready.value = 0
+    assert not lib.QLR_Steamworks_CompleteServerBrowserDetailRequestTerminal(
+        ctypes.byref(channel_request),
+        DETAIL_TERMINAL_PLAYERS,
+        ctypes.byref(release_ready),
+    )
     assert release_ready.value == 1
 
     invalid_request = SteamServerBrowserDetailRequest()
@@ -3666,6 +4932,32 @@ def test_game_server_init_uses_retail_init_signature_and_dedicated_ugc_owner(ste
     assert lib.QLR_SteamworksMock_GetSteamGameServerLastInitQueryPort() == 0xffff
     assert lib.QLR_SteamworksMock_GetSteamGameServerLastInitServerMode() == 2
     assert lib.QLR_SteamworksMock_GetSteamGameServerLastInitVersion() == b"custom-build"
+
+
+def test_dynamic_loader_resolves_retail_first_mock_exports_without_prime_state(
+    steamworks_harness: tuple[ctypes.CDLL, bool],
+) -> None:
+    lib, enabled = steamworks_harness
+
+    if not enabled:
+        assert not lib.QLR_Steamworks_Init()
+        assert not lib.QLR_Steamworks_ServerInit(0x01020304, 27960, 1, 1)
+        return
+
+    lib.QLR_Steamworks_Shutdown()
+    lib.QLR_SteamworksMock_Reset()
+
+    assert lib.QLR_Steamworks_Init()
+    assert lib.QLR_Steamworks_GetAppID() == REFERENCE_RETAIL_APP_ID
+
+    assert lib.QLR_Steamworks_ServerInit(0x01020304, 27960, 1, 1)
+    assert lib.QLR_SteamworksMock_GetSteamGameServerInitCalls() == 1
+    assert lib.QLR_SteamworksMock_GetSteamGameServerLastInitGamePort() == 27960
+    assert lib.QLR_SteamworksMock_GetSteamGameServerLastInitVersion() == b"1069"
+
+    lib.QLR_Steamworks_ServerShutdown()
+    assert lib.QLR_SteamworksMock_GetSteamGameServerShutdownCalls() == 1
+    lib.QLR_Steamworks_Shutdown()
 
 
 def test_game_server_init_failure_keeps_server_runtime_state_cold(steamworks_harness: tuple[ctypes.CDLL, bool]) -> None:
@@ -4527,6 +5819,30 @@ def test_set_lobby_server_requires_local_lobby_ownership(steamworks_harness: tup
 
     assert not lib.QLR_Steamworks_SetLobbyServer(0xAAAAAAAA, 0xBBBBBBBB, 0x7F000001, 27960)
     assert lib.QLR_SteamworksMock_GetLobbySetServerCalls() == 0
+
+
+def test_steam_apps_subscription_wrapper_uses_mock_vtable(
+    steamworks_harness: tuple[ctypes.CDLL, bool],
+) -> None:
+    lib, enabled = steamworks_harness
+
+    if not enabled:
+        assert not lib.QLR_Steamworks_IsSubscribedApp(REFERENCE_RETAIL_APP_ID)
+        return
+
+    lib.QLR_SteamworksMock_Reset()
+    lib.QLR_SteamworksMock_PrimeState()
+    assert lib.QLR_Steamworks_Init()
+
+    lib.QLR_SteamworksMock_SetSteamAppsSubscribedResult(1)
+    assert lib.QLR_Steamworks_IsSubscribedApp(REFERENCE_RETAIL_APP_ID)
+    assert lib.QLR_SteamworksMock_GetSteamAppsInterfaceCalls() == 1
+    assert lib.QLR_SteamworksMock_GetSteamAppsLastAppId() == REFERENCE_RETAIL_APP_ID
+
+    lib.QLR_SteamworksMock_SetSteamAppsSubscribedResult(0)
+    assert not lib.QLR_Steamworks_IsSubscribedApp(0x123456)
+    assert lib.QLR_SteamworksMock_GetSteamAppsInterfaceCalls() == 2
+    assert lib.QLR_SteamworksMock_GetSteamAppsLastAppId() == 0x123456
 
 
 def test_workshop_helpers_use_mapped_ugc_slots(steamworks_harness: tuple[ctypes.CDLL, bool]) -> None:

@@ -15,6 +15,9 @@ artifacts/nightly/
 
 # Local third-party SDK drops
 src/libs/libpng/
+src/libs/libzmq/*
+!src/libs/libzmq/
+!src/libs/libzmq/README.md
 src/libs/vorbis/
 src/libs/_build/
 src/libs/_deps/
