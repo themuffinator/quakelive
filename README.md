@@ -2,8 +2,6 @@
   <img src="assets/img/logo-banner.png" alt="Quake Live SRP" width="100%">
 </p>
 
-# Quake Live SRP
-
 [![Audit](https://img.shields.io/badge/Read-Audit-1f6feb)](AUDIT.md)
 [![Work Queue](https://img.shields.io/badge/View-Work%20Queue-2ea44f)](IMPLEMENTATION_PLAN.md)
 [![Build Guide](https://img.shields.io/badge/Open-Build%20Guide-b8860b)](BUILD.md)
