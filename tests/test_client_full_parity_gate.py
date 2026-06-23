@@ -190,8 +190,8 @@ def _build_client_full_parity_gate_report() -> dict[str, Any]:
 		and "qboolean QL_Steamworks_RegisterClientCallbacks( const ql_steam_client_callback_bindings_t *bindings ) {" in platform_steamworks
 		and "qboolean QL_Steamworks_RegisterLobbyCallbacks( const ql_steam_lobby_callback_bindings_t *bindings ) {" in platform_steamworks
 		and "qboolean QL_Steamworks_RegisterMicroCallbacks( const ql_steam_micro_callback_bindings_t *bindings ) {" in platform_steamworks
-		and 'QL_Steamworks_LoadOptionalSymbol( (void **)&state.SteamAPI_RegisterCallback, "SteamAPI_RegisterCallback" );' in platform_steamworks
-		and 'QL_Steamworks_LoadOptionalSymbol( (void **)&state.SteamAPI_RegisterCallResult, "SteamAPI_RegisterCallResult" );' in platform_steamworks
+		and "QL_Steamworks_LoadOptionalSymbol( (void **)&state.SteamAPI_RegisterCallback, QL_STEAMWORKS_EXPORT_STEAM_API_REGISTER_CALLBACK );" in platform_steamworks
+		and "QL_Steamworks_LoadOptionalSymbol( (void **)&state.SteamAPI_RegisterCallResult, QL_STEAMWORKS_EXPORT_STEAM_API_REGISTER_CALL_RESULT );" in platform_steamworks
 		and "QL_Steamworks_RunCallbacks();" in cl_main
 		and "test_client_steam_callback_owner_reconstructs_retail_frame_pump_and_lifecycle" in platform_services_tests
 		and "test_callback_bundle_registration_and_dispatch_reconstructs_retail_client_owner" in steamworks_harness_tests
@@ -210,8 +210,8 @@ def _build_client_full_parity_gate_report() -> dict[str, Any]:
 			"lobby_callback_registration_present": "qboolean QL_Steamworks_RegisterLobbyCallbacks( const ql_steam_lobby_callback_bindings_t *bindings ) {" in platform_steamworks,
 			"micro_callback_registration_present": "qboolean QL_Steamworks_RegisterMicroCallbacks( const ql_steam_micro_callback_bindings_t *bindings ) {" in platform_steamworks,
 			"optional_register_symbols_present": (
-				'QL_Steamworks_LoadOptionalSymbol( (void **)&state.SteamAPI_RegisterCallback, "SteamAPI_RegisterCallback" );' in platform_steamworks
-				and 'QL_Steamworks_LoadOptionalSymbol( (void **)&state.SteamAPI_RegisterCallResult, "SteamAPI_RegisterCallResult" );' in platform_steamworks
+				"QL_Steamworks_LoadOptionalSymbol( (void **)&state.SteamAPI_RegisterCallback, QL_STEAMWORKS_EXPORT_STEAM_API_REGISTER_CALLBACK );" in platform_steamworks
+				and "QL_Steamworks_LoadOptionalSymbol( (void **)&state.SteamAPI_RegisterCallResult, QL_STEAMWORKS_EXPORT_STEAM_API_REGISTER_CALL_RESULT );" in platform_steamworks
 			),
 			"client_frame_pump_present": "QL_Steamworks_RunCallbacks();" in cl_main,
 			"harness_validation_present": (

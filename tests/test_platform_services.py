@@ -10317,6 +10317,7 @@ def test_steam_browser_request_mode_matrix_tracks_retail_hlil_and_source_fallbac
 
 
 def test_client_web_host_exports_label_online_service_social_and_ugc_boundaries() -> None:
+    cl_main = (REPO_ROOT / "src/code/client/cl_main.c").read_text(encoding="utf-8")
     cl_cgame = (REPO_ROOT / "src/code/client/cl_cgame.c").read_text(encoding="utf-8")
 
     web_mode_block = _extract_function_block(cl_cgame, "static const char *CL_GetWebHostModeLabel( void )")
@@ -10346,11 +10347,15 @@ def test_client_web_host_exports_label_online_service_social_and_ugc_boundaries(
         cl_cgame, "static void CL_LogWebHostWorkshopExportLifecycle( const char *stage, const char *reason )"
     )
     steam_identity_block = _extract_function_block(cl_cgame, "static qboolean CL_WebHost_HasSteamIdentity( void )")
+    web_bootstrap_block = _extract_function_block(cl_cgame, "static void CL_WebHost_RefreshBootstrapProperties( void )")
     friend_block = _extract_function_block(
         cl_cgame, "static void CL_WebHost_BuildFriendListJson( char *buffer, size_t bufferSize )"
     )
     config_block = _extract_function_block(
         cl_cgame, "static void CL_WebHost_BuildConfigJson( char *buffer, size_t bufferSize ) {"
+    )
+    format_summary_block = _extract_function_block(
+        cl_main, "void CL_Steam_FormatFriendSummaryJson( const ql_steam_friend_summary_t *summary, char *buffer, size_t bufferSize ) {"
     )
     method_block = _extract_function_block(
         cl_cgame,
@@ -10385,10 +10390,16 @@ def test_client_web_host_exports_label_online_service_social_and_ugc_boundaries(
     assert 'CL_LogWebHostMatchmakingExportLifecycle( "friend-list", "Steam social export unavailable for current compatibility lane" );' in friend_block
     assert "CL_Steam_FormatFriendSummaryJson( &summary, friendJson, sizeof( friendJson ) );" in friend_block
     assert 'Q_strcat( buffer, bufferSize, friendJson );' in friend_block
+    assert '\\"avatar\\":\\"%s\\"' in format_summary_block
+    assert '\\"avatarUrl\\":\\"%s\\"' in format_summary_block
+    assert '\\"profileUrl\\":\\"%s\\"' in format_summary_block
     assert '"queryPort"' not in friend_block
     assert '"gameServer"' not in friend_block
 
     for field in (
+        "playerAvatar",
+        "playerAvatarUrl",
+        "playerProfileUrl",
         "onlineServicesMode",
         "onlineServicesPolicy",
         "matchmakingProvider",
@@ -10404,6 +10415,12 @@ def test_client_web_host_exports_label_online_service_social_and_ugc_boundaries(
     assert "matchmakingPolicy = CL_GetWebHostMatchmakingPolicyLabel();" in config_block
     assert "workshopProvider = CL_GetWebHostWorkshopProviderLabel();" in config_block
     assert "workshopPolicy = CL_GetWebHostWorkshopPolicyLabel();" in config_block
+    assert "CL_WebHost_FormatSteamAvatarUrl( steamId, cl_webHost.playerAvatarUrl, sizeof( cl_webHost.playerAvatarUrl ) );" in web_bootstrap_block
+    assert "CL_WebHost_FormatSteamProfileUrl( steamId, cl_webHost.playerProfileUrl, sizeof( cl_webHost.playerProfileUrl ) );" in web_bootstrap_block
+    assert '\\"playerProfile\\":{\\"id\\":\\"' in config_block
+    assert '\\"avatar\\":\\"' in config_block
+    assert '\\"avatarUrl\\":\\"' in config_block
+    assert '\\"profileUrl\\":\\"' in config_block
     assert "CL_WebHost_AppendJsonEscaped( buffer, bufferSize, onlineServicesMode );" in config_block
     assert "CL_WebHost_AppendJsonEscaped( buffer, bufferSize, workshopPolicy );" in config_block
 
@@ -12254,8 +12271,12 @@ def test_client_social_presence_and_ugc_callback_lanes_stay_explicit() -> None:
     assert '"{\\"id\\":\\"%s\\",\\"status\\":\\"%s\\",\\"lanIp\\":\\"%s\\"}"' in format_presence_block
     assert "CL_Steam_FormatFriendSummaryJson( &event->summary, friendSummary, sizeof( friendSummary ) );" in format_persona_block
     assert '"{\\"id\\":\\"%s\\",\\"state\\":%u,\\"friend\\":%s}"' in format_persona_block
-    assert '"{\\"id\\":\\"%s\\",\\"name\\":\\"%s\\",\\"state\\":%d,\\"relationship\\":%d,\\"nickname\\":\\"%s\\",\\"status\\":\\"%s\\",\\"lanIp\\":\\"%s\\",\\"playingQuake\\":%d,\\"game\\":%s}"' in format_summary_block
+    assert '"{\\"id\\":\\"%s\\",\\"name\\":\\"%s\\",\\"avatar\\":\\"%s\\",\\"avatarUrl\\":\\"%s\\",\\"profileUrl\\":\\"%s\\",\\"state\\":%d,\\"relationship\\":%d,\\"nickname\\":\\"%s\\",\\"status\\":\\"%s\\",\\"lanIp\\":\\"%s\\",\\"playingQuake\\":%d,\\"game\\":%s}"' in format_summary_block
     assert "CL_Steam_FormatFriendGameJson( summary, game, sizeof( game ) );" in format_summary_block
+    assert "CL_Steam_FormatAvatarUrl( summary->steamId.value, avatarUrl, sizeof( avatarUrl ) );" in format_summary_block
+    assert "CL_Steam_FormatProfileUrl( summary->steamId.value, profileUrl, sizeof( profileUrl ) );" in format_summary_block
+    assert '"steam://avatar/large/%llu"' in cl_main
+    assert '"https://steamcommunity.com/profiles/%llu"' in cl_main
     assert '"server"' not in format_summary_block
     assert "QL_Steamworks_GetQueryUGCResult( queryHandle, i, &publishedFileId, title, sizeof( title ), description, sizeof( description ) )" in ugc_results_block
     assert "QL_Steamworks_GetQueryUGCPreviewURL( queryHandle, i, image, sizeof( image ) )" in ugc_results_block

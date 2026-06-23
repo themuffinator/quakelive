@@ -297,6 +297,8 @@ typedef struct {
 	char		currentDocument[MAX_QPATH];
 	char		pendingHash[MAX_STRING_CHARS];
 	char		playerName[MAX_NAME_LENGTH];
+	char		playerAvatarUrl[96];
+	char		playerProfileUrl[128];
 	char		sessionPath[MAX_OSPATH];
 	char		surfaceImageName[MAX_QPATH];
 	char		surfaceShaderName[MAX_QPATH];
@@ -960,6 +962,46 @@ static qboolean CL_WebHost_HasSteamIdentity( void ) {
 
 /*
 =============
+CL_WebHost_FormatSteamAvatarUrl
+
+Formats the local player's SteamDataSource avatar URI for WebUI consumers.
+=============
+*/
+static void CL_WebHost_FormatSteamAvatarUrl( unsigned long long steamId, char *buffer, size_t bufferSize ) {
+	if ( !buffer || bufferSize == 0 ) {
+		return;
+	}
+
+	if ( steamId == 0ull ) {
+		buffer[0] = '\0';
+		return;
+	}
+
+	Com_sprintf( buffer, bufferSize, "steam://avatar/large/%llu", steamId );
+}
+
+/*
+=============
+CL_WebHost_FormatSteamProfileUrl
+
+Formats the local player's Steam community profile URL for WebUI consumers.
+=============
+*/
+static void CL_WebHost_FormatSteamProfileUrl( unsigned long long steamId, char *buffer, size_t bufferSize ) {
+	if ( !buffer || bufferSize == 0 ) {
+		return;
+	}
+
+	if ( steamId == 0ull ) {
+		buffer[0] = '\0';
+		return;
+	}
+
+	Com_sprintf( buffer, bufferSize, "https://steamcommunity.com/profiles/%llu", steamId );
+}
+
+/*
+=============
 CL_WebHost_RefreshBootstrapProperties
 =============
 */
@@ -982,6 +1024,8 @@ static void CL_WebHost_RefreshBootstrapProperties( void ) {
 		Cvar_VariableStringBuffer( "name", playerName, sizeof( playerName ) );
 	}
 	Q_strncpyz( cl_webHost.playerName, playerName, sizeof( cl_webHost.playerName ) );
+	CL_WebHost_FormatSteamAvatarUrl( steamId, cl_webHost.playerAvatarUrl, sizeof( cl_webHost.playerAvatarUrl ) );
+	CL_WebHost_FormatSteamProfileUrl( steamId, cl_webHost.playerProfileUrl, sizeof( cl_webHost.playerProfileUrl ) );
 }
 
 /*
@@ -4672,7 +4716,24 @@ static void CL_WebHost_BuildConfigJson( char *buffer, size_t bufferSize ) {
 		steamId
 	);
 	CL_WebHost_AppendJsonEscaped( buffer, bufferSize, cl_webHost.playerName );
-	Q_strcat( buffer, bufferSize, "\",\"appId\":" );
+	Q_strcat( buffer, bufferSize, "\",\"playerAvatar\":\"" );
+	CL_WebHost_AppendJsonEscaped( buffer, bufferSize, cl_webHost.playerAvatarUrl );
+	Q_strcat( buffer, bufferSize, "\",\"playerAvatarUrl\":\"" );
+	CL_WebHost_AppendJsonEscaped( buffer, bufferSize, cl_webHost.playerAvatarUrl );
+	Q_strcat( buffer, bufferSize, "\",\"playerProfileUrl\":\"" );
+	CL_WebHost_AppendJsonEscaped( buffer, bufferSize, cl_webHost.playerProfileUrl );
+	Q_strcat( buffer, bufferSize, "\",\"playerProfile\":{\"id\":\"" );
+	CL_WebHost_AppendJsonEscaped( buffer, bufferSize, steamId );
+	Q_strcat( buffer, bufferSize, "\",\"name\":\"" );
+	CL_WebHost_AppendJsonEscaped( buffer, bufferSize, cl_webHost.playerName );
+	Q_strcat( buffer, bufferSize, "\",\"avatar\":\"" );
+	CL_WebHost_AppendJsonEscaped( buffer, bufferSize, cl_webHost.playerAvatarUrl );
+	Q_strcat( buffer, bufferSize, "\",\"avatarUrl\":\"" );
+	CL_WebHost_AppendJsonEscaped( buffer, bufferSize, cl_webHost.playerAvatarUrl );
+	Q_strcat( buffer, bufferSize, "\",\"profileUrl\":\"" );
+	CL_WebHost_AppendJsonEscaped( buffer, bufferSize, cl_webHost.playerProfileUrl );
+	Q_strcat( buffer, bufferSize, "\"}" );
+	Q_strcat( buffer, bufferSize, ",\"appId\":" );
 	Q_strcat( buffer, bufferSize, va( "%u", cl_webHost.appId ) );
 	Q_strcat( buffer, bufferSize, ",\"onlineServicesMode\":\"" );
 	CL_WebHost_AppendJsonEscaped( buffer, bufferSize, onlineServicesMode );

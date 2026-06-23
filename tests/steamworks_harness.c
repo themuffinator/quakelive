@@ -5090,8 +5090,11 @@ static void QLR_SteamworksMock_DispatchPendingCallbacks( qboolean gameServer ) {
 			}
 
 			if ( pending->callResult ) {
-				if ( callbackBase->vtable->runCallResult ) {
-					callbackBase->vtable->runCallResult( callbackBase, pending->payload, pending->ioFailure, pending->callHandle );
+				qlr_callback_run_call_result_fn runCallResult;
+
+				runCallResult = (qlr_callback_run_call_result_fn)callbackBase->vtable->run;
+				if ( runCallResult ) {
+					runCallResult( callbackBase, pending->payload, pending->ioFailure, pending->callHandle );
 				}
 			} else if ( callbackBase->vtable->run ) {
 				callbackBase->vtable->run( callbackBase, pending->payload );

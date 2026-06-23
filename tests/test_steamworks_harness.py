@@ -6395,6 +6395,7 @@ def test_ugc_call_result_failure_projection_preserves_retail_callback_shape(
     assert lib.QLR_SteamworksMock_GetLastCallbackAppId() == 2
     assert lib.QLR_SteamworksMock_GetLastCallbackResult() == 15
 
+    assert lib.QLR_Steamworks_BindUGCQueryCallResult(call_handle)
     assert lib.QLR_SteamworksMock_QueueUGCQueryCompletedEx(
         call_handle,
         0x0123456789ABCDEF,
@@ -6414,6 +6415,7 @@ def test_ugc_call_result_failure_projection_preserves_retail_callback_shape(
     assert lib.QLR_SteamworksMock_GetLastCallbackAppId() == 7
     assert lib.QLR_SteamworksMock_GetLastCallbackResult() == -1
 
+    assert lib.QLR_Steamworks_BindUGCQueryCallResult(call_handle)
     assert lib.QLR_SteamworksMock_QueueUGCQueryCompletedEx(
         call_handle,
         0xFFFFFFFFFFFFFFFF,
@@ -6433,6 +6435,7 @@ def test_ugc_call_result_failure_projection_preserves_retail_callback_shape(
     assert lib.QLR_SteamworksMock_GetLastCallbackAppId() == 0
     assert lib.QLR_SteamworksMock_GetLastCallbackResult() == -1
 
+    assert lib.QLR_Steamworks_BindUGCQueryCallResult(call_handle)
     assert lib.QLR_SteamworksMock_QueueUGCQueryCompletedEx(
         call_handle,
         0xFFFFFFFFFFFFFFFF,
@@ -6453,4 +6456,4 @@ def test_ugc_call_result_failure_projection_preserves_retail_callback_shape(
     assert lib.QLR_SteamworksMock_GetLastCallbackResult() == 0
 
     lib.QLR_Steamworks_UnregisterHarnessCallbacks()
-    assert lib.QLR_SteamworksMock_GetUnregisterCallResultCalls() == 1
+    assert lib.QLR_SteamworksMock_GetUnregisterCallResultCalls() == 4

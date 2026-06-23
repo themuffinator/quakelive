@@ -47,6 +47,30 @@ disabled, until a documented open replacement path exists.
 
 ## Active work
 
+### Task A655: Restore Steamworks UGC call-result CI validation [COMPLETED]
+Priority: High
+Primary areas: `tests/steamworks_harness.c`,
+`tests/test_steamworks_harness.py`, `tests/test_client_full_parity_gate.py`
+Parity estimate: **before 99% -> after 99%** for retail source parity, with
+focused Steamworks UGC call-result validation confidence improving **before
+95% -> after 99%**. Repo-wide parity remains **99%** because this pass fixes
+the retained CI/harness projection around already-reconstructed retail
+`CCallResult` handle-clearing behavior rather than changing game runtime
+source behavior.
+
+Completed work:
+
+1. Rechecked retail `CCallResult<class SteamCallbacks,
+   SteamUGCQueryCompleted_t>` vtable ordering and handle-clearing behavior in
+   Binary Ninja HLIL (`sub_4606b0`, `sub_4606d0`) and the Ghidra function
+   rows.
+2. Corrected the Steamworks harness callback pump so queued call results use
+   the explicit call-result vtable slot instead of the no-handle adapter slot.
+3. Updated the focused UGC failure-projection test to bind each simulated UGC
+   call result separately, matching the retail one-shot call-handle lifetime.
+4. Aligned the client full-parity gate with the current macro-backed
+   `SteamAPI_RegisterCallback` / `SteamAPI_RegisterCallResult` export loads.
+
 ### Task A654: Pin ZMQ receive frame-more flag boundary [COMPLETED]
 Priority: High
 Primary areas: `src/code/server/sv_zmq.c`,

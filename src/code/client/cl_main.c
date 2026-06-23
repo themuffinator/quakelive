@@ -5681,6 +5681,47 @@ static void CL_Steam_FormatFriendGameJson( const ql_steam_friend_summary_t *summ
 
 /*
 =============
+CL_Steam_FormatAvatarUrl
+
+Formats the retained SteamDataSource avatar URI consumed by the WebUI resource
+bridge and renderer shader cache.
+=============
+*/
+static void CL_Steam_FormatAvatarUrl( uint64_t steamId, char *buffer, size_t bufferSize ) {
+	if ( !buffer || bufferSize == 0 ) {
+		return;
+	}
+
+	if ( steamId == 0ull ) {
+		buffer[0] = '\0';
+		return;
+	}
+
+	Com_sprintf( buffer, bufferSize, "steam://avatar/large/%llu", (unsigned long long)steamId );
+}
+
+/*
+=============
+CL_Steam_FormatProfileUrl
+
+Formats the Steam community profile URL used by WebUI profile affordances.
+=============
+*/
+static void CL_Steam_FormatProfileUrl( uint64_t steamId, char *buffer, size_t bufferSize ) {
+	if ( !buffer || bufferSize == 0 ) {
+		return;
+	}
+
+	if ( steamId == 0ull ) {
+		buffer[0] = '\0';
+		return;
+	}
+
+	Com_sprintf( buffer, bufferSize, "https://steamcommunity.com/profiles/%llu", (unsigned long long)steamId );
+}
+
+/*
+=============
 CL_Steam_FormatFriendSummaryJson
 
 Formats a Steam friend summary into the retained browser-event payload shape.
@@ -5693,6 +5734,8 @@ void CL_Steam_FormatFriendSummaryJson( const ql_steam_friend_summary_t *summary,
 	char status[QL_STEAM_STATUS_LENGTH * 2];
 	char lanIp[128];
 	char game[160];
+	char avatarUrl[96];
+	char profileUrl[128];
 
 	if ( !buffer || bufferSize == 0 ) {
 		return;
@@ -5709,13 +5752,18 @@ void CL_Steam_FormatFriendSummaryJson( const ql_steam_friend_summary_t *summary,
 	CL_Steam_JsonEscape( summary->status, status, sizeof( status ) );
 	CL_Steam_JsonEscape( summary->lanIp, lanIp, sizeof( lanIp ) );
 	CL_Steam_FormatFriendGameJson( summary, game, sizeof( game ) );
+	CL_Steam_FormatAvatarUrl( summary->steamId.value, avatarUrl, sizeof( avatarUrl ) );
+	CL_Steam_FormatProfileUrl( summary->steamId.value, profileUrl, sizeof( profileUrl ) );
 
 	Com_sprintf(
 		buffer,
 		bufferSize,
-		"{\"id\":\"%s\",\"name\":\"%s\",\"state\":%d,\"relationship\":%d,\"nickname\":\"%s\",\"status\":\"%s\",\"lanIp\":\"%s\",\"playingQuake\":%d,\"game\":%s}",
+		"{\"id\":\"%s\",\"name\":\"%s\",\"avatar\":\"%s\",\"avatarUrl\":\"%s\",\"profileUrl\":\"%s\",\"state\":%d,\"relationship\":%d,\"nickname\":\"%s\",\"status\":\"%s\",\"lanIp\":\"%s\",\"playingQuake\":%d,\"game\":%s}",
 		id,
 		name,
+		avatarUrl,
+		avatarUrl,
+		profileUrl,
 		summary->personaState,
 		summary->relationship,
 		nickname,
