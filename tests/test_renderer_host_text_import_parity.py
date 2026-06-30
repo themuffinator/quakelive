@@ -19,19 +19,21 @@ def test_renderer_host_text_imports_route_through_shared_renderer_core() -> None
 
 	assert "qboolean R_GetFontStashDebugInfo( image_t **image, int *width, int *height ) {" in tr_font
 	assert "qboolean RE_GetScaledFontMetrics( int fontHandle, float scale, float *outAscent, float *outDescent, float *outLineHeight ) {" in tr_font
-	assert "void RE_DrawScaledText( int x, int y, const char *text, int fontHandle, float scale, int maxX, float *outMaxX, qboolean forceColor, const float *baseColor ) {" in tr_font
-	assert "void RE_MeasureScaledText( const char *text, const char *end, int fontHandle, float scale, int maxX, float *outWidth, float *outHeight, float *outLeft ) {" in tr_font
+	assert "void RE_DrawScaledText( int x, int y, const char *text, int fontHandle, float scale, int limit, float *maxX, qboolean forceColor, const float *baseColor ) {" in tr_font
+	assert "void RE_MeasureScaledText( const char *text, const char *end, int fontHandle, float scale, int limit, float *outWidth, float *outHeight, float *outLeft ) {" in tr_font
 	assert "qboolean R_GetFontStashDebugInfo( image_t **image, int *width, int *height );" in tr_local
 	assert "qboolean RE_GetScaledFontMetrics( int fontHandle, float scale, float *outAscent, float *outDescent, float *outLineHeight );" in tr_local
-	assert "void RE_DrawScaledText( int x, int y, const char *text, int fontHandle, float scale, int maxX, float *outMaxX, qboolean forceColor, const float *baseColor );" in tr_local
-	assert "void RE_MeasureScaledText( const char *text, const char *end, int fontHandle, float scale, int maxX, float *outWidth, float *outHeight, float *outLeft );" in tr_local
+	assert "void RE_DrawScaledText( int x, int y, const char *text, int fontHandle, float scale, int limit, float *maxX, qboolean forceColor, const float *baseColor );" in tr_local
+	assert "void RE_MeasureScaledText( const char *text, const char *end, int fontHandle, float scale, int limit, float *outWidth, float *outHeight, float *outLeft );" in tr_local
 	assert "qboolean RE_GetScaledFontMetrics( int fontHandle, float scale, float *outAscent, float *outDescent, float *outLineHeight );" in client_h
-	assert "void RE_DrawScaledText( int x, int y, const char *text, int fontHandle, float scale, int maxX, float *outMaxX, qboolean forceColor, const float *baseColor );" in client_h
-	assert "void RE_MeasureScaledText( const char *text, const char *end, int fontHandle, float scale, int maxX, float *outWidth, float *outHeight, float *outLeft );" in client_h
-	assert "RE_DrawScaledText( x, y, text, fontHandle, scale, maxX, outMaxX," in cl_ui
-	assert "RE_MeasureScaledText( text, end, fontHandle, scale, maxX, &width, &height, outLeft );" in cl_ui
-	assert "RE_DrawScaledText( x, y, text, fontHandle, scale, maxX, outMaxX," in cl_cgame
-	assert "RE_MeasureScaledText( text, end, fontHandle, scale, maxX, &width, &height, outLeft );" in cl_cgame
+	assert "void RE_DrawScaledText( int x, int y, const char *text, int fontHandle, float scale, int limit, float *maxX, qboolean forceColor, const float *baseColor );" in client_h
+	assert "void RE_MeasureScaledText( const char *text, const char *end, int fontHandle, float scale, int limit, float *outWidth, float *outHeight, float *outLeft );" in client_h
+	assert "RE_DrawScaledText( x, y, text, fontHandle, scale, limit, maxX," in cl_ui
+	assert "RE_MeasureScaledText( text, end, fontHandle, scale, limit, &width, &height, &left );" in cl_ui
+	assert "QL_UI_WriteMeasureTextBounds( outLeft, left, width, height );" in cl_ui
+	assert "RE_DrawScaledText( x, y, text, fontHandle, scale, limit, maxX," in cl_cgame
+	assert "RE_MeasureScaledText( text, end, fontHandle, scale, limit, &width, &height, &left );" in cl_cgame
+	assert "QL_CG_WriteMeasureTextBounds( outLeft, left, width, height );" in cl_cgame
 	assert "QL_UI_GetScaledFont" not in cl_ui
 	assert "QL_CG_GetScaledFont" not in cl_cgame
 

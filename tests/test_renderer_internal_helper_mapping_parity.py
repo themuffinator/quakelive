@@ -1029,8 +1029,8 @@ def test_renderer_mapping_round_278_promotes_tail_postprocess_and_command_symbol
 	assert "static void R_PostProcessRestart( void ) {" in tr_init
 	assert "re.RetailBloomPostProcessCommand = R_AddBloomPostProcessCommand;" in tr_init
 	assert "re.RetailPostProcessPass = R_SetPostProcessBloomParameters;" in tr_init
-	assert "void RE_DrawScaledText( int x, int y, const char *text, int fontHandle, float scale, int maxX, float *outMaxX, qboolean forceColor, const float *baseColor ) {" in tr_font
-	assert "void RE_MeasureScaledText( const char *text, const char *end, int fontHandle, float scale, int maxX, float *outWidth, float *outHeight, float *outLeft ) {" in tr_font
+	assert "void RE_DrawScaledText( int x, int y, const char *text, int fontHandle, float scale, int limit, float *maxX, qboolean forceColor, const float *baseColor ) {" in tr_font
+	assert "void RE_MeasureScaledText( const char *text, const char *end, int fontHandle, float scale, int limit, float *outWidth, float *outHeight, float *outLeft ) {" in tr_font
 
 
 def test_renderer_mapping_round_279_promotes_postprocess_program_and_command_symbols() -> None:

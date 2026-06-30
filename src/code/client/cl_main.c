@@ -9018,6 +9018,8 @@ CL_Frame
 void CL_Frame ( int msec ) {
 	float	oldViewPitch;
 	float	oldViewYaw;
+	qboolean uiMenuVisible;
+	qboolean browserMenuVisible;
 
 	if ( !com_cl_running->integer ) {
 		return;
@@ -9029,7 +9031,14 @@ void CL_Frame ( int msec ) {
 		VM_Call( uivm, UI_SET_ACTIVE_MENU, UIMENU_NEED_CD );
 	} else	if ( cls.state == CA_DISCONNECTED
 		&& !com_sv_running->integer ) {
-		if ( !( cls.keyCatchers & KEYCATCH_UI ) ) {
+		uiMenuVisible = qfalse;
+		if ( uivm ) {
+			uiMenuVisible = VM_Call( uivm, UI_MENUS_ANY_VISIBLE ) ? qtrue : qfalse;
+		}
+		browserMenuVisible = ( ( cls.keyCatchers & KEYCATCH_BROWSER )
+			|| Cvar_VariableIntegerValue( "web_browserActive" )
+			|| Cvar_VariableIntegerValue( "ui_browserAwesomiumPending" ) ) ? qtrue : qfalse;
+		if ( !uiMenuVisible && !browserMenuVisible ) {
 			// if disconnected, bring up the menu
 			S_StopAllSounds();
 			VM_Call( uivm, UI_SET_ACTIVE_MENU, UIMENU_MAIN );

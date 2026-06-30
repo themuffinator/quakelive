@@ -1244,8 +1244,8 @@ void			trap_QL_ActivateAdvert( int cellId );
 qboolean		trap_QL_SetCursorPos( int x, int y );
 qboolean		trap_QL_GetCursorPos( int *x, int *y );
 qboolean		trap_QL_IsSubscribedApp( int appId );
-void			trap_QL_DrawScaledText( int x, int y, const char *text, int fontHandle, float scale, int maxX, float *outMaxX, qboolean forceColor );
-unsigned long long	trap_QL_MeasureText( const char *text, const char *end, int fontHandle, float scale, int maxX, float *outLeft );
+void			trap_QL_DrawScaledText( int x, int y, const char *text, int fontHandle, float scale, int limit, float *maxX, qboolean forceColor );
+unsigned long long	trap_QL_MeasureText( const char *text, const char *end, int fontHandle, float scale, int limit, float *outLeft );
 void			trap_QL_GetItemDownloadInfo( unsigned int itemIdLow, unsigned int itemIdHigh, unsigned long long *outDownloaded, unsigned long long *outTotal );
 #endif
 

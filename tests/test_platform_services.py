@@ -1267,8 +1267,9 @@ def test_online_service_bridge_only_hard_stubs_when_build_disabled() -> None:
     assert "CL_GetOverlayServiceDescriptor()" in refresh_block
     assert "qboolean browserRequested = CL_BrowserRuntimeRequested();" in refresh_block
     assert "qboolean awesomiumAllowed = CL_AwesomiumRuntimeActive();" in refresh_block
+    assert "qboolean awesomiumAvailable = awesomiumAllowed && !cl_webHost.loadFailed;" in refresh_block
     assert "qboolean overlayAvailable = browserRequested && CL_OverlayServiceAvailable();" in refresh_block
-    assert "qboolean browserAvailable = overlayAvailable || awesomiumAllowed;" in refresh_block
+    assert "qboolean browserAvailable = overlayAvailable || awesomiumAvailable;" in refresh_block
     assert 'CL_SetCvarIfChanged( "ui_browserAwesomium", browserAvailable ? "1" : "0" );' in refresh_block
     assert "CL_GetOverlayServiceProviderLabel()" in refresh_block
     assert "CL_GetOverlayServicePolicyLabel()" in refresh_block
@@ -1376,18 +1377,27 @@ def test_disabled_online_services_no_longer_force_console_fallback() -> None:
 
     frame_block = _extract_function_block(cl_main, "void CL_Frame ( int msec ) {")
     assert 'VM_Call( uivm, UI_SET_ACTIVE_MENU, UIMENU_MAIN );' in frame_block
+    assert "qboolean uiMenuVisible;" in frame_block
+    assert "qboolean browserMenuVisible;" in frame_block
+    assert "uiMenuVisible = VM_Call( uivm, UI_MENUS_ANY_VISIBLE ) ? qtrue : qfalse;" in frame_block
+    assert 'Cvar_VariableIntegerValue( "web_browserActive" )' in frame_block
+    assert 'Cvar_VariableIntegerValue( "ui_browserAwesomiumPending" )' in frame_block
+    assert "if ( !uiMenuVisible && !browserMenuVisible ) {" in frame_block
     assert "cls.keyCatchers = KEYCATCH_CONSOLE;" not in frame_block
     assert "S_StopBackgroundTrack();" not in frame_block
 
     draw_block = _extract_function_block(cl_scrn, "void SCR_DrawScreenField( stereoFrame_t stereoFrame ) {")
     assert "uiFullscreen = VM_Call( uivm, UI_IS_FULLSCREEN ) ? qtrue : qfalse;" in draw_block
+    assert "uiMenuVisible = VM_Call( uivm, UI_MENUS_ANY_VISIBLE ) ? qtrue : qfalse;" in draw_block
     assert "if ( browserSuppressUiRefresh && cls.state == CA_DISCONNECTED ) {" in draw_block
     assert "if ( browserOverlayRequested && cls.state == CA_DISCONNECTED ) {" not in draw_block
     assert "if ( browserDrawableSurface ) {" in draw_block
     assert "uiFullscreen = qtrue;" in draw_block
     assert "qboolean browserSuppressUiRefresh;" in draw_block
+    assert "qboolean uiMenuVisible;" in draw_block
     assert "browserSuppressUiRefresh = browserDrawableSurface || ( cls.keyCatchers & KEYCATCH_BROWSER );" in draw_block
     assert "if ( cls.keyCatchers & KEYCATCH_UI && uivm && !browserSuppressUiRefresh ) {" in draw_block
+    assert "if ( !uiMenuVisible && !browserOverlayRequested ) {" in draw_block
     assert 'VM_Call( uivm, UI_SET_ACTIVE_MENU, UIMENU_MAIN );' in draw_block
     assert "consoleFallback" not in draw_block
 
@@ -9170,6 +9180,7 @@ def test_client_browser_host_core_reconstructs_retained_runtime_owner() -> None:
     assert "cl_webHost.coreInitialised = qtrue;" in runtime_block
     assert "qboolean browserRequested = CL_BrowserRuntimeRequested();" in runtime_block
     assert "qboolean awesomiumAllowed = CL_AwesomiumRuntimeActive();" in runtime_block
+    assert "qboolean awesomiumAvailable = awesomiumAllowed && !cl_webHost.loadFailed;" in runtime_block
     assert "qboolean overlayAvailable = browserRequested && CL_OverlayServiceAvailable();" in runtime_block
     assert "cl_webHost.sessionInitialised = qtrue;" in runtime_block
     assert "cl_webHost.viewInitialised = qtrue;" in runtime_block
@@ -9199,14 +9210,17 @@ def test_client_browser_host_core_reconstructs_retained_runtime_owner() -> None:
     assert 'Cvar_VariableStringBuffer( "ui_browserAwesomium", requested, sizeof( requested ) );' in cl_cgame
     assert "qboolean browserRequested = CL_BrowserRuntimeRequested();" in bridge_block
     assert "qboolean awesomiumAllowed = CL_AwesomiumRuntimeActive();" in bridge_block
+    assert "qboolean awesomiumAvailable = awesomiumAllowed && !cl_webHost.loadFailed;" in bridge_block
     assert "qboolean overlayAvailable = browserRequested && CL_OverlayServiceAvailable();" in bridge_block
-    assert "qboolean browserAvailable = overlayAvailable || awesomiumAllowed;" in bridge_block
-    assert "qboolean awesomiumPending = CL_WebHost_AwesomiumPending( awesomiumAllowed );" in bridge_block
+    assert "qboolean browserAvailable = overlayAvailable || awesomiumAvailable;" in bridge_block
+    assert "qboolean awesomiumPending = CL_WebHost_AwesomiumPending( awesomiumAvailable );" in bridge_block
+    assert "qboolean browserLoadFailed = cl_webHost.loadFailed;" in bridge_block
     assert 'CL_SetCvarIfChanged( "ui_browserAwesomium", browserAvailable ? "1" : "0" );' in bridge_block
     assert 'CL_SetCvarIfChanged( "ui_browserAwesomiumPending", awesomiumPending ? "1" : "0" );' in bridge_block
-    assert 'CL_SetCvarIfChanged( "ui_browserAwesomiumProvider", awesomiumAllowed ? "Awesomium WebCore" : overlayProvider );' in bridge_block
-    assert 'CL_SetCvarIfChanged( "ui_browserAwesomiumPolicy", awesomiumAllowed ? "runtime-opt-in" : overlayPolicy );' in bridge_block
+    assert 'CL_SetCvarIfChanged( "ui_browserAwesomiumProvider", awesomiumAvailable ? "Awesomium WebCore" : overlayProvider );' in bridge_block
+    assert 'CL_SetCvarIfChanged( "ui_browserAwesomiumPolicy", awesomiumAvailable ? "runtime-opt-in" : overlayPolicy );' in bridge_block
     assert "CL_WebHost_ResetRuntime( qtrue );" in bridge_block
+    assert "cl_webHost.loadFailed = browserLoadFailed;" in bridge_block
 
     assert "CL_RefreshOnlineServicesBridgeState();" in frame_block
     assert "QLWebHost_OpenURL( CL_WEB_DEFAULT_URL );" in frame_block
@@ -14206,6 +14220,7 @@ def test_native_command_queries_and_fullscreen_gate_normalize_nonzero_returns_to
     assert "return VM_Call( cgvm, CG_CONSOLE_COMMAND ) ? qtrue : qfalse;" in cg_command_block
     assert "return VM_Call( gvm, GAME_CONSOLE_COMMAND ) ? qtrue : qfalse;" in sv_command_block
     assert "uiFullscreen = VM_Call( uivm, UI_IS_FULLSCREEN ) ? qtrue : qfalse;" in draw_block
+    assert "uiMenuVisible = VM_Call( uivm, UI_MENUS_ANY_VISIBLE ) ? qtrue : qfalse;" in draw_block
     assert "return VM_Call( uivm, UI_CONSOLE_COMMAND, cls.realtime );" not in ui_command_block
     assert "return VM_Call( cgvm, CG_CONSOLE_COMMAND );" not in cg_command_block
     assert "return VM_Call( gvm, GAME_CONSOLE_COMMAND );" not in sv_command_block
@@ -15825,8 +15840,10 @@ def test_module_side_syscall_wrappers_normalize_qboolean_contracts() -> None:
     g_syscalls = (REPO_ROOT / "src/code/game/g_syscalls.c").read_text(encoding="utf-8")
 
     ui_register_sound_block = _extract_function_block(cl_ui, "static sfxHandle_t QDECL QL_UI_trap_S_RegisterSound_QL")
-    assert "compressed = ( compressed != 0 ) ? qtrue : qfalse;" in ui_register_sound_block
-    assert "return S_RegisterSound( sample, compressed );" in ui_register_sound_block
+    assert "qboolean compressedFlag;" in ui_register_sound_block
+    assert "compressedFlag = ( compressed == qtrue ) ? qtrue : qfalse;" in ui_register_sound_block
+    assert "return S_RegisterSound( sample, compressedFlag );" in ui_register_sound_block
+    assert "compressed = ( compressed != 0 ) ? qtrue : qfalse;" not in ui_register_sound_block
 
     assert "return syscall( UI_S_REGISTERSOUND, sample, compressed ? qtrue : qfalse );" in ui_syscalls
     assert "return syscall( UI_KEY_ISDOWN, keynum ) ? qtrue : qfalse;" in ui_syscalls

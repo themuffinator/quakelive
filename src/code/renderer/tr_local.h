@@ -1769,8 +1769,8 @@ void R_InitFontStash( void );
 void R_DoneFontStash( void );
 qboolean R_GetFontStashDebugInfo( image_t **image, int *width, int *height );
 void R_DoneFreeType();
-void RE_DrawScaledText( int x, int y, const char *text, int fontHandle, float scale, int maxX, float *outMaxX, qboolean forceColor, const float *baseColor );
-void RE_MeasureScaledText( const char *text, const char *end, int fontHandle, float scale, int maxX, float *outWidth, float *outHeight, float *outLeft );
+void RE_DrawScaledText( int x, int y, const char *text, int fontHandle, float scale, int limit, float *maxX, qboolean forceColor, const float *baseColor );
+void RE_MeasureScaledText( const char *text, const char *end, int fontHandle, float scale, int limit, float *outWidth, float *outHeight, float *outLeft );
 qboolean RE_GetScaledFontMetrics( int fontHandle, float scale, float *outAscent, float *outDescent, float *outLineHeight );
 void RE_RegisterFont( const char *fontName, int pointSize, fontInfo_t *font );
 

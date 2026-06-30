@@ -462,6 +462,7 @@ def test_awesomium_load_failure_hides_host_and_suppresses_error_publish_until_re
 	assert "KEYCATCH_BROWSER" not in update_block
 	assert "QLLoadHandler_PollLiveDocumentReady();" in update_block
 	assert "ownsOverlay = CL_WebHost_SurfaceReadyForOverlay( qtrue );" in ownership_block
+	assert "Con_Close();" in ownership_block
 	assert "cls.keyCatchers |= KEYCATCH_BROWSER;" in ownership_block
 	assert 'CL_SetCvarIfChanged( "web_browserActive", ownsOverlay ? "1" : "0" );' in ownership_block
 	assert "VM_Call( cgvm, CG_EVENT_HANDLING, CGAME_EVENT_CLOSECOMMANDOVERLAY );" in hide_browser_block
@@ -516,10 +517,11 @@ def test_awesomium_pending_state_requires_requested_browser_without_drawable_sur
 	assert "!cl_webHost.browserActive" in pending_block
 	assert "!cl_webHost.loadingDocument" in pending_block
 	assert "return CL_WebHost_SurfaceReadyForOverlay( qtrue ) ? qfalse : qtrue;" in pending_block
-	assert "qboolean awesomiumPending = CL_WebHost_AwesomiumPending( awesomiumAllowed );" in bridge_block
+	assert "qboolean awesomiumPending = CL_WebHost_AwesomiumPending( awesomiumAvailable );" in bridge_block
 	assert 'CL_SetCvarIfChanged( "ui_browserAwesomiumPending", awesomiumPending ? "1" : "0" );' in bridge_block
-	assert 'Cvar_Set( "ui_browserAwesomiumPending", CL_WebHost_AwesomiumPending( CL_AwesomiumRuntimeActive() ) ? "1" : "0" );' in register_block
-	assert '( awesomiumAllowed && !cl_webHost.loadFailed ) ? "1" : "0"' not in cl_cgame
+	assert 'Cvar_Set( "ui_browserAwesomiumPending", CL_WebHost_AwesomiumPending( CL_AwesomiumRuntimeUsable() ) ? "1" : "0" );' in register_block
+	assert "static qboolean CL_AwesomiumRuntimeUsable( void ) {" in cl_cgame
+	assert "return CL_AwesomiumRuntimeActive() && !cl_webHost.loadFailed;" in cl_cgame
 
 
 def test_awesomium_default_menu_launch_retail_winmain_bootstrap_flow_is_pinned() -> None:
@@ -632,7 +634,7 @@ def test_awesomium_default_menu_launch_retail_winmain_bootstrap_flow_is_pinned()
 		(
 			"if ( !CL_BrowserRuntimeRequested() ) {",
 			"return qfalse;",
-			"return CL_OverlayServiceAvailable() || CL_AwesomiumRuntimeAllowed();",
+			"return CL_OverlayServiceAvailable() || CL_AwesomiumRuntimeUsable();",
 		),
 	)
 	assert "return cls.state == CA_DISCONNECTED || cls.state == CA_CINEMATIC;" in bootstrap_allowed_block
@@ -641,10 +643,9 @@ def test_awesomium_default_menu_launch_retail_winmain_bootstrap_flow_is_pinned()
 		(
 			"CL_AwesomiumValidateRequiredRuntime();",
 			"CL_RefreshOnlineServicesBridgeState();",
-			"awesomiumAllowed = CL_AwesomiumRuntimeActive();",
+			"awesomiumAllowed = CL_AwesomiumRuntimeUsable();",
 			"if ( !awesomiumAllowed",
 			"|| !CL_WebHost_ShouldBootstrapMenu()",
-			"|| cl_webHost.loadFailed",
 			"|| cls.glconfig.vidWidth <= 0",
 			"|| cls.glconfig.vidHeight <= 0 ) {",
 			"if ( cl_webHost.liveAwesomium ) {",
@@ -690,15 +691,18 @@ def test_awesomium_default_menu_launch_retail_winmain_bootstrap_flow_is_pinned()
 		(
 			"qboolean browserRequested = CL_BrowserRuntimeRequested();",
 			"qboolean awesomiumAllowed = CL_AwesomiumRuntimeActive();",
+			"qboolean awesomiumAvailable = awesomiumAllowed && !cl_webHost.loadFailed;",
 			"qboolean overlayAvailable = browserRequested && CL_OverlayServiceAvailable();",
-			"qboolean browserAvailable = overlayAvailable || awesomiumAllowed;",
-			"qboolean awesomiumPending = CL_WebHost_AwesomiumPending( awesomiumAllowed );",
+			"qboolean browserAvailable = overlayAvailable || awesomiumAvailable;",
+			"qboolean awesomiumPending = CL_WebHost_AwesomiumPending( awesomiumAvailable );",
+			"qboolean browserLoadFailed = cl_webHost.loadFailed;",
 			'CL_SetCvarIfChanged( "ui_browserAwesomium", browserAvailable ? "1" : "0" );',
 			'CL_SetCvarIfChanged( "ui_browserAwesomiumPending", awesomiumPending ? "1" : "0" );',
-			'CL_SetCvarIfChanged( "ui_browserAwesomiumProvider", awesomiumAllowed ? "Awesomium WebCore" : overlayProvider );',
-			'CL_SetCvarIfChanged( "ui_browserAwesomiumPolicy", awesomiumAllowed ? "runtime-opt-in" : overlayPolicy );',
+			'CL_SetCvarIfChanged( "ui_browserAwesomiumProvider", awesomiumAvailable ? "Awesomium WebCore" : overlayProvider );',
+			'CL_SetCvarIfChanged( "ui_browserAwesomiumPolicy", awesomiumAvailable ? "runtime-opt-in" : overlayPolicy );',
 			"if ( !browserAvailable ) {",
 			"CL_WebHost_ResetRuntime( qtrue );",
+			"cl_webHost.loadFailed = browserLoadFailed;",
 		),
 	)
 
@@ -3033,11 +3037,27 @@ def test_awesomium_mouse_button_and_wheel_helpers_reconstruct_retail_pointer_inj
 	browser_key_block = _extract_function_block(
 		cl_keys, "static void CL_DispatchBrowserKeyEvent( int key, qboolean down ) {"
 	)
+	spectator_toggle_block = _extract_function_block(
+		cl_keys, "static qboolean CL_ShouldOpenTeamMenuOnToggle( void ) {"
+	)
+	menu_owner_block = _extract_function_block(
+		cl_keys, "static void CL_SetActiveMenuForToggle( int menu ) {"
+	)
+	toggle_menu_block = _extract_function_block(
+		cl_keys, "static void CL_ToggleMenuInternal( int key, qboolean sendKeyUp, unsigned time ) {"
+	)
+	release_capture_block = _extract_function_block(
+		cl_cgame, "void CL_WebHost_ReleaseInputCapture( void ) {"
+	)
+	cgame_catcher_block = _extract_function_block(
+		cl_cgame, "static void CL_SetCGameKeyCatcher( int catcher ) {"
+	)
 	key_event_block = _extract_function_block(cl_keys, "void CL_KeyEvent (int key, qboolean down, unsigned time) {")
 
 	assert "void CL_WebView_OnMouseButtonEvent( int key, qboolean down );" in client_h
 	assert "void CL_WebView_OnMouseWheelEvent( int direction );" in client_h
 	assert "void CL_WebHost_HideBrowser( void );" in client_h
+	assert "void CL_WebHost_ReleaseInputCapture( void );" in client_h
 	assert "case K_MOUSE1:" in map_button_block
 	assert "case K_MOUSE2:" in map_button_block
 	assert "case K_MOUSE3:" in map_button_block
@@ -3055,6 +3075,33 @@ def test_awesomium_mouse_button_and_wheel_helpers_reconstruct_retail_pointer_inj
 	assert 'key == K_MWHEELDOWN' in browser_key_block
 	assert 'CL_WebView_OnMouseWheelEvent( -1 );' in browser_key_block
 	assert "CL_WebView_OnKeyEvent( key, down );" in browser_key_block
+	assert "if ( cls.state != CA_ACTIVE ) {" in spectator_toggle_block
+	assert "if ( clc.demoplaying ) {" in spectator_toggle_block
+	assert "if ( !cl.snap.valid ) {" in spectator_toggle_block
+	assert "cl.snap.ps.persistant[PERS_TEAM] == TEAM_SPECTATOR" in spectator_toggle_block
+	assert "CL_WebHost_ReleaseInputCapture();" in menu_owner_block
+	_assert_ordered_anchors(
+		menu_owner_block,
+		(
+			"if ( menu == UIMENU_TEAM ) {",
+			"VM_Call( uivm, UI_SET_ACTIVE_MENU, UIMENU_INGAME );",
+			"VM_Call( uivm, UI_SET_ACTIVE_MENU, menu );",
+		),
+	)
+	assert "VM_Call( uivm, UI_SET_ACTIVE_MENU, menu );" in menu_owner_block
+	assert "Key_SetCatcher( ( Key_GetCatcher() & ~( KEYCATCH_CGAME | KEYCATCH_BROWSER ) ) | KEYCATCH_UI );" in menu_owner_block
+	assert "CL_ShouldOpenTeamMenuOnToggle() ? UIMENU_TEAM : UIMENU_INGAME" in toggle_menu_block
+	assert "if ( !CL_ShouldOpenTeamMenuOnToggle() ) {" in toggle_menu_block
+	assert "CL_SetActiveMenuForToggle( UIMENU_MAIN );" in toggle_menu_block
+	assert "CL_ResetBrowserOverlayState();" in release_capture_block
+	assert (
+		"preserved = cls.keyCatchers & ( KEYCATCH_CONSOLE | KEYCATCH_UI | KEYCATCH_MESSAGE | KEYCATCH_BROWSER );"
+		in cgame_catcher_block
+	)
+	assert "cgameOwned = catcher & ( KEYCATCH_CGAME | KEYCATCH_RETAIL_MOUSEPASS );" in cgame_catcher_block
+	assert "Key_SetCatcher( preserved | cgameOwned );" in cgame_catcher_block
+	assert "CL_SetCGameKeyCatcher( args[1] );" in cl_cgame
+	assert 'Cmd_AddCommand ("togglemenu", CL_ToggleMenu_f);' in cl_keys
 	escape_block_index = key_event_block.index("if ( key == K_ESCAPE && dispatchDown ) {")
 	console_escape_index = key_event_block.index("if ( cls.keyCatchers & KEYCATCH_CONSOLE ) {", escape_block_index)
 	console_escape_return_index = key_event_block.index("return;", console_escape_index)
@@ -4073,6 +4120,9 @@ def test_awesomium_runtime_bootstrap_and_surface_pump_reconstruct_retail_host_co
 	assert "cl_webHost.loadFailed = qtrue;" in live_failure_block
 	assert "CL_ResetBrowserOverlayState();" in live_failure_block
 	assert "CL_RefreshOnlineServicesBridgeState();" in live_failure_block
+	assert "CL_WebHost_ReopenNativeMainMenu();" in live_failure_block
+	assert "static void CL_WebHost_ReopenNativeMainMenu( void ) {" in cl_cgame
+	assert "VM_Call( uivm, UI_SET_ACTIVE_MENU, UIMENU_MAIN );" in cl_cgame
 	assert "return cl_webHost.viewInitialised && cl_webHost.bootstrapReady;" in live_view_block
 	assert "CL_WebHost_CheckLiveAwesomiumSurfaceFailure();" in frame_block
 	assert frame_block.find("QLWebHost_PumpFrame();") < frame_block.find("CL_WebHost_CheckLiveAwesomiumSurfaceFailure();")

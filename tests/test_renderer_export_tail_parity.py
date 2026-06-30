@@ -73,10 +73,10 @@ def test_client_font_registration_uses_compatibility_lane() -> None:
 
 	assert "CL_RegisterFont( VMA(1), args[2], VMA(3) );" in cl_ui
 	assert "CL_RegisterFont( VMA(1), args[2], VMA(3) );" in cl_cgame
-	assert "RE_DrawScaledText( x, y, text, fontHandle, scale, maxX, outMaxX," in cl_ui
-	assert "RE_MeasureScaledText( text, end, fontHandle, scale, maxX, &width, &height, outLeft );" in cl_ui
-	assert "RE_DrawScaledText( x, y, text, fontHandle, scale, maxX, outMaxX," in cl_cgame
-	assert "RE_MeasureScaledText( text, end, fontHandle, scale, maxX, &width, &height, outLeft );" in cl_cgame
+	assert "RE_DrawScaledText( x, y, text, fontHandle, scale, limit, maxX," in cl_ui
+	assert "RE_MeasureScaledText( text, end, fontHandle, scale, limit, &width, &height, &left );" in cl_ui
+	assert "RE_DrawScaledText( x, y, text, fontHandle, scale, limit, maxX," in cl_cgame
+	assert "RE_MeasureScaledText( text, end, fontHandle, scale, limit, &width, &height, &left );" in cl_cgame
 	assert "re.RegisterFont(" not in cl_ui
 	assert "re.RegisterFont(" not in cl_cgame
 	assert cl_cgame.index("case CG_R_REGISTERFONT:") < cl_cgame.index("CL_RegisterFont( VMA(1), args[2], VMA(3) );")

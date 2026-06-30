@@ -2922,24 +2922,24 @@ static ID_INLINE void trap_QL_R_MirrorVector( vec3_t in, orientation_t *surface,
 	(void)camera;
 	VectorCopy( in, out );
 }
-static ID_INLINE void trap_QL_DrawScaledText( int x, int y, const char *text, int fontHandle, float scale, int maxX, float *outMaxX, qboolean forceColor ) {
+static ID_INLINE void trap_QL_DrawScaledText( int x, int y, const char *text, int fontHandle, float scale, int limit, float *maxX, qboolean forceColor ) {
 	(void)x;
 	(void)y;
 	(void)text;
 	(void)fontHandle;
 	(void)scale;
-	(void)maxX;
-	if ( outMaxX ) {
-		*outMaxX = 0.0f;
+	(void)limit;
+	if ( maxX ) {
+		*maxX = 0.0f;
 	}
 	(void)forceColor;
 }
-static ID_INLINE unsigned long long trap_QL_MeasureText( const char *text, const char *end, int fontHandle, float scale, int maxX, float *outLeft ) {
+static ID_INLINE unsigned long long trap_QL_MeasureText( const char *text, const char *end, int fontHandle, float scale, int limit, float *outLeft ) {
 	(void)text;
 	(void)end;
 	(void)fontHandle;
 	(void)scale;
-	(void)maxX;
+	(void)limit;
 	if ( outLeft ) {
 		*outLeft = 0.0f;
 	}
@@ -2987,8 +2987,8 @@ void		trap_QL_AdvertisementBridge_ClearDelay( void );
 void		trap_QL_PublishTaggedInfoString( const char *messageType, const char *infoString );
 void		trap_QL_R_MirrorPoint( vec3_t in, orientation_t *surface, orientation_t *camera, vec3_t out );
 void		trap_QL_R_MirrorVector( vec3_t in, orientation_t *surface, orientation_t *camera, vec3_t out );
-void		trap_QL_DrawScaledText( int x, int y, const char *text, int fontHandle, float scale, int maxX, float *outMaxX, qboolean forceColor );
-unsigned long long trap_QL_MeasureText( const char *text, const char *end, int fontHandle, float scale, int maxX, float *outLeft );
+void		trap_QL_DrawScaledText( int x, int y, const char *text, int fontHandle, float scale, int limit, float *maxX, qboolean forceColor );
+unsigned long long trap_QL_MeasureText( const char *text, const char *end, int fontHandle, float scale, int limit, float *outLeft );
 qboolean	trap_QL_IsSubscribedApp( int appId );
 qhandle_t	trap_QL_GetAvatarImageHandle( unsigned int identityLow, unsigned int identityHigh );
 #endif

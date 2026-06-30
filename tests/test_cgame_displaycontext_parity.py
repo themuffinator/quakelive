@@ -17721,9 +17721,10 @@ def test_cgame_text_paint_limit_reuses_shared_font_selector() -> None:
 		"CG_AdjustFrom640( &screenMaxX, NULL, NULL, NULL );",
 		"CG_AdjustFrom640( &xBias, NULL, &xScale, &yScale );",
 		"fontHandle = CG_SelectTextFontHandle( scale, fontIndex );",
+		"outMaxX = screenMaxX;",
 		"trap_QL_DrawScaledText(",
 		"scale * QL_FONT_HOST_POINT_SIZE * yScale,",
-		"(int)screenMaxX,",
+		"0,",
 		"&outMaxX,",
 		"*maxX = ( outMaxX - xBias ) / xScale;",
 	):
@@ -19582,8 +19583,8 @@ def test_cgame_public_and_local_headers_expose_bridge_imports() -> None:
 		"void\t\ttrap_AdvertisementBridge_ShutdownCGame( void );",
 		"void\t\ttrap_AdvertisementBridge_UpdateLoadingViewParameters( void );",
 		"void\t\ttrap_AdvertisementBridge_SetFrameTime( int frameTime );",
-		"void\t\ttrap_QL_DrawScaledText( int x, int y, const char *text, int fontHandle, float scale, int maxX, float *outMaxX, qboolean forceColor );",
-		"unsigned long long trap_QL_MeasureText( const char *text, const char *end, int fontHandle, float scale, int maxX, float *outLeft );",
+		"void\t\ttrap_QL_DrawScaledText( int x, int y, const char *text, int fontHandle, float scale, int limit, float *maxX, qboolean forceColor );",
+		"unsigned long long trap_QL_MeasureText( const char *text, const char *end, int fontHandle, float scale, int limit, float *outLeft );",
 	):
 		assert expected in local_source
 
@@ -19597,7 +19598,7 @@ def test_cgame_font_syscall_bridge_uses_native_host_text_imports() -> None:
 		"ql_import_f import = CG_GetNativeImportFunction( CG_QL_IMPORT_DRAW_SCALED_TEXT );",
 		"if ( !import ) {",
 		"return;",
-		"((void (QDECL *)( int, int, const char *, int, float, int, float *, int ))import)( x, y, text, fontHandle, scale, maxX, outMaxX, forceColor ? qtrue : qfalse );",
+		"((void (QDECL *)( int, int, const char *, int, float, int, float *, int ))import)( x, y, text, fontHandle, scale, limit, maxX, forceColor ? qtrue : qfalse );",
 	):
 		assert expected in draw_block
 
@@ -19605,7 +19606,7 @@ def test_cgame_font_syscall_bridge_uses_native_host_text_imports() -> None:
 		"ql_import_f import = CG_GetNativeImportFunction( CG_QL_IMPORT_MEASURE_TEXT );",
 		"if ( !import ) {",
 		"return 0;",
-		"return ((unsigned long long (QDECL *)( const char *, const char *, int, float, int, float * ))import)( text, end, fontHandle, scale, maxX, outLeft );",
+		"return ((unsigned long long (QDECL *)( const char *, const char *, int, float, int, float * ))import)( text, end, fontHandle, scale, limit, outLeft );",
 	):
 		assert expected in measure_block
 
@@ -19624,9 +19625,9 @@ def test_cgame_q3_vm_font_import_stubs_fail_closed() -> None:
 		"(void)text;",
 		"(void)fontHandle;",
 		"(void)scale;",
-		"(void)maxX;",
-		"if ( outMaxX ) {",
-		"*outMaxX = 0.0f;",
+		"(void)limit;",
+		"if ( maxX ) {",
+		"*maxX = 0.0f;",
 		"(void)forceColor;",
 	):
 		assert expected in draw_stub
@@ -19636,7 +19637,7 @@ def test_cgame_q3_vm_font_import_stubs_fail_closed() -> None:
 		"(void)end;",
 		"(void)fontHandle;",
 		"(void)scale;",
-		"(void)maxX;",
+		"(void)limit;",
 		"if ( outLeft ) {",
 		"*outLeft = 0.0f;",
 		"return 0;",
@@ -19754,10 +19755,12 @@ def test_native_import_table_keeps_new_cgame_bridge_callbacks() -> None:
 		< client_source.index("ql_cgame_imports[CG_QL_IMPORT_MEASURE_TEXT] = (ql_import_f)QL_CG_trap_MeasureText;")
 	)
 
-	assert "RE_DrawScaledText( x, y, text, fontHandle, scale, maxX, outMaxX, forceColor != qfalse ? qtrue : qfalse, ql_cgame_currentColor );" in draw_block
+	assert "RE_DrawScaledText( x, y, text, fontHandle, scale, limit, maxX, forceColor != qfalse ? qtrue : qfalse, ql_cgame_currentColor );" in draw_block
 	assert "float width;" in measure_block
 	assert "float height;" in measure_block
-	assert "RE_MeasureScaledText( text, end, fontHandle, scale, maxX, &width, &height, outLeft );" in measure_block
+	assert "float left;" in measure_block
+	assert "RE_MeasureScaledText( text, end, fontHandle, scale, limit, &width, &height, &left );" in measure_block
+	assert "QL_CG_WriteMeasureTextBounds( outLeft, left, width, height );" in measure_block
 	assert "return QL_CG_PackFloatBits64( width, height );" in measure_block
 	assert "RE_RegisterFont" not in draw_block
 	assert "RE_RegisterFont" not in measure_block

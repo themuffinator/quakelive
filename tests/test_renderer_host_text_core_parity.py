@@ -191,53 +191,60 @@ def test_renderer_host_text_face_scale_color_and_clipping_contract() -> None:
 		assert expected in face_block
 
 	for expected in (
-		"*outMaxX = (float)x;",
+		"clipX = maxX ? *maxX : 0.0f;",
+		"hasClipX = ( maxX && clipX > 0.0f );",
+		"if ( maxX && !hasClipX ) {",
+		"*maxX = (float)x;",
 		"currentColor[0] = 1.0f;",
 		"face = R_GetFontStashFaceForHandle( fontHandle );",
-		"hasMaxX = ( maxX > 0 );",
+		"hasLimit = ( limit > 0 );",
 		"if ( R_ParseHostTextColorEscape( s, end, &colorIndex, &colorNext ) ) {",
 		"if ( !forceColor ) {",
 		"newColor[3] = currentColor[3];",
 		"RE_SetColor( newColor );",
 		"s = colorNext;",
+		"if ( hasLimit && remaining <= 0 ) {",
 		"next = R_DecodeFontStashCodepoint( s, end, &codepoint );",
 		"glyphMaxX = penX + advance;",
 		"if ( penX + drawRight > glyphMaxX ) {",
-		"if ( hasMaxX && glyphMaxX > maxXf ) {",
-		"*outMaxX = 0.0f;",
+		"if ( hasClipX && glyphMaxX > clipX ) {",
+		"*maxX = penX;",
 		"RE_StretchPic(",
 		"penX + drawLeft,",
 		"(float)y - drawTop,",
 		"penX += advance;",
-		"*outMaxX = glyphMaxX;",
+		"if ( maxX && !hasClipX ) {",
+		"*maxX = glyphMaxX;",
+		"remaining--;",
 		"RE_SetColor( currentColor );",
 	):
 		assert expected in draw_block
-	assert draw_block.index("if ( hasMaxX && glyphMaxX > maxXf ) {") < draw_block.index("RE_StretchPic(")
+	assert draw_block.index("if ( hasClipX && glyphMaxX > clipX ) {") < draw_block.index("RE_StretchPic(")
 
 	for expected in (
 		"*outWidth = 0.0f;",
 		"*outHeight = 0.0f;",
 		"*outLeft = 0.0f;",
 		"face = R_GetFontStashFaceForHandle( fontHandle );",
-		"hasMaxX = ( maxX > 0 );",
+		"hasLimit = ( limit > 0 );",
 		"for ( s = text; *s && ( !end || s < end ); ) {",
+		"if ( hasLimit && remaining <= 0 ) {",
 		"if ( R_ParseHostTextColorEscape( s, end, &colorIndex, &colorNext ) ) {",
 		"s = colorNext;",
 		"next = R_DecodeFontStashCodepoint( s, end, &codepoint );",
 		"glyphRight = penX + drawRight;",
 		"glyphMaxX = penX + advance;",
 		"if ( glyphRight > glyphMaxX ) {",
-		"if ( hasMaxX && glyphMaxX > maxXf ) {",
-		"break;",
 		"hasBounds = qtrue;",
+		"remaining--;",
 		"width = maxRight - minLeft;",
 		"height = maxBottom - minTop;",
 		"height = metricsAscent;",
 		"*outLeft = hasBounds ? minLeft : 0.0f;",
 	):
 		assert expected in measure_block
-	assert measure_block.index("if ( hasMaxX && glyphMaxX > maxXf ) {") < measure_block.index("hasBounds = qtrue;")
+	assert "hasMaxX" not in measure_block
+	assert "maxXf" not in measure_block
 
 
 def test_renderer_host_text_core_docs_track_rg_p8_completion() -> None:

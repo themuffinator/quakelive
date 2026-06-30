@@ -1379,11 +1379,14 @@ QL_UI_trap_S_RegisterSound_QL
 ==============
 */
 static sfxHandle_t QDECL QL_UI_trap_S_RegisterSound_QL( const char *sample, int compressed ) {
-	if ( compressed != qfalse && compressed != qtrue ) {
-		compressed = ( compressed != 0 ) ? qtrue : qfalse;
-	}
+	qboolean compressedFlag;
 
-	return S_RegisterSound( sample, compressed );
+	/*
+	 * Retail uix86 Asset_Parse calls this import with only the sample name.
+	 * Keep normalization local so a missing second stack slot is never written.
+	 */
+	compressedFlag = ( compressed == qtrue ) ? qtrue : qfalse;
+	return S_RegisterSound( sample, compressedFlag );
 }
 
 /*
@@ -1601,12 +1604,33 @@ static int QDECL QL_UI_trap_IsSubscribedApp( int arg1 ) {
 
 /*
 ==============
+QL_UI_WriteMeasureTextBounds
+
+Retail uix86.dll passes a pointer to the first float of a five-float bounds
+packet: left, top, right, bottom, and ascent. Source-side callers use the
+packed return and normally pass NULL here.
+==============
+*/
+static void QL_UI_WriteMeasureTextBounds( float *bounds, float left, float width, float height ) {
+	if ( !bounds ) {
+		return;
+	}
+
+	bounds[0] = left;
+	bounds[1] = 0.0f;
+	bounds[2] = left + width;
+	bounds[3] = 0.0f;
+	bounds[4] = height;
+}
+
+/*
+==============
 QL_UI_trap_DrawScaledText
 ==============
 */
-static void QDECL QL_UI_trap_DrawScaledText( int x, int y, const char *text, int fontHandle, float scale, int maxX, float *outMaxX, int forceColor ) {
-	// uix86.dll HLIL: import[94] (offset 0x178) draws scaled text with maxX/outMaxX.
-	RE_DrawScaledText( x, y, text, fontHandle, scale, maxX, outMaxX, forceColor != qfalse ? qtrue : qfalse, ql_ui_currentColor );
+static void QDECL QL_UI_trap_DrawScaledText( int x, int y, const char *text, int fontHandle, float scale, int limit, float *maxX, int forceColor ) {
+	// uix86.dll HLIL: import[94] (offset 0x178) draws scaled text with limit/maxX.
+	RE_DrawScaledText( x, y, text, fontHandle, scale, limit, maxX, forceColor != qfalse ? qtrue : qfalse, ql_ui_currentColor );
 }
 
 /*
@@ -1614,12 +1638,14 @@ static void QDECL QL_UI_trap_DrawScaledText( int x, int y, const char *text, int
 QL_UI_trap_MeasureText
 ==============
 */
-static unsigned long long QDECL QL_UI_trap_MeasureText( const char *text, const char *end, int fontHandle, float scale, int maxX, float *outLeft ) {
+static unsigned long long QDECL QL_UI_trap_MeasureText( const char *text, const char *end, int fontHandle, float scale, int limit, float *outLeft ) {
 	float width;
 	float height;
+	float left;
 
 	// uix86.dll HLIL: import[95] (offset 0x17c) measures text and returns packed floats.
-	RE_MeasureScaledText( text, end, fontHandle, scale, maxX, &width, &height, outLeft );
+	RE_MeasureScaledText( text, end, fontHandle, scale, limit, &width, &height, &left );
+	QL_UI_WriteMeasureTextBounds( outLeft, left, width, height );
 
 	return QL_UI_PackFloatBits64( width, height );
 }

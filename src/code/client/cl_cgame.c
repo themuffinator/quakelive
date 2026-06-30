@@ -179,6 +179,7 @@ static void CL_WebHost_SyncConfigSnapshot( void );
 static void CL_WebHost_SyncMapCatalogSnapshot( void );
 static void CL_WebHost_SyncFactoryCatalogSnapshot( void );
 static void CL_WebHost_CheckLiveAwesomiumSurfaceFailure( void );
+static void CL_WebHost_ReopenNativeMainMenu( void );
 static void CL_ResetBrowserOverlayState( void );
 
 typedef enum {
@@ -2368,9 +2369,10 @@ static qboolean QLWebHost_EnsureRuntime( void ) {
 #else
 	qboolean browserRequested = CL_BrowserRuntimeRequested();
 	qboolean awesomiumAllowed = CL_AwesomiumRuntimeActive();
+	qboolean awesomiumAvailable = awesomiumAllowed && !cl_webHost.loadFailed;
 	qboolean overlayAvailable = browserRequested && CL_OverlayServiceAvailable();
 
-	if ( !overlayAvailable && !awesomiumAllowed ) {
+	if ( !overlayAvailable && !awesomiumAvailable ) {
 		return qfalse;
 	}
 	if ( cl_webHost.loadFailed && !overlayAvailable ) {
@@ -2382,7 +2384,7 @@ static qboolean QLWebHost_EnsureRuntime( void ) {
 
 	if ( !cl_webHost.coreInitialised ) {
 #if defined( _WIN32 )
-		if ( awesomiumAllowed ) {
+		if ( awesomiumAvailable ) {
 			char homePath[MAX_OSPATH];
 			char basePath[MAX_OSPATH];
 			char *initialConfigJson;
@@ -2685,6 +2687,18 @@ void CL_WebHost_HideBrowser( void ) {
 
 /*
 =============
+CL_WebHost_ReleaseInputCapture
+
+Releases browser-owned input state even when the live browser runtime is not
+available to service a full hide request.
+=============
+*/
+void CL_WebHost_ReleaseInputCapture( void ) {
+	CL_ResetBrowserOverlayState();
+}
+
+/*
+=============
 CL_WebHost_SurfaceReadyForOverlay
 
 Returns true only when the retained browser has a surface that is safe to let
@@ -2713,6 +2727,22 @@ static qboolean CL_WebHost_SurfaceReadyForOverlay( qboolean requireShader ) {
 
 	return qtrue;
 #endif
+}
+
+/*
+=============
+CL_WebHost_ReopenNativeMainMenu
+
+Re-enters the retail UI main-menu export after the live browser path yields to
+native menus.
+=============
+*/
+static void CL_WebHost_ReopenNativeMainMenu( void ) {
+	if ( !uivm || cls.state != CA_DISCONNECTED ) {
+		return;
+	}
+
+	VM_Call( uivm, UI_SET_ACTIVE_MENU, UIMENU_MAIN );
 }
 
 /*
@@ -2750,6 +2780,7 @@ static void CL_WebHost_CheckLiveAwesomiumSurfaceFailure( void ) {
 	cl_webHost.loadFailed = qtrue;
 	CL_ResetBrowserOverlayState();
 	CL_RefreshOnlineServicesBridgeState();
+	CL_WebHost_ReopenNativeMainMenu();
 #endif
 }
 
@@ -2767,6 +2798,7 @@ static void CL_WebHost_UpdateOverlayOwnership( void ) {
 	ownsOverlay = CL_WebHost_SurfaceReadyForOverlay( qtrue );
 	if ( ownsOverlay ) {
 		if ( !( cls.keyCatchers & KEYCATCH_BROWSER ) ) {
+			Con_Close();
 			cls.keyCatchers |= KEYCATCH_BROWSER;
 		}
 	} else {
@@ -6313,6 +6345,18 @@ static qboolean CL_AwesomiumRuntimeActive( void ) {
 
 /*
 =============
+CL_AwesomiumRuntimeUsable
+
+Returns whether the live Awesomium lane is still a valid menu owner for this
+session.
+=============
+*/
+static qboolean CL_AwesomiumRuntimeUsable( void ) {
+	return CL_AwesomiumRuntimeActive() && !cl_webHost.loadFailed;
+}
+
+/*
+=============
 CL_AwesomiumRuntimeRequired
 
 Reports whether this launch profile requires the retail Awesomium menu lane.
@@ -6355,7 +6399,7 @@ static qboolean CL_BrowserHostServiceAvailable( void ) {
 		return qfalse;
 	}
 
-	return CL_OverlayServiceAvailable() || CL_AwesomiumRuntimeAllowed();
+	return CL_OverlayServiceAvailable() || CL_AwesomiumRuntimeUsable();
 }
 
 /*
@@ -6397,6 +6441,7 @@ void CL_RefreshOnlineServicesBridgeState( void ) {
 	const char *parityReason = QL_GetOnlineServicesParityReasonLabel();
 	qboolean browserRequested = CL_BrowserRuntimeRequested();
 	qboolean awesomiumAllowed = CL_AwesomiumRuntimeActive();
+	qboolean awesomiumAvailable = awesomiumAllowed && !cl_webHost.loadFailed;
 
 #if !QL_PLATFORM_HAS_ONLINE_SERVICES
 	cl_advertisementBridge.overlayCompiled = qfalse;
@@ -6419,8 +6464,9 @@ void CL_RefreshOnlineServicesBridgeState( void ) {
 #else
 	const ql_platform_feature_descriptor *overlay = CL_GetOverlayServiceDescriptor();
 	qboolean overlayAvailable = browserRequested && CL_OverlayServiceAvailable();
-	qboolean browserAvailable = overlayAvailable || awesomiumAllowed;
-	qboolean awesomiumPending = CL_WebHost_AwesomiumPending( awesomiumAllowed );
+	qboolean browserAvailable = overlayAvailable || awesomiumAvailable;
+	qboolean awesomiumPending = CL_WebHost_AwesomiumPending( awesomiumAvailable );
+	qboolean browserLoadFailed = cl_webHost.loadFailed;
 
 	cl_advertisementBridge.overlayCompiled = ( overlay && overlay->compiled );
 	cl_advertisementBridge.overlayAvailable = overlayAvailable;
@@ -6429,8 +6475,8 @@ void CL_RefreshOnlineServicesBridgeState( void ) {
 
 	CL_SetCvarIfChanged( "ui_browserAwesomium", browserAvailable ? "1" : "0" );
 	CL_SetCvarIfChanged( "ui_browserAwesomiumPending", awesomiumPending ? "1" : "0" );
-	CL_SetCvarIfChanged( "ui_browserAwesomiumProvider", awesomiumAllowed ? "Awesomium WebCore" : overlayProvider );
-	CL_SetCvarIfChanged( "ui_browserAwesomiumPolicy", awesomiumAllowed ? "runtime-opt-in" : overlayPolicy );
+	CL_SetCvarIfChanged( "ui_browserAwesomiumProvider", awesomiumAvailable ? "Awesomium WebCore" : overlayProvider );
+	CL_SetCvarIfChanged( "ui_browserAwesomiumPolicy", awesomiumAvailable ? "runtime-opt-in" : overlayPolicy );
 	CL_SetCvarIfChanged( "ui_browserAwesomiumParityScope", parityScope );
 	CL_SetCvarIfChanged( "ui_browserAwesomiumParityReason", parityReason );
 	CL_SetCvarIfChanged( "ui_advertisementBridgeProvider", advertProvider );
@@ -6445,6 +6491,7 @@ void CL_RefreshOnlineServicesBridgeState( void ) {
 	}
 	if ( !browserAvailable ) {
 		CL_WebHost_ResetRuntime( qtrue );
+		cl_webHost.loadFailed = browserLoadFailed;
 		CL_ResetBrowserOverlayState();
 	}
 #endif
@@ -7297,7 +7344,7 @@ void QLWebHost_RegisterCommands( void ) {
 	cl_webBrowserActive = Cvar_Get ("web_browserActive", "0", CVAR_ROM );
 	cl_webHost.zoomPercent = CL_WebZoomIntegerValue();
 	cl_webHost.cvarMappingCount = QLWebHost_CountRecoveredWebCvarMappings();
-	Cvar_Set( "ui_browserAwesomiumPending", CL_WebHost_AwesomiumPending( CL_AwesomiumRuntimeActive() ) ? "1" : "0" );
+	Cvar_Set( "ui_browserAwesomiumPending", CL_WebHost_AwesomiumPending( CL_AwesomiumRuntimeUsable() ) ? "1" : "0" );
 }
 
 /*
@@ -7391,10 +7438,9 @@ void CL_WebHost_BootstrapAwesomiumMenu( void ) {
 	qboolean awesomiumAllowed;
 
 	CL_RefreshOnlineServicesBridgeState();
-	awesomiumAllowed = CL_AwesomiumRuntimeActive();
+	awesomiumAllowed = CL_AwesomiumRuntimeUsable();
 	if ( !awesomiumAllowed
 		|| !CL_WebHost_ShouldBootstrapMenu()
-		|| cl_webHost.loadFailed
 		|| cls.glconfig.vidWidth <= 0
 		|| cls.glconfig.vidHeight <= 0 ) {
 		return;
@@ -8246,6 +8292,23 @@ void CL_ShutdownCGame( void ) {
 	cgvm = NULL;
 }
 
+/*
+====================
+CL_SetCGameKeyCatcher
+
+Applies cgame-owned catcher changes while preserving input ownership bits held
+by the console, UI, message, and retained browser bridges.
+====================
+*/
+static void CL_SetCGameKeyCatcher( int catcher ) {
+	int preserved;
+	int cgameOwned;
+
+	preserved = cls.keyCatchers & ( KEYCATCH_CONSOLE | KEYCATCH_UI | KEYCATCH_MESSAGE | KEYCATCH_BROWSER );
+	cgameOwned = catcher & ( KEYCATCH_CGAME | KEYCATCH_RETAIL_MOUSEPASS );
+	Key_SetCatcher( preserved | cgameOwned );
+}
+
 static int	FloatAsInt( float f ) {
 	int		temp;
 
@@ -8469,7 +8532,7 @@ static int CL_CgameSystemCallsImpl( int *args, qboolean logContract ) {
   case CG_KEY_GETCATCHER:
 		return Key_GetCatcher();
   case CG_KEY_SETCATCHER:
-		Key_SetCatcher( args[1] );
+		CL_SetCGameKeyCatcher( args[1] );
     return 0;
   case CG_KEY_GETKEY:
 		return Key_GetKey( VMA(1) );
@@ -8959,11 +9022,32 @@ static void QDECL QL_CG_trap_R_MirrorVector( vec3_t in, orientation_t *surface, 
 
 /*
 ==============
+QL_CG_WriteMeasureTextBounds
+
+Retail cgamex86.dll passes a pointer to the first float of a five-float bounds
+packet: left, top, right, bottom, and ascent. Source-side callers use the
+packed return and normally pass NULL here.
+==============
+*/
+static void QL_CG_WriteMeasureTextBounds( float *bounds, float left, float width, float height ) {
+	if ( !bounds ) {
+		return;
+	}
+
+	bounds[0] = left;
+	bounds[1] = 0.0f;
+	bounds[2] = left + width;
+	bounds[3] = 0.0f;
+	bounds[4] = height;
+}
+
+/*
+==============
 QL_CG_trap_DrawScaledText
 ==============
 */
-static void QDECL QL_CG_trap_DrawScaledText( int x, int y, const char *text, int fontHandle, float scale, int maxX, float *outMaxX, int forceColor ) {
-	RE_DrawScaledText( x, y, text, fontHandle, scale, maxX, outMaxX, forceColor != qfalse ? qtrue : qfalse, ql_cgame_currentColor );
+static void QDECL QL_CG_trap_DrawScaledText( int x, int y, const char *text, int fontHandle, float scale, int limit, float *maxX, int forceColor ) {
+	RE_DrawScaledText( x, y, text, fontHandle, scale, limit, maxX, forceColor != qfalse ? qtrue : qfalse, ql_cgame_currentColor );
 }
 
 /*
@@ -8971,11 +9055,13 @@ static void QDECL QL_CG_trap_DrawScaledText( int x, int y, const char *text, int
 QL_CG_trap_MeasureText
 ==============
 */
-static unsigned long long QDECL QL_CG_trap_MeasureText( const char *text, const char *end, int fontHandle, float scale, int maxX, float *outLeft ) {
+static unsigned long long QDECL QL_CG_trap_MeasureText( const char *text, const char *end, int fontHandle, float scale, int limit, float *outLeft ) {
 	float width;
 	float height;
+	float left;
 
-	RE_MeasureScaledText( text, end, fontHandle, scale, maxX, &width, &height, outLeft );
+	RE_MeasureScaledText( text, end, fontHandle, scale, limit, &width, &height, &left );
+	QL_CG_WriteMeasureTextBounds( outLeft, left, width, height );
 
 	return QL_CG_PackFloatBits64( width, height );
 }

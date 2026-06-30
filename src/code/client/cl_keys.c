@@ -1230,6 +1230,7 @@ void CL_InitKeyCommands( void ) {
 	Cmd_AddCommand ("unbind",Key_Unbind_f);
 	Cmd_AddCommand ("unbindall",Key_Unbindall_f);
 	Cmd_AddCommand ("bindlist",Key_Bindlist_f);
+	Cmd_AddCommand ("togglemenu", CL_ToggleMenu_f);
 }
 
 /*
@@ -1278,6 +1279,47 @@ void CL_AddKeyUpCommands( int key, char *kb ) {
 
 /*
 =============
+CL_ShouldOpenTeamMenuOnToggle
+
+Returns qtrue when the retail menu toggle should enter the spectator join menu
+instead of the generic ingame menu.
+=============
+*/
+static qboolean CL_ShouldOpenTeamMenuOnToggle( void ) {
+	if ( cls.state != CA_ACTIVE ) {
+		return qfalse;
+	}
+
+	if ( clc.demoplaying ) {
+		return qfalse;
+	}
+
+	if ( !cl.snap.valid ) {
+		return qfalse;
+	}
+
+	return ( qboolean )( cl.snap.ps.persistant[PERS_TEAM] == TEAM_SPECTATOR );
+}
+
+/*
+=============
+CL_SetActiveMenuForToggle
+
+Routes a classic menu request through retail UI while making the client-side
+input owner match the menu the UI was asked to activate.
+=============
+*/
+static void CL_SetActiveMenuForToggle( int menu ) {
+	CL_WebHost_ReleaseInputCapture();
+	if ( menu == UIMENU_TEAM ) {
+		VM_Call( uivm, UI_SET_ACTIVE_MENU, UIMENU_INGAME );
+	}
+	VM_Call( uivm, UI_SET_ACTIVE_MENU, menu );
+	Key_SetCatcher( ( Key_GetCatcher() & ~( KEYCATCH_CGAME | KEYCATCH_BROWSER ) ) | KEYCATCH_UI );
+}
+
+/*
+=============
 CL_ToggleMenuInternal
 
 Routes the Quake Live-style menu toggle through the same escape-key path used
@@ -1297,7 +1339,9 @@ static void CL_ToggleMenuInternal( int key, qboolean sendKeyUp, unsigned time ) 
 		if ( cgvm ) {
 			VM_Call( cgvm, CG_EVENT_HANDLING, CGAME_EVENT_NONE );
 		}
-		return;
+		if ( !CL_ShouldOpenTeamMenuOnToggle() ) {
+			return;
+		}
 	}
 
 	if ( !( cls.keyCatchers & KEYCATCH_UI ) ) {
@@ -1306,12 +1350,12 @@ static void CL_ToggleMenuInternal( int key, qboolean sendKeyUp, unsigned time ) 
 		}
 
 		if ( cls.state == CA_ACTIVE && !clc.demoplaying ) {
-			VM_Call( uivm, UI_SET_ACTIVE_MENU, UIMENU_INGAME );
+			CL_SetActiveMenuForToggle( CL_ShouldOpenTeamMenuOnToggle() ? UIMENU_TEAM : UIMENU_INGAME );
 		}
 		else {
 			CL_Disconnect_f();
 			S_StopAllSounds();
-			VM_Call( uivm, UI_SET_ACTIVE_MENU, UIMENU_MAIN );
+			CL_SetActiveMenuForToggle( UIMENU_MAIN );
 		}
 		return;
 	}

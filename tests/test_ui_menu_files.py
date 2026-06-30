@@ -2431,17 +2431,19 @@ def test_ui_native_host_text_wrappers_preserve_color_force_and_packed_measure_co
     cl_ui = (REPO_ROOT / "src/code/client/cl_ui.c").read_text(encoding="utf-8")
     draw_block = _extract_function_block(
         cl_ui,
-        "static void QDECL QL_UI_trap_DrawScaledText( int x, int y, const char *text, int fontHandle, float scale, int maxX, float *outMaxX, int forceColor ) {",
+        "static void QDECL QL_UI_trap_DrawScaledText( int x, int y, const char *text, int fontHandle, float scale, int limit, float *maxX, int forceColor ) {",
     )
     measure_block = _extract_function_block(
         cl_ui,
-        "static unsigned long long QDECL QL_UI_trap_MeasureText( const char *text, const char *end, int fontHandle, float scale, int maxX, float *outLeft ) {",
+        "static unsigned long long QDECL QL_UI_trap_MeasureText( const char *text, const char *end, int fontHandle, float scale, int limit, float *outLeft ) {",
     )
 
-    assert "RE_DrawScaledText( x, y, text, fontHandle, scale, maxX, outMaxX, forceColor != qfalse ? qtrue : qfalse, ql_ui_currentColor );" in draw_block
+    assert "RE_DrawScaledText( x, y, text, fontHandle, scale, limit, maxX, forceColor != qfalse ? qtrue : qfalse, ql_ui_currentColor );" in draw_block
     assert "float width;" in measure_block
     assert "float height;" in measure_block
-    assert "RE_MeasureScaledText( text, end, fontHandle, scale, maxX, &width, &height, outLeft );" in measure_block
+    assert "float left;" in measure_block
+    assert "RE_MeasureScaledText( text, end, fontHandle, scale, limit, &width, &height, &left );" in measure_block
+    assert "QL_UI_WriteMeasureTextBounds( outLeft, left, width, height );" in measure_block
     assert "return QL_UI_PackFloatBits64( width, height );" in measure_block
     assert "RE_RegisterFont" not in draw_block
     assert "RE_RegisterFont" not in measure_block
@@ -2487,8 +2489,8 @@ def test_ui_native_syscall_bridge_matches_recovered_retail_slots() -> None:
         "qboolean trap_QL_SetCursorPos( int x, int y ) {",
         "qboolean trap_QL_GetCursorPos( int *x, int *y ) {",
         "qboolean trap_QL_IsSubscribedApp( int appId ) {",
-        "void trap_QL_DrawScaledText( int x, int y, const char *text, int fontHandle, float scale, int maxX, float *outMaxX, qboolean forceColor ) {",
-        "unsigned long long trap_QL_MeasureText( const char *text, const char *end, int fontHandle, float scale, int maxX, float *outLeft ) {",
+        "void trap_QL_DrawScaledText( int x, int y, const char *text, int fontHandle, float scale, int limit, float *maxX, qboolean forceColor ) {",
+        "unsigned long long trap_QL_MeasureText( const char *text, const char *end, int fontHandle, float scale, int limit, float *outLeft ) {",
         "void trap_QL_GetItemDownloadInfo( unsigned int itemIdLow, unsigned int itemIdHigh, unsigned long long *outDownloaded, unsigned long long *outTotal ) {",
         "UI_GetNativeImportFunction( UI_QL_IMPORT_INIT_ADVERTISEMENT_BRIDGE )",
         "UI_GetNativeImportFunction( UI_QL_IMPORT_SETUP_ADVERT_CELL_SHADER )",
@@ -2505,18 +2507,18 @@ def test_ui_native_syscall_bridge_matches_recovered_retail_slots() -> None:
 
     draw_block = _extract_function_block(
         ui_syscalls,
-        "void trap_QL_DrawScaledText( int x, int y, const char *text, int fontHandle, float scale, int maxX, float *outMaxX, qboolean forceColor ) {",
+        "void trap_QL_DrawScaledText( int x, int y, const char *text, int fontHandle, float scale, int limit, float *maxX, qboolean forceColor ) {",
     )
     measure_block = _extract_function_block(
         ui_syscalls,
-        "unsigned long long trap_QL_MeasureText( const char *text, const char *end, int fontHandle, float scale, int maxX, float *outLeft ) {",
+        "unsigned long long trap_QL_MeasureText( const char *text, const char *end, int fontHandle, float scale, int limit, float *outLeft ) {",
     )
 
     for expected in (
         "ql_import_f import = UI_GetNativeImportFunction( UI_QL_IMPORT_DRAW_SCALED_TEXT );",
         "if ( !import ) {",
         "return;",
-        "((void (QDECL *)( int, int, const char *, int, float, int, float *, int ))import)( x, y, text, fontHandle, scale, maxX, outMaxX, forceColor ? qtrue : qfalse );",
+        "((void (QDECL *)( int, int, const char *, int, float, int, float *, int ))import)( x, y, text, fontHandle, scale, limit, maxX, forceColor ? qtrue : qfalse );",
     ):
         assert expected in draw_block
 
@@ -2524,7 +2526,7 @@ def test_ui_native_syscall_bridge_matches_recovered_retail_slots() -> None:
         "ql_import_f import = UI_GetNativeImportFunction( UI_QL_IMPORT_MEASURE_TEXT );",
         "if ( !import ) {",
         "return 0;",
-        "return ((unsigned long long (QDECL *)( const char *, const char *, int, float, int, float * ))import)( text, end, fontHandle, scale, maxX, outLeft );",
+        "return ((unsigned long long (QDECL *)( const char *, const char *, int, float, int, float * ))import)( text, end, fontHandle, scale, limit, outLeft );",
     ):
         assert expected in measure_block
 
@@ -3167,10 +3169,11 @@ def test_ui_text_paint_limit_uses_host_text_max_projection() -> None:
         "UI_CopyTextSpan( text, limitEnd, limitedText, sizeof( limitedText ) );",
         "UI_AdjustFrom640( &screenX, &screenY, NULL, NULL );",
         "UI_AdjustFrom640( &screenMaxX, NULL, NULL, NULL );",
+        "outMaxX = screenMaxX;",
         "fontHandle = UI_SelectTextFontHandle( scale, ITEM_FONT_INHERIT );",
         "trap_QL_DrawScaledText(",
         "scale * QL_FONT_HOST_POINT_SIZE * uiInfo.uiDC.yscale,",
-        "(int)screenMaxX,",
+        "0,",
         "&outMaxX,",
         "*maxX = ( outMaxX - uiInfo.uiDC.bias ) / uiInfo.uiDC.xscale;",
     ):

@@ -247,6 +247,15 @@ def test_console_cell_geometry_and_alignment_match_retail_engine_scaling() -> No
 	assert "SCR_AdjustFrom640( &con.xadjust, NULL, NULL, NULL );" not in solid_block
 
 
+def test_disconnected_console_yields_to_retail_browser_menu_owner() -> None:
+	source = CL_CONSOLE.read_text(encoding="utf-8")
+	draw_block = _block_from_marker(source, "void Con_DrawConsole")
+
+	assert "if ( cls.state == CA_DISCONNECTED ) {" in draw_block
+	assert "KEYCATCH_UI | KEYCATCH_CGAME | KEYCATCH_BROWSER" in draw_block
+	assert "Con_DrawSolidConsole( 1.0 );" in draw_block
+
+
 def test_screen_overlay_text_uses_retail_host_mono_lane() -> None:
 	source = CL_SCRN.read_text(encoding="utf-8")
 	draw_block = _block_from_marker(source, "void SCR_DrawStringExt")

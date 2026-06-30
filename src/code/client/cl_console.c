@@ -1456,7 +1456,7 @@ void Con_DrawConsole( void ) {
 
 	// if disconnected, render console full screen
 	if ( cls.state == CA_DISCONNECTED ) {
-		if ( !( cls.keyCatchers & (KEYCATCH_UI | KEYCATCH_CGAME)) ) {
+		if ( !( cls.keyCatchers & (KEYCATCH_UI | KEYCATCH_CGAME | KEYCATCH_BROWSER)) ) {
 			Con_DrawSolidConsole( 1.0 );
 			return;
 		}

@@ -107,10 +107,11 @@ Observed facts from the writable source tree:
   color escapes are consumed but do not recolor the active draw state.
 - The renderer host helpers are now gate-checked for their core draw/measure
   contract: face handles fall back through the retained normal/sans faces,
-  requested sizes are rounded and clamped to tenths, max-X clipping happens
-  before drawing the overflowing glyph, `outMaxX` returns `0` on clipping, and
-  measurement preserves bounds/`outLeft` while still reporting the retained
-  font ascent for height.
+  requested sizes are rounded and clamped to tenths, the integer draw/measure
+  slot is treated as the retail visible-character limit, pointer-based max-X
+  clipping happens before drawing the overflowing glyph, and measurement
+  preserves the retail bounds packet while still reporting the retained font
+  ascent for height.
 - `src/code/client/cl_ui.c` and `src/code/client/cl_cgame.c` now route native
   `DrawScaledText` / `MeasureText` through the shared renderer host-text
   helpers instead of resolving `fontInfo_t` locally.
@@ -120,8 +121,9 @@ Observed facts from the writable source tree:
   text import wrappers.
 - The native draw wrappers also preserve the module current-color sidecar and
   normalize `forceColor` before entering `RE_DrawScaledText`; the measure
-  wrappers return retail-style packed width/height floats after calling
-  `RE_MeasureScaledText`.
+  wrappers populate the retail five-float bounds packet (`left`, `top`,
+  `right`, `bottom`, `ascent`) while also returning packed width/height floats
+  for source-side callers.
 - UI and cgame clipped text helpers now have explicit max-X projection gates:
   `Text_Paint_Limit` and `CG_Text_Paint_Limit` project both draw coordinates
   and clip bounds into screen space, draw through host text, then convert the

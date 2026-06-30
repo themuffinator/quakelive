@@ -2164,18 +2164,22 @@ qboolean RE_GetScaledFontMetrics( int fontHandle, float scale, float *outAscent,
 RE_DrawScaledText
 =================
 */
-void RE_DrawScaledText( int x, int y, const char *text, int fontHandle, float scale, int maxX, float *outMaxX, qboolean forceColor, const float *baseColor ) {
+void RE_DrawScaledText( int x, int y, const char *text, int fontHandle, float scale, int limit, float *maxX, qboolean forceColor, const float *baseColor ) {
 	rFontStashFace_t *face;
 	const char *s;
 	const char *end;
 	vec4_t currentColor;
 	float penX;
 	int scaleTenths;
-	qboolean hasMaxX;
-	float maxXf;
+	qboolean hasClipX;
+	float clipX;
+	qboolean hasLimit;
+	int remaining;
 
-	if ( outMaxX ) {
-		*outMaxX = (float)x;
+	clipX = maxX ? *maxX : 0.0f;
+	hasClipX = ( maxX && clipX > 0.0f );
+	if ( maxX && !hasClipX ) {
+		*maxX = (float)x;
 	}
 
 	if ( !text || !text[0] ) {
@@ -2194,8 +2198,8 @@ void RE_DrawScaledText( int x, int y, const char *text, int fontHandle, float sc
 	face = R_GetFontStashFaceForHandle( fontHandle );
 	scaleTenths = R_GetFontStashScaleTenths( scale );
 	penX = (float)x;
-	hasMaxX = ( maxX > 0 );
-	maxXf = (float)maxX;
+	hasLimit = ( limit > 0 );
+	remaining = limit;
 	end = text + strlen( text );
 
 	RE_SetColor( currentColor );
@@ -2216,6 +2220,10 @@ void RE_DrawScaledText( int x, int y, const char *text, int fontHandle, float sc
 		vec4_t newColor;
 		int colorIndex;
 		const char *colorNext;
+
+		if ( hasLimit && remaining <= 0 ) {
+			break;
+		}
 
 		if ( R_ParseHostTextColorEscape( s, end, &colorIndex, &colorNext ) ) {
 			if ( !forceColor ) {
@@ -2243,9 +2251,9 @@ void RE_DrawScaledText( int x, int y, const char *text, int fontHandle, float sc
 		if ( penX + drawRight > glyphMaxX ) {
 			glyphMaxX = penX + drawRight;
 		}
-		if ( hasMaxX && glyphMaxX > maxXf ) {
-			if ( outMaxX ) {
-				*outMaxX = 0.0f;
+		if ( hasClipX && glyphMaxX > clipX ) {
+			if ( maxX ) {
+				*maxX = penX;
 			}
 			break;
 		}
@@ -2267,8 +2275,11 @@ void RE_DrawScaledText( int x, int y, const char *text, int fontHandle, float sc
 
 		penX += advance;
 		s = next;
-		if ( outMaxX ) {
-			*outMaxX = glyphMaxX;
+		if ( maxX && !hasClipX ) {
+			*maxX = glyphMaxX;
+		}
+		if ( hasLimit ) {
+			remaining--;
 		}
 	}
 
@@ -2280,7 +2291,7 @@ void RE_DrawScaledText( int x, int y, const char *text, int fontHandle, float sc
 RE_MeasureScaledText
 =================
 */
-void RE_MeasureScaledText( const char *text, const char *end, int fontHandle, float scale, int maxX, float *outWidth, float *outHeight, float *outLeft ) {
+void RE_MeasureScaledText( const char *text, const char *end, int fontHandle, float scale, int limit, float *outWidth, float *outHeight, float *outLeft ) {
 	rFontStashFace_t *face;
 	const char *s;
 	qboolean hasBounds;
@@ -2293,8 +2304,8 @@ void RE_MeasureScaledText( const char *text, const char *end, int fontHandle, fl
 	float minTop;
 	float penX;
 	int scaleTenths;
-	qboolean hasMaxX;
-	float maxXf;
+	qboolean hasLimit;
+	int remaining;
 
 	if ( outWidth ) {
 		*outWidth = 0.0f;
@@ -2321,8 +2332,8 @@ void RE_MeasureScaledText( const char *text, const char *end, int fontHandle, fl
 	maxRight = 0.0f;
 	minTop = 0.0f;
 	maxBottom = 0.0f;
-	hasMaxX = ( maxX > 0 );
-	maxXf = (float)maxX;
+	hasLimit = ( limit > 0 );
+	remaining = limit;
 
 	for ( s = text; *s && ( !end || s < end ); ) {
 		rFontStashResolvedGlyph_t resolvedGlyph;
@@ -2339,6 +2350,10 @@ void RE_MeasureScaledText( const char *text, const char *end, int fontHandle, fl
 		float glyphRight;
 		int colorIndex;
 		const char *colorNext;
+
+		if ( hasLimit && remaining <= 0 ) {
+			break;
+		}
 
 		if ( R_ParseHostTextColorEscape( s, end, &colorIndex, &colorNext ) ) {
 			s = colorNext;
@@ -2362,9 +2377,6 @@ void RE_MeasureScaledText( const char *text, const char *end, int fontHandle, fl
 		if ( glyphRight > glyphMaxX ) {
 			glyphMaxX = glyphRight;
 		}
-		if ( hasMaxX && glyphMaxX > maxXf ) {
-			break;
-		}
 
 		glyphLeft = penX + drawLeft;
 		hasBounds = qtrue;
@@ -2382,6 +2394,9 @@ void RE_MeasureScaledText( const char *text, const char *end, int fontHandle, fl
 		}
 
 		penX += advance;
+		if ( hasLimit ) {
+			remaining--;
+		}
 		width = maxRight - minLeft;
 		if ( hasBounds ) {
 			height = maxBottom - minTop;

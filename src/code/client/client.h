@@ -558,8 +558,8 @@ qboolean CL_WebRequestResolve( const char *virtualPath, void **outBuffer, int *o
 qboolean CL_LauncherRequestData( const char *virtualPath, void **outBuffer, int *outLength );
 void CL_GetRetailGlconfig( void *glconfig );
 void CL_RegisterFont( const char *fontName, int pointSize, fontInfo_t *font );
-void RE_DrawScaledText( int x, int y, const char *text, int fontHandle, float scale, int maxX, float *outMaxX, qboolean forceColor, const float *baseColor );
-void RE_MeasureScaledText( const char *text, const char *end, int fontHandle, float scale, int maxX, float *outWidth, float *outHeight, float *outLeft );
+void RE_DrawScaledText( int x, int y, const char *text, int fontHandle, float scale, int limit, float *maxX, qboolean forceColor, const float *baseColor );
+void RE_MeasureScaledText( const char *text, const char *end, int fontHandle, float scale, int limit, float *outWidth, float *outHeight, float *outLeft );
 qboolean RE_GetScaledFontMetrics( int fontHandle, float scale, float *outAscent, float *outDescent, float *outLineHeight );
 qhandle_t CL_RegisterShaderFromRGBAWithImageName( const char *shaderName, const char *imageName, const byte *pic, int width, int height, qboolean mipRawImage );
 qhandle_t CL_RegisterShaderFromRGBA( const char *name, const byte *pic, int width, int height, qboolean mipRawImage );
@@ -576,6 +576,7 @@ qboolean CL_WebHost_HasDrawableSurface( void );
 void CL_WebHost_DrawBrowserSurface( void );
 void *CL_WebHost_GetCursorHandle( void );
 void CL_WebHost_HideBrowser( void );
+void CL_WebHost_ReleaseInputCapture( void );
 void CL_WebHost_NotifyAppActivation( qboolean active );
 void CL_WebView_PublishEvent( const char *name, const char *payload );
 void CL_WebView_InvokeCommNotice( const char *message );

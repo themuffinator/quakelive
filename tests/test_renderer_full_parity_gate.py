@@ -397,12 +397,12 @@ def _build_renderer_full_parity_gate_report() -> dict[str, Any]:
 		and rg_g08_note_present
 		and RG_P9_NOTE_PATH.exists()
 		and "RG-P9 is now considered complete." in rg_p9_note
-		and "void RE_DrawScaledText( int x, int y, const char *text, int fontHandle, float scale, int maxX, float *outMaxX, qboolean forceColor, const float *baseColor ) {" in tr_font
-		and "void RE_MeasureScaledText( const char *text, const char *end, int fontHandle, float scale, int maxX, float *outWidth, float *outHeight, float *outLeft ) {" in tr_font
-		and "RE_DrawScaledText( x, y, text, fontHandle, scale, maxX, outMaxX," in cl_ui
-		and "RE_DrawScaledText( x, y, text, fontHandle, scale, maxX, outMaxX," in cl_cgame
-		and "RE_MeasureScaledText( text, end, fontHandle, scale, maxX, &width, &height, outLeft );" in cl_ui
-		and "RE_MeasureScaledText( text, end, fontHandle, scale, maxX, &width, &height, outLeft );" in cl_cgame
+		and "void RE_DrawScaledText( int x, int y, const char *text, int fontHandle, float scale, int limit, float *maxX, qboolean forceColor, const float *baseColor ) {" in tr_font
+		and "void RE_MeasureScaledText( const char *text, const char *end, int fontHandle, float scale, int limit, float *outWidth, float *outHeight, float *outLeft ) {" in tr_font
+		and "RE_DrawScaledText( x, y, text, fontHandle, scale, limit, maxX," in cl_ui
+		and "RE_DrawScaledText( x, y, text, fontHandle, scale, limit, maxX," in cl_cgame
+		and "RE_MeasureScaledText( text, end, fontHandle, scale, limit, &width, &height, &left );" in cl_ui
+		and "RE_MeasureScaledText( text, end, fontHandle, scale, limit, &width, &height, &left );" in cl_cgame
 		and "QL_UI_GetScaledFont" not in cl_ui
 		and "QL_CG_GetScaledFont" not in cl_cgame
 		and "static void RB_ShowFontAtlas( void ) {" in tr_backend
@@ -426,8 +426,8 @@ def _build_renderer_full_parity_gate_report() -> dict[str, Any]:
 			"rg_p8_note_marks_complete": "RG-P8 is now considered complete." in rg_p8_note,
 			"rg_p9_note_present": RG_P9_NOTE_PATH.exists(),
 			"rg_p9_note_marks_complete": "RG-P9 is now considered complete." in rg_p9_note,
-			"ui_routes_through_renderer_host_text": "RE_DrawScaledText( x, y, text, fontHandle, scale, maxX, outMaxX," in cl_ui,
-			"cgame_routes_through_renderer_host_text": "RE_DrawScaledText( x, y, text, fontHandle, scale, maxX, outMaxX," in cl_cgame,
+			"ui_routes_through_renderer_host_text": "RE_DrawScaledText( x, y, text, fontHandle, scale, limit, maxX," in cl_ui,
+			"cgame_routes_through_renderer_host_text": "RE_DrawScaledText( x, y, text, fontHandle, scale, limit, maxX," in cl_cgame,
 			"ui_compat_shim_removed": "QL_UI_GetScaledFont" not in cl_ui,
 			"cgame_compat_shim_removed": "QL_CG_GetScaledFont" not in cl_cgame,
 			"debug_font_atlas_impl_present": bool(unexpected_debug_font_atlas_paths),

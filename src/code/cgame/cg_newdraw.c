@@ -10653,6 +10653,7 @@ static void CG_Text_Paint_LimitExt( float *maxX, float x, float y, float scale, 
 	CG_AdjustFrom640( &xBias, NULL, &xScale, &yScale );
 
 	fontHandle = CG_SelectTextFontHandle( scale, fontIndex );
+	outMaxX = screenMaxX;
 
 	trap_R_SetColor( color );
 	trap_QL_DrawScaledText(
@@ -10661,7 +10662,7 @@ static void CG_Text_Paint_LimitExt( float *maxX, float x, float y, float scale, 
 		drawText,
 		fontHandle,
 		scale * QL_FONT_HOST_POINT_SIZE * yScale,
-		(int)screenMaxX,
+		0,
 		&outMaxX,
 		qfalse );
 	trap_R_SetColor( NULL );

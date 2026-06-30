@@ -108,8 +108,8 @@ typedef struct {
 	void	(*RetailPostProcessPass)( float arg1, float arg2, float arg3, float arg4, float arg5 );
 	qboolean (*RetailProjectPoint)( const vec3_t point, vec4_t clip, vec4_t window );
 	void	(*TransformClipToWindow)( const vec4_t clip, vec4_t normalized, vec4_t window );
-	void	(*DrawScaledText)( int x, int y, const char *text, int fontHandle, float scale, int maxX, float *outMaxX, qboolean forceColor, const float *baseColor );
-	void	(*MeasureScaledText)( const char *text, const char *end, int fontHandle, float scale, int maxX, float *outWidth, float *outHeight, float *outLeft );
+	void	(*DrawScaledText)( int x, int y, const char *text, int fontHandle, float scale, int limit, float *maxX, qboolean forceColor, const float *baseColor );
+	void	(*MeasureScaledText)( const char *text, const char *end, int fontHandle, float scale, int limit, float *outWidth, float *outHeight, float *outLeft );
 	void	(*RetailStretchPicCommand)( void );
 } refexport_t;
 

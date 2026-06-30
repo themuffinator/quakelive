@@ -725,14 +725,14 @@ qboolean trap_QL_IsSubscribedApp( int appId ) {
 trap_QL_DrawScaledText
 =================
 */
-void trap_QL_DrawScaledText( int x, int y, const char *text, int fontHandle, float scale, int maxX, float *outMaxX, qboolean forceColor ) {
+void trap_QL_DrawScaledText( int x, int y, const char *text, int fontHandle, float scale, int limit, float *maxX, qboolean forceColor ) {
 	ql_import_f import = UI_GetNativeImportFunction( UI_QL_IMPORT_DRAW_SCALED_TEXT );
 
 	if ( !import ) {
 		return;
 	}
 
-	((void (QDECL *)( int, int, const char *, int, float, int, float *, int ))import)( x, y, text, fontHandle, scale, maxX, outMaxX, forceColor ? qtrue : qfalse );
+	((void (QDECL *)( int, int, const char *, int, float, int, float *, int ))import)( x, y, text, fontHandle, scale, limit, maxX, forceColor ? qtrue : qfalse );
 }
 
 /*
@@ -740,14 +740,14 @@ void trap_QL_DrawScaledText( int x, int y, const char *text, int fontHandle, flo
 trap_QL_MeasureText
 =================
 */
-unsigned long long trap_QL_MeasureText( const char *text, const char *end, int fontHandle, float scale, int maxX, float *outLeft ) {
+unsigned long long trap_QL_MeasureText( const char *text, const char *end, int fontHandle, float scale, int limit, float *outLeft ) {
 	ql_import_f import = UI_GetNativeImportFunction( UI_QL_IMPORT_MEASURE_TEXT );
 
 	if ( !import ) {
 		return 0;
 	}
 
-	return ((unsigned long long (QDECL *)( const char *, const char *, int, float, int, float * ))import)( text, end, fontHandle, scale, maxX, outLeft );
+	return ((unsigned long long (QDECL *)( const char *, const char *, int, float, int, float * ))import)( text, end, fontHandle, scale, limit, outLeft );
 }
 
 /*

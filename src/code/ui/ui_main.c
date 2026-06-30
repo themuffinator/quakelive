@@ -1810,6 +1810,7 @@ static void Text_Paint_Limit(float *maxX, float x, float y, float scale, vec4_t 
 	screenMaxX = *maxX;
 	UI_AdjustFrom640( &screenX, &screenY, NULL, NULL );
 	UI_AdjustFrom640( &screenMaxX, NULL, NULL, NULL );
+	outMaxX = screenMaxX;
 
 	fontHandle = UI_SelectTextFontHandle( scale, ITEM_FONT_INHERIT );
 	trap_R_SetColor( color );
@@ -1819,7 +1820,7 @@ static void Text_Paint_Limit(float *maxX, float x, float y, float scale, vec4_t 
 		drawText,
 		fontHandle,
 		scale * QL_FONT_HOST_POINT_SIZE * uiInfo.uiDC.yscale,
-		(int)screenMaxX,
+		0,
 		&outMaxX,
 		qfalse );
 	trap_R_SetColor( NULL );

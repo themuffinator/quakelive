@@ -382,6 +382,7 @@ void SCR_DrawScreenField( stereoFrame_t stereoFrame ) {
 	qboolean browserPendingSurface;
 	qboolean browserDrawableSurface;
 	qboolean browserSuppressUiRefresh;
+	qboolean uiMenuVisible;
 
 	re.BeginFrame( stereoFrame );
 
@@ -403,6 +404,7 @@ void SCR_DrawScreenField( stereoFrame_t stereoFrame ) {
 	// if the menu is going to cover the entire screen, we
 	// don't need to render anything under it
 	uiFullscreen = VM_Call( uivm, UI_IS_FULLSCREEN ) ? qtrue : qfalse;
+	uiMenuVisible = VM_Call( uivm, UI_MENUS_ANY_VISIBLE ) ? qtrue : qfalse;
 	browserOverlayRequested = qfalse;
 	browserDrawableSurface = qfalse;
 	browserPendingSurface = qfalse;
@@ -447,8 +449,10 @@ void SCR_DrawScreenField( stereoFrame_t stereoFrame ) {
 			break;
 		case CA_DISCONNECTED:
 			// force menu up
-			S_StopAllSounds();
-			VM_Call( uivm, UI_SET_ACTIVE_MENU, UIMENU_MAIN );
+			if ( !uiMenuVisible && !browserOverlayRequested ) {
+				S_StopAllSounds();
+				VM_Call( uivm, UI_SET_ACTIVE_MENU, UIMENU_MAIN );
+			}
 			break;
 		case CA_CONNECTING:
 		case CA_CHALLENGING:
